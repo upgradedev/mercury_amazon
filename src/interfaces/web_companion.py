@@ -1,64 +1,72 @@
-"""Web Companion HTML and Static Assets for Mercury Voice CTO Cockpit."""
+"""Web Companion HTML and Static Assets for Mercury Voice CTO Cockpit (Fire TV & Alexa+)."""
 
 COMPANION_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mercury: Voice CTO Cockpit & DORA Radar</title>
+  <title>Mercury: Fire TV & Voice CTO War Room</title>
   <style>
     :root {
       --bg: #090d16;
       --card-bg: #111827;
+      --card-focus: #1f2937;
       --accent: #a855f7;
       --accent-hover: #9333ea;
       --text: #f9fafb;
       --text-muted: #9ca3af;
       --border: #374151;
+      --focus-border: #38bdf8;
       --success: #10b981;
       --danger: #ef4444;
       --warning: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    header { border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
-    h1 { font-size: 1.8rem; color: var(--accent); }
-    .badge { background: #374151; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; color: #c084fc; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-    .card h2 { font-size: 1.2rem; margin-bottom: 15px; color: var(--accent); }
-    button { background: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 10px; transition: background 0.2s; }
-    button:hover { background: var(--accent-hover); }
-    .btn-secondary { background: #4b5563; margin-left: 8px; }
-    .btn-secondary:hover { background: #6b7280; }
-    .output-box { background: #090d16; border: 1px solid var(--border); border-radius: 6px; padding: 15px; margin-top: 15px; min-height: 120px; font-size: 0.95rem; }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    body { background: var(--bg); color: var(--text); padding: 24px; line-height: 1.5; font-size: 18px; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { border-bottom: 2px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 2.2rem; color: var(--accent); letter-spacing: -0.5px; }
+    .badge { background: #374151; padding: 6px 14px; border-radius: 999px; font-size: 0.9rem; color: #c084fc; font-weight: 600; }
+    .tv-mode-badge { background: #0369a1; color: #bae6fd; margin-right: 8px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border: 2px solid var(--border); border-radius: 12px; padding: 24px; transition: transform 0.2s, border-color 0.2s; }
+    .card:focus-within, .card.tv-focused { border-color: var(--focus-border); transform: scale(1.01); background: var(--card-focus); }
+    .card h2 { font-size: 1.5rem; margin-bottom: 15px; color: var(--accent); }
+    button { background: var(--accent); color: white; border: 2px solid transparent; padding: 14px 24px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1rem; margin-top: 12px; transition: all 0.2s; outline: none; }
+    button:hover, button:focus { background: var(--accent-hover); border-color: var(--focus-border); box-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+    .btn-secondary { background: #4b5563; margin-left: 10px; }
+    .btn-secondary:hover, .btn-secondary:focus { background: #6b7280; }
+    .output-box { background: #090d16; border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-top: 20px; min-height: 140px; font-size: 1.05rem; }
+    .tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; }
     .tag-elite { background: #065f46; color: #a7f3d0; }
     .tag-anomaly { background: #991b1b; color: #fecaca; }
+    .keyboard-nav-hint { margin-top: 24px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <div>
-        <h1>Mercury: Voice CTO Cockpit</h1>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Amazon Alexa+ & Fire TV War Room | DORA Velocity & AWS Cost Radar</p>
+        <h1>Mercury: Big Screen CTO War Room</h1>
+        <p style="color: var(--text-muted); font-size: 1.1rem; margin-top: 4px;">Amazon Fire TV & Alexa+ | DORA Velocity Radar & AWS Cloud Cost Cockpit</p>
       </div>
-      <span class="badge">Streamable HTTP MCP Active</span>
+      <div>
+        <span class="badge tv-mode-badge">Fire TV 10-Foot UI</span>
+        <span class="badge">Streamable HTTP MCP Active</span>
+      </div>
     </header>
 
     <div class="grid">
       <!-- Panel 1: DORA & PR Radar -->
-      <div class="card">
+      <div class="card" id="card1" tabindex="0">
         <h2>1. DORA Metrics & PR Bottlenecks</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
-          Query real-time engineering velocity and review SLAs via conversational voice intelligence.
+        <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 14px;">
+          Query real-time engineering velocity and review SLAs via conversational voice or D-Pad navigation.
         </p>
         <div>
-          <button onclick="fetchDORA()">Query DORA Velocity</button>
-          <button class="btn-secondary" onclick="fetchPRBottlenecks()">Inspect Stalled PRs</button>
+          <button id="btnDora" onclick="fetchDORA()">Query DORA Velocity</button>
+          <button id="btnPr" class="btn-secondary" onclick="fetchPRBottlenecks()">Inspect Stalled PRs</button>
         </div>
         <div class="output-box" id="doraOutput">
           <span style="color: var(--text-muted);">Awaiting CTO query dispatch...</span>
@@ -66,19 +74,23 @@ COMPANION_HTML = """<!DOCTYPE html>
       </div>
 
       <!-- Panel 2: AWS Cost Radar & Rollback -->
-      <div class="card">
+      <div class="card" id="card2" tabindex="0">
         <h2>2. AWS Cost Radar & Governed Rollback</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
-          Detect cloud spend anomalies and safely rollback flaky services with voice tokens.
+        <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 14px;">
+          Detect cloud spend anomalies and safely stage rollbacks with 300-second voice token leases.
         </p>
         <div>
-          <button onclick="fetchCostRadar()">Inspect Cloud Burn Rate</button>
-          <button class="btn-secondary" style="background:#dc2626;" onclick="stageRollback()">Stage Rollback</button>
+          <button id="btnCost" onclick="fetchCostRadar()">Inspect Cloud Burn Rate</button>
+          <button id="btnRollback" class="btn-secondary" style="background:#dc2626;" onclick="stageRollback()">Stage Rollback</button>
         </div>
         <div class="output-box" id="costOutput">
           <span style="color: var(--text-muted);">Awaiting telemetry fetch...</span>
         </div>
       </div>
+    </div>
+
+    <div class="keyboard-nav-hint">
+      📺 <strong>Fire TV Remote / Keyboard Navigation:</strong> Use [TAB] or Arrow Keys to navigate cards, [ENTER] to execute actions.
     </div>
   </div>
 

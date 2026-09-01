@@ -15,7 +15,7 @@ def test_health_endpoint():
 def test_demo_ui_endpoint():
     res = client.get("/demo")
     assert res.status_code == 200
-    assert "Mercury: Voice CTO Cockpit" in res.text
+    assert "Mercury: Big Screen CTO War Room" in res.text
 
 
 def test_dora_velocity_tool():
