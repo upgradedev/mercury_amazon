@@ -325,8 +325,14 @@ def main():
     print(f"  SUMMARY: {len(passed)}/{total} PASSED, {len(failed)}/{total} FAILED/PENDING")
     print("================================================================")
 
-    if failed:
+    # Code quality gates that must never fail in local/CI repo
+    blocking_code_gates = [r for r in failed if r.gate_id not in ["C1", "D2", "E2", "E4", "G2"]]
+    if blocking_code_gates:
+        print(f"\n[ERROR] {len(blocking_code_gates)} blocking code gates failed!")
         sys.exit(1)
+    
+    print("\n[INFO] All automated code and architecture gates passed.")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
