@@ -1,0 +1,44 @@
+{
+  "project": "mercury_amazon",
+  "title": "Mercury: Voice CTO Cockpit & DORA Radar",
+  "target_duration_seconds": 155.0,
+  "max_allowed_seconds": 180.0,
+  "voice_id": "21m00Tcm4TlvDq8ikWAM",
+  "beats": [
+    {
+      "beat_id": "beat_01_hook",
+      "timestamp_start": 0.0,
+      "timestamp_end": 25.0,
+      "narration_text": "Engineering leaders manage dozens of fragmented tools across GitHub, Datadog, Jira, and AWS Cost Explorer. Critical pull request bottlenecks and sudden cloud spend spikes go unnoticed until Monday morning. This is Mercury.",
+      "visual_action": "Show split-screen of overwhelming engineering dashboards, transitioning to a clean Fire TV / Echo Show War Room display."
+    },
+    {
+      "beat_id": "beat_02_voice_radar",
+      "timestamp_start": 25.0,
+      "timestamp_end": 60.0,
+      "narration_text": "Mercury transforms Amazon Alexa Plus and Fire TV into an executive war room. Powered by the open Model Context Protocol over Streamable HTTP, leaders query deployment frequency and PR review SLAs with a single voice prompt.",
+      "visual_action": "Voice query: 'Alexa, ask Mercury for today's DORA velocity report'. Display renders Elite Tier metrics."
+    },
+    {
+      "beat_id": "beat_03_cost_radar",
+      "timestamp_start": 60.0,
+      "timestamp_end": 100.0,
+      "narration_text": "When staging workloads surge over the weekend, Mercury's AWS Cost Radar detects the anomaly, projects the month-end burn rate, and pinpoints the exact root cause in seconds.",
+      "visual_action": "Surge alert on Amazon Bedrock staging spend (+311%), highlighting root cause."
+    },
+    {
+      "beat_id": "beat_04_governed_rollback",
+      "timestamp_start": 100.0,
+      "timestamp_end": 135.0,
+      "narration_text": "When a flaky release causes change failures, Mercury stages a safe production rollback. The CTO authorizes the action with a voice token, executing immediate remediation hands-free.",
+      "visual_action": "Staged rollback flow, voice token verification, green deployment rollback confirmed."
+    },
+    {
+      "beat_id": "beat_05_closing",
+      "timestamp_start": 135.0,
+      "timestamp_end": 155.0,
+      "narration_text": "Mercury gives engineering leaders instant clarity and decisive control. Built for Amazon Alexa Plus, Fire TV, and AWS.",
+      "visual_action": "Mercury logo, Alexa Plus badge, Fire TV badge, GitHub repo URL."
+    }
+  ]
+}
