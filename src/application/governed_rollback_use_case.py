@@ -1,12 +1,12 @@
 """Use Case: Stage and Execute Governed Production Rollbacks."""
 import time
-from typing import Dict, Optional
+
 from src.domain.governed_rollback import GovernedRollbackAction, RollbackState
 
 
 class GovernedRollbackUseCase:
     def __init__(self):
-        self._actions: Dict[str, GovernedRollbackAction] = {}
+        self._actions: dict[str, GovernedRollbackAction] = {}
 
     def stage_rollback(
         self, action_id: str, target_service: str, target_commit_sha: str, reason: str, lease_sec: float = 300.0
@@ -15,7 +15,7 @@ class GovernedRollbackUseCase:
         self._actions[action_id] = action
         return action
 
-    def confirm_and_execute(self, action_id: str, voice_token: str) -> Optional[str]:
+    def confirm_and_execute(self, action_id: str, voice_token: str) -> str | None:
         action = self._actions.get(action_id)
         if not action or action.state != RollbackState.PENDING_CONFIRMATION:
             return None

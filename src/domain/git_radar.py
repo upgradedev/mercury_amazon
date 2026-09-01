@@ -1,6 +1,5 @@
 """Domain model for PR Review Radar and Bottleneck Detection."""
 from dataclasses import dataclass
-from typing import List
 
 
 @dataclass(frozen=True)
@@ -16,7 +15,7 @@ class PullRequestDigest:
 @dataclass(frozen=True)
 class PRRadarReport:
     total_open_prs: int
-    stale_prs_over_36h: List[PullRequestDigest]
+    stale_prs_over_36h: list[PullRequestDigest]
 
     def to_voice_summary(self) -> str:
         count = len(self.stale_prs_over_36h)

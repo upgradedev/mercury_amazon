@@ -1,8 +1,8 @@
 """Security DAST and Parameterized Offset Tests for Mercury."""
 import pytest
 from fastapi.testclient import TestClient
-from src.interfaces.mcp_server import app
 
+from src.interfaces.mcp_server import app
 
 client = TestClient(app)
 

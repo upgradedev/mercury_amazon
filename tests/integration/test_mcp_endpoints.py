@@ -1,7 +1,7 @@
 """Integration tests for Mercury FastMCP Endpoints."""
 from fastapi.testclient import TestClient
-from src.interfaces.mcp_server import app
 
+from src.interfaces.mcp_server import app
 
 client = TestClient(app)
 

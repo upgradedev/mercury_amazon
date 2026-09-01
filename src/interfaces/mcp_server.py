@@ -1,8 +1,10 @@
 """Interfaces Layer: FastMCP Server for Mercury CTO Engineering Cockpit."""
-from typing import Any, Dict
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
 from src.application.calculate_dora_use_case import CalculateDORAUseCase
 from src.application.detect_cost_anomalies_use_case import DetectCostAnomaliesUseCase
 from src.application.governed_rollback_use_case import GovernedRollbackUseCase
@@ -10,7 +12,6 @@ from src.application.inspect_pr_bottlenecks_use_case import InspectPRBottlenecks
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.interfaces.web_companion import COMPANION_HTML
-
 
 app = FastAPI(
     title="Mercury Voice CTO Cockpit",
@@ -48,12 +49,12 @@ async def demo_ui() -> str:
 
 
 @app.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "mercury-voice-cto", "version": "0.1.0"}
 
 
 @app.post("/mcp/tools/get_dora_velocity_report")
-async def get_dora_velocity_report() -> Dict[str, Any]:
+async def get_dora_velocity_report() -> dict[str, Any]:
     """MCP Tool: Fetch real-time DORA engineering velocity metrics and performance tier."""
     report = dora_use_case.execute()
     return {
@@ -69,7 +70,7 @@ async def get_dora_velocity_report() -> Dict[str, Any]:
 
 
 @app.post("/mcp/tools/get_pr_bottlenecks")
-async def get_pr_bottlenecks() -> Dict[str, Any]:
+async def get_pr_bottlenecks() -> dict[str, Any]:
     """MCP Tool: Inspect stalled pull requests exceeding 36-hour review SLAs."""
     radar = pr_use_case.execute()
     return {
@@ -88,7 +89,7 @@ async def get_pr_bottlenecks() -> Dict[str, Any]:
 
 
 @app.post("/mcp/tools/get_aws_cost_anomalies")
-async def get_aws_cost_anomalies() -> Dict[str, Any]:
+async def get_aws_cost_anomalies() -> dict[str, Any]:
     """MCP Tool: Detect AWS infrastructure burn-rate spikes and root cause alerts."""
     report = cost_use_case.execute()
     return {
@@ -107,7 +108,7 @@ async def get_aws_cost_anomalies() -> Dict[str, Any]:
 
 
 @app.post("/mcp/tools/stage_rollback")
-async def stage_rollback(req: StageRollbackRequest) -> Dict[str, Any]:
+async def stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
     """MCP Tool: Stage a voice-governed production service rollback."""
     action = rollback_use_case.stage_rollback(
         req.action_id, req.target_service, req.target_commit_sha, req.reason, req.lease_sec
@@ -122,7 +123,7 @@ async def stage_rollback(req: StageRollbackRequest) -> Dict[str, Any]:
 
 
 @app.post("/mcp/tools/confirm_rollback")
-async def confirm_rollback(req: ConfirmRollbackRequest) -> Dict[str, Any]:
+async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
     """MCP Tool: Confirm and execute rollback with cryptographic token."""
     res = rollback_use_case.confirm_and_execute(req.action_id, req.voice_token)
     if res is None:

@@ -1,5 +1,6 @@
 """Use Case: Detect Cloud Spend Anomalies."""
 from typing import Protocol
+
 from src.domain.cloud_cost import CloudCostReport
 
 

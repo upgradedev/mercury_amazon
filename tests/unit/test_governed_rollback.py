@@ -1,7 +1,8 @@
 """Unit tests for Governed Rollback domain model and use case."""
 import time
+
 from src.application.governed_rollback_use_case import GovernedRollbackUseCase
-from src.domain.governed_rollback import GovernedRollbackAction, RollbackState
+from src.domain.governed_rollback import RollbackState
 
 
 def test_rollback_lifecycle_and_execution():

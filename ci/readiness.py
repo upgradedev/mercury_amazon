@@ -6,13 +6,11 @@ A gate that is not implemented or unmet reports RED [FAIL], never absent.
 import glob
 import os
 import re
-import subprocess
 import sys
-from typing import Dict, List, Tuple
 
 try:
-    import urllib.request
     import urllib.error
+    import urllib.request
 except ImportError:
     pass
 
@@ -25,8 +23,8 @@ class GateResult:
         self.message = message
 
 
-def audit_project(repo_root: str = ".") -> Tuple[List[GateResult], List[GateResult]]:
-    results: List[GateResult] = []
+def audit_project(repo_root: str = ".") -> tuple[list[GateResult], list[GateResult]]:
+    results: list[GateResult] = []
 
     # Read README if present
     readme_path = os.path.join(repo_root, "README.md")

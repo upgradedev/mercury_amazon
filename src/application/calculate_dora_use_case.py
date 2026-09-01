@@ -1,5 +1,6 @@
 """Use Case: Calculate DORA Velocity Metrics."""
 from typing import Protocol
+
 from src.domain.dora_metrics import DORAMetricsReport
 
 

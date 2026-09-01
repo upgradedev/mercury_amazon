@@ -1,5 +1,6 @@
 """Use Case: Inspect Pull Request Review Bottlenecks."""
 from typing import Protocol
+
 from src.domain.git_radar import PRRadarReport
 
 

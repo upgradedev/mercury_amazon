@@ -3,7 +3,6 @@ import hashlib
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class RollbackState(str, Enum):
@@ -24,8 +23,8 @@ class GovernedRollbackAction:
     created_at_epoch: float = field(default_factory=time.time)
     lease_sec: float = 300.0
     payload_hash: str = ""
-    voice_token: Optional[str] = None
-    execution_output: Optional[str] = None
+    voice_token: str | None = None
+    execution_output: str | None = None
 
     @classmethod
     def create(
@@ -36,7 +35,7 @@ class GovernedRollbackAction:
         reason: str,
         lease_sec: float = 300.0,
     ) -> "GovernedRollbackAction":
-        payload = f"{action_id}:{target_service}:{target_commit_sha}:{reason}".encode("utf-8")
+        payload = f"{action_id}:{target_service}:{target_commit_sha}:{reason}".encode()
         h = hashlib.sha256(payload).hexdigest()
         return cls(
             action_id=action_id,
@@ -48,11 +47,11 @@ class GovernedRollbackAction:
             created_at_epoch=time.time(),
         )
 
-    def is_expired(self, current_time: Optional[float] = None) -> bool:
+    def is_expired(self, current_time: float | None = None) -> bool:
         now = current_time or time.time()
         return (now - self.created_at_epoch) > self.lease_sec
 
-    def confirm(self, voice_token: str, current_time: Optional[float] = None) -> bool:
+    def confirm(self, voice_token: str, current_time: float | None = None) -> bool:
         if self.is_expired(current_time):
             self.state = RollbackState.EXPIRED
             return False
