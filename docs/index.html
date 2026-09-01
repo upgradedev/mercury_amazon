@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mercury — Fire TV Voice CTO Cockpit</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --surface: #111827;
+      --surface-border: #1f293d;
+      --primary: #8b5cf6;
+      --primary-glow: rgba(139, 92, 246, 0.25);
+      --secondary: #38bdf8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 30px 20px; line-height: 1.6; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 24px; border-bottom: 1px solid var(--surface-border); margin-bottom: 30px;
+    }
+    .brand h1 { font-size: 2rem; font-weight: 800; color: #fff; }
+    .brand h1 span { color: var(--primary); }
+    .brand p { color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; }
+    .badge {
+      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4);
+      color: #c4b5fd; padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--surface); border: 1px solid var(--surface-border);
+      border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
+    .card-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 18px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-tile { background: #080c14; border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px; text-align: center; }
+    .stat-val { font-size: 1.3rem; font-weight: 800; color: var(--secondary); }
+    .stat-lbl { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+    .actions-bar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    button {
+      background: var(--primary); color: white; border: none; padding: 10px 18px;
+      border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem;
+      transition: all 0.2s;
+    }
+    button:hover { background: #7c3aed; transform: translateY(-1px); box-shadow: 0 4px 15px var(--primary-glow); }
+    .btn-secondary { background: #1e293b; border: 1px solid #334155; color: var(--text); }
+    .btn-secondary:hover { background: #334155; }
+    .console-box {
+      background: #080c14; border: 1px solid var(--surface-border); border-radius: 8px;
+      padding: 16px; margin-top: 16px; min-height: 140px; font-size: 0.9rem;
+    }
+    .console-header {
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between;
+    }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .tag-elite { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: #6ee7b7; }
+    .tag-warn { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>⚡ <span>Mercury</span> Voice Cockpit</h1>
+        <p>10-Foot Multi-modal Engineering Cockpit on Fire TV & Alexa Voice Control</p>
+      </div>
+      <div class="badges-row">
+        <span class="badge">Fire TV 10-Foot UI</span>
+        <span class="badge">DORA Metrics Radar</span>
+        <span class="badge">AWS Cost Explorer</span>
+      </div>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat-tile">
+        <div class="stat-val">2.4 / day</div>
+        <div class="stat-lbl">Deploy Frequency</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-val">14.5 h</div>
+        <div class="stat-lbl">Lead Time</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-val">3.2%</div>
+        <div class="stat-lbl">Change Failure</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-val">0.8 h</div>
+        <div class="stat-lbl">Mean Recovery</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Panel 1: DORA & PR Radar -->
+      <div class="card">
+        <h2>📊 Engineering Velocity & Pull Request Radar</h2>
+        <p class="card-desc">
+          Aggregates DORA velocity and highlights stale PRs across production repositories on the big screen.
+        </p>
+
+        <div class="actions-bar" style="margin-top: 0;">
+          <button onclick="inspectDora()">Calculate DORA Velocity</button>
+          <button class="btn-secondary" onclick="inspectPrs()">Scan Stale PRs (>36h)</button>
+        </div>
+
+        <div class="console-box">
+          <div class="console-header">
+            <span>DORA Velocity Assessment</span>
+            <span id="doraTag" class="tag tag-elite">ELITE PERFORMER</span>
+          </div>
+          <div id="doraOutput">Click Calculate DORA to aggregate velocity metrics.</div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Cost Radar & Governed Rollback -->
+      <div class="card">
+        <h2>💰 AWS Cost Anomaly & Governed Rollback</h2>
+        <p class="card-desc">
+          Detects runaway AWS Bedrock / ECS spend and executes governed production rollbacks with 300s leases.
+        </p>
+
+        <div class="actions-bar" style="margin-top: 0;">
+          <button onclick="scanCostAnomalies()">Scan AWS Cost Explorer</button>
+          <button class="btn-secondary" style="background:#dc2626;" onclick="initiateRollback()">Execute Governed Rollback</button>
+        </div>
+
+        <div class="console-box">
+          <div class="console-header">
+            <span>Cost Radar & Lease Controller</span>
+            <span id="costTag">NORMAL</span>
+          </div>
+          <div id="costOutput">Click Scan AWS Cost to detect billing anomalies across clusters.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function inspectDora() {
+      document.getElementById('doraTag').className = 'tag tag-elite';
+      document.getElementById('doraTag').innerText = 'ELITE PERFORMER';
+      document.getElementById('doraOutput').innerHTML = 
+        '<strong>DORA Rating:</strong> Elite Performer<br>' +
+        '<strong>Deploy Frequency:</strong> 2.4 deploys/day (Industry top decile)<br>' +
+        '<strong>Change Failure Rate:</strong> 3.2% (Target < 15%)<br>' +
+        '<strong>Voice Summary:</strong> "Team velocity is healthy with 2.4 daily deploys and 0.8h MTTR."';
+    }
+
+    function inspectPrs() {
+      document.getElementById('doraOutput').innerHTML = 
+        '<strong>Total Open PRs:</strong> 18<br>' +
+        '<span class="tag tag-warn">ATTENTION</span> <strong>PR #342:</strong> Implement Stripe Webhook Retry Logic (<code>backend-payments</code>)<br>' +
+        'Open for 48.0 hours without review. Author: <code>dev_alex</code>';
+    }
+
+    function scanCostAnomalies() {
+      document.getElementById('costTag').innerHTML = '<span class="tag tag-warn">ANOMALY DETECTED</span>';
+      document.getElementById('costOutput').innerHTML = 
+        '<span class="tag tag-warn">COST SPIKE +311%</span> <strong>Amazon Bedrock & ECS Staging</strong><br>' +
+        '<strong>Daily Spend:</strong> $185.00 / day (Previous avg: $45.00 / day)<br>' +
+        '<strong>Root Cause:</strong> Unclosed load test tasks in staging cluster.<br>' +
+        '<strong>Spoken Digest:</strong> "Warning: Staging Bedrock tasks increased daily burn by 311%."';
+    }
+
+    function initiateRollback() {
+      document.getElementById('costOutput').innerHTML = 
+        '<span class="tag tag-warn">ROLLBACK LEASE INITIATED</span> <strong>Service: payments-api</strong><br>' +
+        '<strong>Target Commit:</strong> <code>git checkout HEAD~1</code> (SHA <code>12443b59</code>)<br>' +
+        '<strong>Lease Duration:</strong> 300 seconds.<br>' +
+        '<strong>Voice Confirmation Prompt:</strong> "Alexa, approve rollback for payments-api."';
+    }
+  </script>
+</body>
+</html>
