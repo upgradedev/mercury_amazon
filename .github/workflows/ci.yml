@@ -28,7 +28,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest --cov=src --cov-report=term-missing tests/
+          pytest --cov=src --cov-fail-under=85 --cov-report=term-missing tests/
 
       - name: Run submission readiness audit
         run: |
