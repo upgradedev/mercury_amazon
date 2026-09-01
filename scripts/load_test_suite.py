@@ -1,9 +1,9 @@
-"""High-Concurrency Load & Stress Testing Benchmark Runner for Mercury.
+"""In-Process Concurrency & Thread Pool Stress Test Runner for Mercury.
 
 Executes:
-- 1,000 asynchronous DORA metrics calculations
-- 500 concurrent governed rollback lease creations
-- Outputs P50, P90, P99 latency percentiles and throughput RPS
+- 1,000 in-process DORA metrics calculations
+- 500 in-process governed rollback lease creations
+- Measures in-process function execution latency percentiles (P50, P90, P99)
 
 Usage:
     python scripts/load_test_suite.py
@@ -21,7 +21,7 @@ from src.domain.governed_rollback import GovernedRollbackAction
 
 def run_load_stress_suite():
     print("================================================================")
-    print("        MERCURY HIGH-CONCURRENCY LOAD & STRESS BENCHMARK        ")
+    print("   MERCURY IN-PROCESS CONCURRENCY & LATENCY BENCHMARK           ")
     print("================================================================")
 
     # 1. DORA Metrics Throughput
