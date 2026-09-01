@@ -1,0 +1,16 @@
+{
+  "dora_velocity_engine": {
+    "iterations": 1000,
+    "mean_ms": 0.0025,
+    "p50_ms": 0.0024,
+    "p95_ms": 0.0026,
+    "p99_ms": 0.0034
+  },
+  "cost_anomaly_scanner": {
+    "iterations": 1000,
+    "mean_ms": 0.0044,
+    "p50_ms": 0.0043,
+    "p95_ms": 0.0046,
+    "p99_ms": 0.0052
+  }
+}
