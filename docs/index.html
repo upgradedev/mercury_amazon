@@ -7,11 +7,11 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090d16;
-      --surface: #111827;
-      --surface-border: #1f293d;
+      --bg: #060913;
+      --surface: #0f172a;
+      --surface-border: #1e293b;
       --primary: #8b5cf6;
-      --primary-glow: rgba(139, 92, 246, 0.25);
+      --primary-glow: rgba(139, 92, 246, 0.4);
       --secondary: #38bdf8;
       --success: #10b981;
       --danger: #ef4444;
@@ -23,38 +23,65 @@
     .container { max-width: 1200px; margin: 0 auto; }
     header {
       display: flex; justify-content: space-between; align-items: center;
-      padding-bottom: 24px; border-bottom: 1px solid var(--surface-border); margin-bottom: 30px;
+      padding-bottom: 24px; border-bottom: 1px solid var(--surface-border); margin-bottom: 24px;
+      flex-wrap: wrap; gap: 16px;
     }
-    .brand h1 { font-size: 2rem; font-weight: 800; color: #fff; }
-    .brand h1 span { color: var(--primary); }
+    .brand h1 { font-size: 2.2rem; font-weight: 800; color: #fff; }
+    .brand h1 span { color: var(--primary); text-shadow: 0 0 25px var(--primary-glow); }
     .brand p { color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; }
     .badge {
       background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4);
       color: #c4b5fd; padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
     }
+
+    .dpad-banner {
+      background: linear-gradient(90deg, #2e1065 0%, #0f172a 100%);
+      border: 1px solid #7c3aed; border-radius: 10px; padding: 12px 18px;
+      margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.85rem; color: #ddd6fe;
+    }
+    .dpad-keys { display: inline-flex; gap: 6px; }
+    .key-badge {
+      background: #0f172a; border: 1px solid #6d28d9; padding: 2px 8px; border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #fff;
+    }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat-tile {
+      background: #0a0f1d; border: 2px solid var(--surface-border); padding: 18px 14px;
+      border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s;
+    }
+    .stat-tile:hover, .stat-tile.tv-focused {
+      border-color: var(--primary); transform: scale(1.03);
+      box-shadow: 0 0 20px var(--primary-glow); background: #17112d;
+    }
+    .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--secondary); }
+    .stat-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
     .card {
       background: var(--surface); border: 1px solid var(--surface-border);
-      border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
     .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
     .card-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 18px; }
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-    .stat-tile { background: #080c14; border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px; text-align: center; }
-    .stat-val { font-size: 1.3rem; font-weight: 800; color: var(--secondary); }
-    .stat-lbl { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+
     .actions-bar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    button {
-      background: var(--primary); color: white; border: none; padding: 10px 18px;
+    button, .tv-btn {
+      background: var(--primary); color: white; border: 2px solid transparent; padding: 10px 18px;
       border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem;
       transition: all 0.2s;
     }
-    button:hover { background: #7c3aed; transform: translateY(-1px); box-shadow: 0 4px 15px var(--primary-glow); }
-    .btn-secondary { background: #1e293b; border: 1px solid #334155; color: var(--text); }
-    .btn-secondary:hover { background: #334155; }
+    button:hover, button.tv-focused {
+      background: #7c3aed; transform: translateY(-1px);
+      box-shadow: 0 4px 20px var(--primary-glow); border-color: #fff;
+    }
+    .btn-secondary { background: #1e293b; border: 2px solid #334155; color: var(--text); }
+    .btn-secondary:hover, .btn-secondary.tv-focused { background: #334155; border-color: var(--secondary); }
+    
     .console-box {
-      background: #080c14; border: 1px solid var(--surface-border); border-radius: 8px;
+      background: #070a13; border: 1px solid var(--surface-border); border-radius: 8px;
       padding: 16px; margin-top: 16px; min-height: 140px; font-size: 0.9rem;
     }
     .console-header {
@@ -75,25 +102,38 @@
       </div>
       <div class="badges-row">
         <span class="badge">Fire TV 10-Foot UI</span>
+        <span class="badge">D-Pad Spatial Nav</span>
         <span class="badge">DORA Metrics Radar</span>
         <span class="badge">AWS Cost Explorer</span>
       </div>
     </header>
 
+    <!-- TV D-Pad Remote Banner -->
+    <div class="dpad-banner">
+      <div>🎮 <strong>10-Foot TV Spatial Navigation Active:</strong> Use your keyboard Arrow keys & Enter to navigate like a Fire TV Remote!</div>
+      <div class="dpad-keys">
+        <span class="key-badge">▲</span>
+        <span class="key-badge">▼</span>
+        <span class="key-badge">◄</span>
+        <span class="key-badge">►</span>
+        <span class="key-badge">ENTER</span>
+      </div>
+    </div>
+
     <div class="stats-row">
-      <div class="stat-tile">
+      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
         <div class="stat-val">2.4 / day</div>
         <div class="stat-lbl">Deploy Frequency</div>
       </div>
-      <div class="stat-tile">
+      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
         <div class="stat-val">14.5 h</div>
         <div class="stat-lbl">Lead Time</div>
       </div>
-      <div class="stat-tile">
+      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
         <div class="stat-val">3.2%</div>
         <div class="stat-lbl">Change Failure</div>
       </div>
-      <div class="stat-tile">
+      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
         <div class="stat-val">0.8 h</div>
         <div class="stat-lbl">Mean Recovery</div>
       </div>
@@ -108,8 +148,8 @@
         </p>
 
         <div class="actions-bar" style="margin-top: 0;">
-          <button onclick="inspectDora()">Calculate DORA Velocity</button>
-          <button class="btn-secondary" onclick="inspectPrs()">Scan Stale PRs (>36h)</button>
+          <button class="tv-nav" tabindex="0" onclick="inspectDora()">Calculate DORA Velocity</button>
+          <button class="btn-secondary tv-nav" tabindex="0" onclick="inspectPrs()">Scan Stale PRs (>36h)</button>
         </div>
 
         <div class="console-box">
@@ -117,7 +157,7 @@
             <span>DORA Velocity Assessment</span>
             <span id="doraTag" class="tag tag-elite">ELITE PERFORMER</span>
           </div>
-          <div id="doraOutput">Click Calculate DORA to aggregate velocity metrics.</div>
+          <div id="doraOutput">Click Calculate DORA or press Enter to aggregate velocity metrics.</div>
         </div>
       </div>
 
@@ -129,8 +169,8 @@
         </p>
 
         <div class="actions-bar" style="margin-top: 0;">
-          <button onclick="scanCostAnomalies()">Scan AWS Cost Explorer</button>
-          <button class="btn-secondary" style="background:#dc2626;" onclick="initiateRollback()">Execute Governed Rollback</button>
+          <button class="tv-nav" tabindex="0" onclick="scanCostAnomalies()">Scan AWS Cost Explorer</button>
+          <button class="btn-secondary tv-nav" tabindex="0" style="background:#dc2626;" onclick="initiateRollback()">Execute Governed Rollback</button>
         </div>
 
         <div class="console-box">
@@ -145,6 +185,15 @@
   </div>
 
   <script>
+    function speakVoiceDigest(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const ut = new SpeechSynthesisUtterance(text);
+        ut.rate = 1.05;
+        window.speechSynthesis.speak(ut);
+      }
+    }
+
     function inspectDora() {
       document.getElementById('doraTag').className = 'tag tag-elite';
       document.getElementById('doraTag').innerText = 'ELITE PERFORMER';
@@ -153,6 +202,7 @@
         '<strong>Deploy Frequency:</strong> 2.4 deploys/day (Industry top decile)<br>' +
         '<strong>Change Failure Rate:</strong> 3.2% (Target < 15%)<br>' +
         '<strong>Voice Summary:</strong> "Team velocity is healthy with 2.4 daily deploys and 0.8h MTTR."';
+      speakVoiceDigest("Team velocity is rated Elite Performer with 2.4 daily deploys and 0.8 hour recovery time.");
     }
 
     function inspectPrs() {
@@ -160,6 +210,7 @@
         '<strong>Total Open PRs:</strong> 18<br>' +
         '<span class="tag tag-warn">ATTENTION</span> <strong>PR #342:</strong> Implement Stripe Webhook Retry Logic (<code>backend-payments</code>)<br>' +
         'Open for 48.0 hours without review. Author: <code>dev_alex</code>';
+      speakVoiceDigest("Attention: Pull Request 342 in payments backend has been open for 48 hours without review.");
     }
 
     function scanCostAnomalies() {
@@ -169,6 +220,7 @@
         '<strong>Daily Spend:</strong> $185.00 / day (Previous avg: $45.00 / day)<br>' +
         '<strong>Root Cause:</strong> Unclosed load test tasks in staging cluster.<br>' +
         '<strong>Spoken Digest:</strong> "Warning: Staging Bedrock tasks increased daily burn by 311%."';
+      speakVoiceDigest("Warning: Staging Bedrock tasks increased daily burn by 311 percent to 185 dollars per day.");
     }
 
     function initiateRollback() {
@@ -177,7 +229,37 @@
         '<strong>Target Commit:</strong> <code>git checkout HEAD~1</code> (SHA <code>12443b59</code>)<br>' +
         '<strong>Lease Duration:</strong> 300 seconds.<br>' +
         '<strong>Voice Confirmation Prompt:</strong> "Alexa, approve rollback for payments-api."';
+      speakVoiceDigest("Production rollback lease staged for payments API. 300 second lease active. Say: Alexa, approve rollback.");
     }
+
+    // 10-Foot D-Pad Keyboard Spatial Navigation
+    let navElements = [];
+    let currentFocus = 0;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      navElements = Array.from(document.querySelectorAll('.tv-nav'));
+      if (navElements.length > 0) {
+        navElements[0].classList.add('tv-focused');
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (!navElements.length) return;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
+        e.preventDefault();
+        navElements[currentFocus].classList.remove('tv-focused');
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          currentFocus = (currentFocus + 1) % navElements.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          currentFocus = (currentFocus - 1 + navElements.length) % navElements.length;
+        } else if (e.key === 'Enter') {
+          navElements[currentFocus].click();
+        }
+        navElements[currentFocus].classList.add('tv-focused');
+        navElements[currentFocus].focus();
+      }
+    });
   </script>
 </body>
 </html>

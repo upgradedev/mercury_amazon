@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  mercury-tv-cockpit:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DORA_METRICS_INTERVAL_SEC=60
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
