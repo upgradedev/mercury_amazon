@@ -1,4 +1,4 @@
-# Pure Serverless Terraform Infrastructure for Mercury Voice CTO Cockpit on AWS
+# Pure Serverless Terraform Infrastructure for Mercury Voice CTO Cockpit on AWS (eu-west-1)
 # Architecture: AWS Lambda + Function URL + AWS Cost Explorer API + CloudWatch
 
 terraform {
@@ -16,18 +16,20 @@ provider "aws" {
 }
 
 variable "aws_region" {
-  type    = string
-  default = "us-east-1"
+  type        = string
+  default     = "eu-west-1"
+  description = "Primary AWS region for deployment"
 }
 
 variable "environment" {
-  type    = string
-  default = "prod"
+  type        = string
+  default     = "prod"
+  description = "Environment tier"
 }
 
 # 1. IAM Execution Role for Lambda
 resource "aws_iam_role" "mercury_lambda_role" {
-  name = "mercury-lambda-role-${var.environment}"
+  name = "mercury-lambda-role-euw1-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -45,7 +47,7 @@ resource "aws_iam_role" "mercury_lambda_role" {
 
 # 2. Least-Privilege Read Policy for Cost Explorer & CloudWatch
 resource "aws_iam_policy" "mercury_serverless_policy" {
-  name        = "mercury-serverless-policy-${var.environment}"
+  name        = "mercury-serverless-policy-euw1-${var.environment}"
   description = "Least privilege read access for AWS Cost Explorer & CloudWatch metrics"
 
   policy = jsonencode({
@@ -68,7 +70,7 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/mercury-wallboard-${var.environment}:*"
+        Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/mercury-wallboard-euw1-${var.environment}:*"
       }
     ]
   })
@@ -81,7 +83,7 @@ resource "aws_iam_role_policy_attachment" "mercury_attach" {
 
 # 3. AWS Lambda Serverless Wallboard API Function ($0.00 Idle Cost)
 resource "aws_lambda_function" "mercury_wallboard_function" {
-  function_name = "mercury-wallboard-${var.environment}"
+  function_name = "mercury-wallboard-euw1-${var.environment}"
   role          = aws_iam_role.mercury_lambda_role.arn
   runtime       = "python3.11"
   handler       = "src.interfaces.mcp_server.handler"
@@ -92,6 +94,14 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
     variables = {
       ENVIRONMENT = var.environment
     }
+  }
+
+  tags = {
+    Project     = "mercury"
+    Environment = var.environment
+    Region      = var.aws_region
+    ManagedBy   = "terraform"
+    Hackathon   = "amazon-developer-2026"
   }
 }
 
