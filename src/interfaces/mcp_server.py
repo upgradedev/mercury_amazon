@@ -1,3 +1,5 @@
+from pathlib import Path
+from fastapi.responses import FileResponse, JSONResponse
 """Interfaces Layer: FastMCP Server for Mercury CTO Engineering Cockpit."""
 from typing import Any
 
@@ -134,3 +136,16 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)
+
+
+# Serve Companion Web UI & Tourguide
+WEB_DIR = Path(__file__).resolve().parent / "web"
+
+
+@app.get("/")
+@app.get("/web")
+async def serve_dashboard():
+    index_path = WEB_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return JSONResponse({"message": "FastMCP API Live"})

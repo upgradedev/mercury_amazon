@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>📺 Mercury — Fire TV Multi-Modal Engineering Cockpit</title>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg-color: #080d1a;
+      --card-bg: #0f192c;
+      --card-border: #1a2c4e;
+      --accent-cyan: #00e5ff;
+      --accent-green: #00e676;
+      --accent-purple: #b388ff;
+      --accent-amber: #ffb300;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: var(--font-stack);
+      padding: 24px 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 1040px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tagline {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tour-btn {
+      background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tour-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(124, 77, 255, 0.4);
+    }
+    .status-badge {
+      background: rgba(0, 230, 118, 0.12);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .hero-banner {
+      background: linear-gradient(135deg, #132238 0%, #0c1829 100%);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-banner::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; width: 200px; height: 100%;
+      background: radial-gradient(circle, rgba(0, 229, 255, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .hero-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .hero-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 800px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 800px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .card-header {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-main);
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button.action-btn {
+      background: #182844;
+      color: var(--text-main);
+      border: 1px solid #233c66;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    button.action-btn:hover {
+      background: #233c66;
+      border-color: var(--accent-cyan);
+    }
+    button.action-btn.primary {
+      background: var(--accent-cyan);
+      color: #000;
+      border: none;
+    }
+    button.action-btn.primary:hover {
+      background: #33ebff;
+    }
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #050811;
+      border: 1px solid #142038;
+      padding: 14px;
+      border-radius: 8px;
+      color: #79c0ff;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    /* Modal / Tourguide */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .tour-modal {
+      background: #101c33;
+      border: 1px solid var(--accent-purple);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(124, 77, 255, 0.3);
+      position: relative;
+    }
+    .tour-step-badge {
+      background: rgba(179, 136, 255, 0.2);
+      color: var(--accent-purple);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+    .tour-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .tour-body {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .tour-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>📺 Mercury — Fire TV Multi-Modal Engineering Cockpit</h1>
+        <div class="tagline">10-Foot Glanceable Wallboard & Incident Telemetry on the Big Screen</div>
+      </div>
+      <div class="header-actions">
+        <button class="tour-btn" onclick="openTour()">
+          <span>🎯</span> Start Guided Tour
+        </button>
+        <div class="status-badge">● AWS eu-west-1 Live ($0.00 Idle)</div>
+      </div>
+    </header>
+
+    <!-- Hero Showcase -->
+    <section class="hero-banner">
+      <div class="hero-badge">Fire TV & Big Screen Track</div>
+      <div class="hero-title">Glanceable War Room Telemetry & CI/CD Deployment Health</div>
+      <div class="hero-desc">Mercury turns any $30 Fire TV Stick into an ultra-low latency engineering war room wallboard, displaying deployment status, CloudWatch metrics, and incident alerts with 3-meter glanceable typography.</div>
+    </section>
+
+    <!-- Interactive Grid -->
+    <div class="grid-2">
+      
+          <div class="card">
+            <div class="card-header">
+              <span>🎮 Fire TV Remote & Webhook Ingress</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+              Simulate CI/CD pipeline triggers and incident alerts on the 10-foot cockpit.
+            </p>
+            <div class="btn-group">
+              <button class="action-btn" onclick="simulateMercury('CI_SUCCESS')">
+                <span>✅</span> Push GitHub Actions: SUCCESS (6 repos)
+              </button>
+              <button class="action-btn" onclick="simulateMercury('CLOUDWATCH_OK')">
+                <span>📊</span> CloudWatch P95 Latency: 14ms (Optimal)
+              </button>
+              <button class="action-btn primary" onclick="simulateMercury('INCIDENT_ALERT')">
+                <span>⚠️</span> Simulate War Room Incident Alert
+              </button>
+            </div>
+          </div>
+        
+      
+          <div class="card">
+            <div class="card-header">
+              <span>🖥️ 10-Foot Wallboard Monitor</span>
+              <span style="font-size: 11px; color: var(--accent-cyan);">65" Display Mode</span>
+            </div>
+            <div class="code-box" id="mercury-wallboard" style="font-size: 13px;">
+              [MERCURY WAR ROOM COCKPIT ACTIVE]<br>
+              <strong style="color: var(--accent-green);">● AWS eu-west-1 Fleet: 100% HEALTHY</strong><br>
+              • Active Lambdas: 6 / 6 Live (0.00% Error Rate)<br>
+              • Total Fleet Tests: 191 / 191 PASS (100% GREEN)<br>
+              • Idle Cost: $0.00 / month
+            </div>
+          </div>
+        
+    </div>
+  </div>
+
+  <!-- Tourguide Modal -->
+  <div class="modal-overlay" id="tour-modal-overlay">
+    <div class="tour-modal">
+      <div class="tour-step-badge" id="tour-step-count">Step 1 of 4</div>
+      <div class="tour-title" id="tour-title">Tour Title</div>
+      <div class="tour-body" id="tour-body">Tour body text.</div>
+      <div class="tour-actions">
+        <button class="action-btn" id="tour-prev-btn" onclick="prevTourStep()" style="padding: 8px 14px;">← Back</button>
+        <button class="action-btn primary" id="tour-next-btn" onclick="nextTourStep()" style="padding: 8px 16px;">Next Step →</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.TOUR_STEPS = [{"title": "1. 10-Foot UI Design", "desc": "High-contrast glanceable widgets designed for viewing from 3 meters away on 65-inch Fire TVs."}, {"title": "2. Multi-Source DevOps Ingestion", "desc": "Aggregates GitHub Actions, CloudWatch alarms, and AWS Lambda metrics in real time."}, {"title": "3. Alexa+ Voice Navigation", "desc": "Navigate wallboard telemetry hands-free using Fire TV Alexa Voice Remote."}, {"title": "4. Pure Serverless Backend", "desc": "Runs 100% on AWS Lambda with sub-20ms P50 latency and $0.00 idle cost."}];
+  </script>
+
+  <script>
+    let currentStep = 0;
+    const tourSteps = window.TOUR_STEPS || [];
+
+    function openTour() {
+      currentStep = 0;
+      showStep(currentStep);
+      document.getElementById('tour-modal-overlay').classList.add('active');
+    }
+
+    function closeTour() {
+      document.getElementById('tour-modal-overlay').classList.remove('active');
+    }
+
+    function nextTourStep() {
+      if (currentStep < tourSteps.length - 1) {
+        currentStep++;
+        showStep(currentStep);
+      } else {
+        closeTour();
+      }
+    }
+
+    function prevTourStep() {
+      if (currentStep > 0) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    }
+
+    function showStep(idx) {
+      const step = tourSteps[idx];
+      document.getElementById('tour-step-count').textContent = `Step ${idx + 1} of ${tourSteps.length}`;
+      document.getElementById('tour-title').textContent = step.title;
+      document.getElementById('tour-body').innerHTML = step.desc;
+      document.getElementById('tour-next-btn').textContent = (idx === tourSteps.length - 1) ? 'Finish Tour 🚀' : 'Next Step →';
+      document.getElementById('tour-prev-btn').style.visibility = (idx === 0) ? 'hidden' : 'visible';
+    }
+  </script>
+
+  <script>
+
+          function simulateMercury(type) {
+            const wb = document.getElementById('mercury-wallboard');
+            if (type === 'INCIDENT_ALERT') {
+              wb.innerHTML = `
+                <strong style="color: #ff5252;">⚠️ [WAR ROOM INCIDENT DETECTED]</strong><br>
+                • Service: payment-gateway-euw1<br>
+                • Error Spike: 4.2% timeout rate<br>
+                • Action: Automated rollback triggered via FastMCP.
+              `;
+            } else if (type === 'CI_SUCCESS') {
+              wb.innerHTML = `
+                <strong style="color: var(--accent-green);">✅ [CI/CD FLEET PIPELINE PASSED]</strong><br>
+                • Repos: volcan, vesta, mercury, aletheia, avra, hestia<br>
+                • Tests: 191 Passed | Coverage: 95% Average<br>
+                • Deployment: Verified on AWS Lambda & API Gateway.
+              `;
+            } else {
+              wb.innerHTML = `
+                <strong style="color: var(--accent-cyan);">📊 [CLOUDWATCH TELEMETRY OPTIMAL]</strong><br>
+                • P50 Latency: 12.4ms | P95: 48.1ms<br>
+                • DynamoDB Read Capacity: 0.02 RCU (On-Demand)<br>
+                • S3 Storage Partitions: Healthy.
+              `;
+            }
+          }
+        
+  </script>
+</body>
+</html>
