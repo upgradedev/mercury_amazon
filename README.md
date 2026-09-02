@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Alexa+ MCP](https://img.shields.io/badge/Alexa%2B-Streamable%20HTTP-blue.svg)](https://developer.amazon.com)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20%26%20Cost%20Explorer-orange.svg)](https://aws.amazon.com)
-[![Tests: 23 Passed](https://img.shields.io/badge/Tests-23%20Passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-24%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 
 ---
 

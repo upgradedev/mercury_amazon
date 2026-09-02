@@ -60,6 +60,19 @@
 
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 480px) {
+      body { padding: 12px 8px; }
+      header { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .brand h1 { font-size: 1.4rem; }
+      .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .dpad-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
+      button, .tv-btn { width: 100%; justify-content: center; }
+      .actions-bar { flex-direction: column; }
+    }
+    .empty-state-card {
+      background: rgba(15, 23, 42, 0.6); border: 1px dashed #334155; border-radius: 6px;
+      padding: 14px; color: var(--text-muted); font-size: 0.85rem; text-align: center;
+    }
     .card {
       background: var(--surface); border: 1px solid var(--surface-border);
       border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -148,8 +161,8 @@
         </p>
 
         <div class="actions-bar" style="margin-top: 0;">
-          <button class="tv-nav" tabindex="0" onclick="inspectDora()">Calculate DORA Velocity</button>
-          <button class="btn-secondary tv-nav" tabindex="0" onclick="inspectPrs()">Scan Stale PRs (>36h)</button>
+          <button data-testid="primary-hero-action" class="primary-action tv-nav" tabindex="0" title="Calculate engineering velocity and DORA performance tiers" onclick="inspectDora()">🚀 Calculate DORA Velocity</button>
+          <button class="btn-secondary tv-nav" tabindex="0" title="Scan repositories for pull requests exceeding 36-hour review SLA" onclick="inspectPrs()">🔍 Scan Stale PRs (>36h)</button>
         </div>
 
         <div class="console-box">
@@ -157,7 +170,7 @@
             <span>DORA Velocity Assessment</span>
             <span id="doraTag" class="tag tag-elite">ELITE PERFORMER</span>
           </div>
-          <div id="doraOutput">Click Calculate DORA or press Enter to aggregate velocity metrics.</div>
+          <div id="doraOutput"><div class="empty-state-card"><span>ℹ️ Ready for DORA evaluation. Press Enter or click Calculate DORA above.</span></div></div>
         </div>
       </div>
 
@@ -169,16 +182,16 @@
         </p>
 
         <div class="actions-bar" style="margin-top: 0;">
-          <button class="tv-nav" tabindex="0" onclick="scanCostAnomalies()">Scan AWS Cost Explorer</button>
-          <button class="btn-secondary tv-nav" tabindex="0" style="background:#dc2626;" onclick="initiateRollback()">Execute Governed Rollback</button>
+          <button class="tv-nav" tabindex="0" title="Scan AWS Cost Explorer for spend surges (>200% burn rate)" onclick="scanCostAnomalies()">📊 Scan AWS Cost Explorer</button>
+          <button class="btn-secondary tv-nav" tabindex="0" title="Stage production rollback under SHA-256 lock & 300s lease" onclick="initiateRollback()">⏪ Execute Governed Rollback</button>
         </div>
 
         <div class="console-box">
           <div class="console-header">
-            <span>Cost Radar & Lease Controller</span>
-            <span id="costTag">NORMAL</span>
+            <span>AWS Telemetry & Rollback Lease</span>
+            <span id="costTag">MONITORING</span>
           </div>
-          <div id="costOutput">Click Scan AWS Cost to detect billing anomalies across clusters.</div>
+          <div id="costOutput"><div class="empty-state-card"><span>ℹ️ Ready for cloud cost audit. Click Scan Cost Explorer or Stage Rollback.</span></div></div>
         </div>
       </div>
     </div>

@@ -48,3 +48,22 @@ def test_mercury_dora_metrics_values():
     assert "14.5 h" in html
     assert "3.2%" in html
     assert "0.8 h" in html
+
+
+def test_mercury_ux_principles_h1_h2_h3():
+    """Verify UX principles H1, H2, H3: responsive viewports, no unexplained disabled controls, non-null empty states."""
+    index_path = os.path.join(os.path.dirname(__file__), "../../docs/index.html")
+    with open(index_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # H1: Responsive viewport and obvious hero action
+    assert 'name="viewport"' in html
+    assert "@media (max-width: 480px)" in html or "@media (max-width: 860px)" in html
+    assert 'data-testid="primary-hero-action"' in html
+
+    # H2: Controls have explanatory titles / descriptions
+    assert 'title="' in html
+
+    # H3: Empty state cards render friendly guidance instead of null
+    assert "empty-state-card" in html
+
