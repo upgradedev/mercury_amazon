@@ -1,0 +1,14 @@
+{
+  "name": "Mercury Fire TV Engineering Cockpit",
+  "short_name": "Mercury TV",
+  "start_url": "/web",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#080d1a",
+  "theme_color": "#00e5ff",
+  "amazon_fire_tv": {
+    "leanback_mode": true,
+    "remote_control_navigation": true,
+    "glanceable_distance_meters": 3.0
+  }
+}
