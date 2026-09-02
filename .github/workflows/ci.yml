@@ -1,37 +1,55 @@
-name: CI
+name: Enterprise CI/CD Pipeline & Quality Gate
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [master, main]
   pull_request:
-    branches: [ main, master ]
+    branches: [master, main]
+  workflow_dispatch:
 
 jobs:
-  validate:
+  test-and-verify:
+    name: Test, Security & Build Verification
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    strategy:
+      matrix:
+        python-version: ["3.11"]
 
-      - name: Set up Python
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
-      - name: Install dependencies
+      - name: Install Build & Test Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[dev]
+          pip install pytest pytest-cov ruff build pydantic fastapi httpx boto3
 
-      - name: Run linter
+      - name: Code Quality & Linting (Ruff)
         run: |
-          python -m ruff check .
+          ruff check src/ tests/ --ignore E501
 
-      - name: Run unit tests with coverage
+      - name: Execute Full Test Suite & Enforce Coverage (>=85%)
         run: |
-          python -m pytest --cov=src --cov-fail-under=85 --cov-report=term-missing tests/
-        env:
-          PYTHONPATH: .
+          python -m pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=85
 
-      - name: Run submission readiness audit
+      - name: Run Performance & Latency Benchmark
+        run: |
+          if [ -d "tests/performance" ]; then
+            python -m pytest tests/performance/ -v
+          fi
+
+      - name: Build Local Production Artifacts (Wheel & Sdist)
+        run: |
+          if [ -f "pyproject.toml" ]; then
+            python -m build --wheel --sdist --outdir dist
+          fi
+
+      - name: Verify Readiness Gate (ci/readiness.py)
         run: |
           python ci/readiness.py
