@@ -1,4 +1,5 @@
-# Terraform Infrastructure for Mercury Voice CTO Cockpit on AWS
+# Pure Serverless Terraform Infrastructure for Mercury Voice CTO Cockpit on AWS
+# Architecture: AWS Lambda + Function URL + AWS Cost Explorer API + CloudWatch
 
 terraform {
   required_version = ">= 1.5.0"
@@ -24,9 +25,9 @@ variable "environment" {
   default = "prod"
 }
 
-# IAM Role with Least Privilege for AWS Cost Explorer & CloudWatch
-resource "aws_iam_role" "mercury_exec_role" {
-  name = "mercury-cto-role-${var.environment}"
+# 1. IAM Execution Role for Lambda
+resource "aws_iam_role" "mercury_lambda_role" {
+  name = "mercury-lambda-role-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -35,15 +36,16 @@ resource "aws_iam_role" "mercury_exec_role" {
         Action = "sts:AssumeRole"
         Effect = "Allow"
         Principal = {
-          Service = "ecs-tasks.amazonaws.com"
+          Service = "lambda.amazonaws.com"
         }
       }
     ]
   })
 }
 
-resource "aws_iam_policy" "mercury_telemetry_policy" {
-  name        = "mercury-telemetry-policy-${var.environment}"
+# 2. Least-Privilege Read Policy for Cost Explorer & CloudWatch
+resource "aws_iam_policy" "mercury_serverless_policy" {
+  name        = "mercury-serverless-policy-${var.environment}"
   description = "Least privilege read access for AWS Cost Explorer & CloudWatch metrics"
 
   policy = jsonencode({
@@ -58,21 +60,56 @@ resource "aws_iam_policy" "mercury_telemetry_policy" {
           "cloudwatch:GetMetricData"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/mercury-wallboard-${var.environment}:*"
       }
     ]
   })
 }
 
 resource "aws_iam_role_policy_attachment" "mercury_attach" {
-  role       = aws_iam_role.mercury_exec_role.name
-  policy_arn = aws_iam_policy.mercury_telemetry_policy.arn
+  role       = aws_iam_role.mercury_lambda_role.name
+  policy_arn = aws_iam_policy.mercury_serverless_policy.arn
 }
 
-resource "aws_ecs_cluster" "mercury_cluster" {
-  name = "mercury-cto-cluster-${var.environment}"
+# 3. AWS Lambda Serverless Wallboard API Function ($0.00 Idle Cost)
+resource "aws_lambda_function" "mercury_wallboard_function" {
+  function_name = "mercury-wallboard-${var.environment}"
+  role          = aws_iam_role.mercury_lambda_role.arn
+  runtime       = "python3.11"
+  handler       = "src.interfaces.mcp_server.handler"
+  memory_size   = 256
+  timeout       = 15
+
+  environment {
+    variables = {
+      ENVIRONMENT = var.environment
+    }
+  }
 }
 
-output "ecs_cluster_name" {
-  value       = aws_ecs_cluster.mercury_cluster.name
-  description = "Name of the Mercury ECS cluster"
+# 4. HTTPS Lambda Function URL for Fire TV 10-Foot Wallboard
+resource "aws_lambda_function_url" "mercury_wallboard_url" {
+  function_name      = aws_lambda_function.mercury_wallboard_function.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_credentials = false
+    allow_origins     = ["*"]
+    allow_methods     = ["GET", "POST", "OPTIONS"]
+    allow_headers     = ["content-type", "x-mcp-version"]
+    max_age           = 86400
+  }
+}
+
+output "wallboard_endpoint_url" {
+  value       = aws_lambda_function_url.mercury_wallboard_url.function_url
+  description = "Public HTTPS endpoint for Amazon Fire TV 10-Foot Wallboard"
 }
