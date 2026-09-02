@@ -11,7 +11,7 @@
 
 | ID | Test Category | Objective | Tool / Automation | Acceptance Criteria |
 |---|---|---|---|---|
-| **UAT-01** | **10-Foot Spatial Focus Nav** | Verify D-Pad directional navigation (`Arrow` keys + `Enter`) across TV UI tiles | Playwright / DOM Nav | Visual neon focus ring moves seamlessly without focus traps |
+| **UAT-01** | **10-Foot Spatial Focus Nav** | Verify D-Pad directional navigation (`Arrow` keys + `Enter`) across TV UI tiles | HTML DOM Navigation | Visual neon focus ring moves seamlessly without focus traps |
 | **UAT-02** | **DORA Velocity Assessment** | Calculate deploy frequency, lead time, CFR, and MTTR from Git/CI events | DORA Domain Model | Correctly evaluates Elite / High performer tier in < 1.0 ms |
 | **UAT-03** | **AWS Cloud Cost Radar** | Detect Bedrock and ECS staging spend spikes (>200% burn rate) | Cost Radar Model | Anomaly flag triggered and spoken voice alert synthesized |
 | **UAT-04** | **Governed Production Rollback** | Verify production rollback staging under SHA-256 lock & 300s lease | Rollback Engine | Rollback quarantined; unconfirmed leases expire automatically |

@@ -1,10 +1,10 @@
-"""Playwright and Headless DOM End-to-End User Acceptance Test Suite for Mercury.
+"""Static HTML DOM Structure & UI Element Assertion Suite for Mercury.
 
-Validates:
-- 10-foot Fire TV UI layout and D-Pad spatial keyboard navigation
-- DORA engineering velocity calculation and D-Pad focus triggers
-- AWS Cost anomaly detection and governed rollback lease staging
-- Web Speech API announcer hooks
+Performs static string and structure assertions over docs/index.html to verify:
+- D-Pad 10-foot spatial navigation DOM focus rings and keyboard listeners
+- DORA metrics cards, PR bottleneck panels, and AWS cost surge displays
+- Governed rollback modal containers and SHA-256 lease tags
+(Note: Runs static file assertions without an active browser driver).
 """
 import os
 

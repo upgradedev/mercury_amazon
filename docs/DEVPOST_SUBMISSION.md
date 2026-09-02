@@ -36,16 +36,16 @@ Inspired by **Hermes (Mercury)**, the fleet-footed messenger god of trade and ra
 
 ---
 
-## 4. Headline Comparative Result
+## 4. Headline Result
 
-* **76% Faster Executive Decision Velocity:** Reduces cross-dashboard diagnostic time from 25 minutes of manual clicking to a **6-second voice conversation**.
+* **Deterministic Telemetry Synthesis & Governed Rollback:** Real-time evaluation of DORA engineering velocity and AWS cost anomaly detection in < 0.1 ms, with governed rollback leases under SHA-256 locks.
 
 ---
 
 ## 5. Track & Mini-Challenge Declarations
 
-* **Primary Track:** **Alexa+ Track** (or Fire TV Track).
-* **Mini Challenges:** **AWS Builder** + **Open Source**.
+* **Primary Track:** **Fire TV Track** (10-foot spatial navigation companion and voice cockpit).
+* **Mini Challenges:** **Open Source**.
 
 ---
 

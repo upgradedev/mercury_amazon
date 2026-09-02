@@ -82,9 +82,9 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
     j2_passed = any(w in readme_content.lower() for w in ["dual-custody", "governed", "300-second lease", "irreversible", "sha-256 lock", "evidence packet", "rollback"])
     evaluated["J2"] = GateResult("J2", "Real consequence behind hero action", j2_passed, "Guards high-consequence action" if j2_passed else "No high-consequence action guarded")
 
-    j3_match = re.search(r"(< 2ms|< 1\.0 ms|< 0\.5 ms|< 0\.1 ms|\d+%\s*reduction|\d+x|\d+\.\d+\s*hours|\d+\.\d+\s*deploys|100%\s*deterministic|100%\s*automated)", readme_content)
-    j3_passed = bool(j3_match)
-    evaluated["J3"] = GateResult("J3", "One headline comparative number", j3_passed, f"Found metric: {j3_match.group(1)}" if j3_match else "No metric")
+    # J3: One headline comparative number (Requires baseline it beats, margin, and sample size n)
+    has_comparative_n = "n=" in readme_content.lower() or "sample size" in readme_content.lower()
+    evaluated["J3"] = GateResult("J3", "One headline comparative number", False, "Comparative baseline pending owner benchmark with recorded sample size n")
 
     j4_passed = any(s in readme_content.lower() for s in ["alexa+", "ring", "fire tv", "bee wearable", "bedrock"])
     evaluated["J4"] = GateResult("J4", "Sponsor product is load-bearing", j4_passed, "Sponsor product integrated" if j4_passed else "Missing sponsor product")
@@ -110,7 +110,7 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
     for df in domain_files:
         with open(df, "r", encoding="utf-8") as f:
             d_code = f.read()
-            if re.search(r"\b(boto3|requests|fastapi|uvicorn|starlette|botocore)\b", d_code):
+            if re.search(r"^\s*(import|from)\s+(boto3|requests|fastapi|uvicorn|starlette|botocore)\b", d_code, re.MULTILINE):
                 a5_passed = False
                 break
     evaluated["A5"] = GateResult("A5", "Separation of Concerns (Domain imports zero SDKs)", a5_passed, f"Domain clean across {len(domain_files)} files" if a5_passed else "Domain imports framework SDK")
@@ -139,16 +139,18 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
     sec_tests = glob.glob(os.path.join(repo_root, "tests/security/test_*.py"))
     evaluated["C4"] = GateResult("C4", "OWASP / SAST / DAST execution", len(sec_tests) > 0, f"{len(sec_tests)} security test modules found")
 
-    # C5: Browser test (Honest check: does a real browser driver exist?)
+    # C5: Browser test (Strict check: real browser driver import + active page navigation)
     browser_driver_found = False
     e2e_files = glob.glob(os.path.join(repo_root, "tests/e2e/**/*.py"), recursive=True)
     for ef in e2e_files:
         with open(ef, "r", encoding="utf-8") as f:
             ef_content = f.read()
-            if "playwright" in ef_content or "selenium" in ef_content:
+            has_import = bool(re.search(r"^\s*(import|from)\s+(playwright|selenium)\b", ef_content, re.MULTILINE | re.IGNORECASE))
+            has_navigation = bool(re.search(r"\.(goto|get)\s*\(", ef_content, re.IGNORECASE))
+            if has_import and has_navigation:
                 browser_driver_found = True
                 break
-    evaluated["C5"] = GateResult("C5", "End-to-end browser user journey test", browser_driver_found, "Playwright browser test present" if browser_driver_found else "no real browser driver test walking the video path (test_html_structure.py is DOM assertion only)")
+    evaluated["C5"] = GateResult("C5", "End-to-end browser user journey test", browser_driver_found, "Browser driver test present with active page navigation" if browser_driver_found else "no real browser driver test walking the video path (test_html_structure.py is DOM assertion only)")
 
     evaluated["C6"] = GateResult("C6", "Fixture starts at varied parameter offset", True, "Parameterized offset fixtures implemented in tests")
 
