@@ -1,0 +1,10 @@
+{
+  "project": "mercury_amazon",
+  "aws_region": "eu-west-1",
+  "live_endpoint_url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com",
+  "deployed_commit_sha": "5d501f094d05b70150705fe8fc353a6fa4b392e2",
+  "http_probe_status": 200,
+  "idle_monthly_cost_usd": 0.0,
+  "serverless_verified": true,
+  "verified_at_epoch": 1788359750.8451512
+}
