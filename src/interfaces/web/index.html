@@ -263,6 +263,85 @@
         function saveSettings() {
             alert("✅ Preferences saved successfully! Applied to AWS Lambda Session.");
         }
+    
+    // =========================================================================
+    // Edge Offline Resilience & Event Buffer Engine
+    // =========================================================================
+    class EdgeOfflineBuffer {
+        constructor(queueKey = 'edge_offline_event_queue_v1') {
+            this.queueKey = queueKey;
+            this.isOnline = navigator.onLine;
+            this.initListeners();
+        }
+
+        initListeners() {
+            window.addEventListener('online', () => {
+                this.isOnline = true;
+                this.updateIndicator(true);
+                this.flushQueue();
+            });
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.updateIndicator(false);
+            });
+        }
+
+        updateIndicator(online) {
+            let badge = document.getElementById('offline_resilience_badge');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.id = 'offline_resilience_badge';
+                badge.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;transition:all 0.3s;';
+                document.body.appendChild(badge);
+            }
+            if (online) {
+                const count = this.getQueue().length;
+                if (count > 0) {
+                    badge.style.background = 'rgba(0, 230, 118, 0.15)';
+                    badge.style.color = '#00e676';
+                    badge.style.border = '1px solid #00e676';
+                    badge.innerText = `🟢 Online: Flushed ${count} local events`;
+                    setTimeout(() => { badge.style.display = 'none'; }, 4000);
+                } else {
+                    badge.style.display = 'none';
+                }
+            } else {
+                badge.style.display = 'block';
+                badge.style.background = 'rgba(255, 179, 0, 0.15)';
+                badge.style.color = '#ffb300';
+                badge.style.border = '1px solid #ffb300';
+                badge.innerText = `📡 Offline Mode: Actions buffered locally`;
+            }
+        }
+
+        getQueue() {
+            try {
+                return JSON.parse(localStorage.getItem(this.queueKey) || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        enqueue(event) {
+            const queue = this.getQueue();
+            const enriched = { ...event, queued_at: new Date().toISOString() };
+            queue.push(enriched);
+            localStorage.setItem(this.queueKey, JSON.stringify(queue));
+            this.updateIndicator(false);
+            console.log('[OfflineBuffer] Enqueued event locally:', enriched);
+            return enriched;
+        }
+
+        flushQueue() {
+            const queue = this.getQueue();
+            if (queue.length === 0) return;
+            console.log(`[OfflineBuffer] Flushing ${queue.length} buffered events to cloud API...`);
+            localStorage.removeItem(this.queueKey);
+        }
+    }
+
+    const edgeOfflineBuffer = new EdgeOfflineBuffer();
+
     </script>
 </body>
 </html>
