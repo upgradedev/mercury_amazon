@@ -1,48 +1,38 @@
-"""Unit tests for AWS AgentCore Session Adapter."""
+"""
+Unit tests for AWSAgentCoreSessionManager & Multi-Model Circuit Breaker.
+"""
+
 import pytest
-from src.infrastructure.agentcore_adapter import (
-    AWSAgentCoreSessionManager,
-    AgentCoreExecutionResult,
-)
+from src.infrastructure.agentcore_adapter import AWSAgentCoreSessionManager
 
-
-def test_agentcore_registration_and_invocation():
-    mgr = AWSAgentCoreSessionManager(agent_id="agent-ambient-hero")
+def test_session_lifecycle():
+    manager = AWSAgentCoreSessionManager()
+    session = manager.create_session("sess-100", "user-alex")
     
-    executed_events = []
-    def sample_executor(data):
-        executed_events.append(data)
+    assert session.session_id == "sess-100"
+    assert session.user_id == "user-alex"
+    assert len(session.conversation_history) == 0
+    
+    manager.append_message("sess-100", "user", "Synthesize AST diff")
+    retrieved = manager.get_session("sess-100")
+    assert len(retrieved.conversation_history) == 1
+    assert retrieved.conversation_history[0]["content"] == "Synthesize AST diff"
 
-    mgr.register_action_group(
-        name="BatchArrivalApproval",
-        description="Executes batch payments and calendar bookings",
-        api_schema={"type": "object"},
-        executor=sample_executor,
+def test_circuit_breaker_automatic_failover():
+    manager = AWSAgentCoreSessionManager()
+    
+    # Simulate primary Bedrock throttling (HTTP 429)
+    res = manager.invoke_with_circuit_breaker(
+        session_id="sess-cb-1",
+        user_prompt="Critical assistive wellness action",
+        simulate_primary_throttling=True
     )
-
-    res = mgr.invoke_agent(
-        session_id="session-user-123",
-        input_text="Please trigger BatchArrivalApproval for Maria",
-        session_attributes={"user_tier": "SANDWICH_PRO"},
-    )
-
-    assert res.status == "SUCCESS"
-    assert "BatchArrivalApproval" in res.action_groups_called
-    assert len(executed_events) == 1
-    assert res.guardrail_interventions == 0
-
-
-def test_agentcore_guardrail_intervention():
-    mgr = AWSAgentCoreSessionManager(agent_id="agent-governance")
-    res = mgr.invoke_agent(
-        session_id="session-456",
-        input_text="My credit_card is 4111-2222-3333-4444 and password is secret",
-    )
-    assert res.status == "GUARDRAIL_INTERVENED"
-    assert res.guardrail_interventions >= 1
-
-
-def test_agentcore_empty_input_rejected():
-    mgr = AWSAgentCoreSessionManager(agent_id="agent-test")
-    with pytest.raises(ValueError, match="cannot be empty"):
-        mgr.invoke_agent(session_id="s1", input_text="   ")
+    
+    assert res["status"] == "FAILOVER_SUCCESS"
+    assert res["circuit_breaker_active"] is True
+    assert res["model_used"] == "amazon.nova-pro-v1:0"
+    assert "CIRCUIT-BREAKER FAILOVER" in res["response"]
+    
+    session = manager.get_session("sess-cb-1")
+    assert session.circuit_breaker_triggered is True
+    assert len(session.conversation_history) == 2  # user prompt + assistant failover response
