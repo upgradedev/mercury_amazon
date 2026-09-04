@@ -106,9 +106,13 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
                 a1_passed = False
                 break
     evaluated["A1"] = GateResult("A1", "SOLID at module level (<800 lines)", a1_passed, f"All {len(py_files)} files < 800 lines" if a1_passed else "File exceeds 800 lines")
-    evaluated["A2"] = GateResult("A2", "YAGNI (Config knobs have active readers)", True, "Verified in domain and interface layers")
+    env_reads = sum(1 for fpath in py_files if "os.environ" in open(fpath, "r", encoding="utf-8").read())
+    a2_passed = env_reads > 0
+    evaluated["A2"] = GateResult("A2", "YAGNI (Config knobs have active readers)", a2_passed, f"Found {env_reads} active config readers in src")
     evaluated["A3"] = GateResult("A3", "KISS (Quickstart reachable in <=5 steps)", "Quickstart" in readme_content, "Quickstart present with <=5 steps")
-    evaluated["A4"] = GateResult("A4", "DRY (Contracts unified in domain)", True, "Domain entities serve as single source of truth")
+    app_files = glob.glob(os.path.join(repo_root, "src/application/**/*.py"), recursive=True)
+    imports_domain = any("from src.domain" in open(f, "r", encoding="utf-8").read() for f in app_files) if app_files else False
+    evaluated["A4"] = GateResult("A4", "DRY (Contracts unified in domain)", imports_domain, "Domain contracts unified and imported by application layers" if imports_domain else "Application does not import domain contracts")
 
     domain_files = glob.glob(os.path.join(repo_root, "src/domain/**/*.py"), recursive=True)
     a5_passed = True
@@ -120,13 +124,22 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
                 break
     evaluated["A5"] = GateResult("A5", "Separation of Concerns (Domain imports zero SDKs)", a5_passed, f"Domain clean across {len(domain_files)} files" if a5_passed else "Domain imports framework SDK")
     evaluated["A6"] = GateResult("A6", "Domain Driven Design (Bounded context directories)", os.path.exists(os.path.join(repo_root, "src/domain")), "src/domain and src/application present")
-    evaluated["A7"] = GateResult("A7", "Principle of Least Privilege (Write rejection tested)", True, "Tested in unit/integration suites")
+    test_files = glob.glob(os.path.join(repo_root, "tests/**/*.py"), recursive=True)
+    has_security_test = any(
+        any(kw in open(tf, "r", encoding="utf-8").read().lower() for kw in ["reject", "unauthorized", "401", "forbidden", "tamper", "least_privilege"])
+        for tf in test_files
+    )
+    evaluated["A7"] = GateResult("A7", "Principle of Least Privilege (Write rejection tested)", has_security_test, "Tested rejection of unauthorized/tampered requests in test suite" if has_security_test else "No security/rejection tests found")
 
     # --- Section B: Architecture and Compliance (B1 - B4) ---
     comp_doc = os.path.join(repo_root, "docs/COMPLIANCE_AND_ARCHITECTURE.md")
-    evaluated["B1"] = GateResult("B1", "Well-Architected 6 Pillars review", os.path.exists(comp_doc), "Documented in docs/COMPLIANCE_AND_ARCHITECTURE.md")
-    evaluated["B2"] = GateResult("B2", "EU AI Act Articles 10, 13, 14, 15, 50", os.path.exists(comp_doc), "Documented with residual gaps")
-    evaluated["B3"] = GateResult("B3", "GDPR Data Map documented", os.path.exists(comp_doc), "Documented data map")
+    comp_content = open(comp_doc, "r", encoding="utf-8").read() if os.path.exists(comp_doc) else ""
+    b1_passed = "well-architected" in comp_content.lower() and os.path.exists(comp_doc)
+    evaluated["B1"] = GateResult("B1", "Well-Architected 6 Pillars review", b1_passed, "Documented in docs/COMPLIANCE_AND_ARCHITECTURE.md" if b1_passed else "Missing Well-Architected review")
+    b2_passed = ("eu ai act" in comp_content.lower() or "article 14" in comp_content.lower()) and os.path.exists(comp_doc)
+    evaluated["B2"] = GateResult("B2", "EU AI Act Articles 10, 13, 14, 15, 50", b2_passed, "Documented with residual gaps" if b2_passed else "Missing EU AI Act section")
+    b3_passed = "gdpr" in comp_content.lower() and os.path.exists(comp_doc)
+    evaluated["B3"] = GateResult("B3", "GDPR Data Map documented", b3_passed, "Documented data map" if b3_passed else "Missing GDPR data map")
     evaluated["B4"] = GateResult("B4", "Never write 'compliant' or 'conformity'", "compliant" not in readme_content.lower() and "conformity" not in readme_content.lower(), "Zero forbidden compliance claims")
 
     # --- Section C: Tests and Coverage (C1 - C6) ---
@@ -223,7 +236,13 @@ def audit_project(repo_root: str = ".") -> list[GateResult]:
         except Exception:
             pass
     evaluated["G2"] = GateResult("G2", "Deployed SHA matches submitted commit", g2_passed, "Deployed commit SHA recorded in deployment receipt" if g2_passed else "no deploy has been run to match commit SHA")
-    evaluated["G3"] = GateResult("G3", "Claimed capabilities reachable in code", True, "Verified in MCP tools registry")
+    mcp_server_file = os.path.join(repo_root, "src/interfaces/mcp_server.py")
+    g3_passed = False
+    if os.path.exists(mcp_server_file):
+        with open(mcp_server_file, "r", encoding="utf-8") as f:
+            mcp_code = f.read()
+        g3_passed = ("@app.get" in mcp_code or "@app.post" in mcp_code) and "use_case" in mcp_code
+    evaluated["G3"] = GateResult("G3", "Claimed capabilities reachable in code", g3_passed, "Verified routes connect to application use cases" if g3_passed else "Routes not connected to use cases")
     evaluated["G4"] = GateResult("G4", "Zero competitor mentions", not any(c in readme_content.lower() for c in ["cockroach", "backblaze", "qwen", "xprize", "kaggle"]), "No competitor mentions")
 
     # --- Section H: UX (H1 - H3) ---
@@ -323,6 +342,12 @@ def main():
     print(f"  SUMMARY: {passed_count}/{total_count} PASSED, {failed_count}/{total_count} FAILED/PENDING")
     print("================================================================")
 
+    # In CI, exit with failure if any automated code-level gate failed
+    # Deployment sync (G2), browser journey (C5), and owner gates (E4, O1-O3) are recorded honestly as FAIL/PENDING
+    code_level_failed = [r for r in failed_gates if not r.gate_id.startswith("O") and r.gate_id not in ["E4", "C5", "G2"]]
+    if code_level_failed:
+        print(f"\n[FAIL-GATE] {len(code_level_failed)} automated code-level gates failed!")
+        sys.exit(1)
     sys.exit(0)
 
 

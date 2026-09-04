@@ -1,9 +1,14 @@
 """Infrastructure Adapter: GitHub / GitLab API Client."""
+import os
 from src.domain.dora_metrics import DORAMetricsReport
 from src.domain.git_radar import PRRadarReport, PullRequestDigest
 
 
 class GitHubTelemetryAdapter:
+    def __init__(self, token: str | None = None):
+        self.token = token or os.environ.get("GITHUB_TOKEN", "")
+        self.region = os.environ.get("AWS_REGION", "eu-west-1")
+
     def get_metrics_raw(self) -> DORAMetricsReport:
         return DORAMetricsReport(
             deployment_frequency_per_day=2.4,

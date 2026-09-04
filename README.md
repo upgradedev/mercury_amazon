@@ -1,6 +1,6 @@
 # Mercury: Voice CTO Cockpit & Engineering Intelligence
 
-> **Mercury equips VP of Engineering and CTOs with voice-driven DORA metrics, pull request bottleneck diagnostics, and AWS cloud cost anomaly alerts on Alexa+ and Fire TV.**
+> **Mercury equips VP of Engineering and CTOs with voice DORA metrics, PR bottleneck diagnostics, and AWS cost anomaly alerts on Fire TV.**
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
