@@ -30,7 +30,7 @@ Inspired by **Hermes (Mercury)**, the fleet-footed messenger god of trade and ra
 ## 3. How We Built It
 
 * **Architecture:** Clean Hexagonal Domain-Driven Design (DDD) with pure Python telemetry models.
-* **Voice Transport:** FastMCP Server over Streamable HTTP (Spec 2025-11-25+).
+* **Voice Transport:** FastMCP tool catalog server connecting voice clients and 10-foot interfaces.
 * **AWS Integration:** Read-only IAM access to AWS Cost Explorer and CloudWatch metrics.
 * **Zero-Setup Web Demo:** Interactive companion war room dashboard on `/demo`.
 
