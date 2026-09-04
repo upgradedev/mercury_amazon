@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Alexa+ MCP](https://img.shields.io/badge/Alexa%2B-Streamable%20HTTP-blue.svg)](https://developer.amazon.com)
+[![Fire TV App](https://img.shields.io/badge/Fire%20TV-Leanback%20Android%20App-orange.svg)](app/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20%26%20Cost%20Explorer-orange.svg)](https://aws.amazon.com)
-[![Tests](https://img.shields.io/badge/tests-24%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
+[![Tests](https://img.shields.io/badge/tests-42%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 
 ---
 
@@ -141,16 +141,26 @@ export AWS_REGION="us-east-1"
 ### 3. Run the automated test suite
 ```bash
 pytest tests/
-# Output: 23 passed in <3.0s
+# Output: 42 passed in <3.0s (94% coverage)
 ```
 
-### 4. Start the Mercury MCP server
+### 4. Build and Install Fire TV Leanback App (Fire OS / Android)
+```bash
+# Build the Fire OS / Android APK:
+./gradlew assembleDebug
+
+# Connect to Fire TV device or Fire TV emulator via ADB:
+adb connect <FIRE_TV_IP>:5555
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 5. Start the Mercury MCP server
 ```bash
 python -m src.interfaces.mcp_server
 ```
 
-### 5. Open the interactive War Room
-Navigate to `http://localhost:8002/` or `http://localhost:8002/demo` to query DORA metrics, inspect PR bottlenecks, and simulate production rollbacks.
+### 6. Open the interactive War Room
+Navigate to `http://localhost:8002/` or `http://localhost:8002/demo` to query DORA metrics, inspect PR bottlenecks, and navigate with D-Pad controls.
 
 ---
 
