@@ -1,6 +1,7 @@
 /**
- * Fire TV & Vega OS 10-Foot Leanback Spatial D-Pad Navigation & 6-Digit Pairing.
+ * Fire TV & Vega OS 10-Foot Leanback Spatial D-Pad Navigation & Incident Room Controller.
  * Handles remote control keycodes: DPAD_UP (38), DPAD_DOWN (40), DPAD_LEFT (37), DPAD_RIGHT (39), ENTER/SELECT (13).
+ * Exposes window.navigateDpad(direction) for native Android Leanback MainActivity.kt bridge.
  */
 
 class FireTVSpatialNavigator {
@@ -25,7 +26,7 @@ class FireTVSpatialNavigator {
     }
 
     refreshFocusableElements() {
-        this.focusableElements = Array.from(document.querySelectorAll('.btn, .nav-btn, .focusable, a, button, input'));
+        this.focusableElements = Array.from(document.querySelectorAll('.tv-nav, .btn, .nav-btn, .focusable, a, button, input'));
         if (this.focusableElements.length > 0) {
             this.focusElement(0);
         }
@@ -77,9 +78,34 @@ class FireTVSpatialNavigator {
     injectPairingBadge() {
         const el = document.getElementById('firetv-pairing-badge');
         if (el) {
-            el.innerHTML = `📺 Fire TV Pairing Code: <strong>${this.pairingCode}</strong> <span style="color:#00e676;">● Connected</span>`;
+            el.innerHTML = `📺 Fire TV Incident Cockpit: <strong>${this.pairingCode}</strong> <span style="color:#00e676;">● Active</span>`;
         }
     }
 }
 
 window.fireTVNav = new FireTVSpatialNavigator();
+
+// Native Android Leanback / Fire OS MainActivity.kt Bridge
+window.navigateDpad = function(direction) {
+    if (!window.fireTVNav) return;
+    const nav = window.fireTVNav;
+    switch(direction) {
+        case 'UP':
+            nav.focusElement(nav.currentIndex - 1);
+            break;
+        case 'DOWN':
+            nav.focusElement(nav.currentIndex + 1);
+            break;
+        case 'LEFT':
+            nav.focusElement(nav.currentIndex - 1);
+            break;
+        case 'RIGHT':
+            nav.focusElement(nav.currentIndex + 1);
+            break;
+        case 'SELECT':
+            if (nav.focusableElements[nav.currentIndex]) {
+                nav.focusableElements[nav.currentIndex].click();
+            }
+            break;
+    }
+};

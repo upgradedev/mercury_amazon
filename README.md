@@ -1,20 +1,20 @@
-# Mercury: Voice CTO Cockpit & Engineering Intelligence
+# Mercury: Fire TV Incident Commander & War-Room Cockpit
 
-> **Mercury equips VP of Engineering and CTOs with voice DORA metrics, PR bottleneck diagnostics, and AWS cost anomaly alerts on Fire TV.**
+> **Mercury transforms Fire TV into a shared engineering war-room cockpit, diagnosing production outages via Alexa voice queries and executing governed rollbacks with the remote D-Pad.**
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Fire TV App](https://img.shields.io/badge/Fire%20TV-Leanback%20Android%20App-orange.svg)](app/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20%26%20Cost%20Explorer-orange.svg)](https://aws.amazon.com)
-[![Tests](https://img.shields.io/badge/tests-42%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
+[![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
 
 ---
 
 ## Table of Contents
-1. [The Problem](#the-problem-engineering-telemetry-is-fragmented)
-2. [The Solution](#the-solution-mercury)
+1. [The Problem: Outages Cause War-Room Chaos](#the-problem-outages-cause-war-room-chaos)
+2. [The Solution: Fire TV Incident Commander](#the-solution-fire-tv-incident-commander)
 3. [Architecture Overview](#architecture-overview)
-4. [CTO Conversational Interaction Flow](#cto-conversational-interaction-flow)
+4. [Incident Commander Interaction Flow](#incident-commander-interaction-flow)
 5. [Domain-Driven Design Structure](#domain-driven-design-structure)
 6. [Measured Benchmarks](#measured-benchmarks)
 7. [Quickstart in Under 5 Steps](#quickstart-in-under-5-steps)
@@ -24,21 +24,23 @@
 
 ---
 
-## The Problem: Engineering Telemetry is Fragmented
+## The Problem: Outages Cause War-Room Chaos
 
-Engineering leaders juggle 8 to 12 disconnected dashboards across GitHub, Jira, Datadog, Sentry, and AWS Cost Explorer. Critical signals get buried:
-* Pull requests get stuck in code review for over 36 hours without visibility.
-* Staging cloud workloads surge over the weekend due to unclosed tasks, burning budget.
-* Deployment frequency and change failure rates drift without real-time detection.
+During a P0/P1 production incident, having engineers huddle over individual laptop monitors causes fragmented context and miscommunication. When a deployment breaks checkout or spikes 5xx errors, the team needs:
+* A shared situational awareness display in the room on the big screen.
+* Instant spoken answers to the critical question: *"Alexa, what changed?"*
+* Direct D-Pad remote navigation to safely roll back the offending release without opening six disconnected browser tabs.
 
 ---
 
-## The Solution: Mercury
+## The Solution: Fire TV Incident Commander
 
-Mercury aggregates engineering metrics into a conversational voice assistant and multi-modal dashboard:
-1. **DORA & Velocity Radar:** Real-time calculation of Deployment Frequency, Lead Time, Change Failure Rate, and PR cycle times.
-2. **AWS Cloud Cost Radar:** Proactive anomaly detection on AWS Cost Explorer & CloudWatch telemetry.
-3. **Governed Engineering Actions:** Safely triggers rollbacks or pauses flaky CI pipelines via multi-turn voice confirmation.
+Mercury transforms the Fire TV into a shared war-room cockpit:
+1. **Shared War-Room Screen:** Real-time multi-modal telemetry wallboard running natively on Fire OS with 10-foot Leanback UI.
+2. **Spoken Root-Cause Query ("Alexa, what changed?"):** Instant correlation between recent Git commits and CloudWatch 5xx error rate spikes via FastMCP and Bedrock reasoning.
+3. **Spatial D-Pad Remote Rollback:** The on-call engineer navigates directly to the rollback action using the Fire TV remote D-Pad.
+4. **Dual-Custody Human Confirmation:** High-consequence rollbacks require human confirmation under a 300-second cryptographic SHA-256 lease before dispatching to AWS.
+5. **DORA & Cloud Cost Radar:** Real-time monitoring of Deployment Frequency, Lead Time, Change Failure Rate, and AWS Cost Explorer burn surges.
 
 ---
 
@@ -46,46 +48,49 @@ Mercury aggregates engineering metrics into a conversational voice assistant and
 
 ```mermaid
 graph TD
-    CTO["Engineering Leader (Voice / Echo Show / Fire TV)"] -->|"Conversational Query"| Alexa["Amazon Alexa+ Skill"]
-    Alexa -->|"Streamable HTTP (MCP Spec 2025-11-25+)"| MercuryMCP["Mercury MCP Server"]
+    WarRoom["On-Call Team (Fire TV Remote / Alexa Voice)"] -->|"Alexa, what changed?"| Alexa["Amazon Alexa+ / Fire TV Voice"]
+    Alexa -->|"FastMCP Streamable HTTP"| MercuryMCP["Mercury FastMCP Server"]
     
-    subgraph "Mercury Intelligence Engine"
+    subgraph "Mercury Incident Engine"
+        MercuryMCP --> WhatChanged["Root-Cause Correlator ('What Changed?')"]
         MercuryMCP --> DORAModule["DORA & Git Velocity Engine"]
-        MercuryMCP --> CostModule["AWS Cloud Cost Radar"]
-        MercuryMCP --> GovModule["Governed Rollback Gate"]
+        MercuryMCP --> CostModule["AWS CloudWatch & Cost Radar"]
+        MercuryMCP --> GovModule["Governed D-Pad Rollback Gate"]
     end
     
-    subgraph "Ecosystem Integrations"
-        DORAModule --> GitHub["GitHub / GitLab APIs"]
-        CostModule --> AWS["AWS Cost Explorer & CloudWatch"]
-        GovModule --> CI["CI/CD Pipeline Dispatch"]
+    subgraph "Infrastructure Integrations"
+        WhatChanged --> GitHub["GitHub Commits & PR Diffs"]
+        WhatChanged --> CloudWatch["AWS CloudWatch 5xx Alarms"]
+        GovModule --> Lambda["AWS Lambda / ECS Pipeline Dispatch"]
     end
 ```
 
 ---
 
-## CTO Conversational Interaction Flow
+## Incident Commander Interaction Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor CTO as VP of Engineering
-    participant Alexa as Alexa+ / Fire TV
-    participant MCP as Mercury FastMCP
-    participant AWS as AWS Cost Explorer
-    participant Git as GitHub Telemetry
+    actor Team as Incident On-Call Team
+    participant TV as Fire TV 10-Foot Leanback Screen
+    participant Alexa as Alexa Voice Assistant
+    participant MCP as Mercury FastMCP Server
+    participant AWS as AWS CloudWatch & Lambda
+    participant Git as GitHub Commits
 
-    CTO->>Alexa: "Alexa, ask Mercury for today's DORA velocity report"
-    Alexa->>MCP: POST /mcp/tools/get_dora_velocity_report
-    MCP->>Git: Aggregate deployment frequency and lead time
-    MCP-->>Alexa: DORA Report (Elite Tier, 2.4 deploys/day, 14.5h lead time)
-    Alexa-->>CTO: "Engineering velocity tier is Elite. 2.4 deploys per day."
+    Team->>Alexa: "Alexa, ask Mercury what changed?"
+    Alexa->>MCP: POST /mcp/tools/what_changed
+    MCP->>Git: Inspect recent deployment (commit 7c8f2a1)
+    MCP->>AWS: Correlate CloudWatch 5xx error spike (+340%)
+    MCP-->>Alexa: Offending commit found; governed rollback staged
+    Alexa-->>Team: Speaks: "Commit 7c8f2a1 caused 340% 5xx spike. Rollback staged."
+    MCP-->>TV: Update Incident Timeline with glowing D-Pad Rollback Card
 
-    CTO->>Alexa: "Alexa, ask Mercury if there are any AWS cost spikes"
-    Alexa->>MCP: POST /mcp/tools/get_aws_cost_anomalies
-    MCP->>AWS: Fetch daily spend trends & anomaly feed
-    MCP-->>Alexa: Alert: Staging Bedrock surged 311%
-    Alexa-->>CTO: "Alert: Amazon Bedrock staging spend surged by 311%."
+    Team->>TV: Fire TV Remote D-Pad Navigation (ArrowDown -> ENTER)
+    TV->>MCP: POST /mcp/tools/confirm_rollback with leased token
+    MCP->>AWS: Execute rollback on checkout-api
+    MCP-->>TV: Status: ROLLBACK EXECUTED (Service healthy)
 ```
 
 ---

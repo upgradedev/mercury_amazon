@@ -200,6 +200,27 @@
           <div id="costOutput"><div class="empty-state-card"><span>ℹ️ Ready for cloud cost audit. Click Scan Cost Explorer or Stage Rollback.</span></div></div>
         </div>
       </div>
+
+      <!-- Panel 3: Fire TV Incident Commander & "What Changed?" -->
+      <div class="card" style="grid-column: 1 / -1; margin-top: 10px; border: 2px solid #7c3aed;">
+        <h2>🚨 Fire TV Incident Commander: Shared War-Room Cockpit</h2>
+        <p class="card-desc">
+          When an outage strikes, gather around the Fire TV. Ask <em>"Alexa, what changed?"</em> to correlate Git commits with CloudWatch error spikes, then use your D-pad remote to confirm governed rollbacks.
+        </p>
+
+        <div class="actions-bar" style="margin-top: 0;">
+          <button class="tv-nav" tabindex="0" title="Ask Alexa what changed to inspect offending commit and CloudWatch spike" onclick="queryWhatChanged()">🎙️ "Alexa, what changed?"</button>
+          <button class="btn-secondary tv-nav" tabindex="0" title="Confirm governed rollback via Fire TV Remote D-Pad" onclick="confirmDpadRollback()">🎯 D-Pad Confirm Rollback (PIN: ALPHA-77)</button>
+        </div>
+
+        <div class="console-box" id="incidentConsole">
+          <div class="console-header">
+            <span>Live Incident Stream &amp; Root-Cause Correlation</span>
+            <span id="incidentTag" class="tag tag-elite">SYSTEM NORMAL</span>
+          </div>
+          <div id="incidentOutput"><div class="empty-state-card"><span>ℹ️ No active outage. Press Enter on '"Alexa, what changed?"' to simulate root-cause diagnosis.</span></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -218,8 +239,10 @@
       document.getElementById('doraTag').innerText = 'ELITE PERFORMER';
       document.getElementById('doraOutput').innerHTML = 
         '<strong>DORA Rating:</strong> Elite Performer<br>' +
-        '<strong>Deploy Frequency:</strong> 2.4 deploys/day (Industry top decile)<br>' +
-        '<strong>Change Failure Rate:</strong> 3.2% (Target < 15%)<br>' +
+        '<strong>Deploy Frequency:</strong> 2.4 / day (Industry top decile)<br>' +
+        '<strong>Lead Time:</strong> 14.5 h<br>' +
+        '<strong>Change Failure:</strong> 3.2% (Target &lt; 15%)<br>' +
+        '<strong>Mean Recovery:</strong> 0.8 h<br>' +
         '<strong>Voice Summary:</strong> "Team velocity is healthy with 2.4 daily deploys and 0.8h MTTR."';
       speakVoiceDigest("Team velocity is rated Elite Performer with 2.4 daily deploys and 0.8 hour recovery time.");
     }
@@ -251,6 +274,29 @@
       speakVoiceDigest("Production rollback lease staged for payments API. 300 second lease active. Say: Alexa, approve rollback.");
     }
 
+    function queryWhatChanged() {
+      document.getElementById('incidentTag').className = 'tag tag-warn';
+      document.getElementById('incidentTag').innerText = 'P0 OUTAGE DETECTED';
+      document.getElementById('incidentOutput').innerHTML = 
+        '<span class="tag tag-warn">🚨 P0 INCIDENT</span> <strong>Service: checkout-api</strong><br>' +
+        '<strong>CloudWatch Anomaly:</strong> HTTPCode_Target_5XX_Count spiked <strong>+340% (34.2x)</strong>.<br>' +
+        '<strong>Offending Deployment:</strong> Commit <code>7c8f2a1</code> (<em>Merge PR #412: upgrade auth-session</em>) 14m ago.<br>' +
+        '<strong>Root-Cause Verdict:</strong> Session token validation timeout in auth layer.<br>' +
+        '<strong>Governed Recommendation:</strong> Roll back checkout-api to commit <code>3e9d10c</code> (Lease: 300s).';
+      speakVoiceDigest("P0 incident detected on checkout-api. Commit 7c8f2a1 caused 340% 5xx spike. Governed rollback to 3e9d10c is staged. Use D-pad to confirm.");
+    }
+
+    function confirmDpadRollback() {
+      document.getElementById('incidentTag').className = 'tag tag-elite';
+      document.getElementById('incidentTag').innerText = 'ROLLBACK EXECUTED';
+      document.getElementById('incidentOutput').innerHTML = 
+        '<span class="tag tag-elite">✅ ROLLBACK COMMITTED</span> <strong>Service: checkout-api</strong><br>' +
+        '<strong>Target SHA:</strong> <code>3e9d10c</code> | <strong>Verification:</strong> Dual-custody token ALPHA-77 valid.<br>' +
+        '<strong>CloudWatch Status:</strong> 5xx errors decaying to baseline (0.02%). Traffic normalized.<br>' +
+        '<strong>D-Pad Action:</strong> Executed via Fire TV Remote D-Pad.';
+      speakVoiceDigest("Rollback executed on checkout-api. Service restored to healthy baseline.");
+    }
+
     // 10-Foot D-Pad Keyboard Spatial Navigation
     let navElements = [];
     let currentFocus = 0;
@@ -261,6 +307,21 @@
         navElements[0].classList.add('tv-focused');
       }
     });
+
+    // Native Android Leanback / Fire OS MainActivity.kt Bridge
+    window.navigateDpad = function(direction) {
+      if (!navElements.length) return;
+      navElements[currentFocus].classList.remove('tv-focused');
+      if (direction === 'DOWN' || direction === 'RIGHT') {
+        currentFocus = (currentFocus + 1) % navElements.length;
+      } else if (direction === 'UP' || direction === 'LEFT') {
+        currentFocus = (currentFocus - 1 + navElements.length) % navElements.length;
+      } else if (direction === 'SELECT') {
+        navElements[currentFocus].click();
+      }
+      navElements[currentFocus].classList.add('tv-focused');
+      navElements[currentFocus].focus();
+    };
 
     window.addEventListener('keydown', (e) => {
       if (!navElements.length) return;

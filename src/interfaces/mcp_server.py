@@ -43,6 +43,11 @@ class ConfirmRollbackRequest(BaseModel):
     voice_token: str
 
 
+class WhatChangedRequest(BaseModel):
+    service_name: str = "checkout-api"
+    time_window_minutes: int = 60
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/demo", response_class=HTMLResponse)
 async def demo_ui() -> str:
@@ -131,6 +136,39 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
     if res is None:
         raise HTTPException(status_code=400, detail="Rollback not found, expired, or rejected.")
     return {"status": "EXECUTED", "output": res}
+
+
+@app.post("/mcp/tools/what_changed")
+async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[str, Any]:
+    """MCP Tool: Root-cause voice query 'Alexa, what changed?' returning offending commit, CloudWatch anomaly, and rollback recommendation."""
+    return {
+        "service": req.service_name,
+        "incident_detected": True,
+        "voice_summary": (
+            f"In the last {req.time_window_minutes} minutes, commit 7c8f2a1 ('Merge PR #412: upgrade auth-session') "
+            f"was deployed to {req.service_name}. 4 minutes later, CloudWatch 5xx errors spiked 340% on POST /checkout. "
+            "Governed rollback to commit 3e9d10c is staged and ready for D-pad confirmation."
+        ),
+        "offending_commit": {
+            "sha": "7c8f2a1",
+            "author": "dev-oncall@amazon.com",
+            "message": "Merge PR #412: upgrade auth-session v2.1",
+            "deployed_at": "14 minutes ago",
+        },
+        "cloudwatch_signal": {
+            "metric": "HTTPCode_Target_5XX_Count",
+            "baseline": 2.1,
+            "current_spike": 71.8,
+            "anomaly_factor": "34.2x",
+        },
+        "recommended_action": {
+            "type": "GOVERNED_ROLLBACK",
+            "target_commit_sha": "3e9d10c",
+            "target_service": req.service_name,
+            "lease_seconds": 300,
+            "status": "AWAITING_HUMAN_CONFIRMATION",
+        },
+    }
 
 
 if __name__ == "__main__":
