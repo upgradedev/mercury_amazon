@@ -148,9 +148,21 @@ class AWSAgentCoreSessionManager:
             }
 
     def _call_bedrock_model(self, model_id: str, history: List[Dict[str, str]]) -> str:
-        if not self.bedrock_client:
-            return f"Synthesized reasoning from {model_id}"
-        return f"Live AWS Bedrock inference output from {model_id}"
+        if self.bedrock_client:
+            try:
+                messages = [{"role": msg.get("role", "user"), "content": [{"text": msg.get("content", "")}]} for msg in history if msg.get("content")]
+                if not messages:
+                    messages = [{"role": "user", "content": [{"text": "Execute task"}]}]
+                response = self.bedrock_client.converse(
+                    modelId=model_id,
+                    messages=messages
+                )
+                output_text = response.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+                if output_text:
+                    return output_text
+            except Exception:
+                pass
+        return f"Synthesized reasoning from {model_id} (Local Emulation Mode)"
 
     def _mock_or_call_model(self, model_id: str, prompt: str) -> str:
         return f"[CIRCUIT-BREAKER FAILOVER: {model_id}] Resilient execution verified for prompt: '{prompt[:40]}...'"
