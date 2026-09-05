@@ -4,7 +4,7 @@
 
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-243%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-241%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -191,7 +191,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 243 passed
+# 241 passed
 ```
 
 ### 3. Start the server
@@ -292,7 +292,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 243 passed
+python -m pytest tests/ -q                                    # 241 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1031 statements
 node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
 python ci/readiness.py                                        # standards gate audit

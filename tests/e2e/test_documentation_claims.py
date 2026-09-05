@@ -16,10 +16,32 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 README = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 BENCHMARKS = json.loads((REPO_ROOT / "benchmarks_summary.json").read_text(encoding="utf-8"))
 
-MARKDOWN_FILES = [
-    p for p in REPO_ROOT.rglob("*.md")
-    if ".git" not in p.parts and "node_modules" not in p.parts
-]
+def _tracked_markdown() -> list[Path]:
+    """Markdown files git actually tracks, which is what a clone receives.
+
+    Deriving this from ``git ls-files`` rather than from a filesystem glob keeps
+    the collected test count identical in a clone and in a working checkout. That
+    matters because the README badge and readiness gate G1 are both pinned to the
+    collected count, and a count that depends on stray untracked files on one
+    machine makes those checks unreliable.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "*.md"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return sorted(REPO_ROOT / line for line in result.stdout.splitlines() if line.strip())
+    except Exception:
+        pass
+    # Outside a checkout, fall back to the tree so the tests still run.
+    return sorted(
+        p for p in REPO_ROOT.rglob("*.md")
+        if ".git" not in p.parts and "node_modules" not in p.parts
+    )
+
+
+MARKDOWN_FILES = _tracked_markdown()
 
 
 # ------------------------------------------------ Numbers match their source

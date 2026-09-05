@@ -62,7 +62,7 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 243 passed |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 241 passed |
 | Line coverage at or above 85 percent | Met | `python -m pytest tests/ --cov=src`, 92 percent |
 | Every rollback denial reason has a failing-input test | Met | 8 distinct reasons asserted in `tests/integration/test_rollback_authorization.py` |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py` |
