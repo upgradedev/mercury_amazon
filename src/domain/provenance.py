@@ -12,6 +12,7 @@ class DataSource(str, Enum):
     """Where a telemetry report actually came from."""
 
     GITHUB_API = "github-api"
+    LOCAL_GIT = "local-git"
     AWS_COST_EXPLORER = "aws-cost-explorer"
     AWS_CLOUDWATCH = "aws-cloudwatch"
     OFFLINE_FIXTURE = "offline-fixture"

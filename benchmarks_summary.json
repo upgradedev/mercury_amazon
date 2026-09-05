@@ -1,16 +1,51 @@
 {
-  "dora_velocity_engine": {
-    "iterations": 1000,
-    "mean_ms": 0.0025,
-    "p50_ms": 0.0024,
-    "p95_ms": 0.0026,
-    "p99_ms": 0.0034
-  },
-  "cost_anomaly_scanner": {
-    "iterations": 1000,
-    "mean_ms": 0.0044,
-    "p50_ms": 0.0043,
-    "p95_ms": 0.0046,
-    "p99_ms": 0.0052
+  "schema": "mercury.benchmarks/2",
+  "note": "Measured in-process against the ASGI application with fastapi TestClient. Excludes network transit, so these are a floor for a local run, not a field measurement from a Fire TV on a home network.",
+  "measured_at_utc": "2026-09-05T05:57:31Z",
+  "measured_by_command": "python scripts/benchmark_suite.py",
+  "python_version": "3.11.0",
+  "platform": "win32",
+  "data_mode": "offline-fixture (no GITHUB_TOKEN and no AWS credentials present)",
+  "results": {
+    "get_dora_velocity_report": {
+      "iterations": 60,
+      "mean_ms": 3.3595,
+      "p50_ms": 3.1522,
+      "p95_ms": 4.7143,
+      "p99_ms": 6.2955,
+      "max_ms": 6.2955
+    },
+    "get_pr_bottlenecks": {
+      "iterations": 60,
+      "mean_ms": 2.9547,
+      "p50_ms": 2.9087,
+      "p95_ms": 3.7142,
+      "p99_ms": 5.2417,
+      "max_ms": 5.2417
+    },
+    "get_aws_cost_anomalies": {
+      "iterations": 60,
+      "mean_ms": 315.6454,
+      "p50_ms": 305.9443,
+      "p95_ms": 388.5268,
+      "p99_ms": 610.9683,
+      "max_ms": 610.9683
+    },
+    "what_changed": {
+      "iterations": 60,
+      "mean_ms": 99.1836,
+      "p50_ms": 77.9933,
+      "p95_ms": 309.248,
+      "p99_ms": 318.99,
+      "max_ms": 318.99
+    },
+    "governance_token_mint_and_verify": {
+      "iterations": 2000,
+      "mean_ms": 0.0166,
+      "p50_ms": 0.015,
+      "p95_ms": 0.0325,
+      "p99_ms": 0.0619,
+      "max_ms": 0.1918
+    }
   }
 }

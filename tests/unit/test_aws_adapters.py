@@ -26,6 +26,13 @@ class StubCostExplorer:
         return self.payload
 
 
+@pytest.fixture(autouse=True)
+def live_paths_enabled(monkeypatch):
+    """conftest forces MERCURY_OFFLINE on for the suite; these tests exercise both
+    sides of that switch, so the default here is off and the offline cases opt in."""
+    monkeypatch.delenv("MERCURY_OFFLINE", raising=False)
+
+
 def cost_bucket(day: str, entries: dict[str, str]):
     return {
         "TimePeriod": {"Start": day, "End": day},
@@ -210,3 +217,94 @@ def test_simulation_can_be_switched_to_a_healthy_series():
     series = adapter.get_error_series("checkout-api")
     assert series.latest.value == pytest.approx(series.baseline_mean())
     assert "flat and healthy" in series.provenance.detail
+
+
+# ----------------------------------------------------------------- Offline mode
+
+def test_offline_mode_suppresses_the_cost_call_even_with_a_client(monkeypatch):
+    """MERCURY_OFFLINE must win over a working client, or the tests spend money."""
+    monkeypatch.setenv("MERCURY_OFFLINE", "1")
+    stub = StubCostExplorer({"ResultsByTime": [cost_bucket("2026-09-01", {"AmazonEC2": "1.00"})]})
+    report = AWSCostAdapter(client=stub).fetch_cost_report()
+    assert report.provenance.is_live is False
+    assert "MERCURY_OFFLINE is set" in report.provenance.detail
+    assert stub.calls == [], "no Cost Explorer request may be issued in offline mode"
+
+
+def test_offline_mode_suppresses_the_cloudwatch_call(monkeypatch):
+    monkeypatch.setenv("MERCURY_OFFLINE", "1")
+    stub = StubCloudWatch([{"Timestamp": datetime.now(timezone.utc), "Sum": 5.0}])
+    series = CloudWatchMetricAdapter(client=stub).get_error_series("checkout-api")
+    assert series.provenance.is_live is False
+    assert stub.calls == []
+
+
+def test_offline_mode_can_never_make_a_fixture_look_live(monkeypatch):
+    monkeypatch.setenv("MERCURY_OFFLINE", "1")
+    report = AWSCostAdapter(client=StubCostExplorer({"ResultsByTime": []})).fetch_cost_report()
+    assert report.provenance.display_label == "OFFLINE FIXTURE"
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("1", True), ("true", True), ("TRUE", True), ("yes", True), ("on", True),
+    ("0", False), ("false", False), ("", False), ("no", False),
+])
+def test_offline_flag_parsing(monkeypatch, value, expected):
+    from src.infrastructure.offline_mode import offline_mode_enabled
+
+    monkeypatch.setenv("MERCURY_OFFLINE", value)
+    assert offline_mode_enabled() is expected
+
+
+def test_offline_flag_defaults_to_off(monkeypatch):
+    from src.infrastructure.offline_mode import offline_mode_enabled
+
+    monkeypatch.delenv("MERCURY_OFFLINE", raising=False)
+    assert offline_mode_enabled() is False
+
+
+# ----------------------------------------------------------------- Cost caching
+
+def test_a_successful_cost_report_is_cached_so_aws_is_not_billed_per_refresh(monkeypatch):
+    stub = StubCostExplorer({"ResultsByTime": [
+        cost_bucket("2026-09-01", {"AmazonEC2": "10.00"}),
+        cost_bucket("2026-09-02", {"AmazonEC2": "10.00"}),
+    ]})
+    adapter = AWSCostAdapter(client=stub)
+
+    first = adapter.fetch_cost_report()
+    second = adapter.fetch_cost_report()
+
+    assert len(stub.calls) == 1, "the second refresh must be served from cache"
+    assert first.total_month_to_date_usd == second.total_month_to_date_usd
+    assert "Cached for" in first.provenance.detail
+
+
+def test_the_cost_cache_expires(monkeypatch):
+    import src.infrastructure.aws_cost_adapter as module
+
+    monkeypatch.setattr(module, "CACHE_TTL_SECONDS", -1.0)
+    stub = StubCostExplorer({"ResultsByTime": [cost_bucket("2026-09-01", {"AmazonEC2": "10.00"})]})
+    adapter = module.AWSCostAdapter(client=stub)
+
+    adapter.fetch_cost_report()
+    adapter.fetch_cost_report()
+    assert len(stub.calls) == 2
+
+
+def test_the_cost_cache_can_be_invalidated(monkeypatch):
+    stub = StubCostExplorer({"ResultsByTime": [cost_bucket("2026-09-01", {"AmazonEC2": "10.00"})]})
+    adapter = AWSCostAdapter(client=stub)
+    adapter.fetch_cost_report()
+    adapter.invalidate_cache()
+    adapter.fetch_cost_report()
+    assert len(stub.calls) == 2
+
+
+def test_a_failed_cost_call_is_not_cached(monkeypatch):
+    """A transient AWS failure must not pin the wallboard to the fixture."""
+    stub = StubCostExplorer(None, error=RuntimeError("ThrottlingException"))
+    adapter = AWSCostAdapter(client=stub)
+    adapter.fetch_cost_report()
+    adapter.fetch_cost_report()
+    assert len(stub.calls) == 2

@@ -14,16 +14,23 @@ from __future__ import annotations
 
 import calendar
 import json
+import logging
 import os
+import time
 from datetime import date, datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from src.domain.cloud_cost import CloudCostReport, CostAnomaly
 from src.domain.provenance import DataSource, Provenance
+from src.infrastructure.offline_mode import OFFLINE_REASON, offline_mode_enabled
 
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "aws_cost_fixture.json"
 ANOMALY_THRESHOLD_PCT = 50.0
+CACHE_TTL_SECONDS = 900.0
+
+logger = logging.getLogger(__name__)
 
 
 def _iso_now() -> str:
@@ -50,11 +57,30 @@ class AWSCostAdapter:
         self._client = client
         self.region = region or os.environ.get("AWS_COST_EXPLORER_REGION", "us-east-1")
         self.anomaly_threshold_pct = anomaly_threshold_pct
+        self._resolution_cached = False
+        self._resolved_client: Any = None
+        self._cache: tuple[float, CloudCostReport] | None = None
+
+    def _cached_report(self) -> CloudCostReport | None:
+        """Return the cached live report while it is still within its TTL."""
+        if self._cache is None:
+            return None
+        cached_at, report = self._cache
+        if time.time() - cached_at > CACHE_TTL_SECONDS:
+            self._cache = None
+            return None
+        return report
+
+    def invalidate_cache(self) -> None:
+        """Drop the cached report so the next call goes back to Cost Explorer."""
+        self._cache = None
 
     # -------------------------------------------------------------- Fixtures
 
     @staticmethod
+    @lru_cache(maxsize=1)
     def _load_fixture() -> dict[str, Any]:
+        """Read the recorded fixture. Cached, so editing it needs a restart."""
         with open(FIXTURE_PATH, "r", encoding="utf-8") as handle:
             return json.load(handle)
 
@@ -83,18 +109,35 @@ class AWSCostAdapter:
     # ------------------------------------------------------------------ boto3
 
     def _resolve_client(self) -> Any:
-        """Return a Cost Explorer client, or None when credentials do not resolve."""
+        """Return a Cost Explorer client, or None when credentials do not resolve.
+
+        The outcome is cached, including the None outcome. Resolving credentials
+        walks the whole boto3 provider chain, which on a machine with no
+        credentials includes an instance-metadata probe that must time out; doing
+        that per request added over a second to every cost call.
+        """
         if self._client is not None:
             return self._client
+        if self._resolution_cached:
+            return self._resolved_client
+
+        self._resolution_cached = True
         try:
             import boto3  # imported lazily so the package stays importable without boto3
 
             session = boto3.session.Session()
             if session.get_credentials() is None:
-                return None
-            return session.client("ce", region_name=self.region)
+                self._resolved_client = None
+            else:
+                self._resolved_client = session.client("ce", region_name=self.region)
         except Exception:
-            return None
+            self._resolved_client = None
+        return self._resolved_client
+
+    def reset_credential_cache(self) -> None:
+        """Force the next call to resolve credentials again."""
+        self._resolution_cached = False
+        self._resolved_client = None
 
     # ------------------------------------------------------------ Computation
 
@@ -171,7 +214,20 @@ class AWSCostAdapter:
     # ------------------------------------------------------------- Public API
 
     def fetch_cost_report(self) -> CloudCostReport:
-        """Return month-to-date spend, live from Cost Explorer when possible."""
+        """Return month-to-date spend, live from Cost Explorer when possible.
+
+        Successful results are cached for :data:`CACHE_TTL_SECONDS`. Two reasons,
+        both real: AWS bills roughly one cent per Cost Explorer request, and the
+        underlying data only refreshes daily, so polling it per wallboard refresh
+        would spend money to receive the same answer.
+        """
+        if offline_mode_enabled():
+            return self._fixture_report(OFFLINE_REASON)
+
+        cached = self._cached_report()
+        if cached is not None:
+            return cached
+
         client = self._resolve_client()
         if client is None:
             return self._fixture_report(
@@ -195,7 +251,7 @@ class AWSCostAdapter:
                 days_in_month,
                 self.anomaly_threshold_pct,
             )
-            return CloudCostReport(
+            report = CloudCostReport(
                 total_month_to_date_usd=total,
                 projected_end_of_month_usd=projected,
                 anomalies=anomalies,
@@ -204,12 +260,20 @@ class AWSCostAdapter:
                     detail=(
                         f"AWS Cost Explorer GetCostAndUsage, DAILY granularity grouped by SERVICE, "
                         f"{start} to {end} ({elapsed_days} elapsed days). Cost Explorer lags by up "
-                        "to 24 hours, so the newest day may be partial."
+                        f"to 24 hours, so the newest day may be partial. Cached for "
+                        f"{CACHE_TTL_SECONDS:.0f}s because AWS bills per Cost Explorer request."
                     ),
                     observed_at_utc=_iso_now(),
                 ),
             )
         except Exception as exc:
+            # Broad on purpose: any botocore error must degrade to the labelled
+            # fixture rather than take the wallboard down. Logged so a real
+            # failure is diagnosable instead of silently looking like fixture mode.
+            logger.warning("Cost Explorer call failed: %s: %s", type(exc).__name__, exc)
             return self._fixture_report(
                 f"Cost Explorer call failed ({type(exc).__name__}: {exc})."
             )
+
+        self._cache = (time.time(), report)
+        return report

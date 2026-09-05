@@ -7,8 +7,10 @@ the server generates when the variable is unset.
 import os
 
 os.environ.setdefault("MERCURY_ROLLBACK_SECRET", "test-secret-do-not-use-in-production")
-# Keep the suite off the network: without a token the GitHub adapter serves its
-# recorded fixture, which is what these tests assert against.
+# Keep the suite off the network whatever credentials the machine happens to
+# have. Without this the cost endpoint makes a real, billable Cost Explorer
+# request on any developer machine with an AWS profile configured.
+os.environ["MERCURY_OFFLINE"] = "1"
 os.environ.pop("GITHUB_TOKEN", None)
 
 import pytest  # noqa: E402

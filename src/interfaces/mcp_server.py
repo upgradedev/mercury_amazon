@@ -35,12 +35,25 @@ from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
 from src.infrastructure.cloudwatch_github_ingest import DevOpsTelemetryIngestAdapter
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
+from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 
 logger = logging.getLogger("mercury.mcp")
 
 WEB_DIR = Path(__file__).resolve().parent.parent.parent / "docs"
 MAX_STALE_PRS_ON_SCREEN = 6
+
+# The only file types the cockpit route will serve out of docs/. Markdown is
+# deliberately absent: docs/ also holds the project's written documentation and
+# the API server has no business handing it out.
+COCKPIT_ASSET_TYPES = {
+    ".js": "application/javascript",
+    ".json": "application/json",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+}
 
 app = FastAPI(
     title="Mercury Fire TV Incident Commander",
@@ -100,7 +113,8 @@ cloudwatch_adapter = CloudWatchMetricAdapter()
 dora_use_case = CalculateDORAUseCase(github_adapter)
 cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
-incident_use_case = DiagnoseIncidentUseCase(cloudwatch_adapter, github_adapter)
+local_git_provider = LocalGitCommitProvider()
+incident_use_case = DiagnoseIncidentUseCase(cloudwatch_adapter, github_adapter, local_git_provider)
 rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET)
 recommendation_engine = DynamicRecommendationEngine()
 telemetry_detector = TelemetryAbsenceDetector()
@@ -449,13 +463,27 @@ if WEB_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
-@app.get("/{asset_name}.js")
-async def serve_cockpit_script(asset_name: str):
-    """Serve the cockpit's scripts next to the page, matching the Pages layout."""
-    candidate = (WEB_DIR / f"{asset_name}.js").resolve()
-    if candidate.parent != WEB_DIR.resolve() or not candidate.exists():
+@app.get("/{asset_name}")
+async def serve_cockpit_asset(asset_name: str):
+    """Serve the cockpit's sibling assets at the paths the page requests them from.
+
+    The page is written once and served from both GitHub Pages and this server, so
+    it links its script, manifest and service worker relatively. This route makes
+    those relative links resolve here too.
+
+    Only the extensions in :data:`COCKPIT_ASSET_TYPES` are served, and only files
+    that resolve to a direct child of ``docs/``, so this cannot be walked out of
+    the directory into the rest of the repository.
+    """
+    suffix = Path(asset_name).suffix.lower()
+    media_type = COCKPIT_ASSET_TYPES.get(suffix)
+    if media_type is None:
         raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse(candidate, media_type="application/javascript")
+
+    candidate = (WEB_DIR / asset_name).resolve()
+    if candidate.parent != WEB_DIR.resolve() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(candidate, media_type=media_type)
 
 
 if __name__ == "__main__":

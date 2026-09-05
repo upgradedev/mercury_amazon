@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,7 @@ import httpx
 from src.domain.dora_metrics import DORAMetricsReport
 from src.domain.git_radar import STALE_REVIEW_SLA_HOURS, PRRadarReport, PullRequestDigest
 from src.domain.provenance import DataSource, Provenance
+from src.infrastructure.offline_mode import offline_mode_enabled
 
 GITHUB_API_ROOT = "https://api.github.com"
 DEFAULT_REPO = "upgradedev/mercury_amazon"
@@ -104,6 +106,8 @@ class GitHubTelemetryAdapter:
 
     @property
     def can_call_live(self) -> bool:
+        if offline_mode_enabled() and self._client is None:
+            return False
         return bool(self.token) or self._allow_unauthenticated
 
     def _headers(self) -> dict[str, str]:
@@ -153,7 +157,9 @@ class GitHubTelemetryAdapter:
     # -------------------------------------------------------------- Fixtures
 
     @staticmethod
+    @lru_cache(maxsize=1)
     def _load_fixture() -> dict[str, Any]:
+        """Read the recorded fixture. Cached, so editing it needs a restart."""
         with open(FIXTURE_PATH, "r", encoding="utf-8") as handle:
             return json.load(handle)
 

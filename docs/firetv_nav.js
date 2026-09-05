@@ -78,6 +78,15 @@
       .filter(isVisible);
   };
 
+  /** True when the element's box is already wholly inside the viewport. */
+  function isFullyInViewport(element) {
+    var rect = element.getBoundingClientRect();
+    var height = (window.innerHeight || 0);
+    var width = (window.innerWidth || 0);
+    if (!height || !width) return true;
+    return rect.top >= 0 && rect.left >= 0 && rect.bottom <= height && rect.right <= width;
+  }
+
   SpatialNavigator.prototype.setFocus = function (element) {
     if (!element) return;
     var previous = document.querySelector('.' + FOCUS_CLASS);
@@ -85,7 +94,10 @@
     element.classList.add(FOCUS_CLASS);
     this.current = element;
     if (typeof element.focus === 'function') element.focus({ preventScroll: true });
-    if (typeof element.scrollIntoView === 'function') {
+    // Scroll only when the target is not already wholly visible. Calling
+    // scrollIntoView unconditionally made the page jump on load, which on a TV
+    // reads as the wallboard glitching the moment it is switched on.
+    if (typeof element.scrollIntoView === 'function' && !isFullyInViewport(element)) {
       element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   };

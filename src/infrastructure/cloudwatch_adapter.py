@@ -18,11 +18,13 @@ from typing import Any
 
 from src.domain.incident_correlation import MetricPoint, MetricSeries
 from src.domain.provenance import DataSource, Provenance
+from src.infrastructure.offline_mode import OFFLINE_REASON, offline_mode_enabled
 
 DEFAULT_NAMESPACE = "AWS/ApplicationELB"
 DEFAULT_METRIC = "HTTPCode_Target_5XX_Count"
 SIMULATED_BASELINE = 2.0
 SIMULATED_SPIKE = 68.0
+ANCHOR_OFFSET_MINUTES = 4
 
 
 def _iso_now() -> str:
@@ -52,28 +54,60 @@ class CloudWatchMetricAdapter:
         if simulate_incident is None:
             simulate_incident = os.environ.get("MERCURY_SIMULATE_INCIDENT", "1") not in ("0", "false", "False")
         self.simulate_incident = simulate_incident
+        self._resolution_cached = False
+        self._resolved_client: Any = None
 
     def _resolve_client(self) -> Any:
+        """Return a CloudWatch client, or None when credentials do not resolve.
+
+        Cached for the same reason as the Cost Explorer adapter: walking the
+        boto3 credential chain on a machine without credentials waits on an
+        instance-metadata probe, and doing it per request made every incident
+        query take most of a second.
+        """
         if self._client is not None:
             return self._client
+        if self._resolution_cached:
+            return self._resolved_client
+
+        self._resolution_cached = True
         try:
             import boto3
 
             session = boto3.session.Session()
             if session.get_credentials() is None:
-                return None
-            return session.client("cloudwatch", region_name=self.region)
+                self._resolved_client = None
+            else:
+                self._resolved_client = session.client("cloudwatch", region_name=self.region)
         except Exception:
-            return None
+            self._resolved_client = None
+        return self._resolved_client
+
+    def reset_credential_cache(self) -> None:
+        """Force the next call to resolve credentials again."""
+        self._resolution_cached = False
+        self._resolved_client = None
 
     # ------------------------------------------------------------ Simulation
 
-    def _simulated_series(self, service_name: str, reason: str, window_minutes: int) -> MetricSeries:
-        """Build a deterministic local series, labelled as generated rather than read."""
-        now = datetime.now(timezone.utc)
+    def _simulated_series(
+        self,
+        service_name: str,
+        reason: str,
+        window_minutes: int,
+        anchor_at: datetime | None = None,
+    ) -> MetricSeries:
+        """Build a deterministic local series, labelled as generated rather than read.
+
+        When ``anchor_at`` is given, the final reading is placed a few minutes
+        after it. The caller passes the newest known commit time, so the demo
+        correlation is coherent. This only ever moves simulated points; a live
+        CloudWatch reading never reaches this method.
+        """
+        end = (anchor_at + timedelta(minutes=ANCHOR_OFFSET_MINUTES)) if anchor_at else datetime.now(timezone.utc)
         step = max(window_minutes // 6, 1)
         points = [
-            MetricPoint(at=now - timedelta(minutes=step * (6 - index)), value=SIMULATED_BASELINE)
+            MetricPoint(at=end - timedelta(minutes=step * (5 - index)), value=SIMULATED_BASELINE)
             for index in range(6)
         ]
         if self.simulate_incident:
@@ -89,7 +123,14 @@ class CloudWatchMetricAdapter:
                 detail=(
                     f"{reason} These {len(points)} data points for {service_name} were generated "
                     f"locally by CloudWatchMetricAdapter ({shape}) and were never read from "
-                    "CloudWatch. Set MERCURY_SIMULATE_INCIDENT=0 for a healthy series."
+                    "CloudWatch."
+                    + (
+                        f" The final reading is placed {ANCHOR_OFFSET_MINUTES} minutes after the "
+                        "newest known commit so the correlation is demonstrable; the commits are "
+                        "real, this metric is not."
+                        if anchor_at is not None else ""
+                    )
+                    + " Set MERCURY_SIMULATE_INCIDENT=0 for a healthy series."
                 ),
                 observed_at_utc=_iso_now(),
             ),
@@ -101,17 +142,22 @@ class CloudWatchMetricAdapter:
         self,
         service_name: str,
         window_minutes: int = 60,
+        anchor_at: datetime | None = None,
         namespace: str = DEFAULT_NAMESPACE,
         metric_name: str = DEFAULT_METRIC,
         dimension_name: str = "LoadBalancer",
     ) -> MetricSeries:
         """Return the error metric series for a service over the recent window."""
+        if offline_mode_enabled():
+            return self._simulated_series(service_name, OFFLINE_REASON, window_minutes, anchor_at)
+
         client = self._resolve_client()
         if client is None:
             return self._simulated_series(
                 service_name,
                 "No AWS credentials resolved, so no CloudWatch call was attempted.",
                 window_minutes,
+                anchor_at,
             )
 
         try:
@@ -143,6 +189,7 @@ class CloudWatchMetricAdapter:
                         f"in the last {window_minutes} minutes."
                     ),
                     window_minutes,
+                    anchor_at,
                 )
             return MetricSeries(
                 metric_name=metric_name,
@@ -163,4 +210,5 @@ class CloudWatchMetricAdapter:
                 service_name,
                 f"CloudWatch call failed ({type(exc).__name__}: {exc}).",
                 window_minutes,
+                anchor_at,
             )

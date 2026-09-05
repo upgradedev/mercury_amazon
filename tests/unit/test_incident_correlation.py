@@ -132,3 +132,127 @@ def test_provenance_travels_through_the_correlator():
 def test_baseline_mean_excludes_the_latest_point():
     assert series([1, 2, 3, 100]).baseline_mean() == pytest.approx(2.0)
     assert series([1, 2, 3, 100]).baseline_mean(exclude_latest=False) == pytest.approx(26.5)
+
+
+# ------------------------------------------------- Local git commit provider
+
+def test_local_git_provider_reads_real_commits_from_this_checkout():
+    from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+
+    provider = LocalGitCommitProvider()
+    if not provider.is_available:
+        pytest.skip("not running inside a git checkout")
+
+    commits = provider.list_recent_commits(limit=5)
+    assert commits, "git log returned nothing in a repository that has commits"
+    for commit in commits:
+        assert commit["sha"]
+        assert commit["author"]
+        assert commit["committed_at"]
+        # An ISO-8601 timestamp git actually produced, not a placeholder.
+        datetime.fromisoformat(commit["committed_at"])
+
+
+def test_local_git_provider_returns_nothing_outside_a_checkout(tmp_path):
+    from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+
+    provider = LocalGitCommitProvider(repo_root=tmp_path)
+    assert provider.is_available is False
+    assert provider.list_recent_commits() == []
+
+
+def test_local_git_provider_respects_the_limit():
+    from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+
+    provider = LocalGitCommitProvider()
+    if not provider.is_available:
+        pytest.skip("not running inside a git checkout")
+    assert len(provider.list_recent_commits(limit=2)) <= 2
+
+
+# ------------------------------------------------------------ Use case wiring
+
+class _NoCommits:
+    def list_recent_commits(self, limit=10):
+        return []
+
+
+class _SomeCommits:
+    def __init__(self, entries):
+        self.entries = entries
+
+    def list_recent_commits(self, limit=10):
+        return self.entries[:limit]
+
+
+class _RecordingMetrics:
+    def __init__(self, series_to_return):
+        self.series = series_to_return
+        self.anchor_seen = "unset"
+
+    def get_error_series(self, service_name, window_minutes=60, anchor_at=None):
+        self.anchor_seen = anchor_at
+        return self.series
+
+
+def test_use_case_falls_back_from_github_to_local_git():
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+    from src.domain.provenance import DataSource as DS
+
+    entries = [{"sha": "abc1234", "message": "real", "author": "Dev",
+                "committed_at": (NOW - timedelta(minutes=20)).isoformat()}]
+    metrics = _RecordingMetrics(series([2, 2, 2, 2, 70]))
+    use_case = DiagnoseIncidentUseCase(metrics, _NoCommits(), _SomeCommits(entries))
+
+    result = use_case.execute("checkout-api")
+    assert result.commit_provenance.source is DS.LOCAL_GIT
+    assert "git log" in result.commit_provenance.detail
+
+
+def test_use_case_prefers_github_when_it_returns_commits():
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+    from src.domain.provenance import DataSource as DS
+
+    entries = [{"sha": "gh12345", "message": "from github", "author": "Dev",
+                "committed_at": (NOW - timedelta(minutes=20)).isoformat()}]
+    local = _SomeCommits([{"sha": "local11", "message": "local", "author": "Dev",
+                           "committed_at": (NOW - timedelta(minutes=5)).isoformat()}])
+    metrics = _RecordingMetrics(series([2, 2, 2, 2, 70]))
+    use_case = DiagnoseIncidentUseCase(metrics, _SomeCommits(entries), local)
+
+    result = use_case.execute("checkout-api")
+    assert result.commit_provenance.source is DS.GITHUB_API
+
+
+def test_use_case_reports_no_commits_rather_than_inventing_them():
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+    from src.domain.provenance import DataSource as DS
+
+    metrics = _RecordingMetrics(series([2, 2, 2, 2, 70]))
+    use_case = DiagnoseIncidentUseCase(metrics, _NoCommits(), _NoCommits())
+
+    result = use_case.execute("checkout-api")
+    assert result.commit_provenance.source is DS.OFFLINE_FIXTURE
+    assert "does not invent commits" in result.commit_provenance.detail
+    assert result.offending_commit is None
+
+
+def test_the_newest_commit_time_is_passed_as_the_simulation_anchor():
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+
+    newest = NOW - timedelta(minutes=10)
+    entries = [
+        {"sha": "old1234", "message": "old", "author": "D", "committed_at": (NOW - timedelta(hours=5)).isoformat()},
+        {"sha": "new1234", "message": "new", "author": "D", "committed_at": newest.isoformat()},
+    ]
+    metrics = _RecordingMetrics(series([2, 2, 2, 2, 70]))
+    DiagnoseIncidentUseCase(metrics, _SomeCommits(entries)).execute("checkout-api")
+    assert metrics.anchor_seen == newest
+
+
+def test_no_anchor_is_passed_when_there_are_no_commits():
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+
+    metrics = _RecordingMetrics(series([2, 2, 2]))
+    DiagnoseIncidentUseCase(metrics, _NoCommits()).execute("checkout-api")
+    assert metrics.anchor_seen is None

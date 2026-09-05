@@ -87,13 +87,36 @@ def test_what_changed_returns_a_verdict_and_both_provenances(client):
     assert "commit_provenance" in data
 
 
-def test_what_changed_does_not_name_a_commit_without_commit_data(client):
-    """Without a GitHub token there are no commits, so nothing may be blamed."""
+def test_what_changed_falls_back_to_real_local_commits_not_invented_ones(client):
+    """Without a GitHub token the commits come from git log, and say so."""
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
-    assert data["commit_provenance"]["is_live"] is False
-    assert data["offending_commit"] is None
-    assert data["recommended_action"] is None
-    assert data["verdict"] in ("ANOMALY_WITHOUT_ATTRIBUTION", "NO_ANOMALY", "INSUFFICIENT_DATA")
+
+    assert data["commit_provenance"]["data_source"] in ("local-git", "offline-fixture")
+    if data["commit_provenance"]["data_source"] == "local-git":
+        assert "git log" in data["commit_provenance"]["detail"]
+        assert "not the service being monitored" in data["commit_provenance"]["detail"]
+        assert data["offending_commit"]["sha"]
+    else:
+        # No checkout available: nothing may be blamed.
+        assert data["offending_commit"] is None
+        assert data["recommended_action"] is None
+
+
+def test_the_metric_behind_a_correlation_is_never_claimed_to_be_live_offline(client):
+    """The commits may be real while the metric is simulated. The split must show."""
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    assert data["metric_provenance"]["is_live"] is False
+    assert data["metric_provenance"]["display_label"] == "OFFLINE FIXTURE"
+    assert "never read from" in data["metric_provenance"]["detail"]
+
+
+def test_an_anchored_simulation_says_it_was_anchored(client):
+    """Moving a simulated point to fit a commit must be disclosed, not hidden."""
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    if data["offending_commit"] is not None:
+        detail = data["metric_provenance"]["detail"]
+        assert "placed" in detail and "after the newest known commit" in detail
+        assert "the commits are real, this metric is not" in detail
 
 
 def test_what_changed_rejects_an_out_of_range_window(client):
