@@ -43,6 +43,11 @@ jobs:
         run: node tests/e2e/spatial_nav_spec.js
 
       - name: Latency benchmark
+        # Order matters. This rewrites benchmarks_summary.json, and a test in
+        # tests/e2e/test_documentation_claims.py holds the README table to that
+        # file, so it must run after the test suite. Lower iteration counts than
+        # the local default keep the job short; the committed numbers come from
+        # a local run at 60/2000.
         run: python scripts/benchmark_suite.py 20 500
 
       - name: Build wheel and sdist

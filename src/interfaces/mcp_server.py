@@ -20,7 +20,6 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.application.calculate_dora_use_case import CalculateDORAUseCase
@@ -459,8 +458,10 @@ async def serve_cockpit():
     return JSONResponse({"message": "Mercury API is running. The cockpit page was not found in docs/."})
 
 
-if WEB_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+# There is deliberately no StaticFiles mount over docs/. A blanket mount serves
+# every file in that directory, including the written documentation, which is
+# exactly what the allowlist in serve_cockpit_asset below exists to prevent. The
+# cockpit links its assets relatively, so that one route is sufficient.
 
 
 @app.get("/{asset_name}")

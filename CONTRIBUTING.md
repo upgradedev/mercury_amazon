@@ -47,6 +47,13 @@ The test suite sets `MERCURY_OFFLINE=1`, so running it never makes an outbound
 call and never issues a billable AWS Cost Explorer request, whatever credentials
 your machine happens to have configured.
 
+**One coupling to know about.** `python scripts/benchmark_suite.py` rewrites
+`benchmarks_summary.json`, and a test holds the README's benchmark table to that
+file. So running the benchmark will fail your own suite until you update the
+table in the README to the numbers you just measured. That is the test doing its
+job: the README is not allowed to quote a number that no longer exists. Update
+both in the same commit, or do not run the benchmark.
+
 ## Layout
 
 ```

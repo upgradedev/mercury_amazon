@@ -114,13 +114,49 @@ def test_no_document_claims_a_device_run_that_did_not_happen():
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
     assert "Not run" in build_doc
     assert "JAVA_HOME is not set" in build_doc, "the verbatim local build error must be recorded"
-    assert "has never been installed on a Fire TV device" in README \
-        or "never been installed on Fire TV" in README
+    assert "never been installed on a physical Fire TV Stick" in README
+    assert "No Fire TV hardware was available" in build_doc
+
+
+def test_no_document_claims_the_apk_has_been_built():
+    """The Android workflow is configured and has never executed.
+
+    Until a push produces a run, no document may imply an APK exists or that a
+    reader can download one today. This test is the pin on that claim, in the
+    same shape as the Alexa one. Delete it once a run exists.
+    """
+    forbidden_phrasings = [
+        "the apk is assembled by",
+        "the apk builds in ci",
+        "apk is uploaded as a downloadable artifact",
+        "runs in github actions; the apk is uploaded",
+    ]
+    for path in MARKDOWN_FILES:
+        lowered = " ".join(path.read_text(encoding="utf-8").split()).lower()
+        for phrase in forbidden_phrasings:
+            assert phrase not in lowered, (
+                f"{path.name} claims the APK has been built: {phrase!r}"
+            )
+
+    build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
+    assert "never executed" in build_doc
+    assert "zero runs" in build_doc
+    readme_lower = README.lower()
+    assert "has never executed" in readme_lower
+    assert "no apk exists" in readme_lower
+
+
+def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
+    """What can be verified without running it: that it is wired correctly."""
+    workflow = (REPO_ROOT / ".github" / "workflows" / "android.yml").read_text(encoding="utf-8")
+    assert "assembleDebug" in workflow
+    assert "testDebugUnitTest" in workflow
+    assert "if-no-files-found: error" in workflow
 
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = README.split("## Known limitations")[-1]
-    for required in ["No deployment pipeline integration", "No device run",
+    for required in ["No deployment pipeline integration", "No APK and no device run",
                      "Cost Explorer lags", "browser speech synthesis", "In-memory state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 

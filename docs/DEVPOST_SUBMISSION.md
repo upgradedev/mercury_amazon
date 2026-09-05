@@ -98,10 +98,12 @@ stopped being a compromise and started being the design.
 
 Stated here rather than left for a judge to find:
 
-* The APK is assembled by GitHub Actions and uploaded as an artifact. It has never
-  been installed on a Fire TV device or run in the emulator, because no hardware
-  and no Android SDK were available. `docs/FIRE_TV_BUILD.md` records the verbatim
-  local build failure.
+* **No APK exists.** A GitHub Actions workflow to assemble one is written and
+  committed, but it has never executed: nothing has been pushed since it was
+  added, so there are zero runs and zero artifacts. The Kotlin has never been
+  compiled, and nothing has been installed on a Fire TV device or run in the
+  emulator, because no hardware and no Android SDK were available.
+  `docs/FIRE_TV_BUILD.md` records the verbatim local build failure.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The live endpoint answers 200 but runs an older build, so the readiness gates

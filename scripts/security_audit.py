@@ -147,7 +147,9 @@ def main() -> int:
     audit.check(replay.status_code in (409, 403), "the same token cannot be used twice", replay.text[:120])
 
     print("\n[6] The cockpit asset route cannot be walked out of docs/")
-    for probe in ["/..%2f..%2fREADME.md", "/%2e%2e%2fpyproject.toml", "/FRICTION_LOG.md"]:
+    for probe in ["/..%2f..%2fREADME.md", "/%2e%2e%2fpyproject.toml", "/FRICTION_LOG.md",
+                  "/static/FRICTION_LOG.md", "/static/index.html",
+                  "/COMPLIANCE_AND_ARCHITECTURE.md", "/FIRE_TV_BUILD.md"]:
         response = client.get(probe)
         audit.check(response.status_code == 404, f"{probe} is refused", f"got {response.status_code}")
 

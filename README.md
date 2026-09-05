@@ -4,7 +4,7 @@
 
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-241%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-243%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -191,7 +191,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 241 passed
+# 243 passed
 ```
 
 ### 3. Start the server
@@ -243,15 +243,24 @@ closing the activity, so the viewer is never trapped and the war room is never
 closed by accident. `CockpitUrlResolver` accepts only absolute `http` and `https`
 URLs, so a hostile `COCKPIT_URL` intent extra cannot redirect the WebView.
 
-**What has been run, and what has not.** The APK is assembled by
-[`.github/workflows/android.yml`](.github/workflows/android.yml) on a runner with
-the Android SDK, which also runs the Kotlin unit tests and uploads the APK as a
-downloadable artifact. **It has not been built on the maintainer's machine** (no
-JDK, no Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`)
-and **it has not been installed on a physical Fire TV Stick or run in the Fire TV
-emulator.** The D-pad navigation logic it drives is tested for real: 16 assertions
-in `tests/e2e/spatial_nav_spec.js` execute `docs/firetv_nav.js` in Node against a
-synthetic grid of bounding rectangles.
+**What has been run, and what has not.** Be clear about this, because it is the
+weakest part of the submission.
+
+**No APK exists.** [`.github/workflows/android.yml`](.github/workflows/android.yml)
+is written and committed to assemble one on a runner with the Android SDK, run the
+Kotlin unit tests, and upload the APK as an artifact. It **has never executed**:
+nothing has been pushed since it was added, so there are zero runs and zero
+artifacts. The repository is private, so its Actions tab is not visible externally
+either. It has also **not been built on the maintainer's machine** (no JDK, no
+Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`), and it
+**has never been installed on a physical Fire TV Stick or run in the Fire TV
+emulator**.
+
+What *is* verified: the manifest declarations, the Gradle wiring and the key
+handling contract are checked by 25 structural tests, and the D-pad navigation
+logic the APK drives is tested by executing `docs/firetv_nav.js` in Node against
+a synthetic grid, 16 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
+itself has unit tests written but never compiled or run.
 
 ---
 
@@ -283,7 +292,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 241 passed
+python -m pytest tests/ -q                                    # 243 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1031 statements
 node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
 python ci/readiness.py                                        # standards gate audit
@@ -331,8 +340,9 @@ given a substitute number.
 
 * **No deployment pipeline integration.** Governance passes, then a record is
   written locally. The response says so.
-* **No device run.** The APK builds in CI and has never been installed on Fire TV
-  hardware or run in the emulator.
+* **No APK and no device run.** The Android CI workflow is configured but has
+  never executed, so no APK has been produced. Nothing has been installed on Fire
+  TV hardware or run in the emulator, and the Kotlin has never been compiled.
 * **The live deployment is stale.** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`
   answers 200 but runs an older build and reports no build SHA, so gate G2 fails.
   Its teardown has never been tested, so gate D2 fails too.
