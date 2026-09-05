@@ -1,5 +1,7 @@
 """Domain model for AWS Cloud Cost Radar & Anomaly Alerts."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from src.domain.provenance import UNKNOWN_PROVENANCE, Provenance
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,7 @@ class CloudCostReport:
     total_month_to_date_usd: float
     projected_end_of_month_usd: float
     anomalies: list[CostAnomaly]
+    provenance: Provenance = field(default=UNKNOWN_PROVENANCE)
 
     def to_voice_summary(self) -> str:
         base = f"Total cloud spend month-to-date is ${self.total_month_to_date_usd:,.2f}, projected to reach ${self.projected_end_of_month_usd:,.2f}."

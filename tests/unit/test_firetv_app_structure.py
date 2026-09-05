@@ -1,6 +1,5 @@
 """Unit tests for Fire TV / Fire OS Leanback Application Project Structure."""
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 
 def test_firetv_android_manifest_compliance():

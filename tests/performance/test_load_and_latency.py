@@ -1,7 +1,8 @@
 """Load and Latency QA Benchmark for Amazon Developer Hackathon 2026."""
 import time
-import pytest
+
 from fastapi.testclient import TestClient
+
 from src.interfaces.mcp_server import app
 
 

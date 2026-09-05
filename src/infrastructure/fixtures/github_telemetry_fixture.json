@@ -1,0 +1,46 @@
+{
+  "schema": "mercury.github_fixture/1",
+  "note": "Recorded output of one real GitHub REST API read. Mercury serves this when GITHUB_TOKEN is absent, and labels it 'offline-fixture' on screen.",
+  "recorded_from_repository": "pallets/flask",
+  "recorded_at_utc": "2026-09-05T05:29:58Z",
+  "recorded_by_command": "python scripts/record_github_fixture.py pallets/flask",
+  "authenticated": false,
+  "live_provenance_detail": "GitHub REST API for pallets/flask over the last 30 days: 44 default-branch workflow runs, 2 merged pull requests.",
+  "dora": {
+    "deployment_frequency_per_day": 1.467,
+    "lead_time_for_changes_hours": 338.16,
+    "change_failure_rate_percentage": 0.0,
+    "mean_time_to_recovery_hours": 0.0,
+    "sample_size": 46,
+    "window_days": 30
+  },
+  "pull_requests": {
+    "total_open_prs": 3,
+    "stale_prs_over_36h": [
+      {
+        "pr_id": 5660,
+        "repository": "pallets/flask",
+        "title": "Move parts of the session code to sansio",
+        "author": "pgjones",
+        "hours_open": 14865.3,
+        "is_blocked": false
+      },
+      {
+        "pr_id": 5665,
+        "repository": "pallets/flask",
+        "title": "Workflow",
+        "author": "pgjones",
+        "hours_open": 14648.3,
+        "is_blocked": false
+      },
+      {
+        "pr_id": 5918,
+        "repository": "pallets/flask",
+        "title": "automatic options as separate route",
+        "author": "davidism",
+        "hours_open": 4903.4,
+        "is_blocked": false
+      }
+    ]
+  }
+}

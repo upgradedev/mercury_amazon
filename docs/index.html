@@ -1,362 +1,616 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#00e5ff">
-    <script src="webmcp_bridge.js"></script>
-    <script src="firetv_nav.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mercury — Fire TV Voice CTO Cockpit</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Mercury Fire TV Incident Commander</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#8b5cf6">
   <style>
     :root {
       --bg: #060913;
       --surface: #0f172a;
-      --surface-border: #1e293b;
+      --surface-2: #0a0f1d;
+      --border: #1e293b;
       --primary: #8b5cf6;
-      --primary-glow: rgba(139, 92, 246, 0.4);
+      --primary-glow: rgba(139, 92, 246, 0.45);
+      --focus: #fbbf24;
       --secondary: #38bdf8;
       --success: #10b981;
       --danger: #ef4444;
+      --warn: #f59e0b;
       --text: #f8fafc;
-      --text-muted: #94a3b8;
+      --muted: #94a3b8;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 30px 20px; line-height: 1.6; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding-bottom: 24px; border-bottom: 1px solid var(--surface-border); margin-bottom: 24px;
-      flex-wrap: wrap; gap: 16px;
-    }
-    .brand h1 { font-size: 2.2rem; font-weight: 800; color: #fff; }
-    .brand h1 span { color: var(--primary); text-shadow: 0 0 25px var(--primary-glow); }
-    .brand p { color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; }
-    .badge {
-      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4);
-      color: #c4b5fd; padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 28px 22px; line-height: 1.55; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    code, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px;
+             padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; }
+    .brand h1 { font-size: 2rem; font-weight: 800; }
+    .brand h1 span { color: var(--primary); }
+    .brand p { color: var(--muted); font-size: 0.92rem; margin-top: 4px; max-width: 62ch; }
+
+    /* 10-foot focus ring. Deliberately loud: it has to read from a sofa. */
+    .tv-focused {
+      outline: 4px solid var(--focus) !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.25), 0 0 26px rgba(251, 191, 36, 0.55) !important;
+      border-radius: 10px;
     }
 
-    .dpad-banner {
-      background: linear-gradient(90deg, #2e1065 0%, #0f172a 100%);
-      border: 1px solid #7c3aed; border-radius: 10px; padding: 12px 18px;
-      margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.85rem; color: #ddd6fe;
-    }
-    .dpad-keys { display: inline-flex; gap: 6px; }
-    .key-badge {
-      background: #0f172a; border: 1px solid #6d28d9; padding: 2px 8px; border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #fff;
-    }
+    .conn-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+                padding: 12px 16px; margin-bottom: 20px; font-size: 0.86rem; }
+    .conn-bar label { color: var(--muted); }
+    .conn-bar input { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+                      padding: 7px 10px; border-radius: 6px; font-size: 0.85rem; min-width: 230px; }
+    .state-pill { padding: 4px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+                  letter-spacing: 0.04em; text-transform: uppercase; border: 1px solid; }
+    .state-unknown { color: var(--muted); border-color: var(--border); background: rgba(148,163,184,0.1); }
+    .state-checking { color: var(--secondary); border-color: var(--secondary); background: rgba(56,189,248,0.12); }
+    .state-reachable { color: var(--success); border-color: var(--success); background: rgba(16,185,129,0.14); }
+    .state-unreachable { color: var(--danger); border-color: var(--danger); background: rgba(239,68,68,0.14); }
 
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-    .stat-tile {
-      background: #0a0f1d; border: 2px solid var(--surface-border); padding: 18px 14px;
-      border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s;
-    }
-    .stat-tile:hover, .stat-tile.tv-focused {
-      border-color: var(--primary); transform: scale(1.03);
-      box-shadow: 0 0 20px var(--primary-glow); background: #17112d;
-    }
-    .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--secondary); }
-    .stat-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-tile { background: var(--surface-2); border: 2px solid var(--border); padding: 18px 14px;
+                 border-radius: 10px; text-align: center; cursor: pointer; }
+    .stat-val { font-size: 1.7rem; font-weight: 800; color: var(--secondary); }
+    .stat-lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 0.04em; }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-    @media (max-width: 480px) {
-      body { padding: 12px 8px; }
-      header { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .brand h1 { font-size: 1.4rem; }
-      .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-      .dpad-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
-      button, .tv-btn { width: 100%; justify-content: center; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+    .card.wide { grid-column: 1 / -1; }
+    .card h2 { font-size: 1.18rem; font-weight: 700; margin-bottom: 6px; }
+    .card-desc { color: var(--muted); font-size: 0.86rem; margin-bottom: 16px; }
+
+    .actions-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+    button { background: var(--primary); color: #fff; border: 2px solid transparent; padding: 11px 18px;
+             border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+    button:hover { background: #7c3aed; }
+    button[disabled] { opacity: 0.45; cursor: not-allowed; }
+    .btn-secondary { background: #1e293b; border-color: #334155; }
+    .btn-secondary:hover { background: #334155; }
+    .btn-danger { background: #b91c1c; }
+    .btn-danger:hover { background: #dc2626; }
+
+    .console-box { background: #070a13; border: 1px solid var(--border); border-radius: 8px;
+                   padding: 15px; margin-top: 15px; min-height: 150px; font-size: 0.9rem; }
+    .console-header { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+                      color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between;
+                      gap: 10px; flex-wrap: wrap; align-items: center; }
+    .empty-state-card { border: 1px dashed #334155; border-radius: 6px; padding: 14px;
+                        color: var(--muted); font-size: 0.85rem; }
+    .error-card { border: 1px solid var(--danger); background: rgba(239,68,68,0.09); border-radius: 6px;
+                  padding: 14px; color: #fca5a5; font-size: 0.85rem; }
+    .loading-card { border: 1px dashed var(--secondary); border-radius: 6px; padding: 14px;
+                    color: var(--secondary); font-size: 0.85rem; }
+
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+    .tag-ok { background: rgba(16,185,129,0.18); border: 1px solid var(--success); color: #6ee7b7; }
+    .tag-warn { background: rgba(239,68,68,0.18); border: 1px solid var(--danger); color: #fca5a5; }
+    .tag-live { background: rgba(16,185,129,0.18); border: 1px solid var(--success); color: #6ee7b7; }
+    .tag-fixture { background: rgba(245,158,11,0.18); border: 1px solid var(--warn); color: #fcd34d; }
+    .provenance { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #24334a;
+                  color: var(--muted); font-size: 0.76rem; }
+    .latency { color: var(--muted); font-size: 0.72rem; }
+    dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 4px 0 0; }
+    dl.kv dt { color: var(--muted); font-size: 0.82rem; }
+    dl.kv dd { font-size: 0.88rem; }
+
+    .dpad-hint { margin-top: 22px; color: var(--muted); font-size: 0.8rem; text-align: center; }
+    .key-badge { background: var(--surface-2); border: 1px solid #6d28d9; padding: 1px 7px;
+                 border-radius: 4px; font-size: 0.75rem; }
+
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+      body { padding: 14px 10px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .brand h1 { font-size: 1.45rem; }
+      button { width: 100%; }
       .actions-bar { flex-direction: column; }
+      .conn-bar input { min-width: 0; width: 100%; }
     }
-    .empty-state-card {
-      background: rgba(15, 23, 42, 0.6); border: 1px dashed #334155; border-radius: 6px;
-      padding: 14px; color: var(--text-muted); font-size: 0.85rem; text-align: center;
+    /* 10-foot mode: on a TV-sized viewport, scale type up so it reads at 3 metres. */
+    @media (min-width: 1400px) {
+      body { font-size: 20px; }
+      .stat-val { font-size: 2.4rem; }
+      .card h2 { font-size: 1.5rem; }
     }
-    .card {
-      background: var(--surface); border: 1px solid var(--surface-border);
-      border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
-    .card-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 18px; }
-
-    .actions-bar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    button, .tv-btn {
-      background: var(--primary); color: white; border: 2px solid transparent; padding: 10px 18px;
-      border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem;
-      transition: all 0.2s;
-    }
-    button:hover, button.tv-focused {
-      background: #7c3aed; transform: translateY(-1px);
-      box-shadow: 0 4px 20px var(--primary-glow); border-color: #fff;
-    }
-    .btn-secondary { background: #1e293b; border: 2px solid #334155; color: var(--text); }
-    .btn-secondary:hover, .btn-secondary.tv-focused { background: #334155; border-color: var(--secondary); }
-    
-    .console-box {
-      background: #070a13; border: 1px solid var(--surface-border); border-radius: 8px;
-      padding: 16px; margin-top: 16px; min-height: 140px; font-size: 0.9rem;
-    }
-    .console-header {
-      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between;
-    }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    .tag-elite { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: #6ee7b7; }
-    .tag-warn { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: #fca5a5; }
   </style>
-    <script src="suite_companion_enhancements.js"></script>
 </head>
 <body>
   <div class="container">
     <header>
       <div class="brand">
-        <h1>⚡ <span>Mercury</span> Voice Cockpit</h1>
-        <p>10-Foot Multi-modal Engineering Cockpit on Fire TV & Alexa Voice Control</p>
+        <h1><span>Mercury</span> Fire TV Incident Commander</h1>
+        <p>A shared engineering war room on the big screen. Every panel below calls the Mercury
+           API and prints what it got back, including how long the call took and whether the
+           numbers are live or a recorded fixture.</p>
       </div>
-      <div class="badges-row">
-        <span class="badge">Fire TV 10-Foot UI</span>
-        <span class="badge">D-Pad Spatial Nav</span>
-        <span class="badge">DORA Metrics Radar</span>
-        <span class="badge">AWS Cost Explorer</span>
+      <div>
+        <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
     </header>
 
-    <!-- TV D-Pad Remote Banner -->
-    <div class="dpad-banner">
-      <div>🎮 <strong>10-Foot TV Spatial Navigation Active:</strong> Use your keyboard Arrow keys & Enter to navigate like a Fire TV Remote!</div>
-      <div class="dpad-keys">
-        <span class="key-badge">▲</span>
-        <span class="key-badge">▼</span>
-        <span class="key-badge">◄</span>
-        <span class="key-badge">►</span>
-        <span class="key-badge">ENTER</span>
-      </div>
+    <div class="conn-bar">
+      <label for="apiBase">Mercury API</label>
+      <input id="apiBase" type="text" spellcheck="false"
+             title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
+             placeholder="http://localhost:8002">
+      <button class="btn-secondary" data-tv-focusable id="btnCheck"
+              title="Send a real GET /health to the API and report the result">Check connection</button>
+      <span id="connDetail" class="latency">The page has not called the API yet.</span>
     </div>
 
     <div class="stats-row">
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">2.4 / day</div>
-        <div class="stat-lbl">Deploy Frequency</div>
+      <div class="stat-tile" data-tv-focusable tabindex="0" id="tileDeploy"
+           title="Deployment frequency per day. Click to refresh from the API."
+           onclick="Mercury.loadDora()">
+        <div class="stat-val" id="statDeploy">--</div>
+        <div class="stat-lbl">Deploys / day</div>
       </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">14.5 h</div>
-        <div class="stat-lbl">Lead Time</div>
+      <div class="stat-tile" data-tv-focusable tabindex="0" id="tileLead"
+           title="Mean pull request lead time in hours. Click to refresh from the API."
+           onclick="Mercury.loadDora()">
+        <div class="stat-val" id="statLead">--</div>
+        <div class="stat-lbl">Lead time (h)</div>
       </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">3.2%</div>
-        <div class="stat-lbl">Change Failure</div>
+      <div class="stat-tile" data-tv-focusable tabindex="0" id="tileCfr"
+           title="Change failure rate as a percentage of completed CI runs. Click to refresh."
+           onclick="Mercury.loadDora()">
+        <div class="stat-val" id="statCfr">--</div>
+        <div class="stat-lbl">Change failure</div>
       </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">0.8 h</div>
-        <div class="stat-lbl">Mean Recovery</div>
+      <div class="stat-tile" data-tv-focusable tabindex="0" id="tileMttr"
+           title="Mean time from a failed CI run to the next success, in hours. Click to refresh."
+           onclick="Mercury.loadDora()">
+        <div class="stat-val" id="statMttr">--</div>
+        <div class="stat-lbl">Recovery (h)</div>
       </div>
     </div>
 
     <div class="grid">
-      <!-- Panel 1: DORA & PR Radar -->
       <div class="card">
-        <h2>📊 Engineering Velocity & Pull Request Radar</h2>
-        <p class="card-desc">
-          Aggregates DORA velocity and highlights stale PRs across production repositories on the big screen.
-        </p>
+        <h2>Engineering velocity and review backlog</h2>
+        <p class="card-desc">DORA metrics computed from GitHub Actions runs and merged pull requests,
+           and open pull requests past the 36 hour review SLA.</p>
+        <div class="actions-bar">
+          <button data-testid="primary-hero-action" class="primary-action" data-tv-focusable
+                  title="Call POST /mcp/tools/get_dora_velocity_report and render the response"
+                  onclick="Mercury.loadDora()">Load DORA velocity</button>
+          <button class="btn-secondary" data-tv-focusable
+                  title="Call POST /mcp/tools/get_pr_bottlenecks and render the response"
+                  onclick="Mercury.loadPrs()">Scan stale pull requests</button>
+        </div>
+        <div class="console-box">
+          <div class="console-header">
+            <span>Velocity response</span>
+            <span id="doraLatency" class="latency"></span>
+          </div>
+          <div id="doraOutput"><div class="empty-state-card">Nothing loaded yet. Choose an action above and the response will appear here.</div></div>
+        </div>
+      </div>
 
-        <div class="actions-bar" style="margin-top: 0;">
-          <button data-testid="primary-hero-action" class="primary-action tv-nav" tabindex="0" title="Calculate engineering velocity and DORA performance tiers" onclick="inspectDora()">🚀 Calculate DORA Velocity</button>
-          <button class="btn-secondary tv-nav" tabindex="0" title="Scan repositories for pull requests exceeding 36-hour review SLA" onclick="inspectPrs()">🔍 Scan Stale PRs (>36h)</button>
+      <div class="card">
+        <h2>AWS spend radar</h2>
+        <p class="card-desc">Month-to-date spend per service from Cost Explorer, with day-over-average
+           anomalies. Cost Explorer aggregates daily and lags up to 24 hours, so this never shows the last hour.</p>
+        <div class="actions-bar">
+          <button data-tv-focusable
+                  title="Call POST /mcp/tools/get_aws_cost_anomalies and render the response"
+                  onclick="Mercury.loadCost()">Scan AWS spend</button>
+          <button class="btn-secondary" data-tv-focusable
+                  title="Call POST /mcp/tools/audit_observability for the current service"
+                  onclick="Mercury.loadObservability()">Audit observability gaps</button>
+        </div>
+        <div class="console-box">
+          <div class="console-header">
+            <span>Spend response</span>
+            <span id="costLatency" class="latency"></span>
+          </div>
+          <div id="costOutput"><div class="empty-state-card">Nothing loaded yet. Choose an action above and the response will appear here.</div></div>
+        </div>
+      </div>
+
+      <div class="card wide">
+        <h2>What changed?</h2>
+        <p class="card-desc">Correlates the newest error metric reading against its baseline, then
+           attributes the anomaly to the closest commit that landed before it. Staging and confirming a
+           rollback each require the deployment's governance secret.</p>
+
+        <div class="conn-bar" style="margin: 0 0 14px;">
+          <label for="opSecret">Governance secret</label>
+          <input id="opSecret" type="password" spellcheck="false"
+                 title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
+                 placeholder="MERCURY_ROLLBACK_SECRET">
+          <span class="latency">Sent as an Authorization: Bearer header. Never stored.</span>
+        </div>
+
+        <div class="actions-bar">
+          <button data-tv-focusable
+                  title="Call POST /mcp/tools/what_changed and render the correlator's verdict"
+                  onclick="Mercury.loadWhatChanged()">Ask what changed</button>
+          <button class="btn-secondary" data-tv-focusable id="btnStage" disabled
+                  title="Disabled until a correlation returns a rollback target"
+                  onclick="Mercury.stageRollback()">Stage governed rollback</button>
+          <button class="btn-danger" data-tv-focusable id="btnConfirm" disabled
+                  title="Disabled until a rollback has been staged and a governance token issued"
+                  onclick="Mercury.confirmRollback()">Confirm rollback</button>
         </div>
 
         <div class="console-box">
           <div class="console-header">
-            <span>DORA Velocity Assessment</span>
-            <span id="doraTag" class="tag tag-elite">ELITE PERFORMER</span>
+            <span>Incident response</span>
+            <span id="incidentLatency" class="latency"></span>
           </div>
-          <div id="doraOutput"><div class="empty-state-card"><span>ℹ️ Ready for DORA evaluation. Press Enter or click Calculate DORA above.</span></div></div>
-        </div>
-      </div>
-
-      <!-- Panel 2: Cost Radar & Governed Rollback -->
-      <div class="card">
-        <h2>💰 AWS Cost Anomaly & Governed Rollback</h2>
-        <p class="card-desc">
-          Detects runaway AWS Bedrock / ECS spend and executes governed production rollbacks with 300s leases.
-        </p>
-
-        <div class="actions-bar" style="margin-top: 0;">
-          <button class="tv-nav" tabindex="0" title="Scan AWS Cost Explorer for spend surges (>200% burn rate)" onclick="scanCostAnomalies()">📊 Scan AWS Cost Explorer</button>
-          <button class="btn-secondary tv-nav" tabindex="0" title="Stage production rollback under SHA-256 lock & 300s lease" onclick="initiateRollback()">⏪ Execute Governed Rollback</button>
-        </div>
-
-        <div class="console-box">
-          <div class="console-header">
-            <span>AWS Telemetry & Rollback Lease</span>
-            <span id="costTag">MONITORING</span>
-          </div>
-          <div id="costOutput"><div class="empty-state-card"><span>ℹ️ Ready for cloud cost audit. Click Scan Cost Explorer or Stage Rollback.</span></div></div>
-        </div>
-      </div>
-
-      <!-- Panel 3: Fire TV Incident Commander & "What Changed?" -->
-      <div class="card" style="grid-column: 1 / -1; margin-top: 10px; border: 2px solid #7c3aed;">
-        <h2>🚨 Fire TV Incident Commander: Shared War-Room Cockpit</h2>
-        <p class="card-desc">
-          When an outage strikes, gather around the Fire TV. Ask <em>"Alexa, what changed?"</em> to correlate Git commits with CloudWatch error spikes, then use your D-pad remote to confirm governed rollbacks.
-        </p>
-
-        <div class="actions-bar" style="margin-top: 0;">
-          <button class="tv-nav" tabindex="0" title="Ask Alexa what changed to inspect offending commit and CloudWatch spike" onclick="queryWhatChanged()">🎙️ "Alexa, what changed?"</button>
-          <button class="btn-secondary tv-nav" tabindex="0" title="Confirm governed rollback via Fire TV Remote D-Pad" onclick="confirmDpadRollback()">🎯 D-Pad Confirm Rollback (PIN: ALPHA-77)</button>
-        </div>
-
-        <div class="console-box" id="incidentConsole">
-          <div class="console-header">
-            <span>Live Incident Stream &amp; Root-Cause Correlation</span>
-            <span id="incidentTag" class="tag tag-elite">SYSTEM NORMAL</span>
-          </div>
-          <div id="incidentOutput"><div class="empty-state-card"><span>ℹ️ No active outage. Press Enter on '"Alexa, what changed?"' to simulate root-cause diagnosis.</span></div></div>
+          <div id="incidentOutput"><div class="empty-state-card">No correlation requested yet. Ask what changed and the verdict will appear here, including the verdicts where nothing can be blamed.</div></div>
         </div>
       </div>
     </div>
+
+    <p class="dpad-hint">
+      D-pad and keyboard drive the same focus system.
+      <span class="key-badge">&#9650;</span>
+      <span class="key-badge">&#9660;</span>
+      <span class="key-badge">&#9668;</span>
+      <span class="key-badge">&#9658;</span>
+      move to the nearest control in that direction,
+      <span class="key-badge">ENTER</span> activates it.
+    </p>
   </div>
 
+  <script src="webmcp_bridge.js"></script>
+  <script src="firetv_nav.js"></script>
   <script>
-    function speakVoiceDigest(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const ut = new SpeechSynthesisUtterance(text);
-        ut.rate = 1.05;
-        window.speechSynthesis.speak(ut);
+  /* global WebMCPBridge */
+  var Mercury = (function () {
+    'use strict';
+
+    var state = { apiBase: '', staged: null, lastCorrelation: null, connection: 'unknown' };
+
+    function el(id) { return document.getElementById(id); }
+    function escapeHtml(value) {
+      return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function apiBase() {
+      var typed = el('apiBase').value.trim();
+      if (typed) return typed.replace(/\/$/, '');
+      // A page opened from the file system or from GitHub Pages has no API behind
+      // it. Say so rather than pointing at an origin that serves only static files.
+      if (window.location.protocol === 'file:') return '';
+      return window.location.origin;
+    }
+
+    function setConnection(kind, detail) {
+      state.connection = kind;
+      var pill = el('connState');
+      pill.className = 'state-pill state-' + kind;
+      pill.textContent = {
+        unknown: 'API not checked',
+        checking: 'Checking',
+        reachable: 'API reachable',
+        unreachable: 'API unreachable'
+      }[kind];
+      el('connDetail').textContent = detail;
+    }
+
+    function showLoading(targetId, message) {
+      el(targetId).innerHTML = '<div class="loading-card">' + escapeHtml(message) + '</div>';
+    }
+
+    function showError(targetId, error, url) {
+      var hint = state.connection === 'unreachable' || !apiBase()
+        ? ' This page is static unless a Mercury API is running. Start it with '
+          + '<code>python -m src.interfaces.mcp_server</code> and put its URL in the Mercury API box above.'
+        : '';
+      el(targetId).innerHTML =
+        '<div class="error-card"><strong>Request failed.</strong><br>' +
+        escapeHtml(String(error)) +
+        (url ? '<br><span class="latency">' + escapeHtml(url) + '</span>' : '') +
+        hint + '</div>';
+    }
+
+    function provenanceBlock(provenance) {
+      if (!provenance) return '';
+      var live = provenance.is_live === true;
+      return '<div class="provenance"><span class="tag ' + (live ? 'tag-live' : 'tag-fixture') + '">' +
+        escapeHtml(provenance.display_label || (live ? 'LIVE' : 'OFFLINE FIXTURE')) + '</span> ' +
+        '<code>' + escapeHtml(provenance.data_source || 'unknown') + '</code> ' +
+        escapeHtml(provenance.detail || '') +
+        (provenance.observed_at_utc ? ' <em>Observed ' + escapeHtml(provenance.observed_at_utc) + '.</em>' : '') +
+        '</div>';
+    }
+
+    /**
+     * One real HTTP call. Measures wall-clock duration around the fetch with
+     * performance.now() and returns it, so the latency shown on screen is the
+     * latency this page actually experienced.
+     */
+    async function call(path, options, latencyTargetId) {
+      var base = apiBase();
+      if (!base) throw new Error('No Mercury API URL is set, so no request was sent.');
+      var url = base + path;
+      var started = performance.now();
+      var response;
+      try {
+        response = await fetch(url, options || {});
+      } catch (networkError) {
+        setConnection('unreachable', 'Last call to ' + url + ' failed: ' + networkError.message);
+        throw networkError;
+      }
+      var elapsed = performance.now() - started;
+      if (latencyTargetId) {
+        el(latencyTargetId).textContent = 'HTTP ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms';
+      }
+      var body = null;
+      try { body = await response.json(); } catch (parseError) { body = null; }
+      if (!response.ok) {
+        var detail = body && body.detail !== undefined ? body.detail : response.statusText;
+        if (detail && typeof detail === 'object') {
+          detail = (detail.denial_reason ? detail.denial_reason + ': ' : '') + (detail.message || JSON.stringify(detail));
+        }
+        var err = new Error('HTTP ' + response.status + ' - ' + detail);
+        err.status = response.status;
+        throw err;
+      }
+      setConnection('reachable', 'Last call: ' + path + ' returned ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms');
+      return { body: body, elapsedMs: elapsed, status: response.status };
+    }
+
+    function post(path, payload, latencyTargetId, secret) {
+      var headers = { 'Content-Type': 'application/json' };
+      if (secret) headers['Authorization'] = 'Bearer ' + secret;
+      return call(path, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload === undefined ? {} : payload)
+      }, latencyTargetId);
+    }
+
+    function speak(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+
+    // ---------------------------------------------------------------- Actions
+
+    async function checkConnection() {
+      var base = apiBase();
+      if (!base) {
+        setConnection('unreachable', 'No API URL. Enter one, or open this page from a running Mercury server.');
+        return;
+      }
+      setConnection('checking', 'Sending GET ' + base + '/health');
+      try {
+        var result = await call('/health', { method: 'GET' }, null);
+        var sha = result.body.build_sha ? result.body.build_sha.slice(0, 7) : 'unreported';
+        setConnection('reachable',
+          'GET /health returned ' + result.status + ' in ' + result.elapsedMs.toFixed(0) +
+          ' ms. Build ' + sha + '. GitHub live: ' + (result.body.github_live ? 'yes' : 'no, fixture mode') + '.');
+      } catch (error) {
+        setConnection('unreachable', 'GET ' + base + '/health failed: ' + error.message);
       }
     }
 
-    function inspectDora() {
-      document.getElementById('doraTag').className = 'tag tag-elite';
-      document.getElementById('doraTag').innerText = 'ELITE PERFORMER';
-      document.getElementById('doraOutput').innerHTML = 
-        '<strong>DORA Rating:</strong> Elite Performer<br>' +
-        '<strong>Deploy Frequency:</strong> 2.4 / day (Industry top decile)<br>' +
-        '<strong>Lead Time:</strong> 14.5 h<br>' +
-        '<strong>Change Failure:</strong> 3.2% (Target &lt; 15%)<br>' +
-        '<strong>Mean Recovery:</strong> 0.8 h<br>' +
-        '<strong>Voice Summary:</strong> "Team velocity is healthy with 2.4 daily deploys and 0.8h MTTR."';
-      speakVoiceDigest("Team velocity is rated Elite Performer with 2.4 daily deploys and 0.8 hour recovery time.");
+    async function loadDora() {
+      showLoading('doraOutput', 'Calling POST /mcp/tools/get_dora_velocity_report ...');
+      try {
+        var res = await post('/mcp/tools/get_dora_velocity_report', {}, 'doraLatency');
+        var data = res.body;
+        var m = data.metrics;
+        el('statDeploy').textContent = m.deployment_frequency_per_day;
+        el('statLead').textContent = m.lead_time_hours;
+        el('statCfr').textContent = m.change_failure_rate_pct + '%';
+        el('statMttr').textContent = m.mttr_hours;
+        el('doraOutput').innerHTML =
+          '<span class="tag tag-ok">' + escapeHtml(data.tier) + '</span>' +
+          '<dl class="kv">' +
+          '<dt>Deploys per day</dt><dd>' + escapeHtml(m.deployment_frequency_per_day) + '</dd>' +
+          '<dt>Lead time</dt><dd>' + escapeHtml(m.lead_time_hours) + ' h</dd>' +
+          '<dt>Change failure rate</dt><dd>' + escapeHtml(m.change_failure_rate_pct) + '%</dd>' +
+          '<dt>Recovery time</dt><dd>' + escapeHtml(m.mttr_hours) + ' h</dd>' +
+          '<dt>Records used</dt><dd>' + escapeHtml(data.sample_size) + ' over ' + escapeHtml(data.window_days) + ' days</dd>' +
+          '</dl>' + provenanceBlock(data.provenance);
+        speak(data.voice_summary);
+      } catch (error) { showError('doraOutput', error.message); }
     }
 
-    function inspectPrs() {
-      document.getElementById('doraOutput').innerHTML = 
-        '<strong>Total Open PRs:</strong> 18<br>' +
-        '<span class="tag tag-warn">ATTENTION</span> <strong>PR #342:</strong> Implement Stripe Webhook Retry Logic (<code>backend-payments</code>)<br>' +
-        'Open for 48.0 hours without review. Author: <code>dev_alex</code>';
-      speakVoiceDigest("Attention: Pull Request 342 in payments backend has been open for 48 hours without review.");
+    async function loadPrs() {
+      showLoading('doraOutput', 'Calling POST /mcp/tools/get_pr_bottlenecks ...');
+      try {
+        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, 'doraLatency');
+        var data = res.body;
+        var rows = data.stale_prs.map(function (pr) {
+          return '<div><span class="tag tag-warn">' + escapeHtml(pr.hours_open) + ' h</span> #' +
+            escapeHtml(pr.id) + ' ' + escapeHtml(pr.title) + ' <span class="latency">' +
+            escapeHtml(pr.author) + '</span></div>';
+        }).join('');
+        if (!rows) {
+          rows = '<div class="empty-state-card">No pull request is past the 36 hour review SLA.</div>';
+        } else if (data.truncated_for_display) {
+          rows += '<div class="latency">Showing ' + escapeHtml(data.stale_prs.length) + ' of ' +
+            escapeHtml(data.stale_count) + ' stale pull requests.</div>';
+        }
+        el('doraOutput').innerHTML =
+          '<dl class="kv"><dt>Open</dt><dd>' + escapeHtml(data.total_open) + '</dd>' +
+          '<dt>Past SLA</dt><dd>' + escapeHtml(data.stale_count) + '</dd></dl>' +
+          rows + provenanceBlock(data.provenance);
+        speak(data.voice_summary);
+      } catch (error) { showError('doraOutput', error.message); }
     }
 
-    function scanCostAnomalies() {
-      document.getElementById('costTag').innerHTML = '<span class="tag tag-warn">ANOMALY DETECTED</span>';
-      document.getElementById('costOutput').innerHTML = 
-        '<span class="tag tag-warn">COST SPIKE +311%</span> <strong>Amazon Bedrock & ECS Staging</strong><br>' +
-        '<strong>Daily Spend:</strong> $185.00 / day (Previous avg: $45.00 / day)<br>' +
-        '<strong>Root Cause:</strong> Unclosed load test tasks in staging cluster.<br>' +
-        '<strong>Spoken Digest:</strong> "Warning: Staging Bedrock tasks increased daily burn by 311%."';
-      speakVoiceDigest("Warning: Staging Bedrock tasks increased daily burn by 311 percent to 185 dollars per day.");
+    async function loadCost() {
+      showLoading('costOutput', 'Calling POST /mcp/tools/get_aws_cost_anomalies ...');
+      try {
+        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, 'costLatency');
+        var data = res.body;
+        var anomalies = data.anomalies.map(function (a) {
+          return '<div style="margin-top:8px;"><span class="tag tag-warn">+' + escapeHtml(a.increase_pct) +
+            '%</span> <strong>' + escapeHtml(a.service) + '</strong> $' + escapeHtml(a.current_daily_usd) +
+            ' per day against a $' + escapeHtml(a.previous_daily_avg_usd) + ' average.<br><span class="latency">' +
+            escapeHtml(a.root_cause) + '</span></div>';
+        }).join('');
+        if (!anomalies) anomalies = '<div class="empty-state-card">No service exceeded the anomaly threshold.</div>';
+        el('costOutput').innerHTML =
+          '<dl class="kv"><dt>Month to date</dt><dd>$' + escapeHtml(data.month_to_date_usd) + '</dd>' +
+          '<dt>Projected month end</dt><dd>$' + escapeHtml(data.projected_usd) + '</dd></dl>' +
+          anomalies + provenanceBlock(data.provenance);
+        speak(data.voice_summary);
+      } catch (error) { showError('costOutput', error.message); }
     }
 
-    function initiateRollback() {
-      document.getElementById('costOutput').innerHTML = 
-        '<span class="tag tag-warn">ROLLBACK LEASE INITIATED</span> <strong>Service: payments-api</strong><br>' +
-        '<strong>Target Commit:</strong> <code>git checkout HEAD~1</code> (SHA <code>12443b59</code>)<br>' +
-        '<strong>Lease Duration:</strong> 300 seconds.<br>' +
-        '<strong>Voice Confirmation Prompt:</strong> "Alexa, approve rollback for payments-api."';
-      speakVoiceDigest("Production rollback lease staged for payments API. 300 second lease active. Say: Alexa, approve rollback.");
+    async function loadObservability() {
+      showLoading('costOutput', 'Calling POST /mcp/tools/audit_observability ...');
+      try {
+        var res = await post('/mcp/tools/audit_observability',
+          { service_name: 'checkout-api', received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
+        var data = res.body;
+        el('costOutput').innerHTML =
+          '<dl class="kv"><dt>Service</dt><dd>' + escapeHtml(data.service) + '</dd>' +
+          '<dt>Fully observable</dt><dd>' + (data.is_fully_observable ? 'yes' : 'no') + '</dd>' +
+          '<dt>Gap score</dt><dd>' + escapeHtml(data.observability_gap_score) + '</dd>' +
+          '<dt>Missing signals</dt><dd>' + escapeHtml(data.missing_signals.join(', ') || 'none') + '</dd></dl>';
+      } catch (error) { showError('costOutput', error.message); }
     }
 
-    function queryWhatChanged() {
-      document.getElementById('incidentTag').className = 'tag tag-warn';
-      document.getElementById('incidentTag').innerText = 'P0 OUTAGE DETECTED';
-      document.getElementById('incidentOutput').innerHTML = 
-        '<span class="tag tag-warn">🚨 P0 INCIDENT</span> <strong>Service: checkout-api</strong><br>' +
-        '<strong>CloudWatch Anomaly:</strong> HTTPCode_Target_5XX_Count spiked <strong>+340% (34.2x)</strong>.<br>' +
-        '<strong>Offending Deployment:</strong> Commit <code>7c8f2a1</code> (<em>Merge PR #412: upgrade auth-session</em>) 14m ago.<br>' +
-        '<strong>Root-Cause Verdict:</strong> Session token validation timeout in auth layer.<br>' +
-        '<strong>Governed Recommendation:</strong> Roll back checkout-api to commit <code>3e9d10c</code> (Lease: 300s).';
-      speakVoiceDigest("P0 incident detected on checkout-api. Commit 7c8f2a1 caused 340% 5xx spike. Governed rollback to 3e9d10c is staged. Use D-pad to confirm.");
+    async function loadWhatChanged() {
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/what_changed ...');
+      el('btnStage').disabled = true;
+      el('btnConfirm').disabled = true;
+      state.staged = null;
+      try {
+        var res = await post('/mcp/tools/what_changed',
+          { service_name: 'checkout-api', time_window_minutes: 60 }, 'incidentLatency');
+        var data = res.body;
+        state.lastCorrelation = data;
+
+        var verdictTag = data.incident_detected ? 'tag-warn' : 'tag-ok';
+        var html = '<span class="tag ' + verdictTag + '">' + escapeHtml(data.verdict) + '</span>' +
+          '<dl class="kv">' +
+          '<dt>Service</dt><dd>' + escapeHtml(data.service) + '</dd>' +
+          '<dt>Metric</dt><dd>' + escapeHtml(data.metric.name) + '</dd>' +
+          '<dt>Baseline</dt><dd>' + escapeHtml(data.metric.baseline) + '</dd>' +
+          '<dt>Current</dt><dd>' + escapeHtml(data.metric.current) + '</dd>' +
+          '<dt>Factor</dt><dd>' + escapeHtml(data.metric.anomaly_factor) + 'x over ' +
+          escapeHtml(data.metric.sample_size) + ' points</dd></dl>' +
+          '<p style="margin-top:8px;">' + escapeHtml(data.explanation) + '</p>';
+
+        if (data.offending_commit) {
+          html += '<dl class="kv"><dt>Closest commit</dt><dd><code>' +
+            escapeHtml(data.offending_commit.sha) + '</code> ' +
+            escapeHtml(data.offending_commit.message) + ' (' +
+            escapeHtml(data.offending_commit.author) + ')</dd></dl>';
+        }
+        if (data.recommended_action) {
+          html += '<div class="loading-card" style="margin-top:10px;">Rollback target <code>' +
+            escapeHtml(data.recommended_action.target_commit_sha) + '</code>. ' +
+            escapeHtml(data.recommended_action.note) + '</div>';
+          el('btnStage').disabled = false;
+          el('btnStage').title = 'Stage a governed rollback to ' + data.recommended_action.target_commit_sha;
+        } else {
+          el('btnStage').title = 'Disabled: this correlation produced no rollback target.';
+        }
+        html += provenanceBlock(data.metric_provenance) + provenanceBlock(data.commit_provenance);
+        el('incidentOutput').innerHTML = html;
+        speak(data.voice_summary);
+      } catch (error) { showError('incidentOutput', error.message); }
     }
 
-    function confirmDpadRollback() {
-      document.getElementById('incidentTag').className = 'tag tag-elite';
-      document.getElementById('incidentTag').innerText = 'ROLLBACK EXECUTED';
-      document.getElementById('incidentOutput').innerHTML = 
-        '<span class="tag tag-elite">✅ ROLLBACK COMMITTED</span> <strong>Service: checkout-api</strong><br>' +
-        '<strong>Target SHA:</strong> <code>3e9d10c</code> | <strong>Verification:</strong> Dual-custody token ALPHA-77 valid.<br>' +
-        '<strong>CloudWatch Status:</strong> 5xx errors decaying to baseline (0.02%). Traffic normalized.<br>' +
-        '<strong>D-Pad Action:</strong> Executed via Fire TV Remote D-Pad.';
-      speakVoiceDigest("Rollback executed on checkout-api. Service restored to healthy baseline.");
-    }
-
-    // 10-Foot D-Pad Keyboard Spatial Navigation
-    let navElements = [];
-    let currentFocus = 0;
-
-    window.addEventListener('DOMContentLoaded', () => {
-      navElements = Array.from(document.querySelectorAll('.tv-nav'));
-      if (navElements.length > 0) {
-        navElements[0].classList.add('tv-focused');
+    async function stageRollback() {
+      var secret = el('opSecret').value.trim();
+      if (!secret) {
+        showError('incidentOutput', 'No governance secret entered. Staging a rollback needs the deployment secret.');
+        return;
       }
-    });
+      var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
+      if (!rec) { showError('incidentOutput', 'No rollback target. Ask what changed first.'); return; }
 
-    // Native Android Leanback / Fire OS MainActivity.kt Bridge
-    window.navigateDpad = function(direction) {
-      if (!navElements.length) return;
-      navElements[currentFocus].classList.remove('tv-focused');
-      if (direction === 'DOWN' || direction === 'RIGHT') {
-        currentFocus = (currentFocus + 1) % navElements.length;
-      } else if (direction === 'UP' || direction === 'LEFT') {
-        currentFocus = (currentFocus - 1 + navElements.length) % navElements.length;
-      } else if (direction === 'SELECT') {
-        navElements[currentFocus].click();
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/stage_rollback ...');
+      try {
+        var res = await post('/mcp/tools/stage_rollback', {
+          action_id: 'tv-' + Date.now(),
+          target_service: rec.target_service,
+          target_commit_sha: rec.target_commit_sha,
+          reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
+          lease_sec: 300
+        }, 'incidentLatency', secret);
+        state.staged = res.body;
+        el('btnConfirm').disabled = false;
+        el('btnConfirm').title = 'Confirm rollback ' + res.body.action_id + ' with its single-use token';
+        el('incidentOutput').innerHTML =
+          '<span class="tag tag-warn">' + escapeHtml(res.body.state) + '</span>' +
+          '<dl class="kv"><dt>Action</dt><dd><code>' + escapeHtml(res.body.action_id) + '</code></dd>' +
+          '<dt>Target</dt><dd>' + escapeHtml(res.body.target_service) + ' at <code>' +
+          escapeHtml(res.body.target_commit_sha) + '</code></dd>' +
+          '<dt>Payload hash</dt><dd><code>' + escapeHtml(res.body.payload_hash.slice(0, 24)) + '...</code></dd>' +
+          '<dt>Lease left</dt><dd>' + escapeHtml(res.body.lease_seconds_remaining) + ' s</dd></dl>' +
+          '<p style="margin-top:8px;">' + escapeHtml(res.body.confirmation_prompt) + '</p>';
+        speak(res.body.confirmation_prompt);
+      } catch (error) { showError('incidentOutput', error.message); }
+    }
+
+    async function confirmRollback() {
+      var secret = el('opSecret').value.trim();
+      if (!state.staged) { showError('incidentOutput', 'Nothing is staged.'); return; }
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/confirm_rollback ...');
+      try {
+        var res = await post('/mcp/tools/confirm_rollback', {
+          action_id: state.staged.action_id,
+          governance_token: state.staged.governance_token
+        }, 'incidentLatency', secret);
+        el('btnConfirm').disabled = true;
+        el('btnConfirm').title = 'This token has been spent. Stage again for a new one.';
+        el('incidentOutput').innerHTML =
+          '<span class="tag tag-ok">' + escapeHtml(res.body.status) + '</span>' +
+          '<dl class="kv"><dt>Action</dt><dd><code>' + escapeHtml(res.body.action_id) + '</code></dd>' +
+          '<dt>Service</dt><dd>' + escapeHtml(res.body.target_service) + '</dd></dl>' +
+          '<p style="margin-top:8px;">' + escapeHtml(res.body.output) + '</p>';
+        speak('Rollback confirmed for ' + res.body.target_service + '.');
+      } catch (error) { showError('incidentOutput', error.message); }
+    }
+
+    function init() {
+      if (window.location.protocol !== 'file:') el('apiBase').value = window.location.origin;
+      el('btnCheck').addEventListener('click', checkConnection);
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
       }
-      navElements[currentFocus].classList.add('tv-focused');
-      navElements[currentFocus].focus();
+
+      // WebMCP tools call the same endpoints the buttons do, so an agent driving
+      // this page gets exactly what a person clicking it gets.
+      if (typeof WebMCPBridge === 'function') {
+        var bridge = new WebMCPBridge('mercury_war_room');
+        bridge.registerTool('what_changed',
+          'Correlate the newest error metric reading with the deployment that preceded it',
+          { service_name: 'string' },
+          async function (args) {
+            var res = await post('/mcp/tools/what_changed',
+              { service_name: (args && args.service_name) || 'checkout-api' }, null);
+            return res.body;
+          });
+        bridge.registerTool('get_dora_velocity_report',
+          'Read DORA velocity metrics with their data provenance', {},
+          async function () { return (await post('/mcp/tools/get_dora_velocity_report', {}, null)).body; });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    return {
+      loadDora: loadDora, loadPrs: loadPrs, loadCost: loadCost,
+      loadObservability: loadObservability, loadWhatChanged: loadWhatChanged,
+      stageRollback: stageRollback, confirmRollback: confirmRollback,
+      checkConnection: checkConnection
     };
-
-    window.addEventListener('keydown', (e) => {
-      if (!navElements.length) return;
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
-        e.preventDefault();
-        navElements[currentFocus].classList.remove('tv-focused');
-
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          currentFocus = (currentFocus + 1) % navElements.length;
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          currentFocus = (currentFocus - 1 + navElements.length) % navElements.length;
-        } else if (e.key === 'Enter') {
-          navElements[currentFocus].click();
-        }
-        navElements[currentFocus].classList.add('tv-focused');
-        navElements[currentFocus].focus();
-      }
-    });
+  })();
   </script>
-
-    <script>
-    window.addEventListener('DOMContentLoaded', () => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
-        
-        const bridge = new WebMCPBridge('mercury_war_room');
-        bridge.registerTool('query_post_mortem_rag', 'Queries institutional memory vector RAG for similar past incidents', { incident_text: 'string' }, async (args) => {
-            return { matches: 4, top_rca: 'Lambda connection pool exhaustion on spike', recommended_action: 'Increase pool max_connections & add circuit breaker' };
-        });
-        bridge.registerTool('audit_telemetry_completeness', 'Detects missing metrics and log streams during SEV-1 incident', { service: 'string' }, async (args) => {
-            return { service: args.service, gap_score: 0.0, is_fully_observable: true };
-        });
-        
-    });
-    </script>
 </body>
 </html>

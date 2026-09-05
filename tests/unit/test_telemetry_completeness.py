@@ -4,6 +4,7 @@ Unit tests for TelemetryAbsenceDetector (Mercury).
 
 from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 
+
 def test_telemetry_detector_flags_missing_emf_logs_and_p95():
     detector = TelemetryAbsenceDetector()
     received = {"error_rate", "throttling_count", "memory_utilization"}

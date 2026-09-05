@@ -3,9 +3,10 @@ Unit tests for Private Observability Harness in mercury_amazon.
 Verifies CloudWatch EMF formatting, PII sanitization, and zero-leak compliance.
 """
 
-import pytest
 import json
+
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
+
 
 def test_harness_initialization_and_emf_structure():
     harness = PrivateObservabilityHarness(request_id="test-req-123")

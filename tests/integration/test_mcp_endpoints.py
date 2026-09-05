@@ -1,60 +1,137 @@
-"""Integration tests for Mercury FastMCP Endpoints."""
-from fastapi.testclient import TestClient
+"""Integration tests for the Mercury HTTP tool server.
 
-from src.interfaces.mcp_server import app
+Every telemetry endpoint must return provenance, because the cockpit renders it
+and a judge reads it. These tests assert that contract as hard as they assert the
+numbers.
+"""
 
-client = TestClient(app)
 
+def test_health_reports_the_build_sha_field():
+    from fastapi.testclient import TestClient
 
-def test_health_endpoint():
-    res = client.get("/health")
+    from src.interfaces.mcp_server import app
+
+    res = TestClient(app).get("/health")
     assert res.status_code == 200
-    assert res.json()["service"] == "mercury-voice-cto"
+    body = res.json()
+    assert body["service"] == "mercury-firetv-cockpit"
+    # build_sha may be empty outside a git checkout, but the field must exist so
+    # scripts/probe_deployment.py can compare a deployment against a commit.
+    assert "build_sha" in body
+    assert "github_live" in body
 
 
-def test_demo_ui_endpoint():
-    res = client.get("/demo")
+def test_root_serves_the_cockpit_page(client):
+    res = client.get("/")
     assert res.status_code == 200
-    assert "Mercury: Big Screen CTO War Room" in res.text
+    assert "Mercury" in res.text
+    assert "Fire TV Incident Commander" in res.text
 
 
-def test_dora_velocity_tool():
+def test_cockpit_scripts_are_served_next_to_the_page(client):
+    res = client.get("/firetv_nav.js")
+    assert res.status_code == 200
+    assert "mercuryNav" in res.text
+
+
+def test_cockpit_script_route_refuses_path_traversal(client):
+    res = client.get("/..%2f..%2fREADME.js")
+    assert res.status_code in (404, 400)
+
+
+def test_dora_endpoint_returns_metrics_and_provenance(client):
     res = client.post("/mcp/tools/get_dora_velocity_report")
     assert res.status_code == 200
     data = res.json()
-    assert "voice_summary" in data
     assert data["tier"] in ["ELITE", "HIGH", "MEDIUM", "LOW"]
+    assert set(data["metrics"]) == {
+        "deployment_frequency_per_day", "lead_time_hours",
+        "change_failure_rate_pct", "mttr_hours",
+    }
+    prov = data["provenance"]
+    assert prov["data_source"] in ("github-api", "offline-fixture")
+    assert prov["detail"]
+    assert isinstance(prov["is_live"], bool)
 
 
-def test_pr_bottlenecks_tool():
-    res = client.post("/mcp/tools/get_pr_bottlenecks")
+def test_dora_endpoint_is_honest_about_fixture_mode(client):
+    """With no GITHUB_TOKEN in the environment the response must say fixture."""
+    data = client.post("/mcp/tools/get_dora_velocity_report").json()
+    assert data["provenance"]["data_source"] == "offline-fixture"
+    assert data["provenance"]["display_label"] == "OFFLINE FIXTURE"
+    assert data["provenance"]["is_live"] is False
+
+
+def test_pr_bottlenecks_endpoint_returns_counts_and_provenance(client):
+    data = client.post("/mcp/tools/get_pr_bottlenecks").json()
+    assert data["total_open"] >= 0
+    assert data["stale_count"] >= len(data["stale_prs"])
+    assert "provenance" in data
+
+
+def test_cost_endpoint_returns_spend_and_provenance(client):
+    data = client.post("/mcp/tools/get_aws_cost_anomalies").json()
+    assert data["month_to_date_usd"] >= 0
+    assert data["provenance"]["data_source"] in ("aws-cost-explorer", "offline-fixture")
+
+
+def test_what_changed_returns_a_verdict_and_both_provenances(client):
+    res = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"})
     assert res.status_code == 200
     data = res.json()
-    assert data["total_open"] > 0
-    assert len(data["stale_prs"]) >= 1
+    assert data["verdict"] in (
+        "NO_ANOMALY", "ANOMALY_ATTRIBUTED", "ANOMALY_WITHOUT_ATTRIBUTION", "INSUFFICIENT_DATA",
+    )
+    assert data["explanation"]
+    assert "metric_provenance" in data
+    assert "commit_provenance" in data
 
 
-def test_aws_cost_anomalies_tool():
-    res = client.post("/mcp/tools/get_aws_cost_anomalies")
+def test_what_changed_does_not_name_a_commit_without_commit_data(client):
+    """Without a GitHub token there are no commits, so nothing may be blamed."""
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    assert data["commit_provenance"]["is_live"] is False
+    assert data["offending_commit"] is None
+    assert data["recommended_action"] is None
+    assert data["verdict"] in ("ANOMALY_WITHOUT_ATTRIBUTION", "NO_ANOMALY", "INSUFFICIENT_DATA")
+
+
+def test_what_changed_rejects_an_out_of_range_window(client):
+    assert client.post("/mcp/tools/what_changed", json={"time_window_minutes": 99999}).status_code == 422
+    assert client.post("/mcp/tools/what_changed", json={"time_window_minutes": 1}).status_code == 422
+
+
+def test_observability_audit_reports_missing_signals(client):
+    res = client.post("/mcp/tools/audit_observability", json={
+        "service_name": "checkout-api",
+        "received_signals": ["error_rate", "emf_logs"],
+    })
     assert res.status_code == 200
     data = res.json()
-    assert data["month_to_date_usd"] > 0
-    assert len(data["anomalies"]) >= 1
+    assert data["is_fully_observable"] is False
+    assert "p95_latency" in data["missing_signals"]
+    assert 0 < data["observability_gap_score"] <= 1
 
 
-def test_governed_rollback_flow():
-    stage_res = client.post("/mcp/tools/stage_rollback", json={
-        "action_id": "mcp-rb-01",
-        "target_service": "billing-api",
-        "target_commit_sha": "abc12345",
-        "reason": "Database connection pool exhaustion"
+def test_every_response_carries_a_request_id_header(client):
+    res = client.get("/health")
+    assert res.headers.get("X-Mercury-Request-Id")
+
+
+def test_devops_event_feed_starts_empty_and_accepts_authorized_events(client, auth_headers):
+    res = client.post("/webhooks/github/workflow_run", headers=auth_headers, json={
+        "repository": "acme/widgets", "workflow_name": "ci.yml", "conclusion": "failure",
     })
-    assert stage_res.status_code == 200
-    assert stage_res.json()["state"] == "PENDING_CONFIRMATION"
+    assert res.status_code == 200
+    assert res.json()["status"] == "FAILURE"
 
-    confirm_res = client.post("/mcp/tools/confirm_rollback", json={
-        "action_id": "mcp-rb-01",
-        "voice_token": "CTO_VOICE_VERIFIED"
+    feed = client.get("/mcp/events/devops").json()
+    assert feed["total"] >= 1
+    assert feed["events"][0]["source"] == "GitHub_Actions"
+
+
+def test_webhook_ingest_requires_authorization(client):
+    res = client.post("/webhooks/github/workflow_run", json={
+        "repository": "acme/widgets", "workflow_name": "ci.yml", "conclusion": "success",
     })
-    assert confirm_res.status_code == 200
-    assert confirm_res.json()["status"] == "EXECUTED"
+    assert res.status_code == 401

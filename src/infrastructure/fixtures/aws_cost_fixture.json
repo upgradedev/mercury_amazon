@@ -1,0 +1,17 @@
+{
+  "schema": "mercury.aws_cost_fixture/1",
+  "note": "these figures are SYNTHETIC. They were written by hand to exercise the anomaly path and were never read from an AWS account. No AWS credentials were available when this repository was built, so no Cost Explorer response was recorded. Set AWS credentials and the adapter calls ce:GetCostAndUsage for real.",
+  "recorded_at_utc": "",
+  "shape_source": "Field names and units mirror the ce:GetCostAndUsage UnblendedCost response documented by AWS.",
+  "total_month_to_date_usd": 412.55,
+  "projected_end_of_month_usd": 1237.65,
+  "anomalies": [
+    {
+      "service_name": "Amazon Elastic Container Service",
+      "previous_daily_avg_usd": 9.4,
+      "current_daily_usd": 38.6,
+      "percentage_increase": 310.6,
+      "root_cause_explanation": "Synthetic example row. Cost Explorer does not report a cause; a real anomaly requires inspecting the service's usage records."
+    }
+  ]
+}

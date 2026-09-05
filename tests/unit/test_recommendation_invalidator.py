@@ -3,6 +3,7 @@ Unit tests for DynamicRecommendationEngine.
 """
 from src.domain.recommendation_invalidator import DynamicRecommendationEngine, EvidenceContract
 
+
 def test_dynamic_recommendation_auto_withdrawal():
     engine = DynamicRecommendationEngine()
     contract = EvidenceContract(metric_name="LambdaErrorRate", safe_threshold=2.0, comparison="less_than")

@@ -3,9 +3,10 @@ Dynamic Recommendation Invalidator with Live Telemetry TTL Contracts.
 Automatically withdraws incident remediation advice when underlying telemetry self-resolves.
 """
 
-from typing import Dict, Any, List, Optional
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any, Dict
+
 
 @dataclass
 class EvidenceContract:

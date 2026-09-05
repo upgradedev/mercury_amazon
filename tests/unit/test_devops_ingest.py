@@ -1,5 +1,4 @@
 """Unit tests for Mercury DevOps Ingestion."""
-import pytest
 from src.infrastructure.cloudwatch_github_ingest import DevOpsTelemetryIngestAdapter
 
 

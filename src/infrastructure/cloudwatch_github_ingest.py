@@ -1,8 +1,7 @@
 """Multi-Source DevOps Event Ingestion Adapter for Mercury War Room Cockpit."""
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import hashlib
-from typing import Any, Dict
 
 
 @dataclass
