@@ -19,6 +19,13 @@ Single use
 
 Plus the lease: a staged action expires after ``lease_sec`` seconds.
 
+One deliberate consequence: a refused confirmation moves the action to REJECTED,
+so it cannot be confirmed afterwards even with the correct token. A tampering
+attempt burns the action it was aimed at, and the operator must stage again. This
+is fail-closed on purpose. It costs a legitimate operator one re-stage after a
+typo, and it costs an attacker who holds the bearer secret the ability to keep
+guessing against a live lease.
+
 This module imports only the standard library so the domain stays free of SDKs.
 """
 from __future__ import annotations

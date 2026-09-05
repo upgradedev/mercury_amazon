@@ -182,3 +182,37 @@ def test_a_shell_metacharacter_service_name_is_stored_verbatim_not_executed(clie
                       json=stage_payload("itest-inject", target_service=hostile))
     assert res.status_code == 200
     assert res.json()["target_service"] == hostile
+
+
+def test_a_refused_confirmation_burns_the_staged_action(client, auth_headers):
+    """Fail-closed on purpose: a tampering attempt costs the operator a re-stage.
+
+    Documented in the README and in the domain docstring, so this test exists to
+    stop the behaviour changing silently in either direction.
+    """
+    staged = client.post(STAGE, headers=auth_headers, json=stage_payload("itest-burn")).json()
+
+    rejected = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-burn", "governance_token": "not-a-real-token"})
+    assert rejected.status_code == 400
+
+    # The correct token no longer works, because the action is no longer pending.
+    followup = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-burn", "governance_token": staged["governance_token"]})
+    assert followup.status_code == 409
+    assert followup.json()["detail"]["denial_reason"] == "NOT_PENDING"
+
+
+def test_the_security_audit_script_passes_against_the_running_app():
+    """scripts/security_audit.py is a check, so a green suite must include it."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    result = subprocess.run(
+        [sys.executable, "scripts/security_audit.py"],
+        capture_output=True, text=True, cwd=str(repo_root), timeout=300,
+    )
+    assert result.returncode == 0, f"security audit failed:\n{result.stdout[-2000:]}"
+    assert "checks passed" in result.stdout

@@ -4,7 +4,7 @@
 
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-239%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-241%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -160,6 +160,12 @@ sequenceDiagram
 4. **Lease.** A staged action expires after `lease_sec` seconds, default 300, and
    then confirms with `LEASE_EXPIRED`.
 
+A refused confirmation moves the action to `REJECTED`, so it cannot be confirmed
+afterwards even with the correct token. That is fail-closed on purpose: a
+tampering attempt burns the action it was aimed at, and the operator stages
+again. `python scripts/security_audit.py` runs 24 checks over this path against
+the real HTTP surface and exits non-zero if any of them stops holding.
+
 **What it does not do:** Mercury ships no deployment pipeline integration. When
 governance passes, the default dispatcher records the decision locally and its own
 response says so verbatim: *"No deployment pipeline was contacted."* Implement the
@@ -185,7 +191,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 239 passed
+# 241 passed
 ```
 
 ### 3. Start the server
@@ -277,7 +283,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 239 passed
+python -m pytest tests/ -q                                    # 241 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1031 statements
 node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
 python ci/readiness.py                                        # standards gate audit
