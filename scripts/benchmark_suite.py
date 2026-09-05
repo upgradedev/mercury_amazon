@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 os.environ.setdefault("MERCURY_ROLLBACK_SECRET", "benchmark-secret")
+os.environ.setdefault("MERCURY_OFFLINE", "1")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -86,6 +87,16 @@ def benchmark_governance_check(iterations: int) -> dict[str, float]:
     return summarize(latencies, iterations)
 
 
+def _observed_data_mode(client: TestClient) -> str:
+    """Report the data mode the run actually observed, rather than asserting one."""
+    sources = {}
+    for name, path in ENDPOINTS:
+        body = client.post(path).json()
+        provenance = body.get("provenance") or body.get("metric_provenance") or {}
+        sources[name] = provenance.get("data_source", "unknown")
+    return "; ".join(f"{name}={source}" for name, source in sources.items())
+
+
 def main() -> int:
     http_iterations = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_HTTP_ITERATIONS
     crypto_iterations = int(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_CRYPTO_ITERATIONS
@@ -120,7 +131,7 @@ def main() -> int:
         "measured_by_command": "python scripts/benchmark_suite.py",
         "python_version": sys.version.split()[0],
         "platform": sys.platform,
-        "data_mode": "offline-fixture (no GITHUB_TOKEN and no AWS credentials present)",
+        "data_mode": _observed_data_mode(client),
         "results": results,
     }
 

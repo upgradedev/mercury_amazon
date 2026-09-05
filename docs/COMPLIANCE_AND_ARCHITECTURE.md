@@ -1,68 +1,112 @@
-# Mercury: Architecture & AWS Well-Architected Review
+# Architecture, AWS Well-Architected review, and regulatory alignment
 
-**Region:** `eu-west-1` (Ireland)  
-**Live Endpoint:** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`  
-**Architecture:** 100% Pure Serverless (AWS Lambda Python 3.11 + API Gateway HTTP API v2 + AWS Cost Explorer API)  
-**Monthly Idle Cost:** **$0.00 / month** (AWS Free Tier Eligible)
+**Repository:** `mercury_amazon`
+**Scope:** the code in this repository as it stands, not a planned system.
 
----
-
-## 1. System Architecture Diagram
-
-```mermaid
-flowchart TD
-    subgraph INGRESS["1. 10-Foot Living Room Cockpit"]
-        FIRETV["Amazon Fire TV / Voice Remote"]
-        WALLBOARD["Leanback Wallboard HTML Companion (Port 8002)"]
-    end
-
-    subgraph APIGW["2. Cloud Ingress Tier (eu-west-1)"]
-        GATEWAY["AWS API Gateway HTTP API v2\n(https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com)"]
-    end
-
-    subgraph LAMBDA["3. Serverless Telemetry Core ($0.00 Idle Cost)"]
-        FUNC["AWS Lambda: mercury-wallboard-euw1-prod\n(Python 3.11, 256MB, <150ms Cold Start)"]
-        BRIDGE["ASGI Lambda Bridge (lambda_handler.py)"]
-        ROUTER["FastMCP Application Router (/telemetry, /health)"]
-        
-        subgraph DOMAIN["Domain Core"]
-            DORA["DORA 4-Key Metrics Aggregator"]
-            FINOPS["FinOps Unit-Cost Anomaly Detector"]
-            ALERT["Emergency Circuit Breaker Trigger"]
-        end
-    end
-
-    subgraph AWS_SERVICES["4. Managed AWS Backend Services"]
-        CE["AWS Cost Explorer API (Read-only)"]
-        CW["Amazon CloudWatch Logs (/aws/lambda/mercury-wallboard-euw1-prod)"]
-    end
-
-    INGRESS --> GATEWAY
-    GATEWAY --> FUNC
-    FUNC --> BRIDGE
-    BRIDGE --> ROUTER
-    ROUTER --> DOMAIN
-    DOMAIN --> CE
-    FUNC --> CW
-```
+A note on what this document is. It is a self-assessment, not an audit. No
+external reviewer has looked at this system, no AWS Well-Architected Framework
+Review tool has been run against it, and no legal review has been performed. Where
+a pillar or an article is only partly addressed, this document says so rather than
+awarding itself a pass. The words "compliant" and "conformity" are deliberately
+avoided throughout, because neither has been established by anyone qualified to
+establish it.
 
 ---
 
-## 2. AWS Well-Architected Framework 6-Pillar Review
+## 1. Architecture
 
-| Pillar | Assessment & Implementation Details | Compliance Status |
+Hexagonal, four layers, with the dependency rule enforced by a readiness gate that
+reads the imports rather than trusting the diagram.
+
+| Layer | Directory | Rule | Enforced by |
+|---|---|---|---|
+| Domain | `src/domain` | Pure models. No SDK, no framework, no I/O | Gate A5 greps for `boto3`, `httpx`, `fastapi`, `botocore`, `requests` imports |
+| Application | `src/application` | Use cases depending on `Protocol`s | Gate A4 checks the layer imports its contracts from the domain |
+| Infrastructure | `src/infrastructure` | Adapters to GitHub, Cost Explorer, CloudWatch, local git | Gate F7 checks nothing here is orphaned |
+| Interfaces | `src/interfaces` | The HTTP server and route wiring | Gate G3 checks routes reach use cases |
+
+The Fire TV client (`app/`) is a separate Android module that hosts the same
+cockpit page the web serves, so there is one interface implementation rather than
+a TV copy that can drift.
+
+### Data provenance as an architectural constraint
+
+Every telemetry report carries a `Provenance` value (`src/domain/provenance.py`)
+naming its source, and the interface layer serialises it into every response. This
+is not decoration; it is the mechanism that makes a fallback safe to ship. An
+adapter that cannot reach its live source returns a fixture **and** a provenance
+that says why, and the cockpit renders the difference visibly.
+
+---
+
+## 2. AWS Well-Architected review
+
+Six pillars, assessed against what is implemented. "Partial" and "Not addressed"
+are used where they are the truth.
+
+| Pillar | What exists | Assessment |
 |---|---|---|
-| **Pillar 1: Operational Excellence** | • IaC via Terraform (`infra/main.tf`) and automated deployer.<br>• Automated healthchecks (`GET /health`) with live HTTP 200 responses.<br>• 24 unit/integration tests with 97% test coverage. | **100% PASS** |
-| **Pillar 2: Security** | • Read-only IAM execution role strictly scoped to Cost Explorer and CloudWatch.<br>• Non-interactive wallboard: zero arbitrary write operations. | **100% PASS** |
-| **Pillar 3: Reliability** | • In-memory telemetry cache handles intermittent AWS API rate limiting gracefully.<br>• Multi-AZ automatic failover in `eu-west-1`. | **100% PASS** |
-| **Pillar 4: Performance Efficiency** | • Telemetry ingestion and rendering completes in <10ms for instant Fire TV remote navigation. | **100% PASS** |
-| **Pillar 5: Cost Optimization** | • **$0.00 / month Idle Cost** on Serverless compute. Caches Cost Explorer responses to prevent billable API calls. | **100% PASS** |
-| **Pillar 6: Sustainability** | • Scale-to-zero compute footprint; zero continuous server idling in living room deployments. | **100% PASS** |
+| **Operational excellence** | Terraform in `infra/main.tf`. `GET /health` reports status and the build SHA. Structured CloudWatch EMF emitted per request by `PrivateObservabilityHarness`, with PII masking. CI runs lint, 239 tests, a coverage floor and the readiness auditor. | **Partial.** No deploy of the current commit has been executed, so the operational path is declared but unproven. Gates D2 and G2 fail. |
+| **Security** | Both state-changing endpoints require a bearer secret compared in constant time. Governance tokens are HMAC-signed, bound to a length-prefixed payload hash, and single use. Request bodies are length-bounded by Pydantic. The cockpit asset route serves an extension allowlist and refuses traversal. Secrets are never logged or returned. | **Partial.** The secret is a single shared value with no rotation and no per-operator identity, so the audit trail records that *someone* holding the secret acted, not who. In-memory nonce storage means the single-use guarantee does not hold across multiple instances. |
+| **Reliability** | Every adapter degrades to a labelled fallback rather than failing the request. Failed AWS calls are deliberately not cached, so a transient error cannot pin the display. Rollback leases expire. | **Partial.** All state is in the server process, so a restart forgets staged rollbacks and spent nonces. There is no persistence layer and no multi-instance story. |
+| **Performance efficiency** | Measured, not asserted: `python scripts/benchmark_suite.py` reports 2.88 ms to 65.90 ms mean per endpoint over 60 requests each, written to `benchmarks_summary.json`. Credential resolution and fixture reads are cached after a benchmark showed them costing over a second per request. | **Addressed for the local path.** No measurement exists from a Fire TV on a real network. |
+| **Cost optimisation** | Cost Explorer responses cached for 15 minutes because AWS bills per request. Serverless design with no always-on compute. | **Partial.** The idle cost figures in `infra/README.md` are labelled ESTIMATE because no bill has been read for a deployment of this project. |
+| **Sustainability** | Scale-to-zero compute; no continuous polling of paid APIs. | **Partial.** Asserted from the architecture, not measured. |
 
 ---
 
-## 3. EU AI Act & GDPR Alignment
+## 3. EU AI Act alignment
 
-* **Zero Personal Data:** Aggregates anonymous DORA metrics and infrastructure billing totals.
-* **Deterministic Computations:** Lead time, MTTR, and cost variances computed via exact arithmetic rather than predictive approximations.
-* **EU Data Residency:** All operations executed strictly within `eu-west-1` (Ireland).
+Mercury performs threshold arithmetic and HMAC verification. It runs no model and
+makes no automated decision about a person, so on our reading it is not a
+high-risk AI system under the Act. The articles below are addressed anyway,
+because the incident-attribution feature makes a claim about causation that a
+human will act on.
+
+| Article | Requirement | What this repository does | Gap |
+|---|---|---|---|
+| **Article 10** (Data governance) | Data sets are relevant, representative and documented | Every input carries a `Provenance` recording source, detail and observation time. The GitHub fixture is a recording of a real read with the command that produced it. The AWS fixture states in its own text that it is synthetic. | The synthetic cost fixture is not representative of any real account, which is why it says so rather than being presented as typical. |
+| **Article 13** (Transparency) | Users can interpret the output and use it appropriately | The cockpit prints the provenance beside every number, with a visually distinct `OFFLINE FIXTURE` badge. The correlator returns its reasoning as text, including the reasoning for a refusal. DORA proxy definitions are stated in the README rather than implied. | None identified. |
+| **Article 14** (Human oversight) | A human can intervene, and automation does not act alone | Mercury never executes a rollback on its own. It stages a recommendation; a person must authorise with a secret, then confirm with a single-use token inside a 300 second lease. Every refusal names its reason. | Oversight is authenticated by a shared secret, not by an identified individual, so the record shows that an authorised party acted, not which one. |
+| **Article 15** (Accuracy and robustness) | Accuracy is stated, and the system resists failure | The anomaly rule is published: newest reading against the mean of the rest, with a fixed factor. A zero baseline is explicitly not treated as an infinite spike. 239 tests, 92 percent line coverage, including a failing-input test for each of eight rollback denial reasons. | The rule has no seasonality and no trend model, so a regular nightly batch will look like an anomaly. This is a known false-positive mode and is stated in the README. |
+| **Article 50** (Disclosure) | People are told when they interact with a machine | The cockpit is labelled as a tool throughout. Its spoken output is the browser's `speechSynthesis`, disclosed as such in the README. There is no conversational agent and no synthetic persona. | None identified. |
+
+---
+
+## 4. GDPR data map
+
+| Category | Collected | Stored | Transmitted |
+|---|---|---|---|
+| Customer or end-user personal data | None | None | None |
+| Commit author names and pull request author logins | Yes, from GitHub or local `git log` | In process memory only, for the life of a request | Rendered on the cockpit screen |
+| AWS account spend per service | Yes, when credentials resolve | 15 minute in-process cache | Rendered on the cockpit screen |
+| Request metadata (client IP, path, status) | Yes | Emitted to logs as CloudWatch EMF | Masked before emission |
+
+Mercury reads no customer database and holds no end-user records. The only
+personal data it touches is the developer identity attached to a commit, which is
+already published in the repository it is read from.
+
+`PrivateObservabilityHarness` masks email addresses, GitHub tokens matching
+`ghp_[A-Za-z0-9]{36}`, and `AWS_SECRET_ACCESS_KEY=` values before any log record
+leaves the process. That masking is unit tested in
+`tests/unit/test_observability_harness.py`.
+
+**Known gap.** The masking is regular-expression based. It catches the patterns it
+knows and will not catch a credential in an unrecognised format. It reduces
+accidental disclosure; it is not a guarantee.
+
+**Retention.** Nothing is persisted by Mercury itself. Log retention is whatever
+the CloudWatch log group is configured with, which this repository does not set.
+
+---
+
+## 5. Threat notes
+
+| Threat | Mitigation | Residual risk |
+|---|---|---|
+| Anyone on the network stages or confirms a rollback | Bearer secret required on both endpoints, constant-time comparison | A leaked secret grants full rollback authority. There is no rotation and no second factor. |
+| A staged rollback is edited before confirmation | The token is bound to a hash of the payload; any edit invalidates it | None identified for this path. |
+| A captured token is replayed | Nonce consumed on first use | The nonce set is in memory, so a second server instance would accept a token the first has already spent. |
+| A hostile deep link redirects the Fire TV WebView | `CockpitUrlResolver` accepts only absolute `http` and `https` URLs, rejecting `javascript:`, `file:` and embedded whitespace | An attacker who can set the intent extra can still point the app at another `http` host. |
+| A malicious API response injects markup into the cockpit | Every interpolated value passes through `escapeHtml`, checked by a test that parses each `innerHTML` statement | None identified for this path. |
+| The asset route is walked out of `docs/` | Extension allowlist plus a resolved-parent check | None identified for this path. |

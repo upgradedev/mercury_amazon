@@ -1,8 +1,8 @@
 {
+  "schema": "mercury.video_plan/1",
+  "status": "PLAN ONLY. No video has been recorded. Durations below are intended, not measured.",
   "project": "mercury_amazon",
   "title": "Mercury: Voice CTO Cockpit & DORA Radar",
-  "total_duration_sec": 155.0,
-  "is_under_180s_cap": true,
   "beats": [
     {
       "beat_index": 1,
@@ -59,5 +59,6 @@
       "narration_text": "Mercury gives engineering leaders instant clarity and decisive control. Built for Amazon Alexa Plus, Fire TV, and AWS.",
       "visual_action": "Mercury logo, Alexa Plus badge, Fire TV badge, GitHub repo URL."
     }
-  ]
+  ],
+  "intended_total_duration_sec": 155.0
 }

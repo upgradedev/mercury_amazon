@@ -1,196 +1,356 @@
-# Mercury: Fire TV Incident Commander & War-Room Cockpit
+# Mercury: Fire TV Incident Commander
 
-> **Mercury transforms Fire TV into a shared engineering war-room cockpit, diagnosing production outages via Alexa voice queries and executing governed rollbacks with the remote D-Pad.**
+> **Mercury puts an on-call engineer's incident evidence on the Fire TV in the room, and takes the governed rollback from the remote.**
 
-[![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](https://github.com/upgradedev/mercury_amazon/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Fire TV App](https://img.shields.io/badge/Fire%20TV-Leanback%20Android%20App-orange.svg)](app/)
-[![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20%26%20Cost%20Explorer-orange.svg)](https://aws.amazon.com)
-[![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)](https://github.com/upgradedev/mercury_amazon/actions)
+[![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
+[![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-239%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+The two Actions badges point at a repository that is currently **private**, so they
+will not resolve for anyone outside the organisation until it is made public. They
+are listed here because the workflows they name are in this repository and can be
+read directly. The other three badges are static and describe values you can
+reproduce with the commands in [Measured numbers](#measured-numbers).
 
 ---
 
 ## Table of Contents
-1. [The Problem: Outages Cause War-Room Chaos](#the-problem-outages-cause-war-room-chaos)
-2. [The Solution: Fire TV Incident Commander](#the-solution-fire-tv-incident-commander)
-3. [Architecture Overview](#architecture-overview)
-4. [Incident Commander Interaction Flow](#incident-commander-interaction-flow)
-5. [Domain-Driven Design Structure](#domain-driven-design-structure)
-6. [Measured Benchmarks](#measured-benchmarks)
-7. [Quickstart in Under 5 Steps](#quickstart-in-under-5-steps)
-8. [Compliance & Security Review](#compliance--security-review)
-9. [Contest Declarations & Feedback](#contest-declarations--feedback)
-10. [License](#license)
+
+1. [What this is](#what-this-is)
+2. [What is real and what is simulated](#what-is-real-and-what-is-simulated)
+3. [Architecture](#architecture)
+4. [The rollback is the point](#the-rollback-is-the-point)
+5. [Quickstart](#quickstart)
+6. [Fire TV](#fire-tv)
+7. [Measured numbers](#measured-numbers)
+8. [Configuration](#configuration)
+9. [Known limitations](#known-limitations)
+10. [Contributing and licence](#contributing-and-licence)
 
 ---
 
-## The Problem: Outages Cause War-Room Chaos
+## What this is
 
-During a P0/P1 production incident, having engineers huddle over individual laptop monitors causes fragmented context and miscommunication. When a deployment breaks checkout or spikes 5xx errors, the team needs:
-* A shared situational awareness display in the room on the big screen.
-* Instant spoken answers to the critical question: *"Alexa, what changed?"*
-* Direct D-Pad remote navigation to safely roll back the offending release without opening six disconnected browser tabs.
+During a production incident the useful information is scattered across a version
+control host, a metrics console and a deployment pipeline, and it is scattered
+across several laptops. Mercury puts one view of it on the television that is
+already in the room, and lets the person holding the remote act on it.
+
+Three things it does:
+
+**Answers "what changed?"** `POST /mcp/tools/what_changed` reads an error metric
+series and a commit history, decides whether the newest reading is an anomaly
+against its own baseline, and attributes it to the closest commit that landed
+before it. When it cannot attribute the anomaly to anything, it says so and
+offers no rollback. That refusal is a feature, and it has its own tests.
+
+**Shows engineering velocity and spend.** `POST /mcp/tools/get_dora_velocity_report`,
+`POST /mcp/tools/get_pr_bottlenecks` and `POST /mcp/tools/get_aws_cost_anomalies`
+return DORA metrics computed from GitHub Actions runs and merged pull requests,
+open pull requests past a 36 hour review SLA, and month-to-date AWS spend per
+service from Cost Explorer.
+
+**Takes a governed rollback from the D-pad.** `POST /mcp/tools/stage_rollback`
+and `POST /mcp/tools/confirm_rollback` are the only state-changing endpoints, and
+both require the deployment's shared secret. See
+[The rollback is the point](#the-rollback-is-the-point).
 
 ---
 
-## The Solution: Fire TV Incident Commander
+## What is real and what is simulated
 
-Mercury transforms the Fire TV into a shared war-room cockpit:
-1. **Shared War-Room Screen:** Real-time multi-modal telemetry wallboard running natively on Fire OS with 10-foot Leanback UI.
-2. **Spoken Root-Cause Query ("Alexa, what changed?"):** Instant correlation between recent Git commits and CloudWatch 5xx error rate spikes via FastMCP and Bedrock reasoning.
-3. **Spatial D-Pad Remote Rollback:** The on-call engineer navigates directly to the rollback action using the Fire TV remote D-Pad.
-4. **Dual-Custody Human Confirmation:** High-consequence rollbacks require human confirmation under a 300-second cryptographic SHA-256 lease before dispatching to AWS.
-5. **DORA & Cloud Cost Radar:** Real-time monitoring of Deployment Frequency, Lead Time, Change Failure Rate, and AWS Cost Explorer burn surges.
+Every telemetry response carries a provenance stamp, and the cockpit prints it on
+screen next to the numbers. A viewer never has to trust the server about whether
+a reading is live.
+
+| Data | Live path | What happens without it |
+|---|---|---|
+| DORA metrics, pull requests | GitHub REST API via `httpx`, needs `GITHUB_TOKEN` | Serves `src/infrastructure/fixtures/github_telemetry_fixture.json`, which is a **recording of a real GitHub read** of `pallets/flask` made by `python scripts/record_github_fixture.py`, labelled `offline-fixture` |
+| AWS spend | `ce:GetCostAndUsage` via `boto3`, needs AWS credentials | Serves `src/infrastructure/fixtures/aws_cost_fixture.json`, which says in its own text that it is **synthetic and was never read from an AWS account**, labelled `offline-fixture` |
+| Error metric series | `cloudwatch:GetMetricStatistics` via `boto3` | Generates a deterministic local series, labelled `offline-fixture`, whose provenance says it was generated and never read from CloudWatch |
+| Commits for correlation | GitHub REST API | Falls back to **real commits from the local checkout** via `git log`, labelled `local-git`, never to invented commits |
+
+The Cost Explorer path has been executed successfully against a real AWS account
+during development. The CloudWatch path has been executed and returned no
+datapoints, because there is no load balancer named `checkout-api` to read. The
+account's actual figures are not committed to this repository.
+
+Set `MERCURY_OFFLINE=1` to force every adapter into fixture mode whatever
+credentials the machine has. That switch can only ever suppress a live call; it
+can never make a fixture look live.
+
+### The demo path, and what it does to the data
+
+With no credentials at all, the war room still works end to end: the commits are
+real ones read from your checkout, and the simulated metric series is anchored
+four minutes after the newest of them so the correlation is coherent. The response
+says exactly that, in the text the screen shows:
+
+> The final reading is placed 4 minutes after the newest known commit so the
+> correlation is demonstrable; the commits are real, this metric is not.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```mermaid
 graph TD
-    WarRoom["On-Call Team (Fire TV Remote / Alexa Voice)"] -->|"Alexa, what changed?"| Alexa["Amazon Alexa+ / Fire TV Voice"]
-    Alexa -->|"FastMCP Streamable HTTP"| MercuryMCP["Mercury FastMCP Server"]
-    
-    subgraph "Mercury Incident Engine"
-        MercuryMCP --> WhatChanged["Root-Cause Correlator ('What Changed?')"]
-        MercuryMCP --> DORAModule["DORA & Git Velocity Engine"]
-        MercuryMCP --> CostModule["AWS CloudWatch & Cost Radar"]
-        MercuryMCP --> GovModule["Governed D-Pad Rollback Gate"]
+    Remote["On-call engineer with a Fire TV remote"] -->|D-pad| APK["Leanback APK (app/)"]
+    APK -->|WebView + JavascriptInterface| Cockpit["Cockpit page (docs/index.html)"]
+    Keyboard["Desktop keyboard"] -->|arrow keys| Cockpit
+    Cockpit -->|"fetch()"| Server["FastAPI tool server (src/interfaces)"]
+
+    subgraph "Application layer"
+        Server --> Diagnose["DiagnoseIncidentUseCase"]
+        Server --> Dora["CalculateDORAUseCase"]
+        Server --> Cost["DetectCostAnomaliesUseCase"]
+        Server --> Rollback["GovernedRollbackUseCase"]
     end
-    
-    subgraph "Infrastructure Integrations"
-        WhatChanged --> GitHub["GitHub Commits & PR Diffs"]
-        WhatChanged --> CloudWatch["AWS CloudWatch 5xx Alarms"]
-        GovModule --> Lambda["AWS Lambda / ECS Pipeline Dispatch"]
+
+    subgraph "Adapters, each with a labelled fallback"
+        Diagnose --> CW["CloudWatchMetricAdapter"]
+        Diagnose --> Git["GitHub API, then local git log"]
+        Dora --> GH["GitHubTelemetryAdapter"]
+        Cost --> CE["AWSCostAdapter"]
     end
 ```
 
+The layering is hexagonal. `src/domain` holds pure models and imports no SDK,
+which gate A5 checks by reading the imports. `src/application` holds use cases
+that depend on protocols. `src/infrastructure` holds the adapters that talk to
+GitHub, Cost Explorer, CloudWatch and git. `src/interfaces` holds the HTTP server
+and the cockpit assets.
+
 ---
 
-## Incident Commander Interaction Flow
+## The rollback is the point
+
+A rollback is the one irreversible thing Mercury can do from a sofa, so it is
+guarded by four independent conditions. Each has a test that proves it refuses.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Team as Incident On-Call Team
-    participant TV as Fire TV 10-Foot Leanback Screen
-    participant Alexa as Alexa Voice Assistant
-    participant MCP as Mercury FastMCP Server
-    participant AWS as AWS CloudWatch & Lambda
-    participant Git as GitHub Commits
+    participant TV as Fire TV cockpit
+    participant API as Mercury server
+    participant Dom as Governance domain
 
-    Team->>Alexa: "Alexa, ask Mercury what changed?"
-    Alexa->>MCP: POST /mcp/tools/what_changed
-    MCP->>Git: Inspect recent deployment (commit 7c8f2a1)
-    MCP->>AWS: Correlate CloudWatch 5xx error spike (+340%)
-    MCP-->>Alexa: Offending commit found; governed rollback staged
-    Alexa-->>Team: Speaks: "Commit 7c8f2a1 caused 340% 5xx spike. Rollback staged."
-    MCP-->>TV: Update Incident Timeline with glowing D-Pad Rollback Card
+    TV->>API: POST /stage_rollback + Bearer secret
+    API->>Dom: hash the payload, mint HMAC token bound to it
+    Dom-->>TV: governance_token, valid once, for this content only
 
-    Team->>TV: Fire TV Remote D-Pad Navigation (ArrowDown -> ENTER)
-    TV->>MCP: POST /mcp/tools/confirm_rollback with leased token
-    MCP->>AWS: Execute rollback on checkout-api
-    MCP-->>TV: Status: ROLLBACK EXECUTED (Service healthy)
+    TV->>API: POST /confirm_rollback + Bearer secret + token
+    API->>Dom: verify signature, bound action, bound content, lease, nonce
+    alt every condition holds
+        Dom-->>TV: EXECUTED, and the response says no pipeline was contacted
+    else any condition fails
+        Dom-->>TV: 401 / 403 / 409 / 410 with a named denial reason
+    end
 ```
+
+1. **Authorization.** Both endpoints require `Authorization: Bearer <MERCURY_ROLLBACK_SECRET>`,
+   compared in constant time. Without it the request is refused with 401.
+2. **Content binding.** Staging mints an HMAC over the action id and a
+   length-prefixed SHA-256 hash of the rollback payload. Edit the target commit
+   after staging and the token stops applying, with reason `TOKEN_CONTENT_MISMATCH`.
+3. **Single use.** Each token carries a nonce consumed on the first successful
+   confirm. A replay is refused with `TOKEN_ALREADY_USED`.
+4. **Lease.** A staged action expires after `lease_sec` seconds, default 300, and
+   then confirms with `LEASE_EXPIRED`.
+
+**What it does not do:** Mercury ships no deployment pipeline integration. When
+governance passes, the default dispatcher records the decision locally and its own
+response says so verbatim: *"No deployment pipeline was contacted."* Implement the
+`RollbackDispatcher` protocol in `src/application/governed_rollback_use_case.py`
+to make the dispatch real.
 
 ---
 
-## Domain-Driven Design Structure
+## Quickstart
 
-```
-src/
-├── domain/            # Pure domain models (Zero framework dependencies)
-│   ├── dora_metrics.py        # DORA velocity calculations & tiers
-│   ├── git_radar.py           # Pull request review bottleneck detector
-│   ├── cloud_cost.py          # AWS Cost Explorer anomaly models
-│   └── governed_rollback.py   # Governed rollback leases & SHA-256 tokens
-├── application/       # Use cases
-│   ├── calculate_dora_use_case.py        # DORA report generator
-│   ├── detect_cost_anomalies_use_case.py # Cost anomaly scanner
-│   ├── inspect_pr_bottlenecks_use_case.py# PR SLA inspector
-│   └── governed_rollback_use_case.py     # Rollback orchestrator
-├── infrastructure/    # Adapters (GitHub client, AWS Cost Explorer)
-│   ├── github_adapter.py      # Git telemetry provider
-│   └── aws_cost_adapter.py    # AWS Cost Explorer provider
-└── interfaces/        # FastMCP Server & War Room Dashboard
-    ├── mcp_server.py          # FastMCP Streamable HTTP Server
-    └── web_companion.py       # Single-page war room UI
-```
+Time to first result on a machine with Python 3.11 and no credentials: about two
+minutes, most of it `pip install`.
 
----
+### 1. Install
 
-## Measured Benchmarks
-
-| Metric | Measured Value | Verification Command |
-|---|---|---|
-| **DORA Metric Evaluation Latency** | **< 0.1 ms** (in-memory tier assessment) | `pytest tests/unit/test_dora_metrics.py` |
-| **Governed Rollback SHA-256 Lock** | **< 0.1 ms** (cryptographic lease generation) | `pytest tests/unit/test_governed_rollback.py` |
-| **Monthly Idle Cost** | **$0.00 / month** (AWS Serverless compute free tier) | `cat infra/README.md` |
-
----
-
-## Quickstart in Under 5 Steps
-
-### 1. Clone the repository
 ```bash
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
+pip install -e ".[dev]"
 ```
 
-### 2. Configure credentials
+### 2. Run the tests
+
 ```bash
-export GITHUB_TOKEN="ghp_your_token"
-export AWS_REGION="us-east-1"
+python -m pytest tests/ -q
+# 239 passed
 ```
 
-### 3. Run the automated test suite
+### 3. Start the server
+
 ```bash
-pytest tests/
-# Output: 42 passed in <3.0s (94% coverage)
+export MERCURY_ROLLBACK_SECRET="pick-any-string-for-a-local-demo"
+export MERCURY_OFFLINE=1          # optional: never make an outbound call
+python -m src.interfaces.mcp_server
 ```
 
-### 4. Build and Install Fire TV Leanback App (Fire OS / Android)
-```bash
-# Build the Fire OS / Android APK:
-./gradlew assembleDebug
+Leaving `MERCURY_ROLLBACK_SECRET` unset is allowed for a local run: the server
+generates an ephemeral one and prints it to its log for you to paste into the
+cockpit. It changes on every restart.
 
-# Connect to Fire TV device or Fire TV emulator via ADB:
+### 4. Open the cockpit and use it
+
+Open `http://127.0.0.1:8002/`. Press **Check connection** to send a real
+`GET /health` and watch the state pill change from *API not checked*. Then
+**Ask what changed**, paste the governance secret, **Stage governed rollback**,
+and **Confirm rollback**. Confirm a second time to watch it refuse.
+
+Arrow keys move focus to the nearest control in that direction, which is the same
+code path the Fire TV remote drives.
+
+### 5. Build the Fire TV APK
+
+```bash
+./gradlew :app:assembleDebug     # needs JDK 17 and the Android SDK
 adb connect <FIRE_TV_IP>:5555
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 5. Start the Mercury MCP server
+Full device, emulator and troubleshooting instructions are in
+[`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md).
+
+---
+
+## Fire TV
+
+The app in `app/` is a Leanback Android application. `AndroidManifest.xml`
+declares `android.software.leanback` as required, `android.hardware.touchscreen`
+as not required, and a `LEANBACK_LAUNCHER` activity, which is what makes it a Fire
+TV app rather than a phone app.
+
+`MainActivity` hosts the cockpit in a WebView with JavaScript enabled, exposes a
+small `MercuryHost` JavaScript interface, and forwards D-pad key codes into the
+page. Back is resolved by asking the page first, then WebView history, then
+closing the activity, so the viewer is never trapped and the war room is never
+closed by accident. `CockpitUrlResolver` accepts only absolute `http` and `https`
+URLs, so a hostile `COCKPIT_URL` intent extra cannot redirect the WebView.
+
+**What has been run, and what has not.** The APK is assembled by
+[`.github/workflows/android.yml`](.github/workflows/android.yml) on a runner with
+the Android SDK, which also runs the Kotlin unit tests and uploads the APK as a
+downloadable artifact. **It has not been built on the maintainer's machine** (no
+JDK, no Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`)
+and **it has not been installed on a physical Fire TV Stick or run in the Fire TV
+emulator.** The D-pad navigation logic it drives is tested for real: 16 assertions
+in `tests/e2e/spatial_nav_spec.js` execute `docs/firetv_nav.js` in Node against a
+synthetic grid of bounding rectangles.
+
+---
+
+## Measured numbers
+
+Every number below is produced by a committed command. Run it and it prints them.
+
+### Latency
+
+`python scripts/benchmark_suite.py` measures each endpoint in-process through the
+ASGI application and writes `benchmarks_summary.json` with the timestamp, the
+iteration count and the data mode it observed.
+
+| Endpoint | Requests | Mean | p95 | Command |
+|---|---|---|---|---|
+| `get_dora_velocity_report` | 60 | 3.08 ms | 5.19 ms | `python scripts/benchmark_suite.py` |
+| `get_pr_bottlenecks` | 60 | 2.50 ms | 2.95 ms | `python scripts/benchmark_suite.py` |
+| `get_aws_cost_anomalies` | 60 | 2.48 ms | 2.99 ms | `python scripts/benchmark_suite.py` |
+| `what_changed` | 60 | 49.51 ms | 81.11 ms | `python scripts/benchmark_suite.py` |
+| Governance mint and verify | 2000 | 0.0198 ms | 0.0345 ms | `python scripts/benchmark_suite.py` |
+
+Measured on Windows, CPython 3.11.0, with `MERCURY_OFFLINE=1`. These exclude
+network transit, so they are a floor for a local run rather than a field
+measurement from a Fire TV on a home network. `what_changed` is the slow one
+because it shells out to `git log` for the commit fallback.
+
+**The one comparative number:** the full four-condition governance check costs 0.0198 ms mean over 2000 cycles, against a 2.48 ms mean for the cheapest endpoint round trip measured in the same run. Guarding the rollback therefore adds about 0.8 percent to the request it guards. Baseline, margin and sample size all come from that one command.
+
+### Tests and coverage
+
 ```bash
-python -m src.interfaces.mcp_server
+python -m pytest tests/ -q                                    # 239 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1031 statements
+node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
+python ci/readiness.py                                        # standards gate audit
 ```
 
-### 6. Open the interactive War Room
-Navigate to `http://localhost:8002/` or `http://localhost:8002/demo` to query DORA metrics, inspect PR bottlenecks, and navigate with D-Pad controls.
+### Data fixtures
+
+```bash
+python scripts/record_github_fixture.py pallets/flask   # re-record the GitHub fixture
+python scripts/probe_deployment.py                      # re-probe the deployment
+```
+
+`deploy_teardown_receipt.json` is the output of that probe. It records only what
+was observed, and it reports `deployed_commit_sha` as `null` because the deployed
+build does not report one. Gate G2 therefore fails, correctly, and says so.
 
 ---
 
-## Compliance & Security Review
+## Configuration
 
-| Standard | Implementation Status | Evidence Reference |
+| Variable | Effect | Default |
 |---|---|---|
-| **AWS Well-Architected Review** | 6 Pillars addressed | [`docs/COMPLIANCE_AND_ARCHITECTURE.md`](docs/COMPLIANCE_AND_ARCHITECTURE.md) |
-| **EU AI Act Alignment** | Articles 10, 13, 14, 15, 50 addressed | [`docs/COMPLIANCE_AND_ARCHITECTURE.md`](docs/COMPLIANCE_AND_ARCHITECTURE.md) |
-| **GDPR Data Map** | Zero PII or customer database records accessed | [`docs/COMPLIANCE_AND_ARCHITECTURE.md`](docs/COMPLIANCE_AND_ARCHITECTURE.md) |
+| `MERCURY_ROLLBACK_SECRET` | Bearer secret for both rollback endpoints | An ephemeral one is generated and logged |
+| `MERCURY_OFFLINE` | Force every adapter to skip its live call | off |
+| `GITHUB_TOKEN` | Enables the live GitHub path | unset, fixture mode |
+| `MERCURY_GITHUB_REPO` | Repository to measure | `upgradedev/mercury_amazon` |
+| `MERCURY_DORA_WINDOW_DAYS` | DORA measurement window | 30 |
+| `MERCURY_SIMULATE_INCIDENT` | Shape of the simulated metric series | `1`, ending in a spike |
+| `MERCURY_BUILD_SHA` | Build SHA reported by `/health` | read from `git rev-parse HEAD` |
+| `AWS_REGION` | Region for CloudWatch | `eu-west-1` |
+
+### How DORA is computed
+
+GitHub does not expose DORA, so these are proxies and they are stated rather than
+implied. Deployment frequency is successful default-branch workflow runs divided
+by the window in days. Lead time is the mean hours from pull request creation to
+merge. Change failure rate is failed completed runs over all completed runs.
+Recovery time is the mean hours from a failed run to the next successful one. A
+repository with no workflow runs reports zero and says why, rather than being
+given a substitute number.
 
 ---
 
-## Contest Declarations & Feedback
+## Known limitations
 
-* **Primary Track:** **Fire TV Track** (repointed from Alexa+).
-* **Mini Challenges:** **Open Source**.
-* **Friction Log:** Detailed developer feedback in [`docs/FRICTION_LOG.md`](docs/FRICTION_LOG.md) (+10% Stage 2 bonus).
+* **No deployment pipeline integration.** Governance passes, then a record is
+  written locally. The response says so.
+* **No device run.** The APK builds in CI and has never been installed on Fire TV
+  hardware or run in the emulator.
+* **The live deployment is stale.** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`
+  answers 200 but runs an older build and reports no build SHA, so gate G2 fails.
+  Its teardown has never been tested, so gate D2 fails too.
+* **No video.** Gates E2 and E4 fail for that reason.
+* **No browser-driver end-to-end test.** Gate C5 fails. The Node spatial navigation
+  spec is a DOM shim, not a browser, and is not counted as one.
+* **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
+  delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
+  needs CloudWatch metric alarms, which Mercury does not implement.
+* **Anomaly detection is a threshold, not a model.** The newest reading against the
+  mean of the rest, with a fixed factor. It has no seasonality and no trend.
+* **Voice is browser speech synthesis.** The cockpit reads its summaries aloud with
+  the browser's `speechSynthesis`. There is no Alexa skill and no Alexa integration
+  in this repository.
+* **In-memory state.** Staged rollbacks and spent nonces live in the server
+  process, so a restart forgets them. A multi-instance deployment needs shared
+  storage before the single-use guarantee holds across instances.
 
 ---
 
-## License
+## Contributing and licence
 
-This project is licensed under the [MIT License](LICENSE).
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the layout,
+the test commands and what a pull request is checked against. Issue templates live
+in [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE).
 
-### 📊 Comparative Benchmark (Gate J3 Verified)
-* **MTTR & Ingestion Speed:** **14.2ms P95 latency** (87% faster than browser kiosks) across **n=50 incident simulation batches**.
-* **Idle Cost:** **$0.00 / month** on AWS Lambda (eu-west-1).
+Licensed under the [MIT Licence](LICENSE).

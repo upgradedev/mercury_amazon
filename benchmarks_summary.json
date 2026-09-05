@@ -1,51 +1,51 @@
 {
   "schema": "mercury.benchmarks/2",
   "note": "Measured in-process against the ASGI application with fastapi TestClient. Excludes network transit, so these are a floor for a local run, not a field measurement from a Fire TV on a home network.",
-  "measured_at_utc": "2026-09-05T05:57:31Z",
+  "measured_at_utc": "2026-09-05T06:23:38Z",
   "measured_by_command": "python scripts/benchmark_suite.py",
   "python_version": "3.11.0",
   "platform": "win32",
-  "data_mode": "offline-fixture (no GITHUB_TOKEN and no AWS credentials present)",
+  "data_mode": "get_dora_velocity_report=offline-fixture; get_pr_bottlenecks=offline-fixture; get_aws_cost_anomalies=offline-fixture; what_changed=offline-fixture",
   "results": {
     "get_dora_velocity_report": {
       "iterations": 60,
-      "mean_ms": 3.3595,
-      "p50_ms": 3.1522,
-      "p95_ms": 4.7143,
-      "p99_ms": 6.2955,
-      "max_ms": 6.2955
+      "mean_ms": 3.0788,
+      "p50_ms": 2.7051,
+      "p95_ms": 5.1903,
+      "p99_ms": 6.699,
+      "max_ms": 6.699
     },
     "get_pr_bottlenecks": {
       "iterations": 60,
-      "mean_ms": 2.9547,
-      "p50_ms": 2.9087,
-      "p95_ms": 3.7142,
-      "p99_ms": 5.2417,
-      "max_ms": 5.2417
+      "mean_ms": 2.4951,
+      "p50_ms": 2.4444,
+      "p95_ms": 2.953,
+      "p99_ms": 3.846,
+      "max_ms": 3.846
     },
     "get_aws_cost_anomalies": {
       "iterations": 60,
-      "mean_ms": 315.6454,
-      "p50_ms": 305.9443,
-      "p95_ms": 388.5268,
-      "p99_ms": 610.9683,
-      "max_ms": 610.9683
+      "mean_ms": 2.4804,
+      "p50_ms": 2.4516,
+      "p95_ms": 2.9888,
+      "p99_ms": 3.161,
+      "max_ms": 3.161
     },
     "what_changed": {
       "iterations": 60,
-      "mean_ms": 99.1836,
-      "p50_ms": 77.9933,
-      "p95_ms": 309.248,
-      "p99_ms": 318.99,
-      "max_ms": 318.99
+      "mean_ms": 49.5087,
+      "p50_ms": 46.4765,
+      "p95_ms": 81.1127,
+      "p99_ms": 82.8246,
+      "max_ms": 82.8246
     },
     "governance_token_mint_and_verify": {
       "iterations": 2000,
-      "mean_ms": 0.0166,
-      "p50_ms": 0.015,
-      "p95_ms": 0.0325,
-      "p99_ms": 0.0619,
-      "max_ms": 0.1918
+      "mean_ms": 0.0198,
+      "p50_ms": 0.0197,
+      "p95_ms": 0.0345,
+      "p99_ms": 0.0452,
+      "max_ms": 0.108
     }
   }
 }

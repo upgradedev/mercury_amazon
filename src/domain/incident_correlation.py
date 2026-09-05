@@ -101,7 +101,11 @@ class IncidentCorrelation:
         return self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and self.rollback_target is not None
 
     def to_voice_summary(self) -> str:
-        """One spoken sentence for Alexa or the Fire TV text-to-speech readout."""
+        """One sentence short enough to be read aloud in a room.
+
+        The cockpit speaks it with the browser's speech synthesis. Nothing in
+        this repository integrates a voice assistant.
+        """
         if self.verdict is CorrelationVerdict.INSUFFICIENT_DATA:
             return f"I do not have enough {self.metric_name} data for {self.service_name} to answer that."
         if self.verdict is CorrelationVerdict.NO_ANOMALY:

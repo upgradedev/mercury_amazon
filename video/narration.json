@@ -1,4 +1,6 @@
 {
+  "schema": "mercury.video_narration/1",
+  "status": "PLAN ONLY. This is a script for a video that has not been recorded.",
   "project": "mercury_amazon",
   "title": "Mercury: Voice CTO Cockpit & DORA Radar",
   "target_duration_seconds": 155.0,

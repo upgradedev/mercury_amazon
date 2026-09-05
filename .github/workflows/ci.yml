@@ -1,4 +1,4 @@
-name: Enterprise CI/CD Pipeline & Quality Gate
+name: CI
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   test-and-verify:
-    name: Test, Security & Build Verification
+    name: Lint, test, benchmark, audit
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -28,28 +28,27 @@ jobs:
       - name: Install Build & Test Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov ruff build pydantic fastapi httpx boto3
+          pip install -e ".[dev]"
+          pip install build
 
-      - name: Code Quality & Linting (Ruff)
+      - name: Lint
         run: |
-          ruff check src/ tests/ --ignore E501
+          ruff check src/ tests/ scripts/ ci/ --ignore E501
 
-      - name: Execute Full Test Suite & Enforce Coverage (>=85%)
+      - name: Test suite with the coverage floor
         run: |
-          python -m pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=85
+          python -m pytest tests/ -q --cov=src --cov-report=term-missing --cov-fail-under=85
 
-      - name: Run Performance & Latency Benchmark
-        run: |
-          if [ -d "tests/performance" ]; then
-            python -m pytest tests/performance/ -v
-          fi
+      - name: D-pad spatial navigation spec (real navigator, executed in Node)
+        run: node tests/e2e/spatial_nav_spec.js
 
-      - name: Build Local Production Artifacts (Wheel & Sdist)
-        run: |
-          if [ -f "pyproject.toml" ]; then
-            python -m build --wheel --sdist --outdir dist
-          fi
+      - name: Latency benchmark
+        run: python scripts/benchmark_suite.py 20 500
 
-      - name: Verify Readiness Gate (ci/readiness.py)
-        run: |
-          python ci/readiness.py
+      - name: Build wheel and sdist
+        run: python -m build --wheel --sdist --outdir dist
+
+      - name: Standards readiness audit
+        # Fails the job on any blocking gate. Gates that need a deployment, a
+        # video or hardware still print FAIL, with the reason they are exempt.
+        run: python ci/readiness.py
