@@ -39,6 +39,13 @@ jobs:
         run: |
           python -m pytest tests/ -q --cov=src --cov-report=term-missing --cov-fail-under=85
 
+      - name: Coverage summary agrees with the README
+        # The README quotes a coverage percentage and a statement count. A test
+        # pins them to coverage_summary.json cheaply; this step is what proves
+        # that recorded file still matches a real measurement, and fails the job
+        # when either number has drifted.
+        run: python scripts/record_coverage_summary.py --check
+
       - name: D-pad spatial navigation spec (real navigator, executed in Node)
         run: node tests/e2e/spatial_nav_spec.js
 

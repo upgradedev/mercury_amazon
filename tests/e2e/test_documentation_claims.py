@@ -329,3 +329,47 @@ def test_the_readme_security_audit_check_count_matches_the_audit_run():
     assert printed, f"the audit printed no check count:\n{result.stdout}"
     assert claimed.group(1) == printed.group(1), \
         f"README says {claimed.group(1)} security audit checks, the audit runs {printed.group(1)}"
+
+
+def test_the_readme_coverage_numbers_match_the_recorded_measurement():
+    """The README quotes a coverage percentage and a statement count. Pin both.
+
+    These were the last unguarded numbers in the README, and they are the same
+    defect class as the stale spatial-navigation and security-audit counts this
+    suite already pins. The comparison is against coverage_summary.json rather
+    than a live coverage run, because measuring coverage inside a test re-runs the
+    whole suite and turns a fast check into a multi-minute one. CI regenerates
+    that file with ``python scripts/record_coverage_summary.py --check``, so a
+    drifted measurement fails the build there.
+    """
+    summary_path = REPO_ROOT / "coverage_summary.json"
+    assert summary_path.exists(), (
+        "coverage_summary.json is missing; run python scripts/record_coverage_summary.py"
+    )
+    recorded = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    badge = re.search(r"coverage-(\d+)%25-", README)
+    assert badge, "the README no longer carries a coverage badge"
+    stated = re.search(r"(\d+)% of (\d+) statements", README)
+    assert stated, "the README no longer states a coverage percentage and statement count"
+
+    assert int(stated.group(2)) == recorded["statements"], (
+        f"README says {stated.group(2)} statements, the recorded run measured {recorded['statements']}"
+    )
+    assert int(stated.group(1)) == recorded["percent"], (
+        f"README says {stated.group(1)}% coverage, the recorded run measured {recorded['percent']}%"
+    )
+    assert int(badge.group(1)) == recorded["percent"], (
+        f"the coverage badge says {badge.group(1)}%, the recorded run measured {recorded['percent']}%"
+    )
+
+
+def test_the_recorded_coverage_clears_the_floor_the_ci_workflow_enforces():
+    """A recorded number below the CI floor would mean the workflow could not pass."""
+    recorded = json.loads((REPO_ROOT / "coverage_summary.json").read_text(encoding="utf-8"))
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    floor = re.search(r"--cov-fail-under=(\d+)", workflow)
+    assert floor, "the CI workflow no longer enforces a coverage floor"
+    assert recorded["percent"] >= int(floor.group(1)), (
+        f"recorded coverage {recorded['percent']}% is below the CI floor of {floor.group(1)}%"
+    )
