@@ -1,46 +1,88 @@
 {
   "schema": "mercury.video_narration/1",
-  "status": "PLAN ONLY. This is a script for a video that has not been recorded.",
+  "status": "PLAN ONLY. No video has been recorded. Durations are intended, not measured against a take. Every beat is an action that exists in the repository today and was performed in a desktop browser against a local server. No beat shows a Fire TV device or the Fire TV emulator, because no APK has been built.",
   "project": "mercury_amazon",
-  "title": "Mercury: Voice CTO Cockpit & DORA Radar",
-  "target_duration_seconds": 155.0,
+  "title": "Mercury: Fire TV Incident Commander",
+  "source_of_truth": "video/SHOT_LIST.md",
+  "target_duration_seconds": 168.0,
   "max_allowed_seconds": 180.0,
-  "voice_id": "21m00Tcm4TlvDq8ikWAM",
   "beats": [
     {
-      "beat_id": "beat_01_hook",
+      "beat_id": "beat_01_question",
       "timestamp_start": 0.0,
-      "timestamp_end": 25.0,
-      "narration_text": "Engineering leaders manage dozens of fragmented tools across GitHub, Datadog, Jira, and AWS Cost Explorer. Critical pull request bottlenecks and sudden cloud spend spikes go unnoticed until Monday morning. This is Mercury.",
-      "visual_action": "Show split-screen of overwhelming engineering dashboards, transitioning to a clean Fire TV / Echo Show War Room display."
+      "timestamp_end": 12.0,
+      "narration_text": "An incident starts. Somebody asks what broke. The answer is spread across six browser tabs on six different laptops, and the one screen everyone in the room can see is showing nothing.",
+      "visual_action": "Cold open on the loaded cockpit at 1920x1080 in a desktop browser. No click yet."
     },
     {
-      "beat_id": "beat_02_voice_radar",
-      "timestamp_start": 25.0,
-      "timestamp_end": 60.0,
-      "narration_text": "Mercury transforms Amazon Alexa Plus and Fire TV into an executive war room. Powered by the open Model Context Protocol over Streamable HTTP, leaders query deployment frequency and PR review SLAs with a single voice prompt.",
-      "visual_action": "Voice query: 'Alexa, ask Mercury for today's DORA velocity report'. Display renders Elite Tier metrics."
+      "beat_id": "beat_02_answer_on_load",
+      "timestamp_start": 12.0,
+      "timestamp_end": 30.0,
+      "narration_text": "Mercury answers before anyone clicks. On load it calls its own API and puts one sentence on the screen: the commit that raised the error rate, the service it raised it on, and how far above baseline the reading is.",
+      "visual_action": "Reload the page. The hero renders the correlator's verdict, the anomaly factor as the large figure, and the offending commit message quoted with its author."
     },
     {
-      "beat_id": "beat_03_cost_radar",
-      "timestamp_start": 60.0,
-      "timestamp_end": 100.0,
-      "narration_text": "When staging workloads surge over the weekend, Mercury's AWS Cost Radar detects the anomaly, projects the month-end burn rate, and pinpoints the exact root cause in seconds.",
-      "visual_action": "Surge alert on Amazon Bedrock staging spend (+311%), highlighting root cause."
+      "beat_id": "beat_03_provenance",
+      "timestamp_start": 30.0,
+      "timestamp_end": 45.0,
+      "narration_text": "Both halves of that answer say where they came from. The metric series is simulated, and the badge beside it says so. The commits are real, read from the checkout. The latency is timed in the page, not written into it.",
+      "visual_action": "Hold on the two source badges in the hero footer, offline-fixture against metric series and local-git against commit history, beside the measured latency line."
     },
     {
-      "beat_id": "beat_04_governed_rollback",
-      "timestamp_start": 100.0,
-      "timestamp_end": 135.0,
-      "narration_text": "When a flaky release causes change failures, Mercury stages a safe production rollback. The CTO authorizes the action with a voice token, executing immediate remediation hands-free.",
-      "visual_action": "Staged rollback flow, voice token verification, green deployment rollback confirmed."
+      "beat_id": "beat_04_dpad",
+      "timestamp_start": 45.0,
+      "timestamp_end": 62.0,
+      "narration_text": "The remote moves in space, not down a list. Focus jumps to the nearest control in the direction pressed, and the hint bar names whatever the ring is on. The disabled control is skipped rather than focused.",
+      "visual_action": "Press Right, Right, Down, Right, Left. The focus ring moves and the Focused label in the key hint bar changes with each press."
     },
     {
-      "beat_id": "beat_05_closing",
-      "timestamp_start": 135.0,
+      "beat_id": "beat_05_center_back",
+      "timestamp_start": 62.0,
+      "timestamp_end": 78.0,
+      "narration_text": "Center drills into a panel. Back returns to the wall before it would ever close the application, so the war room is not shut by accident during an incident.",
+      "visual_action": "Press Enter on the Delivery velocity tile, then Escape. The BACK legend changes to Back to the wall and then back again."
+    },
+    {
+      "beat_id": "beat_06_two_sources",
+      "timestamp_start": 78.0,
+      "timestamp_end": 95.0,
+      "narration_text": "One screen, two kinds of truth. The velocity panel is serving a recording because no GitHub token is set, and says so. The spend panel, on a machine with credentials, is a live Cost Explorer read, and says that too.",
+      "visual_action": "Load DORA velocity, then scan AWS spend. Compare the OFFLINE FIXTURE badge against the LIVE aws-cost-explorer badge. Do not read live spend figures aloud."
+    },
+    {
+      "beat_id": "beat_07_refusal",
+      "timestamp_start": 95.0,
+      "timestamp_end": 108.0,
+      "narration_text": "The only irreversible control on the screen refuses in plain words when the governance secret is missing. It does not fail silently and it does not pretend.",
+      "visual_action": "With the Secret field empty, press Stage governed rollback. The incident panel shows the refusal text."
+    },
+    {
+      "beat_id": "beat_08_staging",
+      "timestamp_start": 108.0,
+      "timestamp_end": 125.0,
+      "narration_text": "With the secret, staging mints a single-use token bound to a hash of exactly this rollback. Change the target afterwards and the token stops applying.",
+      "visual_action": "Type the secret, stage again. Show PENDING_CONFIRMATION, the payload hash, the lease countdown as the hero figure, and Confirm becoming enabled."
+    },
+    {
+      "beat_id": "beat_09_confirm",
+      "timestamp_start": 125.0,
+      "timestamp_end": 142.0,
+      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. Mercury ships no pipeline integration, and the moment of success is where it admits that.",
+      "visual_action": "Press Confirm rollback. Read the EXECUTED output verbatim, including the sentence stating no pipeline was contacted."
+    },
+    {
+      "beat_id": "beat_10_replay_refused",
+      "timestamp_start": 142.0,
       "timestamp_end": 155.0,
-      "narration_text": "Mercury gives engineering leaders instant clarity and decisive control. Built for Amazon Alexa Plus, Fire TV, and AWS.",
-      "visual_action": "Mercury logo, Alexa Plus badge, Fire TV badge, GitHub repo URL."
+      "narration_text": "Press it again and the server refuses by name. The token was valid once. Leave a staging past its lease and it expires the same way.",
+      "visual_action": "Press Confirm rollback a second time. Show the 409 NOT_PENDING denial and the reason line saying the token has been spent."
+    },
+    {
+      "beat_id": "beat_11_not_built",
+      "timestamp_start": 155.0,
+      "timestamp_end": 168.0,
+      "narration_text": "What is not built: no APK exists, the Kotlin has never been compiled, and nothing has run on Fire TV hardware. The navigation, the correlation and the governance were driven live here. The device was not.",
+      "visual_action": "Cut to docs/FIRE_TV_BUILD.md open on the recorded build failure."
     }
   ]
 }

@@ -12,6 +12,7 @@ The spatial navigation behaviour itself is exercised by ``spatial_nav_spec.js``,
 which runs the real navigator in Node; ``test_spatial_navigation_spec_passes``
 below is the bridge that runs it inside pytest.
 """
+import json
 import re
 import shutil
 import subprocess
@@ -117,34 +118,23 @@ def test_the_secret_is_sent_as_a_bearer_header(html):
     assert "Bearer " in html
 
 
-def _innerhtml_statements(html: str) -> list[str]:
-    """Return each ``innerHTML = ...;`` assignment as one whole statement."""
-    statements = []
-    for match in re.finditer(r"\.innerHTML\s*=", html):
-        tail = html[match.end():]
-        end = tail.find(";")
-        statements.append(tail[: end if end != -1 else 200])
-    return statements
+def test_response_values_reach_the_dom_as_text_and_never_as_markup(html, nav_js):
+    """No markup sink exists in the cockpit at all.
 
-
-def test_user_supplied_values_are_escaped_before_being_written_into_the_dom(html):
-    """Any response value concatenated into innerHTML must pass through escapeHtml."""
-    assert "function escapeHtml" in html
-    statements = _innerhtml_statements(html)
-    assert statements, "expected the page to build output with innerHTML"
-
-    for statement in statements:
-        # A statement that concatenates anything must escape or delegate to a
-        # builder that escapes. A pure string literal needs neither.
-        concatenates = "+" in statement
-        if not concatenates:
-            continue
-        interpolates_identifier = re.search(r"\+\s*(?!')[A-Za-z_$]", statement)
-        if not interpolates_identifier:
-            continue
-        assert "escapeHtml(" in statement or "provenanceBlock(" in statement or "rows" in statement, (
-            f"unescaped interpolation into innerHTML: {statement.strip()[:140]}"
-        )
+    The page used to concatenate API responses into ``innerHTML`` and rely on an
+    escaping helper being called at every site. It now builds nodes with
+    ``createElement`` and writes values with ``textContent``, which removes the
+    class of defect rather than guarding each instance of it. This test asserts
+    the absence of the sink, which is the stronger property.
+    """
+    for source, name in ((html, "index.html"), (nav_js, "firetv_nav.js")):
+        assert not re.search(r"\.innerHTML\s*=", source), f"{name} assigns innerHTML"
+        assert not re.search(r"\.outerHTML\s*=", source), f"{name} assigns outerHTML"
+        assert "insertAdjacentHTML" not in source, f"{name} calls insertAdjacentHTML"
+        assert "document.write" not in source, f"{name} calls document.write"
+    assert "createElement(" in html and "textContent" in html, (
+        "the page must build its output as DOM nodes"
+    )
 
 
 # ----------------------------------------------------------- One focus system
@@ -208,6 +198,116 @@ def test_empty_states_explain_themselves_instead_of_rendering_nothing(html):
 def test_static_hosting_is_declared_honestly(html):
     """Opened from GitHub Pages there is no API, and the page must say so."""
     assert "This page is static unless a Mercury API is running" in html
+
+
+# ------------------------------------------------------- The five second read
+
+def test_the_hero_answer_is_empty_until_the_api_answers(html):
+    """The hero states an incident. None of those states may be in the markup."""
+    markup = html.split("<script>")[0]
+    for computed in ["Incident attributed", "Incident, nothing to blame", "Steady",
+                     "Rollback staged", "ANOMALY_ATTRIBUTED"]:
+        assert computed not in markup, f"{computed!r} is painted into the markup"
+    # What the markup may say is that nothing has been asked yet.
+    assert 'id="heroHeadline"' in markup
+    assert "No answer yet" in markup
+    assert 'data-state="idle"' in markup
+
+
+def test_the_hero_headline_and_figure_are_written_from_the_response(html):
+    script = html.split("<script>")[-1]
+    assert "function heroFromCorrelation" in script
+    for field in ["data.offending_commit.sha", "metric.anomaly_factor", "data.verdict"]:
+        assert field in script, f"the hero never reads {field} from the response"
+
+
+def test_the_page_asks_what_changed_on_load_rather_than_waiting_for_a_click(html):
+    """A wallboard that says nothing until someone clicks cannot be read at all."""
+    script = html.split("<script>")[-1]
+    assert "checkConnection().then(loadWhatChanged)" in script
+    assert "if (apiBase())" in script, "the load-time call must be conditional on there being an API"
+
+
+def test_the_key_hint_bar_names_the_remote_keys(html):
+    assert 'class="keybar"' in html
+    for key in ["CENTER", "BACK"]:
+        assert f">{key}<" in html, f"the key hint bar does not name {key}"
+    assert 'id="hintFocus"' in html, "the hint bar must show which control the cursor is on"
+
+
+def test_the_hint_bar_is_fed_by_the_navigator_not_by_a_second_key_handler(html, nav_js):
+    assert "mercury:focuschange" in nav_js, "the navigator must announce focus changes"
+    assert "mercury:focuschange" in html, "the page must subscribe to the announcement"
+    assert "announceFocus" in nav_js
+
+
+def test_back_returns_from_a_panel_before_it_leaves_the_application(html):
+    script = html.split("<script>")[-1]
+    assert "window.mercuryOnBack" in script
+    assert "showWall()" in script and "function showPanel" in script
+
+
+# ------------------------------------------------------------- Accessibility
+
+def test_the_page_has_landmarks_a_skip_link_and_one_h1(html):
+    assert 'class="skip-link"' in html
+    for landmark in ["<header", "<main>", "<footer"]:
+        assert landmark in html, f"missing landmark {landmark}"
+    assert html.count("<h1") == 1, "a 10-foot page has exactly one headline"
+    assert 'aria-labelledby="heroHeadline"' in html
+
+
+def test_async_regions_announce_themselves_to_assistive_technology(html):
+    """Every region a fetch rewrites must be a live region."""
+    assert html.count('aria-live="polite"') >= 4
+    for region in ["heroLive", "incidentOutput", "doraOutput", "costOutput"]:
+        assert region in html
+
+
+def test_reduced_motion_is_honoured(html):
+    assert "@media (prefers-reduced-motion: reduce)" in html
+
+
+def test_light_and_dark_are_both_defined(html):
+    assert "@media (prefers-color-scheme: light)" in html
+    assert "color-scheme:" in html
+
+
+def test_every_disabled_control_states_its_reason_in_visible_text(html):
+    """A title attribute is a hover affordance, and a television has no pointer."""
+    for reason_id in ["stageReason", "confirmReason"]:
+        assert f'id="{reason_id}"' in html, f"{reason_id} carries the on-screen reason"
+        assert f'aria-describedby="{reason_id}"' in html, (
+            f"the disabled control is not described by {reason_id}"
+        )
+    assert "Staging is off until" in html
+    assert "Confirming is off until" in html
+
+
+def test_a_web_font_has_a_real_fallback_stack(html):
+    """Fire TV hardware may never reach fonts.googleapis.com."""
+    if "fonts.googleapis.com" not in html:
+        return
+    families = re.search(r"--sans:\s*([^;]+);", html)
+    assert families, "no --sans stack is declared"
+    assert families.group(1).count(",") >= 3, "the display font needs real fallbacks behind it"
+    mono = re.search(r"--mono:\s*([^;]+);", html)
+    assert mono and "monospace" in mono.group(1)
+
+
+def test_the_manifest_names_no_file_that_is_not_committed():
+    """A manifest that lists absent icons 404s on every load."""
+    manifest = json.loads((DOCS / "manifest.json").read_text(encoding="utf-8"))
+    for icon in manifest.get("icons", []):
+        assert (DOCS / icon["src"]).exists(), f"manifest names {icon['src']}, which is not committed"
+    start_url = manifest.get("start_url", "").lstrip("./")
+    assert (DOCS / start_url).exists()
+
+
+def test_no_service_worker_claims_an_offline_cache_that_is_never_filled():
+    """The previous worker cached nothing and named another product's cache."""
+    assert not (DOCS / "sw.js").exists()
+    assert "serviceWorker" not in INDEX.read_text(encoding="utf-8")
 
 
 # -------------------------------------------------- The real navigator spec run

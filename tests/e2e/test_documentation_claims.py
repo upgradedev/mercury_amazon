@@ -235,6 +235,50 @@ def test_the_video_directory_does_not_attest_a_video():
         assert "PLAN ONLY" in data.get("status", ""), f"{name} does not declare itself a plan"
 
 
+def test_the_video_plan_claims_no_capability_the_repository_lacks():
+    """The prose gates above read Markdown only, and the video plan is JSON.
+
+    That gap let the shot plan keep describing an Alexa voice query, an Echo Show,
+    Datadog, Jira and a spend figure nobody measured, months after those claims
+    were removed from every Markdown file. This test scans the plan files as text
+    so the same drift fails the build instead of shipping.
+    """
+    forbidden = ["alexa", "echo show", "datadog", "jira", "voice token", "elite tier"]
+    for name in ["cue_sheet.json", "narration.json"]:
+        lowered = (REPO_ROOT / "video" / name).read_text(encoding="utf-8").lower()
+        for term in forbidden:
+            assert term not in lowered, f"video/{name} describes {term!r}, which this repository has no implementation of"
+
+
+def test_the_video_plan_and_shot_list_agree_and_fit_the_time_limit():
+    """A beat list that outruns the limit is a plan for a rejected submission."""
+    shot_list = (REPO_ROOT / "video" / "SHOT_LIST.md").read_text(encoding="utf-8")
+    assert "PLAN ONLY" in shot_list, "the shot list does not declare itself a plan"
+    assert "does not satisfy the Fire TV track's device requirement" in shot_list, \
+        "the shot list must state that a browser recording is not a device run"
+
+    cue = json.loads((REPO_ROOT / "video" / "cue_sheet.json").read_text(encoding="utf-8"))
+    narration = json.loads((REPO_ROOT / "video" / "narration.json").read_text(encoding="utf-8"))
+
+    assert cue["total_duration_sec"] <= cue["max_allowed_seconds"]
+    assert [b["beat_id"] for b in cue["beats"]] == [b["beat_id"] for b in narration["beats"]], \
+        "the cue sheet and the narration describe different beats"
+
+    # Beats must tile the runtime with no gap and no overlap, because a plan whose
+    # timings do not add up cannot be recorded from.
+    previous_end = 0.0
+    for beat in cue["beats"]:
+        assert beat["timestamp_start"] == previous_end, f"{beat['beat_id']} does not start where the previous beat ended"
+        previous_end = beat["timestamp_end"]
+    assert previous_end == cue["total_duration_sec"]
+
+    # words_count is generated from narration_text. If someone edits the text by
+    # hand without rerunning the generator, this catches it.
+    for beat in cue["beats"]:
+        assert beat["words_count"] == len(beat["narration_text"].split()), \
+            f"{beat['beat_id']} word count does not match its narration; rerun scripts/build_video_plan.py"
+
+
 def test_no_fabricated_receipt_files_remain():
     for name in ["video_sync_receipt.json", "verification_receipt.json"]:
         assert not (REPO_ROOT / name).exists(), f"{name} attests something that did not happen"

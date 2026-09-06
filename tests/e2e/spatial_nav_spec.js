@@ -18,6 +18,7 @@ const NAV_SOURCE = path.join(__dirname, '..', '..', 'docs', 'firetv_nav.js');
 
 function makeElement(id, left, top, width, height) {
   const classes = new Set();
+  const attributes = { 'data-tv-label': `label for ${id}` };
   return {
     id,
     tagName: 'BUTTON',
@@ -25,6 +26,8 @@ function makeElement(id, left, top, width, height) {
     disabled: false,
     clicked: 0,
     focused: 0,
+    textContent: id,
+    getAttribute: (name) => (name in attributes ? attributes[name] : null),
     classList: {
       add: (name) => classes.add(name),
       remove: (name) => classes.delete(name),
@@ -51,10 +54,20 @@ function installDom(elements) {
       if (selector === '.tv-focused') return elements.find((e) => e.hasClass('tv-focused')) || null;
       return null;
     },
-    dispatch: (type, event) => (listeners[type] || []).forEach((h) => h(event))
+    dispatch: (type, event) => (listeners[type] || []).forEach((h) => h(event)),
+    dispatchEvent: (event) => {
+      (listeners[event.type] || []).forEach((h) => h(event));
+      return true;
+    }
   };
   global.document = document;
-  global.window = { location: { protocol: 'http:' } };
+  // A minimal CustomEvent so the navigator's focus announcement runs here too,
+  // which is the same code path the cockpit's key hint bar subscribes to.
+  function CustomEventShim(type, init) {
+    this.type = type;
+    this.detail = init && init.detail;
+  }
+  global.window = { location: { protocol: 'http:' }, CustomEvent: CustomEventShim };
   return document;
 }
 
@@ -216,6 +229,21 @@ test('arrow keys are left alone while typing in a text field', () => {
     key: 'ArrowDown', target: { tagName: 'INPUT' }, preventDefault: () => {}
   });
   assert.strictEqual(nav.current.id, 'r1c1', 'focus does not move away from a field being typed in');
+});
+
+test('each focus change is announced to the page with the control label', () => {
+  const cells = grid();
+  const { nav, document } = loadNavigator(cells);
+  const announced = [];
+  document.addEventListener('mercury:focuschange', (event) => {
+    announced.push([event.detail.element.id, event.detail.label]);
+  });
+  nav.setFocus(at(cells, 0, 0));
+  nav.move('RIGHT');
+  assert.deepStrictEqual(announced, [
+    ['r0c0', 'label for r0c0'],
+    ['r0c1', 'label for r0c1']
+  ], 'the key hint bar is fed by the navigator, not by a second key handler');
 });
 
 test('only one element carries the focus class at a time', () => {

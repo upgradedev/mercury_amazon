@@ -85,6 +85,65 @@ the war room closes mid-incident.
 
 ---
 
+## Accomplishments we are proud of
+
+**The refusals work and are tested.** Confirm a rollback twice and the second
+attempt comes back `409 NOT_PENDING`. Let the lease run out and it comes back
+`410 LEASE_EXPIRED`. Edit the target after staging and the token stops applying.
+Each denial is named on the screen rather than swallowed, and each has a test.
+
+**The page cannot show a number it did not fetch.** Every figure in the cockpit is
+written from a response body through `textContent`, with the latency measured in
+the page by `performance.now()`. A test fails if a hardcoded metric, a random
+pairing code or an `innerHTML` assignment returns to the file.
+
+**Live and recorded data sit side by side, both labelled.** On a machine with AWS
+credentials the spend panel shows a `LIVE` badge reading `aws-cost-explorer` while
+the velocity panel next to it shows `OFFLINE FIXTURE` and states that `GITHUB_TOKEN`
+is not set. The screen never asks to be trusted about which is which.
+
+**The D-pad geometry is real.** Focus moves to the nearest control in the pressed
+direction, skips disabled controls instead of landing on them, and holds at an
+edge rather than wrapping. The same file drives both arrow keys and the Leanback
+bridge, so there is one navigation implementation rather than two.
+
+---
+
+## What is live and what is simulated
+
+Stated plainly, because the cockpit shows it anyway.
+
+| Part | Status |
+|---|---|
+| Correlation, DORA, cost and governance endpoints | **Live.** Real HTTP, called by the page on load and on every press |
+| Commits used for attribution | **Live.** Read from the local checkout with `git log` when no GitHub token is set |
+| AWS spend | **Live** when credentials exist, and the badge says `aws-cost-explorer`. Otherwise a synthetic fixture that says so |
+| GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
+| Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
+| The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
+| Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware |
+
+---
+
+## What's next
+
+**Build the APK and run it on hardware.** This is the gap that matters most. The
+workflow is written and the Kotlin is there; neither has ever executed.
+
+**Make the dispatch real.** `RollbackDispatcher` is a one-method protocol. Wiring
+it to a deployment pipeline turns the governed decision into a governed action
+without touching the governance code.
+
+**Replace the threshold with a model.** Anomaly detection compares a reading to a
+baseline mean, so a nightly batch job looks like an incident. Seasonality is the
+obvious next step.
+
+**Persist the governance ledger.** Staged actions live in memory today, so a
+restart forgets them. An audit trail that survives a restart is the difference
+between a demo and something an on-call rota would rely on.
+
+---
+
 ## What we learned
 
 A dashboard that does not call its own API is a screenshot. The most valuable

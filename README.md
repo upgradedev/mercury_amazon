@@ -2,10 +2,43 @@
 
 > **Mercury puts an on-call engineer's incident evidence on the Fire TV in the room, and takes the governed rollback from the remote.**
 
+```mermaid
+flowchart LR
+    Q["Someone walks in<br/>and asks: what broke?"]
+    Q --> M["1. What broke<br/>the error rate against<br/>its own baseline"]
+    M --> C["2. What changed<br/>the closest commit that<br/>landed before the reading"]
+    C --> R["3. Governed rollback<br/>from the D-pad, refused<br/>unless four conditions hold"]
+    M -.->|"reading is inside baseline"| N["Mercury names no commit<br/>and offers no rollback"]
+    C -.->|"no deploy landed close enough"| N
+```
+
+The dotted paths are the point as much as the solid one. Mercury answers on load,
+and when it cannot attribute the anomaly to a change it says so and offers nothing
+to press. Each number on the screen carries a badge saying whether it was read
+live or served from a recording.
+
+### Run it in two minutes
+
+```bash
+git clone https://github.com/upgradedev/mercury_amazon.git
+cd mercury_amazon
+pip install -e ".[dev]"
+python -m pytest tests/ -q
+python -m src.interfaces.mcp_server
+```
+
+Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
+commits are read from the checkout you just cloned, the metric series is simulated
+and labelled as simulated on screen, and the server prints an ephemeral governance
+secret to its log for you to paste into the cockpit. Most of the two minutes is
+`pip install`. On PowerShell, set the secret with
+`$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
+would rather choose it yourself. Full detail in [Quickstart](#quickstart).
+
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-241%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-259%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 The two Actions badges point at a repository that is currently **private**, so they
@@ -191,7 +224,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 241 passed
+# 259 passed
 ```
 
 ### 3. Start the server
@@ -199,6 +232,14 @@ python -m pytest tests/ -q
 ```bash
 export MERCURY_ROLLBACK_SECRET="pick-any-string-for-a-local-demo"
 export MERCURY_OFFLINE=1          # optional: never make an outbound call
+python -m src.interfaces.mcp_server
+```
+
+On PowerShell, which is where this repository is developed:
+
+```powershell
+$env:MERCURY_ROLLBACK_SECRET = "pick-any-string-for-a-local-demo"
+$env:MERCURY_OFFLINE = "1"        # optional: never make an outbound call
 python -m src.interfaces.mcp_server
 ```
 
@@ -292,8 +333,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 241 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1031 statements
+python -m pytest tests/ -q                                    # 259 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1081 statements
 node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
 python ci/readiness.py                                        # standards gate audit
 ```

@@ -19,6 +19,7 @@
 
   var FOCUSABLE_SELECTOR = '[data-tv-focusable]:not([disabled]):not([hidden])';
   var FOCUS_CLASS = 'tv-focused';
+  var FOCUS_EVENT = 'mercury:focuschange';
   var PERPENDICULAR_PENALTY = 2.5;
   var DIRECTIONS = { UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT' };
 
@@ -67,6 +68,30 @@
     return along + across * PERPENDICULAR_PENALTY;
   }
 
+  /** Best available human-readable name for a control, for the key hint bar. */
+  function labelOf(element) {
+    var explicit = typeof element.getAttribute === 'function'
+      ? (element.getAttribute('data-tv-label') || element.getAttribute('aria-label'))
+      : null;
+    if (explicit) return explicit;
+    var text = element.textContent ? String(element.textContent).trim() : '';
+    return text.length > 60 ? text.slice(0, 57) + '...' : text;
+  }
+
+  /**
+   * Tell the page which control the cursor is on. The page renders this in its
+   * key hint bar, the way a television application does, without registering a
+   * second key handler of its own. Guarded because this file is also executed
+   * outside a browser by the navigation spec.
+   */
+  function announceFocus(element) {
+    var CustomEventCtor = typeof window !== 'undefined' ? window.CustomEvent : null;
+    if (typeof document.dispatchEvent !== 'function' || typeof CustomEventCtor !== 'function') return;
+    document.dispatchEvent(new CustomEventCtor(FOCUS_EVENT, {
+      detail: { element: element, label: labelOf(element) }
+    }));
+  }
+
   function SpatialNavigator() {
     this.current = null;
     this.enabled = true;
@@ -100,6 +125,7 @@
     if (typeof element.scrollIntoView === 'function' && !isFullyInViewport(element)) {
       element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+    announceFocus(element);
   };
 
   SpatialNavigator.prototype.focusFirst = function () {
@@ -219,6 +245,7 @@
     scoreCandidate: scoreCandidate,
     FOCUSABLE_SELECTOR: FOCUSABLE_SELECTOR,
     FOCUS_CLASS: FOCUS_CLASS,
+    FOCUS_EVENT: FOCUS_EVENT,
     PERPENDICULAR_PENALTY: PERPENDICULAR_PENALTY
   };
 })();
