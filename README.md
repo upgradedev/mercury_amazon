@@ -8,8 +8,8 @@ flowchart LR
     Q --> M["1. What broke<br/>the error rate against<br/>its own baseline"]
     M --> C["2. What changed<br/>the closest commit that<br/>landed before the reading"]
     C --> R["3. Governed rollback<br/>from the D-pad, refused<br/>unless four conditions hold"]
-    M -.->|"reading is inside baseline"| N["Mercury names no commit<br/>and offers no rollback"]
-    C -.->|"no deploy landed close enough"| N
+    M -.->|reading is inside baseline| N["Mercury names no commit<br/>and offers no rollback"]
+    C -.->|no deploy landed close enough| N
 ```
 
 The dotted paths are the point as much as the solid one. Mercury answers on load,
@@ -17,7 +17,7 @@ and when it cannot attribute the anomaly to a change it says so and offers nothi
 to press. Each number on the screen carries a badge saying whether it was read
 live or served from a recording.
 
-### Run it in two minutes
+### Run it
 
 ```bash
 git clone https://github.com/upgradedev/mercury_amazon.git
@@ -30,8 +30,11 @@ python -m src.interfaces.mcp_server
 Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
-secret to its log for you to paste into the cockpit. Most of the two minutes is
-`pip install`. On PowerShell, set the secret with
+secret to its log for you to paste into the cockpit. The test run takes 11 to 18
+seconds (three wall-clock runs of `python -m pytest tests/ -q` on the development
+machine). The `pip install` before it dominates the total and depends on your
+network; a clean-environment install here ran past ten minutes, so budget for that
+rather than for a fast one. On PowerShell, set the secret with
 `$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
@@ -209,8 +212,12 @@ to make the dispatch real.
 
 ## Quickstart
 
-Time to first result on a machine with Python 3.11 and no credentials: about two
-minutes, most of it `pip install`.
+Time to first result on a machine with Python 3.11 and no credentials, measured
+rather than guessed: `python -m pytest tests/ -q` takes 11 to 18 seconds over
+three wall-clock runs, and starting the server and getting an answer on screen is
+immediate after that. The variable is `pip install`, which depends on your
+network. A clean-environment install measured here ran past ten minutes, so it
+dominates everything else in this section.
 
 ### 1. Install
 
