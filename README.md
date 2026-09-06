@@ -40,7 +40,7 @@ would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-259%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-261%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -112,6 +112,13 @@ The Cost Explorer path has been executed successfully against a real AWS account
 during development. The CloudWatch path has been executed and returned no
 datapoints, because there is no load balancer named `checkout-api` to read. The
 account's actual figures are not committed to this repository.
+
+Those two sentences are the only claims in this README that you cannot check by
+running something. They describe work done against a private AWS account outside
+this repository, no artefact of which is committed here, so treat them as an
+unverified maintainer statement rather than as evidence. Nothing the running
+product shows depends on them: without credentials every adapter serves a fixture
+and says so on screen.
 
 Set `MERCURY_OFFLINE=1` to force every adapter into fixture mode whatever
 credentials the machine has. That switch can only ever suppress a live call; it
@@ -199,7 +206,7 @@ sequenceDiagram
 A refused confirmation moves the action to `REJECTED`, so it cannot be confirmed
 afterwards even with the correct token. That is fail-closed on purpose: a
 tampering attempt burns the action it was aimed at, and the operator stages
-again. `python scripts/security_audit.py` runs 24 checks over this path against
+again. `python scripts/security_audit.py` runs 28 checks over this path against
 the real HTTP surface and exits non-zero if any of them stops holding.
 
 **What it does not do:** Mercury ships no deployment pipeline integration. When
@@ -231,7 +238,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 259 passed
+# 261 passed
 ```
 
 ### 3. Start the server
@@ -307,7 +314,7 @@ emulator**.
 What *is* verified: the manifest declarations, the Gradle wiring and the key
 handling contract are checked by 25 structural tests, and the D-pad navigation
 logic the APK drives is tested by executing `docs/firetv_nav.js` in Node against
-a synthetic grid, 16 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
+a synthetic grid, 17 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
 itself has unit tests written but never compiled or run.
 
 ---
@@ -340,9 +347,9 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 259 passed
+python -m pytest tests/ -q                                    # 261 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1081 statements
-node tests/e2e/spatial_nav_spec.js                            # 16/16 assertions
+node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python ci/readiness.py                                        # standards gate audit
 ```
 

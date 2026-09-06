@@ -15,7 +15,7 @@ Stated plainly, because the difference matters when you are judging this.
 | Build on the maintainer's machine | **Not run.** See "Why the build is configured for CI" below |
 | Install on a physical Fire TV Stick | **Not run.** No Fire TV hardware was available |
 | Run in the Fire TV emulator image | **Not run.** No Android SDK was available in the build environment |
-| D-pad navigation logic | Tested for real: 16 assertions in `tests/e2e/spatial_nav_spec.js` execute `docs/firetv_nav.js` in Node against a synthetic grid |
+| D-pad navigation logic | Tested for real: 17 assertions in `tests/e2e/spatial_nav_spec.js` execute `docs/firetv_nav.js` in Node against a synthetic grid |
 
 The cockpit page the APK loads is the same page served by `docs/` and by the Python
 server, so what the WebView renders on a TV is the page you can open in a browser

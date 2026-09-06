@@ -5,6 +5,7 @@ code did not support. These tests make that class of defect fail the build rathe
 than wait for a reader to notice.
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -282,3 +283,49 @@ def test_the_video_plan_and_shot_list_agree_and_fit_the_time_limit():
 def test_no_fabricated_receipt_files_remain():
     for name in ["video_sync_receipt.json", "verification_receipt.json"]:
         assert not (REPO_ROOT / name).exists(), f"{name} attests something that did not happen"
+
+
+# ------------------------------- Counted claims are counted by running them
+
+def test_the_readme_spatial_nav_assertion_count_matches_the_spec_run():
+    """The README quotes an assertion count. Run the spec and compare.
+
+    This number is printed by the spec itself from ``cases.length``, so it moves
+    whenever a case is added. Without this test it goes stale silently, which is
+    exactly how it went stale once already.
+    """
+    claimed = re.findall(r"(\d+) assertions in `tests/e2e/spatial_nav_spec\.js`", README)
+    assert claimed, "the README no longer states a spatial navigation assertion count"
+
+    try:
+        result = subprocess.run(
+            ["node", "tests/e2e/spatial_nav_spec.js"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=60,
+        )
+    except (FileNotFoundError, OSError):
+        pytest.skip("node is not installed, so the spec cannot be executed here")
+
+    assert result.returncode == 0, f"the spatial navigation spec failed:\n{result.stdout}{result.stderr}"
+    printed = re.search(r"(\d+)/(\d+) spatial navigation assertions passed", result.stdout)
+    assert printed, f"the spec printed no assertion count:\n{result.stdout}"
+    assert printed.group(1) == printed.group(2), f"{printed.group(0)}"
+    for stated in claimed:
+        assert stated == printed.group(2), \
+            f"README says {stated} spatial navigation assertions, the spec runs {printed.group(2)}"
+
+
+def test_the_readme_security_audit_check_count_matches_the_audit_run():
+    """The README quotes a security-audit check count. Run the audit and compare."""
+    claimed = re.search(r"`python scripts/security_audit\.py` runs (\d+) checks", README)
+    assert claimed, "the README no longer states a security audit check count"
+
+    env = dict(os.environ, MERCURY_ROLLBACK_SECRET="documentation-claim-test", MERCURY_OFFLINE="1")
+    result = subprocess.run(
+        [sys.executable, "scripts/security_audit.py"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=180, env=env,
+    )
+    assert result.returncode == 0, f"the security audit failed:\n{result.stdout}{result.stderr}"
+    printed = re.search(r"all (\d+) checks passed", result.stdout)
+    assert printed, f"the audit printed no check count:\n{result.stdout}"
+    assert claimed.group(1) == printed.group(1), \
+        f"README says {claimed.group(1)} security audit checks, the audit runs {printed.group(1)}"
