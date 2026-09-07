@@ -509,7 +509,9 @@ every label, badge and provenance stamp in fractions of that root, so the headli
 read across a room at 55.7px while the state pill under it rendered at 17.3px, the
 provenance note at 18.7px and the rollback sentence at 19.7px. Commit `da99c6a`
 fixed that, and the before state is still reproducible, because the page that
-produced it is still in the history:
+produced it is still in the history. Run this on a clean checkout only: it
+overwrites `docs/index.html` and then throws that copy away, so commit or stash
+anything uncommitted in it first.
 
 ```bash
 git show 1f705a9:docs/index.html > docs/index.html   # the commit before the fix
