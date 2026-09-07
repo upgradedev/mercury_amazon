@@ -40,7 +40,7 @@ would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-263%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-312%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -63,7 +63,8 @@ reproduce with the commands in [Measured numbers](#measured-numbers).
 7. [Measured numbers](#measured-numbers)
 8. [Configuration](#configuration)
 9. [Known limitations](#known-limitations)
-10. [Contributing and licence](#contributing-and-licence)
+10. [Who would buy this, and why](#who-would-buy-this-and-why)
+11. [Contributing and licence](#contributing-and-licence)
 
 ---
 
@@ -105,7 +106,7 @@ a reading is live.
 |---|---|---|
 | DORA metrics, pull requests | GitHub REST API via `httpx`, needs `GITHUB_TOKEN` | Serves `src/infrastructure/fixtures/github_telemetry_fixture.json`, which is a **recording of a real GitHub read** of `pallets/flask` made by `python scripts/record_github_fixture.py`, labelled `offline-fixture` |
 | AWS spend | `ce:GetCostAndUsage` via `boto3`, needs AWS credentials | Serves `src/infrastructure/fixtures/aws_cost_fixture.json`, which says in its own text that it is **synthetic and was never read from an AWS account**, labelled `offline-fixture` |
-| Error metric series | `cloudwatch:GetMetricStatistics` via `boto3` | Generates a deterministic local series, labelled `offline-fixture`, whose provenance says it was generated and never read from CloudWatch |
+| Error metric series | `cloudwatch:GetMetricStatistics` via `boto3` | Generates a deterministic local series **from the SHA-256 of the service name**, labelled `offline-fixture`, whose provenance says it was generated and never read from CloudWatch. A service name the fixture does not know is refused, not invented |
 | Commits for correlation | GitHub REST API | Falls back to **real commits from the local checkout** via `git log`, labelled `local-git`, never to invented commits |
 
 The Cost Explorer path has been executed successfully against a real AWS account
@@ -128,11 +129,40 @@ can never make a fixture look live.
 
 With no credentials at all, the war room still works end to end: the commits are
 real ones read from your checkout, and the simulated metric series is anchored
-four minutes after the newest of them so the correlation is coherent. The response
-says exactly that, in the text the screen shows:
+relative to the newest of them so the correlation is coherent. The response says
+exactly that, in the text the screen shows:
 
 > The final reading is placed 4 minutes after the newest known commit so the
 > correlation is demonstrable; the commits are real, this metric is not.
+
+### The refusals are the first thing you can press
+
+Three of the four answers the correlator can give are refusals, so the cockpit
+offers four services on the hero, one per answer. The numbers behind each are
+derived from the SHA-256 of the service name, so no two services read the same
+and every machine reads the same as this one.
+
+| Press | Verdict | What it shows |
+|---|---|---|
+| `checkout-api` | `ANOMALY_ATTRIBUTED` | A spike four minutes after a real commit. Names the commit, offers the rollback |
+| `payments-worker` | `NO_ANOMALY` | A reading above its baseline but under the 3.0x threshold. Names nothing, offers nothing |
+| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION` | A spike placed four hours after the newest commit, outside the 60 minute attribution window. Calls it an anomaly, then declines to blame anything |
+| `quiet-service` | `INSUFFICIENT_DATA` | A name the fixture does not know. Refused outright rather than given an invented spike |
+
+Reproduce all four from a shell against a running server:
+
+```bash
+for s in checkout-api payments-worker search-indexer quiet-service; do
+  curl -s -X POST localhost:8002/mcp/tools/what_changed \
+       -H 'Content-Type: application/json' -d "{\"service_name\":\"$s\"}" \
+    | python -c "import json,sys; d=json.load(sys.stdin); print(d['service'], d['verdict'], d['metric'])"
+done
+```
+
+The fixture used to be two module constants, so every service name returned the
+same spike and neither refusal verdict was reachable from any input a reader
+could supply. `tests/integration/test_mcp_endpoints.py` now drives all four
+through the endpoint the cockpit calls.
 
 ---
 
@@ -209,11 +239,31 @@ tampering attempt burns the action it was aimed at, and the operator stages
 again. `python scripts/security_audit.py` runs 28 checks over this path against
 the real HTTP surface and exits non-zero if any of them stops holding.
 
-**What it does not do:** Mercury ships no deployment pipeline integration. When
-governance passes, the default dispatcher records the decision locally and its own
-response says so verbatim: *"No deployment pipeline was contacted."* Implement the
-`RollbackDispatcher` protocol in `src/application/governed_rollback_use_case.py`
-to make the dispatch real.
+### What happens after governance passes
+
+The default is unchanged and stays the default: `RecordOnlyDispatcher` writes the
+decision locally, and its own response says so verbatim, *"No deployment pipeline
+was contacted."* `GET /health` reports `"rollback_dispatch": "record-only"` when
+that is what a confirmed rollback would reach.
+
+One real dispatcher now exists behind that default.
+`src/infrastructure/github_actions_dispatcher.py` asks a GitHub Actions workflow
+to run through `POST /repos/{owner}/{repo}/actions/workflows/{file}/dispatches`,
+carrying the action id, the target service, the target commit, the reason and the
+payload hash as workflow inputs. It is selected only by
+`MERCURY_ROLLBACK_DISPATCH=github_actions`, and being selected is not being armed:
+without `MERCURY_ROLLBACK_DISPATCH_ARMED=1`, a token and a repository, it builds
+the request, prints it with the token redacted, and opens no socket. A dispatch
+that is attempted and does not return HTTP 204 raises, the API answers 502, and
+the spent governance nonce means the action cannot be confirmed again.
+
+**It has never been fired.** No request has ever been sent to github.com from this
+repository: that needs a token with `actions:write` on a repository that has such
+a workflow, and neither exists here. What is proved is the shape. The 15 tests in
+`tests/unit/test_rollback_dispatcher.py` drive it through `httpx.MockTransport`
+and assert the exact method, URL, headers and body it would send, that an unarmed
+or half-configured dispatcher leaves the transport untouched, and that a refusal
+raises rather than reporting success. Firing it for real is an owner action.
 
 ---
 
@@ -238,7 +288,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 263 passed
+# 312 passed
 ```
 
 ### 3. Start the server
@@ -298,6 +348,40 @@ closing the activity, so the viewer is never trapped and the war room is never
 closed by accident. `CockpitUrlResolver` accepts only absolute `http` and `https`
 URLs, so a hostile `COCKPIT_URL` intent extra cannot redirect the WebView.
 
+A Fire TV stick on a home network usually reaches the cockpit over plain `http`
+from a laptop, so a debug build has to permit cleartext and a release build must
+not. `app/src/main/AndroidManifest.xml`, which is the only manifest a release
+build merges, declares `android:usesCleartextTraffic="false"`. The permission
+lives in `app/src/debug/AndroidManifest.xml` with `tools:replace`, so the merger
+applies it to debug variants alone. Three tests in
+`tests/unit/test_firetv_app_structure.py` assert that split, including one that
+fails if any manifest outside the debug source set permits cleartext. They assert
+the manifests the merger is given, not its output: no merged manifest has been
+produced here, for the same reason no APK has.
+
+### Ten-foot legibility, measured
+
+```bash
+pip install -e ".[ux]" && playwright install chromium
+python scripts/measure_legibility.py
+# Measured 222 visible text readings across 4 views at 1920x1080 (root font 24px)
+#   smallest rendered text anywhere: 24px (floor 24px)
+#   readings under the floor: 0 of 222
+```
+
+That script starts the server, opens the page in Chromium at 1920x1080, drives it
+until all three evidence panels have loaded content, and reports the rendered
+`font-size` of every element painting text of its own. Before the fix it reported
+173 of 226 readings under 24px, with the smallest at 17.3px: the page set a 24px
+root at the television breakpoint and then wrote every label, badge and provenance
+stamp in fractions of that root, so the headline read across a room while the
+evidence under it did not. Reproduce the failing measurement by raising the floor:
+`python scripts/measure_legibility.py --floor 26` exits 1.
+
+The floor is a CSS pixel floor at a 1920x1080 CSS viewport. A Fire TV device that
+reports a smaller CSS viewport at the same physical resolution is not covered by
+this measurement, and nothing here has been measured on Fire TV hardware.
+
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
@@ -312,7 +396,7 @@ Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`), and i
 emulator**.
 
 What *is* verified: the manifest declarations, the Gradle wiring and the key
-handling contract are checked by 25 structural tests, and the D-pad navigation
+handling contract are checked by 28 structural tests, and the D-pad navigation
 logic the APK drives is tested by executing `docs/firetv_nav.js` in Node against
 a synthetic grid, 17 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
 itself has unit tests written but never compiled or run.
@@ -331,25 +415,26 @@ iteration count and the data mode it observed.
 
 | Endpoint | Requests | Mean | p95 | Command |
 |---|---|---|---|---|
-| `get_dora_velocity_report` | 60 | 3.08 ms | 5.19 ms | `python scripts/benchmark_suite.py` |
-| `get_pr_bottlenecks` | 60 | 2.50 ms | 2.95 ms | `python scripts/benchmark_suite.py` |
-| `get_aws_cost_anomalies` | 60 | 2.48 ms | 2.99 ms | `python scripts/benchmark_suite.py` |
-| `what_changed` | 60 | 49.51 ms | 81.11 ms | `python scripts/benchmark_suite.py` |
-| Governance mint and verify | 2000 | 0.0198 ms | 0.0345 ms | `python scripts/benchmark_suite.py` |
+| `get_dora_velocity_report` | 60 | 3.13 ms | 4.07 ms | `python scripts/benchmark_suite.py` |
+| `get_pr_bottlenecks` | 60 | 3.02 ms | 3.71 ms | `python scripts/benchmark_suite.py` |
+| `get_aws_cost_anomalies` | 60 | 2.91 ms | 3.55 ms | `python scripts/benchmark_suite.py` |
+| `what_changed` | 60 | 40.38 ms | 59.50 ms | `python scripts/benchmark_suite.py` |
+| Governance mint and verify | 2000 | 0.0238 ms | 0.0419 ms | `python scripts/benchmark_suite.py` |
 
 Measured on Windows, CPython 3.11.0, with `MERCURY_OFFLINE=1`. These exclude
 network transit, so they are a floor for a local run rather than a field
 measurement from a Fire TV on a home network. `what_changed` is the slow one
 because it shells out to `git log` for the commit fallback.
 
-**The one comparative number:** the full four-condition governance check costs 0.0198 ms mean over 2000 cycles, against a 2.48 ms mean for the cheapest endpoint round trip measured in the same run. Guarding the rollback therefore adds about 0.8 percent to the request it guards. Baseline, margin and sample size all come from that one command.
+**The one comparative number:** the full four-condition governance check costs 0.0238 ms mean over 2000 cycles, against a 2.91 ms mean for the cheapest endpoint round trip measured in the same run. Guarding the rollback therefore adds 0.82 percent to the request it guards. Baseline, margin and sample size all come from that one command.
 
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 263 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1081 statements
+python -m pytest tests/ -q                                    # 312 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1210 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
+python scripts/measure_legibility.py                          # needs the ux extra
 python ci/readiness.py                                        # standards gate audit
 ```
 
@@ -375,9 +460,14 @@ build does not report one. Gate G2 therefore fails, correctly, and says so.
 | `GITHUB_TOKEN` | Enables the live GitHub path | unset, fixture mode |
 | `MERCURY_GITHUB_REPO` | Repository to measure | `upgradedev/mercury_amazon` |
 | `MERCURY_DORA_WINDOW_DAYS` | DORA measurement window | 30 |
-| `MERCURY_SIMULATE_INCIDENT` | Shape of the simulated metric series | `1`, ending in a spike |
+| `MERCURY_SIMULATE_INCIDENT` | `0` flattens every simulated service. It cannot make an unknown service known | `1`, each service takes its own shape |
 | `MERCURY_BUILD_SHA` | Build SHA reported by `/health` | read from `git rev-parse HEAD` |
 | `AWS_REGION` | Region for CloudWatch | `eu-west-1` |
+| `MERCURY_ROLLBACK_DISPATCH` | `github_actions` selects the real dispatcher | unset, record only |
+| `MERCURY_ROLLBACK_DISPATCH_ARMED` | `1` lets the dispatcher open a socket. Without it, dry run | unset, dry run |
+| `MERCURY_ROLLBACK_REPO` | `owner/name` holding the rollback workflow | unset, cannot arm |
+| `MERCURY_ROLLBACK_WORKFLOW` | Workflow file to dispatch | `rollback.yml` |
+| `MERCURY_ROLLBACK_REF` | Git ref the workflow runs on | `main` |
 
 ### How DORA is computed
 
@@ -393,8 +483,14 @@ given a substitute number.
 
 ## Known limitations
 
-* **No deployment pipeline integration.** Governance passes, then a record is
-  written locally. The response says so.
+* **No rollback dispatch has ever been fired.** The default dispatcher records the
+  decision locally and its response says so. A GitHub Actions dispatcher exists
+  and is shape-tested against a mock transport, but no request has ever left this
+  repository, and it stays disarmed unless three environment variables are set.
+* **The simulated metric series is still simulated.** It is derived from the
+  service name rather than from a constant, which makes the four verdicts
+  reachable and reproducible, but it is generated locally and every surface that
+  shows it says so.
 * **No APK and no device run.** The Android CI workflow is configured but has
   never executed, so no APK has been produced. Nothing has been installed on Fire
   TV hardware or run in the emulator, and the Kotlin has never been compiled.
@@ -415,6 +511,63 @@ given a substitute number.
 * **In-memory state.** Staged rollbacks and spent nonces live in the server
   process, so a restart forgets them. A multi-instance deployment needs shared
   storage before the single-use guarantee holds across instances.
+
+---
+
+## Who would buy this, and why
+
+**This section is a commercial hypothesis, not a finding.** Nothing in it has been
+tested against a buyer. There is no price in it, no market size, no revenue
+projection and no conversion rate, because no figure of that kind exists here that
+was produced by anything, and an invented one would be worth less than the gap it
+fills.
+
+**The buyer.** An engineering organisation that carries on-call: one production
+service, a paging rota, and someone whose week is worse when an incident runs long.
+The signing name is whoever owns that rota, usually a head of platform or of
+engineering. The user is the responder holding the remote at two in the morning,
+and the two are not the same person.
+
+**The budget line.** The engineering tooling line that already carries the on-call
+paging subscription and the observability subscription. Mercury is not asking for a
+new line: it sits on the screen those two tools are already read on, and its claim
+is about the minutes between the page and the rollback, which is what that line is
+bought to shorten.
+
+**The willingness-to-pay basis.** These organisations already pay per seat for
+incident management and paging, and per host or per ingested gigabyte for metrics
+and logs. The comparable line items, with list prices their vendors publish openly,
+are PagerDuty and Atlassian Opsgenie or Jira Service Management for paging, and
+Datadog and Grafana Cloud for observability. Those published pages are the basis a
+price should be argued from, and the honest state of it is that **no figure from
+them is restated here, because none has been read and recorded against a date by
+anyone working on this repository.** Doing that, and writing down the date the page
+was read, is the next step and is not one that can be faked from memory.
+
+**The first ten conversations.** A target list, not a pipeline. None of these has
+been contacted, and no one has agreed to anything.
+
+1. Upgrade (`upgrade.net.gr`), the maintainer's own consultancy: its own on-call
+   rota, and the only place where the access to install this already exists.
+2. to 4. The three client engineering organisations Upgrade already runs production
+   services for. Deliberately unnamed here, because none of them has been asked and
+   naming a client as a prospect before asking is not a thing to do in public.
+5. Engineering teams in Greece and Cyprus that publish a public status page. The
+   status page is the checkable signal: a company that runs one has a rota.
+6. The AWS Partner Network consultancies in Athens whose practice is already
+   observability and cost work, approached as a channel rather than as a customer.
+7. Organisations whose postmortems appear in the public `danluu/post-mortems`
+   collection: a team that writes postmortems in the open already spends money on
+   the tooling around them.
+8. Responders met at SREcon EMEA, which is where this buyer goes on purpose.
+9. Maintainers of the open-source on-call and status page tooling Mercury would sit
+   beside, approached about an integration rather than a sale.
+10. Amazon's Fire TV developer relations, as a distribution conversation rather
+    than a revenue one.
+
+**What would falsify it.** If responders say the television is the wrong screen,
+because everyone is remote and the room is empty, then the premise is wrong and no
+price fixes it. That is the first question to ask, and it has not been asked.
 
 ---
 

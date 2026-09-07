@@ -1,12 +1,12 @@
 {
   "schema": "mercury.coverage/1",
   "note": "Line coverage of src/ measured by pytest-cov over the committed test suite. The CI floor is 85 percent; this is the value that run produced.",
-  "measured_at_utc": "2026-09-06T22:07:16Z",
+  "measured_at_utc": "2026-09-07T21:56:11Z",
   "measured_by_command": "python scripts/record_coverage_summary.py",
   "equivalent_command": "python -m pytest tests/ -q --cov=src --cov-report=term",
   "python_version": "3.11.0",
   "platform": "win32",
-  "statements": 1081,
-  "missed": 76,
+  "statements": 1210,
+  "missed": 81,
   "percent": 93
 }

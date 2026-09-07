@@ -179,7 +179,7 @@ def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = README.split("## Known limitations")[-1]
-    for required in ["No deployment pipeline integration", "No APK and no device run",
+    for required in ["No rollback dispatch has ever been fired", "No APK and no device run",
                      "Cost Explorer lags", "browser speech synthesis", "In-memory state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 
@@ -373,3 +373,133 @@ def test_the_recorded_coverage_clears_the_floor_the_ci_workflow_enforces():
     assert recorded["percent"] >= int(floor.group(1)), (
         f"recorded coverage {recorded['percent']}% is below the CI floor of {floor.group(1)}%"
     )
+
+
+def test_no_document_claims_the_rollback_dispatcher_has_been_fired():
+    """A GitHub Actions dispatcher exists. No request has ever been sent.
+
+    Same shape as the Alexa and APK pins above: the code is real, the execution
+    is not, and no document may blur the two. Delete this test once a dispatch
+    has actually run and there is a run to point at.
+    """
+    forbidden_phrasings = [
+        "the rollback has been dispatched",
+        "dispatches rollbacks to github actions today",
+        "a rollback was dispatched",
+        "fires the workflow",
+    ]
+    for path in MARKDOWN_FILES:
+        lowered = " ".join(path.read_text(encoding="utf-8").split()).lower()
+        for phrase in forbidden_phrasings:
+            assert phrase not in lowered, f"{path.name} claims a dispatch happened: {phrase!r}"
+
+    readme_lower = " ".join(README.split()).lower()
+    assert "it has never been fired" in readme_lower
+    assert "no request has ever been sent to github.com" in readme_lower
+
+
+def test_the_readme_dispatcher_test_count_matches_the_module_it_names():
+    """The README quotes a test count for the dispatcher. Count them."""
+    claimed = re.search(
+        r"the (\d+) tests in\s+`tests/unit/test_rollback_dispatcher\.py`", README, re.IGNORECASE)
+    assert claimed, "the README no longer states a dispatcher test count"
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/unit/test_rollback_dispatcher.py",
+         "--collect-only", "-q"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=300,
+    )
+    collected = re.search(r"(\d+)\s+tests?\s+collected", result.stdout)
+    assert collected, f"could not read a collected count:\n{result.stdout[-500:]}"
+    assert int(claimed.group(1)) == int(collected.group(1)), (
+        f"README says {claimed.group(1)} dispatcher tests, pytest collects {collected.group(1)}"
+    )
+
+
+def test_the_readme_cleartext_claim_matches_the_manifests():
+    """The README describes where cleartext is permitted. Read the files."""
+    assert 'android:usesCleartextTraffic="false"' in README
+    main_manifest = (REPO_ROOT / "app" / "src" / "main" / "AndroidManifest.xml").read_text(
+        encoding="utf-8"
+    )
+    debug_manifest = (REPO_ROOT / "app" / "src" / "debug" / "AndroidManifest.xml").read_text(
+        encoding="utf-8"
+    )
+    assert 'android:usesCleartextTraffic="false"' in main_manifest
+    assert 'android:usesCleartextTraffic="true"' in debug_manifest
+    assert "tools:replace" in debug_manifest
+
+
+def test_the_buyer_section_declares_itself_a_hypothesis_and_invents_no_numbers():
+    """The commercial section is the easiest place in a README to make things up.
+
+    The rule it is held to is the one that was set for it: name the buyer, the
+    budget line, the basis and the first calls, and state plainly that none of it
+    has been tested. A price, a market size or a conversion rate would all be
+    fabrications, so this test refuses them by shape rather than by review.
+    """
+    assert "## Who would buy this, and why" in README
+    section = README.split("## Who would buy this, and why")[1].split("\n## ")[0]
+
+    # Normalised, because a required sentence can be split across a wrap.
+    lowered = " ".join(section.split()).lower()
+    assert "commercial hypothesis, not a finding" in lowered
+    assert "none of these has been contacted" in lowered
+    for required in ["the buyer.", "the budget line.", "the willingness-to-pay basis."]:
+        assert required in lowered, f"the section does not name {required!r}"
+
+    forbidden = {
+        r"[$€£]\s?\d": "a currency figure",
+        r"\barr\b": "an ARR claim",
+        r"\btam\b": "a market size",
+        r"\d+\s?%": "a percentage",
+        r"\bper (?:seat|user|host|month) (?:for|at) [$€£]": "a price",
+    }
+    for pattern, what in forbidden.items():
+        found = re.search(pattern, section, re.IGNORECASE)
+        assert not found, f"the buyer section states {what}: {found.group(0)!r}"
+
+
+def test_the_readme_structural_test_count_matches_the_module_it_describes():
+    """The Fire TV section quotes a count of structural tests. Count them."""
+    claimed = re.search(r"checked by (\d+) structural tests", README)
+    assert claimed, "the README no longer states a structural test count"
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/unit/test_firetv_app_structure.py",
+         "--collect-only", "-q"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=300,
+    )
+    collected = re.search(r"(\d+)\s+tests?\s+collected", result.stdout)
+    assert collected, f"could not read a collected count:\n{result.stdout[-500:]}"
+    assert int(claimed.group(1)) == int(collected.group(1)), (
+        f"README says {claimed.group(1)} structural tests, pytest collects {collected.group(1)}"
+    )
+
+
+def test_the_governance_overhead_percentage_is_the_arithmetic_of_the_recorded_run():
+    """The one comparative number is derived. Derive it again from the same file.
+
+    Its three inputs are already pinned to benchmarks_summary.json by the table
+    test above. The percentage on top of them was not, which made it the one
+    number in the README free to survive a re-benchmark unchanged.
+    """
+    stated = re.search(
+        r"governance check costs ([\d.]+) ms mean over (\d+) cycles, against a ([\d.]+) ms mean "
+        r"for the cheapest endpoint round trip measured in the same run\. Guarding the rollback "
+        r"therefore adds ([\d.]+) percent",
+        " ".join(README.split()),
+    )
+    assert stated, "the README no longer states the comparative number in the expected shape"
+
+    governance = BENCHMARKS["results"]["governance_token_mint_and_verify"]
+    endpoints = {name: stats for name, stats in BENCHMARKS["results"].items()
+                 if name != "governance_token_mint_and_verify"}
+    cheapest = min(stats["mean_ms"] for stats in endpoints.values())
+
+    assert float(stated.group(1)) == pytest.approx(governance["mean_ms"], abs=0.0001)
+    assert int(stated.group(2)) == governance["iterations"]
+    assert float(stated.group(3)) == pytest.approx(cheapest, abs=0.01)
+    assert float(stated.group(4)) == pytest.approx(
+        governance["mean_ms"] / cheapest * 100.0, abs=0.01
+    ), "the stated overhead is not the quotient of the two numbers beside it"

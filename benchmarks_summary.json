@@ -1,7 +1,7 @@
 {
   "schema": "mercury.benchmarks/2",
   "note": "Measured in-process against the ASGI application with fastapi TestClient. Excludes network transit, so these are a floor for a local run, not a field measurement from a Fire TV on a home network.",
-  "measured_at_utc": "2026-09-05T06:23:38Z",
+  "measured_at_utc": "2026-09-07T21:54:13Z",
   "measured_by_command": "python scripts/benchmark_suite.py",
   "python_version": "3.11.0",
   "platform": "win32",
@@ -9,43 +9,43 @@
   "results": {
     "get_dora_velocity_report": {
       "iterations": 60,
-      "mean_ms": 3.0788,
-      "p50_ms": 2.7051,
-      "p95_ms": 5.1903,
-      "p99_ms": 6.699,
-      "max_ms": 6.699
+      "mean_ms": 3.1346,
+      "p50_ms": 3.0723,
+      "p95_ms": 4.0654,
+      "p99_ms": 5.3125,
+      "max_ms": 5.3125
     },
     "get_pr_bottlenecks": {
       "iterations": 60,
-      "mean_ms": 2.4951,
-      "p50_ms": 2.4444,
-      "p95_ms": 2.953,
-      "p99_ms": 3.846,
-      "max_ms": 3.846
+      "mean_ms": 3.0237,
+      "p50_ms": 2.9442,
+      "p95_ms": 3.7099,
+      "p99_ms": 4.0633,
+      "max_ms": 4.0633
     },
     "get_aws_cost_anomalies": {
       "iterations": 60,
-      "mean_ms": 2.4804,
-      "p50_ms": 2.4516,
-      "p95_ms": 2.9888,
-      "p99_ms": 3.161,
-      "max_ms": 3.161
+      "mean_ms": 2.912,
+      "p50_ms": 2.8174,
+      "p95_ms": 3.5469,
+      "p99_ms": 3.604,
+      "max_ms": 3.604
     },
     "what_changed": {
       "iterations": 60,
-      "mean_ms": 49.5087,
-      "p50_ms": 46.4765,
-      "p95_ms": 81.1127,
-      "p99_ms": 82.8246,
-      "max_ms": 82.8246
+      "mean_ms": 40.3846,
+      "p50_ms": 37.4268,
+      "p95_ms": 59.5035,
+      "p99_ms": 71.0432,
+      "max_ms": 71.0432
     },
     "governance_token_mint_and_verify": {
       "iterations": 2000,
-      "mean_ms": 0.0198,
-      "p50_ms": 0.0197,
-      "p95_ms": 0.0345,
-      "p99_ms": 0.0452,
-      "max_ms": 0.108
+      "mean_ms": 0.0238,
+      "p50_ms": 0.0211,
+      "p95_ms": 0.0419,
+      "p99_ms": 0.0709,
+      "max_ms": 0.1618
     }
   }
 }
