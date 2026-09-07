@@ -4,6 +4,9 @@ Every telemetry endpoint must return provenance, because the cockpit renders it
 and a judge reads it. These tests assert that contract as hard as they assert the
 numbers.
 """
+import re
+
+import pytest
 
 
 def test_health_reports_the_build_sha_field():
@@ -158,3 +161,104 @@ def test_webhook_ingest_requires_authorization(client):
         "repository": "acme/widgets", "workflow_name": "ci.yml", "conclusion": "success",
     })
     assert res.status_code == 401
+
+
+# -------------------------------------- Every verdict is reachable from the API
+#
+# The defect these close: the simulated metric series came from two module
+# constants, so every service name returned the same 34x factor. The correlator's
+# NO_ANOMALY and ANOMALY_WITHOUT_ATTRIBUTION verdicts had unit tests but no input
+# a reviewer could supply ever reached them over HTTP. These drive the four
+# verdicts through the endpoint the cockpit calls.
+
+DEMO_SERVICES = ["checkout-api", "payments-worker", "search-indexer"]
+
+
+def _what_changed(client, service_name):
+    res = client.post("/mcp/tools/what_changed", json={"service_name": service_name})
+    assert res.status_code == 200
+    return res.json()
+
+
+def test_the_metric_series_is_not_the_same_for_every_service(client):
+    readings = {
+        name: (_what_changed(client, name)["metric"]["baseline"],
+               _what_changed(client, name)["metric"]["current"])
+        for name in DEMO_SERVICES
+    }
+    assert len(set(readings.values())) == len(DEMO_SERVICES), (
+        f"the simulated series does not depend on the service: {readings}"
+    )
+
+
+def test_the_demo_services_reach_three_different_verdicts(client):
+    verdicts = {name: _what_changed(client, name)["verdict"] for name in DEMO_SERVICES}
+    commits_available = (
+        _what_changed(client, "checkout-api")["commit_provenance"]["data_source"]
+        in ("local-git", "github-api")
+    )
+
+    assert verdicts["payments-worker"] == "NO_ANOMALY"
+    assert verdicts["search-indexer"] == "ANOMALY_WITHOUT_ATTRIBUTION"
+    if commits_available:
+        assert verdicts["checkout-api"] == "ANOMALY_ATTRIBUTED"
+        assert len(set(verdicts.values())) == 3
+    else:
+        # No checkout and no token: nothing can be attributed, and the correlator
+        # must say so rather than blaming something.
+        assert verdicts["checkout-api"] == "ANOMALY_WITHOUT_ATTRIBUTION"
+
+
+def test_the_steady_service_is_refused_on_the_factor_not_on_missing_data(client):
+    """A zero baseline would also produce NO_ANOMALY. Prove it is the threshold."""
+    data = _what_changed(client, "payments-worker")
+    metric = data["metric"]
+    assert metric["baseline"] > 0
+    assert metric["sample_size"] >= 2
+    assert 1.0 < metric["anomaly_factor"] < 3.0
+    assert "below the 3.0x threshold" in data["explanation"]
+    assert data["recommended_action"] is None
+    assert data["offending_commit"] is None
+
+
+def test_the_unattributed_service_had_commits_available_and_still_blamed_nothing(client):
+    """The refusal must come from the attribution window, not from an empty history."""
+    data = _what_changed(client, "search-indexer")
+    if data["commit_provenance"]["data_source"] not in ("local-git", "github-api"):
+        pytest.skip("no commit history is reachable here, so the window cannot be the reason")
+
+    assert data["verdict"] == "ANOMALY_WITHOUT_ATTRIBUTION"
+    assert data["metric"]["anomaly_factor"] >= 3.0
+    assert data["offending_commit"] is None
+    assert data["recommended_action"] is None
+    assert "no commit landed in the" in data["explanation"]
+    assert "deliberately outside" in data["metric_provenance"]["detail"]
+
+
+def test_an_unknown_service_is_refused_rather_than_given_an_invented_incident(client):
+    data = _what_changed(client, "quiet-service")
+    assert data["verdict"] == "INSUFFICIENT_DATA"
+    assert data["incident_detected"] is False
+    assert data["metric"]["sample_size"] == 0
+    assert data["metric"]["current"] == 0.0
+    assert data["recommended_action"] is None
+    assert "does not invent a reading" in data["metric_provenance"]["detail"]
+
+
+def test_the_cockpit_offers_exactly_the_services_the_fixture_knows():
+    """The demo buttons on the page and the fixture must not drift apart."""
+    from pathlib import Path
+
+    from src.infrastructure.cloudwatch_adapter import SIMULATED_SERVICES
+
+    page = (Path(__file__).resolve().parent.parent.parent / "docs" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    offered = set(re.findall(r'data-service="([^"]+)"', page))
+    assert set(SIMULATED_SERVICES) < offered, (
+        f"the cockpit does not offer every known service: {set(SIMULATED_SERVICES) - offered}"
+    )
+    unknown = offered - set(SIMULATED_SERVICES)
+    assert len(unknown) == 1, (
+        f"the cockpit must offer exactly one name the fixture refuses, found {sorted(unknown)}"
+    )

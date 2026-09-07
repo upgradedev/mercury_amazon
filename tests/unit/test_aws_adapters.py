@@ -10,7 +10,15 @@ import pytest
 
 from src.domain.provenance import DataSource
 from src.infrastructure.aws_cost_adapter import FIXTURE_PATH, AWSCostAdapter
-from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
+from src.infrastructure.cloudwatch_adapter import (
+    SHAPE_INSIDE_BASELINE,
+    SHAPE_UNATTRIBUTED,
+    SIMULATED_SERVICES,
+    UNATTRIBUTED_ANCHOR_OFFSET_MINUTES,
+    CloudWatchMetricAdapter,
+    simulated_baseline_for,
+    simulated_multiplier_for,
+)
 
 
 class StubCostExplorer:
@@ -216,7 +224,9 @@ def test_simulation_can_be_switched_to_a_healthy_series():
     adapter._resolve_client = lambda: None
     series = adapter.get_error_series("checkout-api")
     assert series.latest.value == pytest.approx(series.baseline_mean())
-    assert "flat and healthy" in series.provenance.detail
+    # The named shape, not the trailing sentence about the switch: that sentence
+    # is printed for every series and would make this assertion unfailable.
+    assert "shape 'flat_and_healthy'" in series.provenance.detail
 
 
 # ----------------------------------------------------------------- Offline mode
@@ -308,3 +318,124 @@ def test_a_failed_cost_call_is_not_cached(monkeypatch):
     adapter.fetch_cost_report()
     adapter.fetch_cost_report()
     assert len(stub.calls) == 2
+
+
+# ------------------------------------- The simulated series depends on the service
+#
+# The defect these replace: SIMULATED_BASELINE and SIMULATED_SPIKE were module
+# constants, so every service name a caller supplied returned the same numbers.
+# An invented name got the same spike as the demo service, and the correlator's
+# two refusal verdicts were unreachable from any input.
+
+def offline_adapter(**kwargs) -> CloudWatchMetricAdapter:
+    adapter = CloudWatchMetricAdapter(**kwargs)
+    adapter._resolve_client = lambda: None
+    return adapter
+
+
+def test_two_services_never_return_the_same_series():
+    adapter = offline_adapter()
+    readings = {
+        name: (adapter.get_error_series(name).baseline_mean(), adapter.get_error_series(name).latest.value)
+        for name in SIMULATED_SERVICES
+    }
+    assert len(set(readings.values())) == len(readings), f"services share a reading: {readings}"
+
+
+def test_the_same_service_reads_the_same_on_every_call():
+    """Derived from SHA-256, not from the randomised builtin hash."""
+    first = offline_adapter().get_error_series("checkout-api")
+    second = offline_adapter().get_error_series("checkout-api")
+    assert [p.value for p in first.points] == [p.value for p in second.points]
+
+
+def test_the_derived_values_are_pinned_to_the_recorded_digest():
+    """A change to the derivation must be a deliberate one, not a silent one.
+
+    These are the values the derivation prints today, read from:
+        python -c "from src.infrastructure.cloudwatch_adapter import *; \
+                   print(simulated_baseline_for('checkout-api'))"
+    """
+    assert (simulated_baseline_for("checkout-api"), simulated_multiplier_for(
+        "checkout-api", SIMULATED_SERVICES["checkout-api"].shape)) == (2.95, 12.9)
+    assert (simulated_baseline_for("payments-worker"), simulated_multiplier_for(
+        "payments-worker", SIMULATED_SERVICES["payments-worker"].shape)) == (5.9, 1.6)
+    assert (simulated_baseline_for("search-indexer"), simulated_multiplier_for(
+        "search-indexer", SIMULATED_SERVICES["search-indexer"].shape)) == (4.59, 9.29)
+
+
+def test_an_inside_baseline_service_stays_under_the_anomaly_threshold():
+    """1.20x to 1.89x, against a 3.0x threshold. The margin is the point."""
+    for name, service in SIMULATED_SERVICES.items():
+        if service.shape != SHAPE_INSIDE_BASELINE:
+            continue
+        multiplier = simulated_multiplier_for(name, service.shape)
+        assert 1.2 <= multiplier < 2.0, f"{name} multiplier {multiplier} is not inside its baseline"
+        assert multiplier > 1.0, "a flat line does not show a threshold refusing"
+        series = offline_adapter().get_error_series(name)
+        assert series.latest.value / series.baseline_mean() < 3.0
+
+
+def test_a_spiking_service_clears_the_anomaly_threshold_by_a_margin():
+    for name, service in SIMULATED_SERVICES.items():
+        if service.shape == SHAPE_INSIDE_BASELINE:
+            continue
+        series = offline_adapter().get_error_series(name)
+        assert series.latest.value / series.baseline_mean() >= 6.0, name
+
+
+def test_the_unattributed_service_is_anchored_outside_the_attribution_window():
+    from src.domain.incident_correlation import DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+
+    assert UNATTRIBUTED_ANCHOR_OFFSET_MINUTES > DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+
+    anchor = datetime.now(timezone.utc) - timedelta(hours=12)
+    name = next(n for n, s in SIMULATED_SERVICES.items() if s.shape == SHAPE_UNATTRIBUTED)
+    series = offline_adapter().get_error_series(name, anchor_at=anchor)
+
+    gap_minutes = (series.latest.at - anchor).total_seconds() / 60
+    assert gap_minutes > DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+    assert "deliberately outside" in series.provenance.detail
+
+
+def test_an_unknown_service_is_refused_rather_than_given_an_invented_spike():
+    series = offline_adapter().get_error_series("quiet-service")
+    assert series.points == [], "a name the fixture does not know must produce no data"
+    assert series.provenance.source is DataSource.OFFLINE_FIXTURE
+    assert "does not invent a reading" in series.provenance.detail
+    assert "quiet-service" in series.provenance.detail
+
+
+def test_an_unknown_service_is_still_refused_with_the_incident_switch_off():
+    series = offline_adapter(simulate_incident=False).get_error_series("quiet-service")
+    assert series.points == []
+
+
+def test_an_unknown_service_is_refused_when_cloudwatch_returns_nothing():
+    """The live path's empty fallback must not invent a series either."""
+    stub = StubCloudWatch([])
+    series = CloudWatchMetricAdapter(client=stub).get_error_series("quiet-service")
+    assert series.points == []
+    assert "returned no datapoints" in series.provenance.detail
+    assert "does not invent a reading" in series.provenance.detail
+
+
+def test_a_live_reading_for_an_unknown_service_is_returned_unchanged():
+    """The refusal is about inventing data, not about which names may be read."""
+    now = datetime.now(timezone.utc)
+    stub = StubCloudWatch([
+        {"Timestamp": now - timedelta(minutes=10), "Sum": 1.0},
+        {"Timestamp": now, "Sum": 4.0},
+    ])
+    series = CloudWatchMetricAdapter(client=stub).get_error_series("quiet-service")
+    assert series.provenance.is_live is True
+    assert [p.value for p in series.points] == [1.0, 4.0]
+
+
+def test_the_provenance_reports_the_shape_and_the_numbers_it_generated():
+    series = offline_adapter().get_error_series("payments-worker")
+    detail = series.provenance.detail
+    assert f"shape '{SHAPE_INSIDE_BASELINE}'" in detail
+    assert f"baseline {series.baseline_mean()}" in detail
+    assert f"rising to {series.latest.value}" in detail
+    assert "SHA-256 of the service name" in detail
