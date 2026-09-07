@@ -348,6 +348,14 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
         },
         "metric_provenance": correlation.metric_provenance.to_dict(),
         "commit_provenance": correlation.commit_provenance.to_dict(),
+        # How many changes were candidates, and whether the one named was the only
+        # one. Every attribution the correlator got wrong against the labelled
+        # corpus in scripts/correlation_trial.py had more than one candidate, so
+        # this count is on the wire and on the screen rather than in a log line.
+        "attribution": {
+            "commits_in_window": correlation.commits_in_window,
+            "is_ambiguous": correlation.attribution_is_ambiguous,
+        },
         "offending_commit": None,
         "recommended_action": None,
     }

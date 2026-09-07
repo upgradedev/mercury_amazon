@@ -14,6 +14,14 @@ from two inputs, a metric series and a list of commits, using explicit rules:
 
 Every step reports what it did. When there is no anomaly, or no commit inside the
 attribution window, the correlator says so rather than naming a commit anyway.
+
+Rule 3 is a heuristic and it has a measured failure mode. ``scripts/correlation_trial.py``
+scores this class against a labelled corpus, and every attribution it got wrong was a case
+where more than one change had landed inside the window: naming the newest of several is
+right only when the newest is the culprit. The correlator therefore counts the candidates
+and says how many there were, so an operator is told when the name it gave is one of
+several rather than the only one. It does not silently pick differently, because there is
+nothing in a metric series that says which of two changes in the same window did it.
 """
 from __future__ import annotations
 
@@ -88,6 +96,19 @@ class IncidentCorrelation:
     metric_provenance: Provenance
     commit_provenance: Provenance
     sample_size: int
+    #: How many commits landed inside the attribution window before the reading.
+    #: Zero on every verdict that names nobody. One means the attribution had a
+    #: single candidate; more than one means it named the newest of several.
+    commits_in_window: int = 0
+
+    @property
+    def attribution_is_ambiguous(self) -> bool:
+        """True when a commit was named but it was not the only candidate.
+
+        Measured, not asserted: in ``correlation_trial_summary.json`` every
+        attribution that named the wrong commit is a case where this is true.
+        """
+        return self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and self.commits_in_window > 1
 
     @property
     def incident_detected(self) -> bool:
@@ -124,6 +145,11 @@ class IncidentCorrelation:
             f"{self.metric_name} on {self.service_name} is {self.anomaly_factor:.1f} times its baseline. "
             f"The closest preceding change is commit {commit.sha} by {commit.author}."
         )
+        if self.attribution_is_ambiguous:
+            spoken += (
+                f" {self.commits_in_window} changes landed inside the attribution window, so this is "
+                "the closest of several and may not be the one that did it."
+            )
         if target is not None:
             spoken += f" Rolling back to {target.sha} is staged and waiting for your confirmation."
         return spoken
@@ -225,6 +251,12 @@ class IncidentCorrelator:
             f"{(latest.at - offending.committed_at).total_seconds() / 60:.0f} minutes before the reading, "
             f"the closest change inside the {self.attribution_window_minutes} minute attribution window."
         )
+        if len(candidates) > 1:
+            explanation += (
+                f" It is not the only candidate: {len(candidates)} changes landed inside that window, "
+                "and this rule names the closest one. Every attribution this correlator got wrong in "
+                "scripts/correlation_trial.py was a window with more than one change in it."
+            )
         if rollback_target is None:
             explanation += " No earlier commit is known, so no rollback target can be offered."
         else:
@@ -243,4 +275,5 @@ class IncidentCorrelator:
             metric_provenance=series.provenance,
             commit_provenance=commit_provenance,
             sample_size=len(series.points),
+            commits_in_window=len(candidates),
         )

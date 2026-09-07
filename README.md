@@ -1,21 +1,27 @@
-# Mercury: Fire TV Incident Commander
+# Mercury: what broke, what changed, and a governed rollback
 
-> **Mercury puts an on-call engineer's incident evidence on the Fire TV in the room, and takes the governed rollback from the remote.**
+> **Mercury tells an on-call engineer which change broke production, or refuses to name one, and puts the rollback behind four governance conditions.** It reads a real commit history against an error metric, publishes how often that attribution is right, and renders on a Fire TV as one of its screens.
 
 ```mermaid
 flowchart LR
-    Q["Someone walks in<br/>and asks: what broke?"]
+    Q["Someone asks:<br/>what broke?"]
     Q --> M["1. What broke<br/>the error rate against<br/>its own baseline"]
     M --> C["2. What changed<br/>the closest commit that<br/>landed before the reading"]
-    C --> R["3. Governed rollback<br/>from the D-pad, refused<br/>unless four conditions hold"]
+    C --> R["3. Governed rollback,<br/>refused unless four<br/>conditions hold"]
     M -.->|reading is inside baseline| N["Mercury names no commit<br/>and offers no rollback"]
     C -.->|no deploy landed close enough| N
+    C -.->|more than one change in the window| A["Mercury names the closest<br/>and says it is one of several"]
 ```
 
-The dotted paths are the point as much as the solid one. Mercury answers on load,
-and when it cannot attribute the anomaly to a change it says so and offers nothing
-to press. Each number on the screen carries a badge saying whether it was read
-live or served from a recording.
+The dotted paths are the point as much as the solid one, and they are the ones
+that were measured. `python scripts/correlation_trial.py` scores the correlator
+against 1160 labelled incidents and publishes both what it gets right and what it
+gets wrong: see [How often it is right](#how-often-it-is-right), which is the
+least flattering section in this file and the one to read first.
+
+Mercury answers on load. Each number on the screen carries a badge saying whether
+it was read live or served from a recording, and every attribution says how many
+changes it had to choose between.
 
 ### Run it
 
@@ -30,25 +36,31 @@ python -m src.interfaces.mcp_server
 Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
-secret to its log for you to paste into the cockpit. The test run takes 11 to 18
-seconds (three wall-clock runs of `python -m pytest tests/ -q` on the development
-machine). The `pip install` before it dominates the total and depends on your
+secret to its log for you to paste into the cockpit. The test run takes 24.8 to
+25.7 seconds (three wall-clock runs of `python -m pytest tests/ -q` on the
+development machine, timed around the subprocess). The `pip install` before it dominates the total and depends on your
 network; a clean-environment install here ran past ten minutes, so budget for that
 rather than for a fast one. On PowerShell, set the secret with
 `$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
-[![Fire TV APK](https://github.com/upgradedev/mercury_amazon/actions/workflows/android.yml/badge.svg)](.github/workflows/android.yml)
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-312%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-343%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The two Actions badges point at a repository that is currently **private**, so they
-will not resolve for anyone outside the organisation until it is made public. They
-are listed here because the workflows they name are in this repository and can be
-read directly. The other three badges are static and describe values you can
-reproduce with the commands in [Measured numbers](#measured-numbers).
+**No APK exists.** The Android build is
+[`.github/workflows/android.yml`](.github/workflows/android.yml), a plain file link
+and deliberately not a status badge: that workflow **has never executed**, nothing
+has been pushed since it was added, and a green build badge over zero runs is the
+kind of thing a five second scan reads as a shipped app. Detail in
+[Fire TV](#fire-tv).
+
+The CI badge points at a repository that is currently **private**, so that badge
+will not resolve for anyone outside the organisation until it is made public. It is
+listed here because the workflow it names is in this repository and can be read
+directly. The other three badges are static and describe values you can reproduce
+with the commands in [Measured numbers](#measured-numbers).
 
 ---
 
@@ -56,24 +68,32 @@ reproduce with the commands in [Measured numbers](#measured-numbers).
 
 1. [What this is](#what-this-is)
 2. [What is real and what is simulated](#what-is-real-and-what-is-simulated)
-3. [Architecture](#architecture)
-4. [The rollback is the point](#the-rollback-is-the-point)
-5. [Quickstart](#quickstart)
-6. [Fire TV](#fire-tv)
-7. [Measured numbers](#measured-numbers)
-8. [Configuration](#configuration)
-9. [Known limitations](#known-limitations)
-10. [Who would buy this, and why](#who-would-buy-this-and-why)
-11. [Contributing and licence](#contributing-and-licence)
+3. [How often it is right](#how-often-it-is-right)
+4. [Architecture](#architecture)
+5. [The rollback is the point](#the-rollback-is-the-point)
+6. [Quickstart](#quickstart)
+7. [Fire TV](#fire-tv)
+8. [Measured numbers](#measured-numbers)
+9. [Configuration](#configuration)
+10. [Known limitations](#known-limitations)
+11. [Who would buy this, and why](#who-would-buy-this-and-why)
+12. [Contributing and licence](#contributing-and-licence)
 
 ---
 
 ## What this is
 
 During a production incident the useful information is scattered across a version
-control host, a metrics console and a deployment pipeline, and it is scattered
-across several laptops. Mercury puts one view of it on the television that is
-already in the room, and lets the person holding the remote act on it.
+control host, a metrics console and a deployment pipeline. The question that
+matters is one question: which change did this, and can it be undone safely. The
+asset in this repository is the engine that answers it, scored against a labelled
+corpus rather than demonstrated once.
+
+The screen is a delivery choice, not the product. Mercury renders on a Fire TV in
+a room, and on a laptop browser, from the same HTTP surface and the same page: the
+D-pad ring and the arrow keys are one code path. It is entered in the Fire TV track
+because the ten-foot surface is built, measured and honest about what has not been
+run, and the section on it says exactly what has not.
 
 Three things it does:
 
@@ -81,7 +101,10 @@ Three things it does:
 series and a commit history, decides whether the newest reading is an anomaly
 against its own baseline, and attributes it to the closest commit that landed
 before it. When it cannot attribute the anomaly to anything, it says so and
-offers no rollback. That refusal is a feature, and it has its own tests.
+offers no rollback. That refusal is a feature, and it has its own tests. When more
+than one change sits inside the attribution window it names the closest and says
+how many others there were, because that is the case every wrong answer it gave
+against the labelled corpus fell into.
 
 **Shows engineering velocity and spend.** `POST /mcp/tools/get_dora_velocity_report`,
 `POST /mcp/tools/get_pr_bottlenecks` and `POST /mcp/tools/get_aws_cost_anomalies`
@@ -163,6 +186,93 @@ The fixture used to be two module constants, so every service name returned the
 same spike and neither refusal verdict was reachable from any input a reader
 could supply. `tests/integration/test_mcp_endpoints.py` now drives all four
 through the endpoint the cockpit calls.
+
+Those four are a demonstration, not evidence. The evidence is below.
+
+---
+
+## How often it is right
+
+The demo above cannot fail, and a demo that cannot fail says nothing about the
+engine. So the correlator is scored against a labelled corpus it did not author:
+
+```bash
+python scripts/correlation_trial.py
+# Scored 1160 labelled cases against IncidentCorrelator (3.0x threshold, 60 minute window), seed 20260908
+```
+
+It writes `correlation_trial_summary.json`, and a test compares the numbers below
+against that file, so they cannot drift away from the run that produced them.
+
+**Where the corpus comes from.** The deployment stream is this repository's own
+`git log`, 59 real commits over 6.1 days, recorded once into
+`src/infrastructure/fixtures/commit_stream_fixture.json` at commit `dc800ef` so a
+published figure does not move every time somebody commits. The reading time of
+every case with **no** cause is drawn over the span of that log and snapped to a
+fixed 10 minute polling grid, with no reference at all to where individual commits
+fall: that generator is handed two dates and never the commits.
+`tests/unit/test_correlation_trial.py` regenerates those cases against a commit log
+whose times have been shuffled inside the same span and asserts that not one
+reading time moves. For a regression the reading necessarily follows its cause, but
+the propagation delay is drawn from a range that reaches past the 60 minute window,
+and how many polls late somebody looks at the screen is drawn separately. The error
+values are generated here and were never read from a monitored service.
+
+| Measure | Value | Over |
+|---|---|---|
+| Hit rate, fresh look | **22.0%** | 300 regressions seen on the first poll after onset |
+| Hit rate, late look | **3.3%** | 300 regressions seen one to four polls later |
+| Correct refusal, exogenous spikes | **62.0%** | 300 anomalies no commit caused |
+| False attribution, exogenous spikes | **13.3%** | the same 300 |
+| Stayed quiet on a healthy series | 99.5% | 200 ordinary series |
+| Refused for want of data | 100% | 60 telemetry gaps |
+| Naming precision | 27.9% | the 272 times it named a commit |
+
+Those are the numbers. They are bad, and each one is bad for a reason that is
+worth more than the number:
+
+**The late look is the real defect.** `MetricSeries.baseline_mean` drops only the
+newest point, so a spike that has been running for three polls is most of its own
+baseline and the factor collapses. A tenfold regression looked at three polls late
+reads as `NO_ANOMALY`: 254 of those 300 cases were missed outright.
+`tests/unit/test_correlation_trial.py::test_a_spike_running_for_three_polls_is_inside_its_own_baseline`
+pins that behaviour with a hand-built series, so it cannot change silently. Nobody
+designed it, the corpus found it, and fixing it needs a baseline drawn from a
+window before the onset rather than from the same six points, which is a change to
+the detector rather than a change to the wording.
+
+**The wrong names have a single cause.** Of the 156 attributions that named an
+innocent commit, **156** were windows with more than one change in them: naming
+the closest change is only right when the closest change is the culprit, and this
+repository commits in bursts of three to eight minutes apart. That is why the
+answer now carries `attribution.commits_in_window` and says on screen that it is
+one of several. It does not silently pick differently, because nothing in a metric
+series says which of two changes in the same window did it. The disclosure covers
+130 of those 156, and it appears on 35 of the 76 correct namings as well, which is
+what it costs.
+
+**The false-attribution rate is half a number without the commit density.** An
+anomaly with no cause is attributed exactly when some commit happens to fall in the
+60 minutes before the reading, so the rate is a joint property of the window and of
+the stream. `--commit-stride` thins the recorded log and the report sweeps it:
+
+| Commits in the stream | Commits per hour | False attribution rate |
+|---|---|---|
+| 59 (every commit) | 0.405 | 8.0% |
+| 30 (every 2nd) | 0.206 | 5.8% |
+| 15 (every 4th) | 0.103 | 3.2% |
+| 8 (every 8th) | 0.055 | 1.4% |
+
+Read that as: on a service that deploys as often as this repository commits, one
+anomaly in twelve that no deployment caused will still get a deployment blamed for
+it.
+
+**What this trial is not.** Not a field trial, and not a claim about production.
+No real error metric appears in it, the noise model and the severity spread are
+assumptions written by the authors rather than observations, and the commits are
+development commits from this repository rather than deployments of a monitored
+service. `--noise-sigma` and `--seed` are there so a reader can see how much of any
+figure is those assumptions.
 
 ---
 
@@ -270,9 +380,10 @@ raises rather than reporting success. Firing it for real is an owner action.
 ## Quickstart
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
-rather than guessed: `python -m pytest tests/ -q` takes 11 to 18 seconds over
+rather than guessed: `python -m pytest tests/ -q` takes 24.8 to 25.7 seconds over
 three wall-clock runs, and starting the server and getting an answer on screen is
-immediate after that. The variable is `pip install`, which depends on your
+immediate after that. It grew from 11 to 18 seconds when the correlation trial and
+the legibility measurement joined the suite, which is what those two cost. The variable is `pip install`, which depends on your
 network. A clean-environment install measured here ran past ten minutes, so it
 dominates everything else in this section.
 
@@ -288,7 +399,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 312 passed
+# 343 passed
 ```
 
 ### 3. Start the server
@@ -364,23 +475,47 @@ produced here, for the same reason no APK has.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 222 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 220 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 222
+#   readings under the floor: 0 of 220
+#   smallest operational text (reasons, provenance, pills): 25.9px over 29 readings
 ```
 
 That script starts the server, opens the page in Chromium at 1920x1080, drives it
 until all three evidence panels have loaded content, and reports the rendered
-`font-size` of every element painting text of its own. The two numbers that
-matter are the smallest size and the count under the floor, and a test holds this
-README to both. The total number of readings is not pinned: it moves with
-whatever the page rendered on the day, which includes a commit message read from
-`git log`. Before the fix it reported
-173 of 226 readings under 24px, with the smallest at 17.3px: the page set a 24px
-root at the television breakpoint and then wrote every label, badge and provenance
-stamp in fractions of that root, so the headline read across a room while the
-evidence under it did not. Reproduce the failing measurement by raising the floor:
-`python scripts/measure_legibility.py --floor 26` exits 1.
+`font-size` of every element painting text of its own. Three numbers matter and a
+test holds this README to all three: the smallest size anywhere, the count under
+the floor, and the smallest **operational** reading, which is the text an operator
+acts on rather than the labels around it. The total number of readings is not
+pinned: it moves with whatever the page rendered on the day, which includes a
+commit message read from `git log`. Reproduce a failing measurement by raising the
+floor: `python scripts/measure_legibility.py --floor 26` exits 1.
+
+Two defects have been fixed here, and the second was invisible while only the
+first was measured.
+
+**The floor.** Before commit `da99c6a` this reported 173 of 226 readings under
+24px, with the smallest at 17.3px: the page set a 24px root at the television
+breakpoint and then wrote every label, badge and provenance stamp in fractions of
+that root, so the headline read across a room at 55.7px while the state pill under
+it rendered at 17.3px, the provenance note at 18.7px and the rollback sentence at
+19.7px. Those four figures describe the build before that commit and nothing
+since; the run above is the current one.
+
+**The reading order.** Clearing the floor put the sentence that says what the
+D-pad is about to do at exactly the same size as the decorative wordmark caption,
+because a floor says nothing about which text matters. The reason strings, the two
+provenance chips and the connection pill now sit a tier above the body copy at
+25.9px and 27.6px, and the measurement reports that tier separately so it cannot
+quietly sink back to the floor.
+
+**The setup form is off the first screen.** The API URL and the governance secret
+were two text inputs in the top bar, which is a form standing between a viewer and
+the incident and the worst thing in this product to operate with a D-pad. They are
+now behind a `Setup` toggle, hidden on load, and the D-pad ring skips hidden
+controls so the remote cannot land in them. The API defaults to the origin the page
+was served from, and pressing **Stage governed rollback** with no secret opens the
+setup row by itself and says why. The first screen is the incident.
 
 The floor is a CSS pixel floor at a 1920x1080 CSS viewport. A Fire TV device that
 reports a smaller CSS viewport at the same physical resolution is not covered by
@@ -419,25 +554,26 @@ iteration count and the data mode it observed.
 
 | Endpoint | Requests | Mean | p95 | Command |
 |---|---|---|---|---|
-| `get_dora_velocity_report` | 60 | 3.13 ms | 4.07 ms | `python scripts/benchmark_suite.py` |
-| `get_pr_bottlenecks` | 60 | 3.02 ms | 3.71 ms | `python scripts/benchmark_suite.py` |
-| `get_aws_cost_anomalies` | 60 | 2.91 ms | 3.55 ms | `python scripts/benchmark_suite.py` |
-| `what_changed` | 60 | 40.38 ms | 59.50 ms | `python scripts/benchmark_suite.py` |
-| Governance mint and verify | 2000 | 0.0238 ms | 0.0419 ms | `python scripts/benchmark_suite.py` |
+| `get_dora_velocity_report` | 60 | 3.21 ms | 5.46 ms | `python scripts/benchmark_suite.py` |
+| `get_pr_bottlenecks` | 60 | 2.48 ms | 3.17 ms | `python scripts/benchmark_suite.py` |
+| `get_aws_cost_anomalies` | 60 | 2.35 ms | 2.75 ms | `python scripts/benchmark_suite.py` |
+| `what_changed` | 60 | 52.09 ms | 77.03 ms | `python scripts/benchmark_suite.py` |
+| Governance mint and verify | 2000 | 0.0335 ms | 0.0451 ms | `python scripts/benchmark_suite.py` |
 
 Measured on Windows, CPython 3.11.0, with `MERCURY_OFFLINE=1`. These exclude
 network transit, so they are a floor for a local run rather than a field
 measurement from a Fire TV on a home network. `what_changed` is the slow one
 because it shells out to `git log` for the commit fallback.
 
-**The one comparative number:** the full four-condition governance check costs 0.0238 ms mean over 2000 cycles, against a 2.91 ms mean for the cheapest endpoint round trip measured in the same run. Guarding the rollback therefore adds 0.82 percent to the request it guards. Baseline, margin and sample size all come from that one command.
+**The one comparative number:** the full four-condition governance check costs 0.0335 ms mean over 2000 cycles, against a 2.35 ms mean for the cheapest endpoint round trip measured in the same run. Guarding the rollback therefore adds 1.43 percent to the request it guards. Baseline, margin and sample size all come from that one command.
 
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 312 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1210 statements
+python -m pytest tests/ -q                                    # 343 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1218 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
+python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
 python ci/readiness.py                                        # standards gate audit
 ```
@@ -446,8 +582,15 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python scripts/record_github_fixture.py pallets/flask   # re-record the GitHub fixture
+python scripts/correlation_trial.py --record            # re-record the commit stream from git log
 python scripts/probe_deployment.py                      # re-probe the deployment
 ```
+
+`src/infrastructure/fixtures/commit_stream_fixture.json` is the output of that
+second command: 59 real commits from `git log`, recorded at `dc800ef`, with the
+head it was recorded at written into the file. It is a recording rather than a live
+read so that the accuracy figures above stay attached to the corpus that produced
+them instead of moving on every commit.
 
 `deploy_teardown_receipt.json` is the output of that probe. It records only what
 was observed, and it reports `deployed_commit_sha` as `null` because the deployed
@@ -509,6 +652,21 @@ given a substitute number.
   needs CloudWatch metric alarms, which Mercury does not implement.
 * **Anomaly detection is a threshold, not a model.** The newest reading against the
   mean of the rest, with a fixed factor. It has no seasonality and no trend.
+* **A spike that has been running for three polls hides inside its own baseline.**
+  The baseline is the mean of the same six points minus the newest, so by the third
+  poll after onset a tenfold regression reads as healthy. Measured: **3.3%** hit
+  rate on the late-look stratum against **22.0%** on a fresh look, over 300 cases
+  each. Both numbers are in [How often it is right](#how-often-it-is-right), and
+  the fix is a baseline drawn from before the onset, which is not implemented.
+* **Attribution names the closest change, and often that is the wrong one.** Every
+  wrong name it gave against the labelled corpus was a window holding more than one
+  change. The answer now says how many candidates there were, on the wire and on
+  the screen, but it still names one of them rather than ranking them.
+* **The delivery-channel premise is an assumption, not a finding.** That an on-call
+  engineer is in a room with a television during an incident has never been tested
+  with a responder. Nobody has been asked. If they are all remote, the ten-foot
+  surface is the wrong surface and the engine is what survives, which is why the
+  engine is what this README leads with.
 * **Voice is browser speech synthesis.** The cockpit reads its summaries aloud with
   the browser's `speechSynthesis`. There is no Alexa skill and no Alexa integration
   in this repository.
@@ -529,8 +687,16 @@ fills.
 **The buyer.** An engineering organisation that carries on-call: one production
 service, a paging rota, and someone whose week is worse when an incident runs long.
 The signing name is whoever owns that rota, usually a head of platform or of
-engineering. The user is the responder holding the remote at two in the morning,
+engineering. The user is the responder answering the page at two in the morning,
 and the two are not the same person.
+
+**What is being sold, and what is being assumed.** What is being sold is the
+what-broke, what-changed, governed-rollback path over a real commit history, with
+its accuracy published rather than asserted. What is being assumed is that a
+television is a screen that responder is near. The first is measurable and is
+measured above; the second is a guess about where this work happens, and it has
+never been checked with a responder. Those two are not the same kind of claim and
+this section does not treat them as one.
 
 **The budget line.** The engineering tooling line that already carries the on-call
 paging subscription and the observability subscription. Mercury is not asking for a
@@ -569,9 +735,22 @@ been contacted, and no one has agreed to anything.
 10. Amazon's Fire TV developer relations, as a distribution conversation rather
     than a revenue one.
 
-**What would falsify it.** If responders say the television is the wrong screen,
-because everyone is remote and the room is empty, then the premise is wrong and no
-price fixes it. That is the first question to ask, and it has not been asked.
+**What would falsify it.** Two different things, and they fail differently.
+
+If responders say the television is the wrong screen, because everyone is remote
+and the room is empty, then the delivery premise is wrong and no price fixes it.
+That is the first question to ask and it has not been asked. It would cost the
+surface, not the product: the same page and the same HTTP surface already render
+on a laptop, and the four-condition governance path does not care what screen
+confirmed it.
+
+If responders say the attribution is not worth reading, that is fatal, and the
+measured hit rate in [How often it is right](#how-often-it-is-right) is the reason
+to take that seriously: on the evidence there, the engine is not a product yet.
+What would make it one is a baseline drawn from before the onset and a ranked
+candidate set instead of a single closest name, both of which the corpus points
+straight at. No commercial claim here rests on a figure that has not been
+measured, and none of the figures above is a commercial figure.
 
 ---
 

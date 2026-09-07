@@ -46,6 +46,13 @@ jobs:
         # when either number has drifted.
         run: python scripts/record_coverage_summary.py --check
 
+      - name: Correlation trial agrees with the recorded summary
+        # The README quotes correlation_trial_summary.json and a test pins the two
+        # together. This step is what proves that recorded file is still what the
+        # committed correlator produces against the committed corpus, so a change
+        # to the detector cannot leave a stale accuracy figure in the README.
+        run: python scripts/correlation_trial.py --check
+
       - name: D-pad spatial navigation spec (real navigator, executed in Node)
         run: node tests/e2e/spatial_nav_spec.js
 

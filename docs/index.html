@@ -111,9 +111,17 @@
     .wordmark span { color: var(--muted); font-size: 0.82rem; letter-spacing: 0.09em; text-transform: uppercase; }
 
     .conn-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem; }
-    .conn-bar label { color: var(--muted); }
-    .conn-bar input {
-      background: var(--inset); border: 1px solid var(--line); color: var(--text);
+    /* The setup fields, off the first screen until asked for. */
+    .setup-row {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem;
+      background: var(--inset); border: 1px solid var(--line); border-radius: 0.6rem;
+      padding: 0.8rem 1rem; margin-bottom: 0.8rem;
+    }
+    .setup-row[hidden] { display: none; }
+    .setup-row .note { flex-basis: 100%; }
+    .conn-bar label, .setup-row label { color: var(--muted); }
+    .setup-row input {
+      background: var(--panel); border: 1px solid var(--line); color: var(--text);
       padding: 0.45rem 0.6rem; border-radius: 0.4rem; font: inherit; font-size: 0.82rem; min-width: 13rem;
     }
     .state-pill {
@@ -158,7 +166,7 @@
     }
     .hero-text { flex: 1 1 24ch; min-width: 0; }
     .hero-headline { font-size: clamp(1.5rem, 2.9vw, 2.9rem); margin-bottom: 0.5rem; overflow-wrap: break-word; }
-    .hero-cause { font-size: clamp(1rem, 1.2vw, 1.3rem); color: var(--muted); overflow-wrap: break-word; }
+    .hero-cause { font-size: clamp(1.15rem, 1.3vw, 1.4rem); color: var(--muted); overflow-wrap: break-word; }
     .hero-cause .quote { color: var(--text); }
 
     .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1.2rem; }
@@ -293,8 +301,8 @@
       .hero { padding: 1.25rem; border-left-width: 6px; }
       .hero-answer { gap: 1rem; }
       .hero-actions .btn { width: 100%; }
-      .conn-bar input { min-width: 0; width: 100%; }
-      .conn-bar { width: 100%; }
+      .setup-row input { min-width: 0; width: 100%; }
+      .conn-bar, .setup-row { width: 100%; }
       .keybar { padding: 0.6rem 5vw; font-size: 0.75rem; }
       .keybar .focused-label { margin-left: 0; width: 100%; }
       /* A phone has no D-pad, and at this width the note alone made the fixed
@@ -330,16 +338,15 @@
          than it did. The measurement script fails when it stops clearing. */
       body { padding-bottom: 7rem; }
 
-      /* Tier one: labels, badges, keys and one-line notes. At the floor. */
+      /* Tier one: decoration. Eyebrows, keys, section labels and one-line notes,
+         at the floor. Nothing here changes what a viewer is about to do. */
       .wordmark span,
       .conn-bar,
-      .conn-bar input,
-      .state-pill,
+      .setup-row,
+      .setup-row input,
       .note,
       .hero-eyebrow,
       .hero-figure-label,
-      .src-badge,
-      .reason,
       .demo-states-label,
       .btn-demo,
       .btn-sub,
@@ -347,9 +354,6 @@
       .tile-open,
       .console-header,
       .latency,
-      .tag,
-      .provenance,
-      .provenance .src,
       .error-detail,
       dl.kv dt,
       .row .sub,
@@ -364,9 +368,25 @@
       .error-card,
       dl.kv dd { font-size: 1.08rem; }
 
+      /* Tier three: the operational text. Not a floor problem, a reading order
+         problem. These were at the floor, which put the sentence saying what the
+         D-pad is about to do at the same size as the decorative wordmark caption:
+         "Ready to stage a rollback of checkout-api to b485c43" is the last thing
+         read before an irreversible action, and the two provenance chips beside it
+         are what say whether the number driving it was live or a fixture. They now
+         sit above the body copy rather than under it. Measured by
+         python scripts/measure_legibility.py, which reports the smallest
+         operational reading separately from the smallest reading anywhere. */
+      .state-pill,
+      .src-badge,
+      .tag,
+      .provenance,
+      .provenance .src { font-size: 1.08rem; }
+      .reason { font-size: 1.15rem; }
+
       /* Both inputs sit on one row with three controls beside them, and at 24px
          the old 13rem minimum pushed the whole bar onto a second line. */
-      .conn-bar input { min-width: 9rem; }
+      .setup-row input { min-width: 9rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -384,26 +404,41 @@
         <span>Fire TV Incident Commander</span>
       </div>
 
+      <!-- Two text fields used to sit here, on the first screen. On a television
+           that is a form standing between the viewer and the incident, and typing
+           into it with a D-pad is the worst interaction in the product. The page
+           defaults the API to its own origin and keeps both fields behind this
+           toggle, which is also opened automatically the moment an action needs
+           the governance secret. -->
       <div class="conn-bar">
-        <label for="apiBase">API</label>
-        <input id="apiBase" type="text" spellcheck="false" autocomplete="off"
-               title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
-               placeholder="http://127.0.0.1:8002">
-        <label for="opSecret">Secret</label>
-        <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
-               title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
-               placeholder="MERCURY_ROLLBACK_SECRET">
         <button id="btnCheck" class="btn" data-tv-focusable data-tv-label="Check connection"
                 title="Send a real GET /health to the API and report the result">Check</button>
         <button id="btnSpeak" class="btn" data-tv-focusable data-tv-label="Read summaries aloud"
                 aria-pressed="false"
                 title="Read each answer aloud with the browser's own speech synthesis">Read aloud: off</button>
+        <button id="btnSetup" class="btn" data-tv-focusable data-tv-label="Open connection setup"
+                aria-expanded="false" aria-controls="setupRow"
+                title="Show the API URL and governance secret fields. They are hidden so the first screen on a television is the incident, not a form.">Setup</button>
         <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
     </header>
 
-    <p class="note" id="connDetail">The page has not called the API yet. Sent as an
-       Authorization: Bearer header on the two rollback calls only. Never stored.</p>
+    <div class="setup-row" id="setupRow" hidden>
+      <label for="apiBase">API</label>
+      <input id="apiBase" type="text" spellcheck="false" autocomplete="off"
+             title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
+             placeholder="http://127.0.0.1:8002">
+      <label for="opSecret">Secret</label>
+      <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
+             title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
+             placeholder="MERCURY_ROLLBACK_SECRET">
+      <p class="note">The API defaults to the origin this page was served from, so it is
+        usually already right. The secret is MERCURY_ROLLBACK_SECRET: the server prints an
+        ephemeral one at startup when the variable is unset.</p>
+    </div>
+
+    <p class="note" id="connDetail">The page has not called the API yet. The governance secret
+       is sent as an Authorization: Bearer header on the two rollback calls only. Never stored.</p>
 
     <main>
       <!-- ------------------------------------------------------------- Hero -->
@@ -657,6 +692,28 @@
       return window.location.origin;
     }
 
+    /* The setup fields are off the first screen. Show them when the viewer asks,
+       and show them by themselves the moment an action cannot proceed without
+       what is in them, so a refusal to stage points at the field it needs. */
+    function setSetupVisible(visible) {
+      el('setupRow').hidden = !visible;
+      var button = el('btnSetup');
+      button.setAttribute('aria-expanded', visible ? 'true' : 'false');
+      button.textContent = visible ? 'Hide setup' : 'Setup';
+      button.setAttribute('data-tv-label', visible ? 'Hide connection setup' : 'Open connection setup');
+    }
+
+    function toggleSetup() { setSetupVisible(el('setupRow').hidden); }
+
+    function requireSecret() {
+      var secret = el('opSecret').value.trim();
+      if (!secret) {
+        setSetupVisible(true);
+        try { el('opSecret').focus(); } catch (ignored) { /* no focus on a TV WebView */ }
+      }
+      return secret;
+    }
+
     function setConnection(kind, detail) {
       state.connection = kind;
       var pill = el('connState');
@@ -684,7 +741,7 @@
       if (state.connection === 'unreachable' || !apiBase()) {
         card.appendChild(h('span', 'error-detail',
           'This page is static unless a Mercury API is running. Start it with '
-          + 'python -m src.interfaces.mcp_server and put its URL in the API box above.'));
+          + 'python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.'));
       }
       render(targetId, card);
     }
@@ -809,14 +866,23 @@
       ];
 
       if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) {
+        /* Say out loud when the named commit was one of several candidates. Against
+           the labelled corpus in scripts/correlation_trial.py, every attribution the
+           correlator got wrong was a window with more than one change in it, so an
+           operator about to roll back is told which kind of answer this is. */
+        var ambiguous = data.attribution && data.attribution.is_ambiguous;
         setHero({
           state: 'alarm',
-          eyebrow: 'Incident attributed',
+          eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Incident attributed',
           figure: factor + '×',
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
           headline: 'Commit ' + data.offending_commit.sha + ' raised ' + metric.name + ' on ' + data.service,
           quote: data.offending_commit.message,
-          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the reading.',
+          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the reading.'
+            + (ambiguous
+              ? ' It is not the only one: ' + data.attribution.commits_in_window
+                + ' changes landed inside the attribution window, and this rule names the closest.'
+              : ' It is the only change inside the attribution window.'),
           badges: badges
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') {
@@ -864,7 +930,7 @@
         figureLabel: 'Not measured',
         headline: 'No Mercury API answered',
         cause: message + ' This page is static unless a Mercury API is running. '
-          + 'Start it with python -m src.interfaces.mcp_server and put its URL in the API box above.',
+          + 'Start it with python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.',
         badges: []
       });
     }
@@ -903,7 +969,8 @@
     async function checkConnection() {
       var base = apiBase();
       if (!base) {
-        setConnection('unreachable', 'No API URL. Enter one, or open this page from a running Mercury server.');
+        setSetupVisible(true);
+        setConnection('unreachable', 'No API URL. Press Setup and enter one, or open this page from a running Mercury server.');
         return;
       }
       setConnection('checking', 'Sending GET ' + base + '/health');
@@ -988,7 +1055,12 @@
         box.appendChild(kv([
           ['Closest commit', data.offending_commit.sha + ' ' + data.offending_commit.message],
           ['Author', data.offending_commit.author],
-          ['Committed', data.offending_commit.committed_at]
+          ['Committed', data.offending_commit.committed_at],
+          ['Candidates in the window', (data.attribution ? data.attribution.commits_in_window : '?')
+            + ((data.attribution && data.attribution.is_ambiguous)
+              ? ' changes landed inside the window. This names the closest of them, which is the '
+                + 'case every wrong attribution in the correlation trial fell into.'
+              : ' change landed inside the window, so there was nothing else it could be.')]
         ]));
       }
       if (data.recommended_action) {
@@ -1007,7 +1079,7 @@
     }
 
     async function stageRollback() {
-      var secret = el('opSecret').value.trim();
+      var secret = requireSecret();
       var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
       if (!rec) {
         showError('incidentOutput', 'No rollback target. Ask what changed first.');
@@ -1016,7 +1088,8 @@
       }
       if (!secret) {
         showError('incidentOutput',
-          'No governance secret entered. Staging a rollback needs the deployment secret from the Secret field.');
+          'No governance secret entered. Staging a rollback needs the deployment secret, and the '
+          + 'Setup fields have been opened above for it. The server prints an ephemeral one at startup.');
         showPanel('incident');
         return;
       }
@@ -1065,7 +1138,7 @@
     }
 
     async function confirmRollback() {
-      var secret = el('opSecret').value.trim();
+      var secret = requireSecret();
       if (!state.staged) {
         showError('incidentOutput', 'Nothing is staged.');
         showPanel('incident');
@@ -1279,6 +1352,7 @@
 
       document.addEventListener('click', onClick);
       el('btnCheck').addEventListener('click', checkConnection);
+      el('btnSetup').addEventListener('click', toggleSetup);
       el('btnSpeak').addEventListener('click', toggleSpeech);
       el('btnWhatChanged').addEventListener('click', loadWhatChanged);
       el('btnStage').addEventListener('click', stageRollback);

@@ -1,0 +1,422 @@
+{
+  "recorded_at_utc": "2026-09-07T22:59:03.913860+00:00",
+  "recorded_by": "python scripts/correlation_trial.py --record",
+  "recorded_at_head": "dc800ef",
+  "source": "git log in this checkout. These are real development commits from this repository, not deployments of any monitored service, and they are recorded rather than read live so a published measurement does not move on every commit.",
+  "commit_count": 59,
+  "commits": [
+    {
+      "sha": "dc800ef",
+      "full_sha": "dc800ef",
+      "message": "test(ux): pin the legibility claim, not the reading count that moves with the page",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T01:00:48+03:00"
+    },
+    {
+      "sha": "b485c43",
+      "full_sha": "b485c43",
+      "message": "docs: name the buyer, and re-synchronise every number to a fresh measurement",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T00:58:20+03:00"
+    },
+    {
+      "sha": "da99c6a",
+      "full_sha": "da99c6a",
+      "message": "feat(cockpit): put the refusals on the screen and make the evidence readable",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T00:58:10+03:00"
+    },
+    {
+      "sha": "1f705a9",
+      "full_sha": "1f705a9",
+      "message": "feat(incident): derive the simulated series from the service, refuse unknown names",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T00:57:57+03:00"
+    },
+    {
+      "sha": "0e46a1f",
+      "full_sha": "0e46a1f",
+      "message": "feat(rollback): add a real GitHub Actions dispatcher, disarmed by default",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T00:57:44+03:00"
+    },
+    {
+      "sha": "ecec63a",
+      "full_sha": "ecec63a",
+      "message": "fix(firetv): scope cleartext traffic to debug builds only",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-08T00:57:32+03:00"
+    },
+    {
+      "sha": "5d1b912",
+      "full_sha": "5d1b912",
+      "message": "test(docs): pin the README coverage numbers to a recorded measurement",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-07T01:08:16+03:00"
+    },
+    {
+      "sha": "5390de1",
+      "full_sha": "5390de1",
+      "message": "docs,test: correct two stale counts and make them fail the build if they drift",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-07T00:35:39+03:00"
+    },
+    {
+      "sha": "c84ab4e",
+      "full_sha": "c84ab4e",
+      "message": "docs: replace the unmeasured two minute claim with measured timings",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-07T00:25:24+03:00"
+    },
+    {
+      "sha": "cc28375",
+      "full_sha": "cc28375",
+      "message": "feat(cockpit,docs): make the judge-facing surfaces answer in five seconds",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-06T03:16:25+03:00"
+    },
+    {
+      "sha": "4aadc0d",
+      "full_sha": "4aadc0d",
+      "message": "test: make the collected test count identical in a clone and a checkout",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T09:40:37+03:00"
+    },
+    {
+      "sha": "90945c8",
+      "full_sha": "90945c8",
+      "message": "fix: make a fresh clone behave the same as the workspace checkout",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T09:37:58+03:00"
+    },
+    {
+      "sha": "c9b6dc6",
+      "full_sha": "c9b6dc6",
+      "message": "security: make the audit script a real check, delete the sync-receipt generator",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T09:31:21+03:00"
+    },
+    {
+      "sha": "7a471fb",
+      "full_sha": "7a471fb",
+      "message": "docs,ci: make every written claim checkable, and make the readiness auditor able to fail",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T09:26:39+03:00"
+    },
+    {
+      "sha": "20c1b81",
+      "full_sha": "20c1b81",
+      "message": "fix(perf,demo): cache credential resolution, add an offline switch, make the war room demoable from real local data",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T09:10:04+03:00"
+    },
+    {
+      "sha": "f499ea1",
+      "full_sha": "f499ea1",
+      "message": "feat(firetv): make the Leanback app substantive and its build third-party verifiable",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T08:49:18+03:00"
+    },
+    {
+      "sha": "7eca26d",
+      "full_sha": "7eca26d",
+      "message": "feat(core): replace fabricated telemetry with real adapters and a real auth boundary",
+      "author": "Mercury",
+      "committed_at": "2026-09-05T08:45:10+03:00"
+    },
+    {
+      "sha": "7b99905",
+      "full_sha": "7b99905",
+      "message": "feat(firetv): pivot to Fire TV Incident Commander with what-changed tool and D-pad bridge",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T18:03:28+03:00"
+    },
+    {
+      "sha": "c6ed5d0",
+      "full_sha": "c6ed5d0",
+      "message": "docs(devpost): reframe mcp description and preserve open source mini challenge",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T15:49:33+03:00"
+    },
+    {
+      "sha": "3f0098f",
+      "full_sha": "3f0098f",
+      "message": "feat(build): add gradle wrapper and purge mock bedrock inference string",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T15:41:12+03:00"
+    },
+    {
+      "sha": "6d6d954",
+      "full_sha": "6d6d954",
+      "message": "ci: harden readiness auditor and synchronize test suites",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T12:50:07+03:00"
+    },
+    {
+      "sha": "d2d4a5c",
+      "full_sha": "d2d4a5c",
+      "message": "feat(firetv): scaffold complete Gradle and Kotlin Leanback app shell for Fire OS",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T12:19:28+03:00"
+    },
+    {
+      "sha": "b99b8b5",
+      "full_sha": "b99b8b5",
+      "message": "feat(resilience): implement dynamic recommendation invalidation with telemetry contracts",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T09:10:36+03:00"
+    },
+    {
+      "sha": "55dbd08",
+      "full_sha": "55dbd08",
+      "message": "fix(client): sync PWA manifest, WebMCP bridge, and Fire TV nav scripts to docs/ for GitHub Pages",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T08:41:40+03:00"
+    },
+    {
+      "sha": "96bed40",
+      "full_sha": "96bed40",
+      "message": "feat(ui): add 3-step setup wizard, 6-app suite switcher, SaaS pricing tiers and TV remote guide",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T08:35:50+03:00"
+    },
+    {
+      "sha": "c75f982",
+      "full_sha": "c75f982",
+      "message": "fix(tests): restore specialized companion HTML and harmonize AgentCore session API",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T08:06:11+03:00"
+    },
+    {
+      "sha": "76647ca",
+      "full_sha": "76647ca",
+      "message": "feat(llm): integrate Amazon Nova Pro, Nova Lite and AWS Bedrock Guardrails",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T07:06:20+03:00"
+    },
+    {
+      "sha": "ae16f21",
+      "full_sha": "ae16f21",
+      "message": "feat(client): implement WebMCP in-browser tools, Mobile PWA manifest and Fire TV D-Pad pairing navigation",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-04T07:03:28+03:00"
+    },
+    {
+      "sha": "fbc1d6b",
+      "full_sha": "fbc1d6b",
+      "message": "feat(core): implement Completeness Engine, Self-Auditing Memory and Deterministic Invariant Gates",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T21:28:07+03:00"
+    },
+    {
+      "sha": "d367a26",
+      "full_sha": "d367a26",
+      "message": "feat: deploy Circuit Breaker, Circle of Care, Intent Drift Guardrail and Post-Mortem RAG/Stripe adapters",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T17:20:18+03:00"
+    },
+    {
+      "sha": "16017bd",
+      "full_sha": "16017bd",
+      "message": "feat(aws-builder): integrate AgentCore, SageMaker inference adapters and unit tests",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T14:31:56+03:00"
+    },
+    {
+      "sha": "b6fadd4",
+      "full_sha": "b6fadd4",
+      "message": "feat(resilience): implement edge offline buffer and EU AI Act certificate generator",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T12:34:23+03:00"
+    },
+    {
+      "sha": "ce03586",
+      "full_sha": "ce03586",
+      "message": "feat(observability): implement repo-specific private observability harness with CloudWatch EMF and PII sanitization",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T12:22:33+03:00"
+    },
+    {
+      "sha": "8db43d8",
+      "full_sha": "8db43d8",
+      "message": "feat: add self-explaining Settings & Device Configuration panel and Nielsen UX heuristics to Web Companion",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-03T10:43:32+03:00"
+    },
+    {
+      "sha": "a644b4d",
+      "full_sha": "a644b4d",
+      "message": "feat: implement AWS Step Functions Sagas, EventBridge & SQS DLQs, CQRS Vector OpenSearch, and 223 tests",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T23:07:07+03:00"
+    },
+    {
+      "sha": "34e74b4",
+      "full_sha": "34e74b4",
+      "message": "docs: expand enterprise E2E UAT testbook matrix and harden CI/CD testing pipeline with >=85% coverage enforcement",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T22:47:38+03:00"
+    },
+    {
+      "sha": "6fb4477",
+      "full_sha": "6fb4477",
+      "message": "chore: sync readiness gates J3, D2, G2 and update deployment receipts",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T17:38:27+03:00"
+    },
+    {
+      "sha": "5d501f0",
+      "full_sha": "5d501f0",
+      "message": "feat: resolve all technical audit gaps and update test badge to 26 passed",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T16:55:18+03:00"
+    },
+    {
+      "sha": "238928c",
+      "full_sha": "238928c",
+      "message": "feat: add rich companion web UI with interactive guided tourguide",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T16:29:02+03:00"
+    },
+    {
+      "sha": "9fb42b0",
+      "full_sha": "9fb42b0",
+      "message": "feat: GTM commercial bridges and badge update to 26 passed",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T16:13:57+03:00"
+    },
+    {
+      "sha": "614ce8e",
+      "full_sha": "614ce8e",
+      "message": "qa: full-scale QA testbook, load benchmark, and badge update to 25 passed",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T14:37:57+03:00"
+    },
+    {
+      "sha": "52a97ef",
+      "full_sha": "52a97ef",
+      "message": "docs(arch): add comprehensive AWS Well-Architected and EU AI Act review for eu-west-1",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T13:50:30+03:00"
+    },
+    {
+      "sha": "c6af9a4",
+      "full_sha": "c6af9a4",
+      "message": "feat(infra): migrate to pure serverless AWS Lambda wallboard with .00 idle cost",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T13:08:41+03:00"
+    },
+    {
+      "sha": "cffc485",
+      "full_sha": "cffc485",
+      "message": "feat(ux): implement H1-H3 responsive empty states, Section I personas review gates and update test badges",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T03:14:01+03:00"
+    },
+    {
+      "sha": "10c1a5e",
+      "full_sha": "10c1a5e",
+      "message": "Cleanup: delete deploy generator script, harden C5 regex and remove ungrounded DEVPOST baselines",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T03:03:00+03:00"
+    },
+    {
+      "sha": "dbe8e07",
+      "full_sha": "dbe8e07",
+      "message": "Integrity audit: remove manufactured deploy receipt, rename HTML assertion tests, remove bad arithmetic baselines and enforce 53-gate standards auditor",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T02:42:36+03:00"
+    },
+    {
+      "sha": "fb452af",
+      "full_sha": "fb452af",
+      "message": "Add Playwright E2E suite, UAT testbook, concurrency load tests and OWASP security audit",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T02:13:39+03:00"
+    },
+    {
+      "sha": "bb60973",
+      "full_sha": "bb60973",
+      "message": "Add Friction Log, Docker Compose stack, D-Pad spatial nav and speech UI",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T02:03:14+03:00"
+    },
+    {
+      "sha": "2e62e47",
+      "full_sha": "2e62e47",
+      "message": "Add video subtitle synthesizer, cue sheets and advance readiness to 41/42",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T01:20:34+03:00"
+    },
+    {
+      "sha": "95fc16b",
+      "full_sha": "95fc16b",
+      "message": "Add interactive web showcase, deploy harness and update readiness auditor",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T01:01:51+03:00"
+    },
+    {
+      "sha": "12443b5",
+      "full_sha": "12443b5",
+      "message": "Organize benchmark imports with ruff",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T00:07:08+03:00"
+    },
+    {
+      "sha": "8cc2ce7",
+      "full_sha": "8cc2ce7",
+      "message": "Add reproducible benchmark suite script",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-02T00:06:14+03:00"
+    },
+    {
+      "sha": "681e651",
+      "full_sha": "681e651",
+      "message": "Update readiness auditor exit condition for automated CI",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:50:23+03:00"
+    },
+    {
+      "sha": "8b84a35",
+      "full_sha": "8b84a35",
+      "message": "Add pythonpath and PYTHONPATH to CI pytest runner",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:49:12+03:00"
+    },
+    {
+      "sha": "d991af0",
+      "full_sha": "d991af0",
+      "message": "Configure ruff lint rules and clean up variables",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:47:51+03:00"
+    },
+    {
+      "sha": "8c77ad5",
+      "full_sha": "8c77ad5",
+      "message": "Configure setuptools build backend",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:46:14+03:00"
+    },
+    {
+      "sha": "717621c",
+      "full_sha": "717621c",
+      "message": "Enforce 85% test coverage in CI workflow",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:27:53+03:00"
+    },
+    {
+      "sha": "df7939e",
+      "full_sha": "df7939e",
+      "message": "Implement Fire TV 10-foot UI and remote navigation support",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:20:53+03:00"
+    },
+    {
+      "sha": "d237622",
+      "full_sha": "d237622",
+      "message": "Initial commit: Mercury voice CTO cockpit and DORA radar",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-09-01T23:15:30+03:00"
+    }
+  ]
+}

@@ -65,6 +65,26 @@ def test_the_evidence_panels_were_actually_open_when_this_was_measured(measureme
         assert stats["text_elements"] >= 20, f"the {view} view rendered almost no text"
 
 
+def test_the_operational_text_reads_above_the_body_copy_not_at_the_floor(measurement):
+    """A floor is not a reading order.
+
+    The sentence that says what the D-pad is about to do ("Ready to stage a rollback of
+    checkout-api to b485c43"), the two provenance chips that say whether the number
+    driving it was live, and the connection pill were all sitting exactly on the 24px
+    floor, which is where the decorative wordmark caption sits. They are now a tier above
+    it. This asserts the ordering rather than a magic number, so the type scale can move
+    as long as the operational text keeps reading larger than the smallest decoration.
+    """
+    assert measurement["operational_readings"] >= 10, (
+        "almost no operational text was measured, so this assertion proves nothing"
+    )
+    assert measurement["smallest_operational_px"] > measurement["smallest_rendered_px"], (
+        f"the smallest operational reading is {measurement['smallest_operational_px']}px, the same "
+        f"as the smallest reading anywhere ({measurement['smallest_rendered_px']}px): "
+        f"{measurement['smallest_operational_selector']}"
+    )
+
+
 def test_the_page_never_scrolls_sideways_on_a_television(measurement):
     assert measurement["horizontal_overflow"] is False
 
@@ -114,3 +134,10 @@ def test_the_readme_legibility_numbers_match_this_measurement(measurement):
         "the two totals the README quotes from the same run disagree with each other"
     )
     assert int(readings.group(1)) > 0
+
+    operational = re.search(r"smallest operational text[^:]*: ([\d.]+)px", readme)
+    assert operational, "the README no longer quotes the smallest operational reading"
+    assert float(operational.group(1)) == measurement["smallest_operational_px"], (
+        f"README says the smallest operational text is {operational.group(1)}px, this run "
+        f"measured {measurement['smallest_operational_px']}px"
+    )

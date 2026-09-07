@@ -113,6 +113,47 @@ def test_the_governance_secret_field_is_a_password_input_and_not_persisted(html)
     assert "Never stored" in html
 
 
+def test_the_setup_fields_are_off_the_first_screen(html):
+    """A television's first screen must be the incident, not a form.
+
+    Both text fields used to sit in the top bar, where they are a D-pad hostile setup
+    step in front of the answer. They now live in a row that starts ``hidden`` behind a
+    focusable toggle, and the D-pad ring skips hidden controls, so the remote never
+    lands in a text field it cannot type into comfortably.
+    """
+    setup_row = re.search(r'<div class="setup-row" id="setupRow"([^>]*)>', html)
+    assert setup_row, "the setup fields are no longer in a row of their own"
+    assert "hidden" in setup_row.group(1), "the setup row is not hidden on load"
+
+    for field in ('id="apiBase"', 'id="opSecret"'):
+        position = html.index(field)
+        assert position > html.index('id="setupRow"'), f"{field} is outside the setup row"
+        assert position < html.index('id="connDetail"'), f"{field} escaped the setup row"
+
+    toggle = re.search(r'<button id="btnSetup"(.*?)</button>', html, re.S)
+    assert toggle, "there is no control that reveals the setup fields"
+    assert 'aria-controls="setupRow"' in toggle.group(1)
+    assert 'aria-expanded="false"' in toggle.group(1)
+    assert "data-tv-focusable" in toggle.group(1), "the toggle is not reachable from the D-pad"
+
+
+def test_the_hero_holds_no_text_input_at_all(html):
+    """The hero is the answer. Nothing in it may ask the viewer to type."""
+    hero = html[html.index('<section id="hero"'):html.index('<section id="wall"')]
+    assert "<input" not in hero
+    assert "<textarea" not in hero
+
+
+def test_an_action_that_needs_the_secret_opens_the_field_it_needs(html):
+    """Hiding a field is only kind if the refusal that needs it points at it."""
+    script = html.split("<script>")[-1]
+    assert "function requireSecret" in script
+    assert script.count("requireSecret()") >= 2, (
+        "both rollback actions must go through the helper that reveals the secret field"
+    )
+    assert "setSetupVisible(true)" in script
+
+
 def test_the_secret_is_sent_as_a_bearer_header(html):
     assert "'Authorization'] = 'Bearer '" in html or "Authorization" in html
     assert "Bearer " in html

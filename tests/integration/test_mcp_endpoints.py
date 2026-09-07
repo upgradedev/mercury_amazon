@@ -122,6 +122,37 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
         assert "the commits are real, this metric is not" in detail
 
 
+def test_what_changed_reports_how_many_changes_were_candidates(client):
+    """The count the correlation trial argued for has to reach the wire.
+
+    Against the labelled corpus in ``scripts/correlation_trial.py`` every attribution the
+    correlator got wrong was a window holding more than one change, so the number of
+    candidates is part of the answer rather than a detail in a log line.
+    """
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    attribution = data["attribution"]
+    assert isinstance(attribution["commits_in_window"], int)
+    assert attribution["commits_in_window"] >= 0
+
+    if data["verdict"] == "ANOMALY_ATTRIBUTED":
+        assert attribution["commits_in_window"] >= 1
+        assert attribution["is_ambiguous"] == (attribution["commits_in_window"] > 1)
+        if attribution["is_ambiguous"]:
+            assert "It is not the only candidate" in data["explanation"]
+    else:
+        # Nothing was named, so there is nothing to be ambiguous about.
+        assert attribution["is_ambiguous"] is False
+
+
+def test_a_verdict_that_names_nobody_claims_no_candidates(client):
+    """The two refusals must not report a candidate they did not act on."""
+    for service in ("payments-worker", "search-indexer", "quiet-service"):
+        data = _what_changed(client, service)
+        assert data["offending_commit"] is None
+        assert data["attribution"]["commits_in_window"] == 0
+        assert data["attribution"]["is_ambiguous"] is False
+
+
 def test_what_changed_rejects_an_out_of_range_window(client):
     assert client.post("/mcp/tools/what_changed", json={"time_window_minutes": 99999}).status_code == 422
     assert client.post("/mcp/tools/what_changed", json={"time_window_minutes": 1}).status_code == 422

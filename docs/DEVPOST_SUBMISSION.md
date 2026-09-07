@@ -7,21 +7,24 @@
 
 ## Tagline (22 words)
 
-Mercury puts an on-call engineer's incident evidence on the Fire TV in the room,
-and takes the governed rollback from the remote.
+Mercury tells an on-call engineer which change broke production, or refuses to
+name one, and puts the rollback behind four governance conditions.
 
 ---
 
 ## Inspiration
 
-An incident starts and everyone opens the same six tabs on six different laptops.
-The version control host is in one, the metrics console is in another, the
-deployment pipeline is in a third, and the one question that matters is spread
-across all of them: what changed just before this broke?
+An incident starts and everyone opens the same six tabs. The version control host
+is in one, the metrics console is in another, the deployment pipeline is in a
+third, and the one question that matters is spread across all of them: what
+changed just before this broke?
 
-There is already a screen in that room that everyone can see. It is showing
-nothing. Mercury puts the answer on it, and lets the person holding the remote act
-on the answer without opening a laptop at all.
+Mercury answers that question from a real commit history, says how confident it is
+entitled to be, and puts the undo behind a governance check. Then it renders where
+the people are. A Fire TV in the room is one of those places and the one this
+entry is built for: a screen everyone can see, driven by a remote, with the
+evidence readable from a sofa. The screen is the delivery; the attribution engine
+is the thing.
 
 ---
 
@@ -32,7 +35,15 @@ history, decides whether the newest reading is an anomaly against its own
 baseline, and attributes it to the closest commit that landed before it. When it
 cannot attribute the anomaly to anything, it says so and offers no rollback. That
 refusal has its own tests, because a war room tool that always has an answer is
-worse than one that admits when it does not.
+worse than one that admits when it does not. When more than one change sits in the
+attribution window, the answer says so and names how many.
+
+**Publishes how often that is right.** `python scripts/correlation_trial.py`
+scores the correlator against 1160 labelled incidents built on this repository's
+real commit log, with the reading times of every case that has no cause drawn
+without reference to where any commit falls. It reports the hit rate and the
+false-attribution rate side by side, and the numbers are not flattering: the
+README carries them in full.
 
 **Shows velocity and spend.** DORA metrics computed from GitHub Actions runs and
 merged pull requests, open pull requests past a 36 hour review SLA, and
@@ -62,7 +73,7 @@ same place as the number.
 D-pad navigation is geometric rather than a list walk. For a pressed direction it
 keeps only the candidates that lie in that direction, scores them by distance
 along the axis of travel plus a penalty for perpendicular drift, and takes the
-minimum. The real file is executed in Node against a synthetic grid by 16
+minimum. The real file is executed in Node against a synthetic grid by 17
 assertions, so the geometry is tested rather than asserted.
 
 ---
@@ -86,6 +97,15 @@ the war room closes mid-incident.
 ---
 
 ## Accomplishments we are proud of
+
+**We scored the engine instead of demonstrating it.** The cockpit's demo places a
+simulated spike minutes after a real commit, which is a demonstration that cannot
+fail and therefore proves nothing. So the correlator is also run against a labelled
+corpus whose reading times were drawn without looking at the commit log, and both
+halves of the result are published: what it names correctly, and how often it
+blames an innocent change. That corpus found a defect nobody had noticed, which is
+that a spike running for three polls is inside its own baseline and reads as
+healthy.
 
 **The refusals work and are tested.** Confirm a rollback twice and the second
 attempt comes back `409 NOT_PENDING`. Let the lease run out and it comes back
@@ -121,6 +141,7 @@ Stated plainly, because the cockpit shows it anyway.
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
+| Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`, hit rate and false-attribution rate both published |
 | Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware |
 
 ---
@@ -134,9 +155,11 @@ workflow is written and the Kotlin is there; neither has ever executed.
 it to a deployment pipeline turns the governed decision into a governed action
 without touching the governance code.
 
-**Replace the threshold with a model.** Anomaly detection compares a reading to a
-baseline mean, so a nightly batch job looks like an incident. Seasonality is the
-obvious next step.
+**Fix what the corpus found.** Draw the baseline from a window before the onset
+rather than from the same six points, so a spike stops hiding inside its own
+baseline, and offer a ranked candidate set instead of a single closest name. Both
+are pointed at directly by the trial results, and both would be re-scored against
+the same corpus.
 
 **Persist the governance ledger.** Staged actions live in memory today, so a
 restart forgets them. An audit trail that survives a restart is the difference
@@ -168,7 +191,17 @@ Stated here rather than left for a judge to find:
 * The live endpoint answers 200 but runs an older build, so the readiness gates
   for deployment matching (D2, G2) fail and are reported as failing.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
-  like an anomaly.
+  like an anomaly, and a spike that has been running for three polls is inside its
+  own baseline and reads as healthy. Measured on the labelled corpus, the hit rate
+  falls from the fresh-look figure to almost nothing on a late look. Both numbers
+  are in the README.
+* Attribution names the closest change in the window. Every wrong name it gave
+  against the corpus was a window with more than one change in it. The answer now
+  says how many candidates there were; it does not rank them.
+* That an on-call engineer is in a room with a television during an incident is an
+  assumption. It has never been tested with a responder. The same page and the same
+  HTTP surface render on a laptop, so what that assumption risks is the surface,
+  not the engine.
 * Voice output is the browser's speech synthesis. There is no Alexa skill and no
   Alexa integration in this repository.
 

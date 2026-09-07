@@ -40,6 +40,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 VIEWPORT = {"width": 1920, "height": 1080}
 TEN_FOOT_FLOOR_PX = 24.0
 
+# The floor is a floor for everything. It is not the whole question, because a
+# floor says nothing about reading order: a sentence that gates an irreversible
+# action and a decorative wordmark caption can both sit exactly on it, which is
+# what they did. These classes carry the text an operator acts on, and the script
+# reports their smallest reading separately from the smallest reading anywhere.
+#
+#   reason        why a rollback button is enabled or disabled, and what it targets
+#   hero-cause    the correlator's own sentence about what it concluded
+#   state-pill    whether the API answered
+#   provenance    where a number came from
+#   src / tag     the live-or-fixture chips beside it
+OPERATIONAL_CLASSES = frozenset({
+    "reason", "hero-cause", "state-pill", "provenance", "src", "tag", "src-badge",
+})
+
 # Every element that paints text of its own, with the rendered size of that text.
 # "Of its own" means a direct child text node: without that, a wrapper reports the
 # size it inherits and the same line is counted several times.
@@ -202,6 +217,9 @@ def main() -> int:
         for view, elements in views.items()
     }
 
+    operational = [e for e in every if OPERATIONAL_CLASSES & set(e["cls"].split())]
+    smallest_operational = min((e["px"] for e in operational), default=0.0)
+
     result = {
         "viewport": VIEWPORT,
         "floor_px": args.floor,
@@ -209,6 +227,11 @@ def main() -> int:
         "text_element_readings": len(every),
         "under_floor": len(under),
         "smallest_rendered_px": smallest,
+        "operational_readings": len(operational),
+        "smallest_operational_px": smallest_operational,
+        "smallest_operational_selector": min(
+            operational, key=lambda e: e["px"], default={"tag": "", "cls": ""}
+        ).get("cls", ""),
         "per_view": per_view,
         "horizontal_overflow": layout["scrollWidth"] > layout["innerWidth"],
         "keybar_height_px": layout["keybarHeight"],
@@ -231,6 +254,8 @@ def main() -> int:
         print(f"  smallest rendered text anywhere: {smallest}px "
               f"(floor {args.floor:.0f}px)")
         print(f"  readings under the floor: {len(under)} of {len(every)}")
+        print(f"  smallest operational text (reasons, provenance, pills): "
+              f"{smallest_operational}px over {len(operational)} readings")
         print(f"  horizontal overflow: {result['horizontal_overflow']} "
               f"(scrollWidth {layout['scrollWidth']}, innerWidth {layout['innerWidth']})")
         print(f"  fixed key bar: {layout['keybarHeight']}px tall, "
