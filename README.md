@@ -504,13 +504,23 @@ floor: `python scripts/measure_legibility.py --floor 26` exits 1.
 Two defects have been fixed here, and the second was invisible while only the
 first was measured.
 
-**The floor.** Before commit `da99c6a` this reported 173 of 226 readings under
-24px, with the smallest at 17.3px: the page set a 24px root at the television
-breakpoint and then wrote every label, badge and provenance stamp in fractions of
-that root, so the headline read across a room at 55.7px while the state pill under
-it rendered at 17.3px, the provenance note at 18.7px and the rollback sentence at
-19.7px. Those four figures describe the build before that commit and nothing
-since; the run above is the current one.
+**The floor.** The page set a 24px root at the television breakpoint and then wrote
+every label, badge and provenance stamp in fractions of that root, so the headline
+read across a room at 55.7px while the state pill under it rendered at 17.3px, the
+provenance note at 18.7px and the rollback sentence at 19.7px. Commit `da99c6a`
+fixed that, and the before state is still reproducible, because the page that
+produced it is still in the history:
+
+```bash
+git show 1f705a9:docs/index.html > docs/index.html   # the commit before the fix
+python scripts/measure_legibility.py
+#   smallest rendered text anywhere: 17.3px (floor 24px)
+#   readings under the floor: 155 of 200
+git checkout -- docs/index.html                      # put the current page back
+```
+
+Those figures describe that build and nothing since. The run at the top of this
+section is the current one, and it is what the same command prints today.
 
 **The reading order.** Clearing the floor put the sentence that says what the
 D-pad is about to do at exactly the same size as the decorative wordmark caption,
