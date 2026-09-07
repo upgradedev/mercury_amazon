@@ -162,6 +162,19 @@
     .hero-cause .quote { color: var(--text); }
 
     .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1.2rem; }
+    .demo-states { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px dashed var(--line-soft); }
+    .demo-states-label {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.6rem;
+    }
+    .demo-states-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+    .btn-demo { font-family: var(--mono); font-size: 0.85rem; }
+    .btn-demo[aria-pressed="true"] { border-color: var(--focus); color: var(--focus); }
+    .btn-sub {
+      display: block; font-family: var(--sans); font-weight: 400;
+      color: var(--muted); font-size: 0.78rem; margin-top: 0.2rem;
+    }
+    .btn-demo[aria-pressed="true"] .btn-sub { color: var(--text); }
     .hero-reasons { margin-top: 0.6rem; display: grid; gap: 0.15rem; }
     .hero-foot {
       margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--line-soft);
@@ -293,14 +306,67 @@
     @media (min-width: 1000px) {
       .wall { grid-template-columns: repeat(3, 1fr); }
     }
-    /* 10-foot mode. Root type goes to 24px so body copy clears the minimum for
-       reading at three metres, and the padding becomes a TV title-safe margin. */
+    /* 10-foot mode. Root type goes to 24px, which is the floor for reading at
+       three metres, and the padding becomes a TV title-safe margin.
+
+       Raising the root alone was not enough, and that was the defect this block
+       now fixes. Every label, badge, provenance stamp and console line on this
+       page is set in fractions of a rem, so at a 24px root the headline read
+       across a room at 55.7px while the evidence under it rendered at 17.3px to
+       19.7px. The rules below put a floor of 1rem under all of it, in two tiers
+       so the reading order survives: supporting labels at the floor, panel body
+       copy a little above it.
+
+       Measured, not eyeballed: python scripts/measure_legibility.py opens this
+       page in Chromium at 1920x1080, drives it until the panels have content,
+       and prints the smallest rendered size on screen. */
     @media (min-width: 1400px) {
       html { font-size: 24px; }
       .shell { padding: 3.5vh 5vw 1.5rem; }
       .keybar { padding: 0.7rem 5vw; }
-      .panel-desc, .tile-sub { font-size: 0.85rem; }
       .topbar { padding-bottom: 0.7rem; margin-bottom: 0.9rem; }
+      /* The key bar wraps onto a second line once its own text clears the floor,
+         and it is fixed, so the page has to reserve more room under the content
+         than it did. The measurement script fails when it stops clearing. */
+      body { padding-bottom: 7rem; }
+
+      /* Tier one: labels, badges, keys and one-line notes. At the floor. */
+      .wordmark span,
+      .conn-bar,
+      .conn-bar input,
+      .state-pill,
+      .note,
+      .hero-eyebrow,
+      .hero-figure-label,
+      .src-badge,
+      .reason,
+      .demo-states-label,
+      .btn-demo,
+      .btn-sub,
+      .tile-eyebrow,
+      .tile-open,
+      .console-header,
+      .latency,
+      .tag,
+      .provenance,
+      .provenance .src,
+      .error-detail,
+      dl.kv dt,
+      .row .sub,
+      .keybar,
+      .key { font-size: 1rem; }
+
+      /* Tier two: the sentences a viewer actually reads off the wall. */
+      .panel-desc,
+      .tile-sub,
+      .empty-state-card,
+      .loading-card,
+      .error-card,
+      dl.kv dd { font-size: 1.08rem; }
+
+      /* Both inputs sit on one row with three controls beside them, and at 24px
+         the old 13rem minimum pushed the whole bar onto a second line. */
+      .conn-bar input { min-width: 9rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -381,6 +447,43 @@
         <div class="hero-reasons">
           <span class="reason" id="stageReason">Staging is off until the server returns a rollback target.</span>
           <span class="reason" id="confirmReason">Confirming is off until staging mints a single-use governance token.</span>
+        </div>
+
+        <!-- The four services the offline fixture knows about, one per answer the
+             correlator can give. Three of them make it refuse. The names are the
+             ones in SIMULATED_SERVICES in src/infrastructure/cloudwatch_adapter.py,
+             and a test fails the build if the two lists drift apart. -->
+        <div class="demo-states" role="group" aria-labelledby="demoStatesLabel">
+          <p class="demo-states-label" id="demoStatesLabel">Ask about another service</p>
+          <div class="demo-states-row">
+            <button class="btn btn-demo" data-service="checkout-api" aria-pressed="true" data-tv-focusable
+                    data-tv-label="Ask about checkout-api"
+                    title="Correlate checkout-api, whose simulated spike lands minutes after a real commit">
+              checkout-api
+              <span class="btn-sub">spike just after a commit</span>
+            </button>
+            <button class="btn btn-demo" data-service="payments-worker" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about payments worker"
+                    title="Correlate payments-worker, whose reading stays under the anomaly threshold">
+              payments-worker
+              <span class="btn-sub">reading inside its own baseline</span>
+            </button>
+            <button class="btn btn-demo" data-service="search-indexer" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about search indexer"
+                    title="Correlate search-indexer, whose spike is hours away from any commit">
+              search-indexer
+              <span class="btn-sub">spike with no change to blame</span>
+            </button>
+            <button class="btn btn-demo" data-service="quiet-service" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about a service Mercury does not know"
+                    title="Ask about a name the offline fixture does not know, and watch it refuse">
+              quiet-service
+              <span class="btn-sub">a name the fixture refuses</span>
+            </button>
+          </div>
+          <p class="note">Without AWS credentials the metric series is generated locally, and it is
+            generated from the name of the service, so these four answers differ. A name that is not
+            on this list is refused rather than given an invented reading.</p>
         </div>
 
         <div class="hero-foot">
@@ -502,7 +605,7 @@
   var Mercury = (function () {
     'use strict';
 
-    var SERVICE = 'checkout-api';
+    var DEFAULT_SERVICE = 'checkout-api';
 
     var state = {
       view: 'wall',
@@ -510,7 +613,10 @@
       staged: null,
       lastCorrelation: null,
       connection: 'unknown',
-      speak: false
+      speak: false,
+      /* Which service the next correlation asks about. Changed only by the demo
+         state buttons, so the screen always names the service it answered for. */
+      service: DEFAULT_SERVICE
     };
 
     function el(id) { return document.getElementById(id); }
@@ -734,13 +840,17 @@
           badges: badges
         });
       } else {
+        // The refusal reason lives in the metric provenance, and it is the part
+        // a viewer needs: the correlator's own sentence only says the series was
+        // too short, not why the server declined to produce one.
+        var why = data.metric_provenance && data.metric_provenance.detail;
         setHero({
           state: 'idle',
           eyebrow: 'Cannot answer',
           figure: 'n/a',
           figureLabel: metric.sample_size + ' data points',
           headline: 'Not enough data to answer for ' + data.service,
-          cause: data.explanation,
+          cause: data.explanation + (why ? ' ' + why : ''),
           badges: badges
         });
       }
@@ -816,7 +926,7 @@
         figure: '...',
         figureLabel: 'call in flight',
         headline: 'Asking the Mercury API what changed',
-        cause: 'POST /mcp/tools/what_changed for ' + SERVICE + ' over the last 60 minutes.',
+        cause: 'POST /mcp/tools/what_changed for ' + state.service + ' over the last 60 minutes.',
         badges: []
       });
       el('heroLatency').textContent = 'Measuring.';
@@ -831,7 +941,7 @@
 
       try {
         var res = await post('/mcp/tools/what_changed',
-          { service_name: SERVICE, time_window_minutes: 60 }, 'incidentLatency');
+          { service_name: state.service, time_window_minutes: 60 }, 'incidentLatency');
         var data = res.body;
         state.lastCorrelation = data;
         el('heroLatency').textContent =
@@ -1104,7 +1214,7 @@
       showLoading('costOutput', 'Calling POST /mcp/tools/audit_observability ...');
       try {
         var res = await post('/mcp/tools/audit_observability',
-          { service_name: SERVICE, received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
+          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
         var data = res.body;
         var box = document.createElement('div');
         box.appendChild(kv([
@@ -1135,11 +1245,23 @@
       observability: loadObservability
     };
 
+    /* The demo state buttons change which service the next correlation asks
+       about. They exist because three of the four answers the correlator can
+       give are refusals, and a refusal nobody can reach is not a control. */
+    function selectService(name) {
+      state.service = name;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-service]'), function (button) {
+        button.setAttribute('aria-pressed', button.getAttribute('data-service') === name ? 'true' : 'false');
+      });
+      loadWhatChanged();
+    }
+
     function onClick(event) {
       var node = event.target.closest ? event.target.closest('button') : null;
       if (!node) { return; }
       if (node.hasAttribute('data-back')) { showWall(); return; }
       if (node.hasAttribute('data-panel')) { showPanel(node.getAttribute('data-panel')); return; }
+      if (node.hasAttribute('data-service')) { selectService(node.getAttribute('data-service')); return; }
       var action = node.getAttribute('data-action');
       if (action && ACTIONS[action]) { ACTIONS[action](); }
     }
@@ -1185,7 +1307,7 @@
           { service_name: 'string' },
           async function (args) {
             var res = await post('/mcp/tools/what_changed',
-              { service_name: (args && args.service_name) || SERVICE }, null);
+              { service_name: (args && args.service_name) || state.service }, null);
             return res.body;
           });
         bridge.registerTool('get_dora_velocity_report',
