@@ -11,6 +11,11 @@
   There is deliberately no `package` attribute: Android Gradle Plugin 8 takes the
   application id from `namespace` in app/build.gradle.kts and fails the build when
   the manifest declares one as well.
+
+  This is the only manifest a release build merges, so `usesCleartextTraffic` is
+  declared `false` here rather than left to the platform default. The debug source
+  set at app/src/debug/AndroidManifest.xml turns it back on for local development,
+  where the cockpit is served over plain http from a laptop on the same network.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -40,7 +45,7 @@
         android:logo="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Leanback"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"

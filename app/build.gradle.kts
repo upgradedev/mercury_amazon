@@ -31,8 +31,11 @@ android {
 
     buildTypes {
         debug {
-            // Fire TV sticks on a home network usually serve the cockpit over
-            // plain http from a laptop, so cleartext is allowed in debug only.
+            // Cleartext is permitted for this build type and no other. The
+            // permission lives in app/src/debug/AndroidManifest.xml, which the
+            // manifest merger applies to debug variants only; the main manifest
+            // declares usesCleartextTraffic="false" and is the only manifest a
+            // release build merges.
             isMinifyEnabled = false
         }
         release {

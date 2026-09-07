@@ -16,6 +16,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 APP = REPO_ROOT / "app"
 MANIFEST = APP / "src" / "main" / "AndroidManifest.xml"
+DEBUG_MANIFEST = APP / "src" / "debug" / "AndroidManifest.xml"
+TOOLS_NS = "http://schemas.android.com/tools"
 KOTLIN = APP / "src" / "main" / "kotlin" / "com" / "amazon" / "mercury" / "wallboard"
 KOTLIN_TESTS = APP / "src" / "test" / "kotlin" / "com" / "amazon" / "mercury" / "wallboard"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
@@ -90,6 +92,55 @@ def test_the_manifest_has_no_package_attribute(manifest_root):
 
 def test_the_manifest_is_well_formed_xml():
     ET.parse(MANIFEST)  # raises on malformed XML
+
+
+# ------------------------------------------------------------------ Cleartext
+#
+# There is no separate release manifest in this project. A release build merges
+# app/src/main/AndroidManifest.xml and nothing else, so "the release manifest
+# does not permit cleartext" means exactly: the main manifest declares
+# usesCleartextTraffic="false", and the only file that turns it back on is the
+# debug source set.
+#
+# These assert the source manifests. The merged output has not been produced:
+# there is no JDK and no Android SDK on the development machine, and the
+# verbatim failure is recorded in docs/FIRE_TV_BUILD.md. So this checks what the
+# merger will be given, not what it emitted.
+
+def test_the_main_manifest_forbids_cleartext_traffic(manifest_root):
+    """The main manifest is the whole of a release build's manifest input."""
+    application = manifest_root.find("application")
+    assert android_attr(application, "usesCleartextTraffic") == "false", (
+        "the manifest a release build merges must declare usesCleartextTraffic=false"
+    )
+
+
+def test_a_debug_source_set_is_the_only_place_cleartext_is_permitted():
+    assert DEBUG_MANIFEST.exists(), "app/src/debug/AndroidManifest.xml is missing"
+    application = ET.parse(DEBUG_MANIFEST).getroot().find("application")
+    assert android_attr(application, "usesCleartextTraffic") == "true"
+    assert application.get(f"{{{TOOLS_NS}}}replace") == "android:usesCleartextTraffic", (
+        "without tools:replace the merger fails on the conflict with the main manifest"
+    )
+
+    permitting = [
+        path for path in APP.rglob("AndroidManifest.xml")
+        if 'android:usesCleartextTraffic="true"' in path.read_text(encoding="utf-8")
+    ]
+    assert permitting == [DEBUG_MANIFEST], (
+        f"cleartext is permitted outside the debug source set: {permitting}"
+    )
+
+
+def test_the_gradle_comment_agrees_with_where_cleartext_actually_lives(app_gradle):
+    """The defect this replaces was a comment that contradicted the manifest."""
+    debug_block = app_gradle.split("debug {")[1].split("release {")[0]
+    assert "src/debug/AndroidManifest.xml" in debug_block, (
+        "the debug build type must name the file that grants cleartext"
+    )
+    assert 'usesCleartextTraffic="false"' in debug_block, (
+        "the comment must state what the release path actually does"
+    )
 
 
 # --------------------------------------------------------------------- Gradle
