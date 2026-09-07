@@ -83,6 +83,13 @@ def test_the_readme_legibility_numbers_match_this_measurement(measurement):
     Same pin as the spatial navigation and security audit counts elsewhere in
     this suite: a number quoted in prose is free to drift the day after it is
     typed unless something re-runs the command that produced it.
+
+    Two of the quoted numbers are pinned exactly and one is not, on purpose. The
+    smallest rendered size and the count under the floor are what the fix claims,
+    and neither moves unless the type scale moves. The total number of readings
+    moves with whatever the page happened to render, which includes a commit
+    message from ``git log``, so holding the README to it would turn an unrelated
+    commit into a red build. The README says so where it quotes the number.
     """
     import re
 
@@ -94,9 +101,16 @@ def test_the_readme_legibility_numbers_match_this_measurement(measurement):
     under = re.search(r"readings under the floor: (\d+) of (\d+)", readme)
     assert under, "the README no longer quotes the count under the floor"
 
-    assert int(readings.group(1)) == measurement["text_element_readings"]
     assert int(readings.group(2)) == len(measurement["per_view"])
-    assert float(smallest.group(1)) == measurement["smallest_rendered_px"]
-    assert (int(under.group(1)), int(under.group(2))) == (
-        measurement["under_floor"], measurement["text_element_readings"]
+    assert float(smallest.group(1)) == measurement["smallest_rendered_px"], (
+        f"README says the smallest rendered text is {smallest.group(1)}px, this run measured "
+        f"{measurement['smallest_rendered_px']}px"
     )
+    assert int(under.group(1)) == measurement["under_floor"], (
+        f"README says {under.group(1)} readings are under the floor, this run measured "
+        f"{measurement['under_floor']}"
+    )
+    assert int(under.group(2)) == int(readings.group(1)), (
+        "the two totals the README quotes from the same run disagree with each other"
+    )
+    assert int(readings.group(1)) > 0

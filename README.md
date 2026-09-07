@@ -371,7 +371,11 @@ python scripts/measure_legibility.py
 
 That script starts the server, opens the page in Chromium at 1920x1080, drives it
 until all three evidence panels have loaded content, and reports the rendered
-`font-size` of every element painting text of its own. Before the fix it reported
+`font-size` of every element painting text of its own. The two numbers that
+matter are the smallest size and the count under the floor, and a test holds this
+README to both. The total number of readings is not pinned: it moves with
+whatever the page rendered on the day, which includes a commit message read from
+`git log`. Before the fix it reported
 173 of 226 readings under 24px, with the smallest at 17.3px: the page set a 24px
 root at the television breakpoint and then wrote every label, badge and provenance
 stamp in fractions of that root, so the headline read across a room while the
