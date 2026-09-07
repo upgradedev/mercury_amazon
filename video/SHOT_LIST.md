@@ -139,8 +139,8 @@ this payload. Edit the target after staging and it stops applying.
 **Action:** press **Confirm rollback**.
 **Expected on screen:** status `EXECUTED`, and the output verbatim:
 `Governance passed for 'checkout-api' to commit <sha>. Recorded locally. No
-deployment pipeline was contacted`, followed by the line explaining that Mercury
-ships no pipeline integration.
+deployment pipeline was contacted`, followed by the line naming the record-only
+dispatcher this deployment is running.
 **Point to make:** read that sentence out. The product tells the room it did not
 deploy anything, on the screen, in the moment of success.
 

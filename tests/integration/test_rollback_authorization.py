@@ -216,3 +216,87 @@ def test_the_security_audit_script_passes_against_the_running_app():
     )
     assert result.returncode == 0, f"security audit failed:\n{result.stdout[-2000:]}"
     assert "checks passed" in result.stdout
+
+
+# ------------------------------------------------- The dispatcher behind the gate
+
+def _use_case_with(dispatcher, operator_secret):
+    from src.application.governed_rollback_use_case import GovernedRollbackUseCase
+
+    return GovernedRollbackUseCase(operator_secret, dispatcher)
+
+
+def test_the_default_deployment_contacts_no_pipeline_and_says_so(client, auth_headers):
+    """MERCURY_ROLLBACK_DISPATCH is unset here, so the record-only default stands."""
+    staged = client.post(STAGE, headers=auth_headers, json=stage_payload("itest-default")).json()
+    done = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-default", "governance_token": staged["governance_token"]})
+
+    assert done.status_code == 200
+    assert "No deployment pipeline was contacted" in done.json()["output"]
+    assert client.get("/health").json()["rollback_dispatch"] == "record-only"
+
+
+def test_a_configured_but_unarmed_dispatcher_reports_a_dry_run(
+    client, auth_headers, operator_secret, monkeypatch
+):
+    """Governance passes, the request is described, and no socket is opened."""
+    import httpx
+
+    from src.infrastructure.github_actions_dispatcher import GitHubActionsRollbackDispatcher
+    from src.interfaces import mcp_server
+
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(204)
+
+    dispatcher = GitHubActionsRollbackDispatcher(
+        "acme/payments", token="ghp_itest", armed=False,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        disarm_reason="MERCURY_ROLLBACK_DISPATCH_ARMED is not set, so this dispatch is a dry run.",
+    )
+    monkeypatch.setattr(mcp_server, "rollback_use_case", _use_case_with(dispatcher, operator_secret))
+
+    staged = client.post(STAGE, headers=auth_headers, json=stage_payload("itest-dry")).json()
+    done = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-dry", "governance_token": staged["governance_token"]})
+
+    assert done.status_code == 200
+    output = done.json()["output"]
+    assert "DRY RUN: no request was sent" in output
+    assert "https://api.github.com/repos/acme/payments/actions/workflows" in output
+    assert sent == [], "a dry run must not reach the transport"
+
+
+def test_a_failed_dispatch_is_a_502_and_the_action_cannot_be_confirmed_again(
+    client, auth_headers, operator_secret, monkeypatch
+):
+    """Fail closed: the nonce is spent even though the dispatch did not succeed."""
+    import httpx
+
+    from src.infrastructure.github_actions_dispatcher import GitHubActionsRollbackDispatcher
+    from src.interfaces import mcp_server
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, text='{"message":"Resource not accessible by integration"}')
+
+    dispatcher = GitHubActionsRollbackDispatcher(
+        "acme/payments", token="ghp_itest", armed=True,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    monkeypatch.setattr(mcp_server, "rollback_use_case", _use_case_with(dispatcher, operator_secret))
+
+    staged = client.post(STAGE, headers=auth_headers, json=stage_payload("itest-502")).json()
+    failed = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-502", "governance_token": staged["governance_token"]})
+
+    assert failed.status_code == 502
+    assert failed.json()["detail"]["denial_reason"] == "DISPATCH_FAILED"
+    assert "Resource not accessible" in failed.json()["detail"]["message"]
+
+    retried = client.post(CONFIRM, headers=auth_headers, json={
+        "action_id": "itest-502", "governance_token": staged["governance_token"]})
+    assert retried.status_code == 409
+    assert retried.json()["detail"]["denial_reason"] == "NOT_PENDING"

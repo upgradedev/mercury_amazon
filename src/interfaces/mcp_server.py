@@ -33,6 +33,10 @@ from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
 from src.infrastructure.cloudwatch_github_ingest import DevOpsTelemetryIngestAdapter
+from src.infrastructure.github_actions_dispatcher import (
+    GitHubActionsRollbackDispatcher,
+    RollbackDispatchError,
+)
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
@@ -114,7 +118,20 @@ cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
 local_git_provider = LocalGitCommitProvider()
 incident_use_case = DiagnoseIncidentUseCase(cloudwatch_adapter, github_adapter, local_git_provider)
-rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET)
+
+# Selected by MERCURY_ROLLBACK_DISPATCH. None unless a deployment asks for it, in
+# which case the use case keeps its record-only default and nothing is contacted.
+rollback_dispatcher = GitHubActionsRollbackDispatcher.from_env()
+if rollback_dispatcher is not None:
+    logger.warning(
+        "Rollback dispatch mode is github_actions against %s/%s@%s. Armed: %s. %s",
+        rollback_dispatcher.repository or "<no repository configured>",
+        rollback_dispatcher.workflow,
+        rollback_dispatcher.ref,
+        rollback_dispatcher.armed,
+        rollback_dispatcher.disarm_reason,
+    )
+rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET, rollback_dispatcher)
 recommendation_engine = DynamicRecommendationEngine()
 telemetry_detector = TelemetryAbsenceDetector()
 devops_events: list[dict[str, Any]] = []
@@ -226,7 +243,21 @@ async def health_check() -> dict[str, Any]:
         "build_sha": BUILD_SHA,
         "rollback_secret_is_ephemeral": ROLLBACK_SECRET_IS_EPHEMERAL,
         "github_live": github_adapter.can_call_live,
+        "rollback_dispatch": _dispatch_mode(),
     }
+
+
+def _dispatch_mode() -> str:
+    """Say which dispatcher a confirmed rollback would reach, without guessing.
+
+    Three states, and the difference between the last two is the whole point of
+    the env gate: configured is not armed.
+    """
+    if rollback_dispatcher is None:
+        return "record-only"
+    if rollback_dispatcher.armed:
+        return "github-actions-armed"
+    return "github-actions-dry-run"
 
 
 @app.post("/mcp/tools/get_dora_velocity_report")
@@ -430,6 +461,19 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
         raise HTTPException(
             status_code=DENIAL_STATUS.get(exc.reason, 403),
             detail={"denial_reason": exc.reason.value, "message": str(exc)},
+        ) from exc
+    except RollbackDispatchError as exc:
+        # Governance passed and the nonce is spent, so this action can never be
+        # confirmed again. Say that, rather than implying a retry will work.
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "denial_reason": "DISPATCH_FAILED",
+                "message": (
+                    f"{exc} The governance token for '{req.action_id}' has been spent, so this "
+                    "action cannot be confirmed again. Stage the rollback afresh."
+                ),
+            },
         ) from exc
 
     return {

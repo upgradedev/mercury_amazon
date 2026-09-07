@@ -67,7 +67,7 @@
       "beat_id": "beat_09_confirm",
       "timestamp_start": 125.0,
       "timestamp_end": 142.0,
-      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. Mercury ships no pipeline integration, and the moment of success is where it admits that.",
+      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. This deployment is running the record only dispatcher, and the moment of success is where it admits that.",
       "visual_action": "Press Confirm rollback. Read the EXECUTED output verbatim, including the sentence stating no pipeline was contacted."
     },
     {

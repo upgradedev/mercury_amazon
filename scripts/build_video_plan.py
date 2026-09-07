@@ -78,8 +78,8 @@ BEATS = [
     (
         "beat_09_confirm", 125.0, 142.0,
         "Governance passes, and the product says out loud what it did not do. No "
-        "deployment pipeline was contacted. Mercury ships no pipeline integration, "
-        "and the moment of success is where it admits that.",
+        "deployment pipeline was contacted. This deployment is running the record only "
+        "dispatcher, and the moment of success is where it admits that.",
         "Press Confirm rollback. Read the EXECUTED output verbatim, including the "
         "sentence stating no pipeline was contacted.",
     ),

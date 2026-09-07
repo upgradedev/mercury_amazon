@@ -27,16 +27,19 @@ class RollbackDispatcher(Protocol):
 class RecordOnlyDispatcher:
     """Default dispatcher. Records the decision and performs no cloud call.
 
-    Mercury does not ship a pipeline integration. This dispatcher exists so the
-    governance path is complete and testable, and it says plainly in its own
-    output that no deployment system was contacted.
+    This is what a deployment reaches unless it has selected another dispatcher,
+    and it says plainly in its own output that no deployment system was
+    contacted. A real one exists in
+    ``src/infrastructure/github_actions_dispatcher.py``; it is selected by
+    ``MERCURY_ROLLBACK_DISPATCH`` and is not reachable by accident.
     """
 
     def dispatch(self, action: GovernedRollbackAction) -> str:
         return (
             f"Governance passed for '{action.target_service}' to commit {action.target_commit_sha[:8]}. "
-            "Recorded locally. No deployment pipeline was contacted: Mercury ships no pipeline "
-            "integration, so wire a RollbackDispatcher to make this dispatch for real."
+            "Recorded locally. No deployment pipeline was contacted: this deployment is running the "
+            "record-only dispatcher. Set MERCURY_ROLLBACK_DISPATCH=github_actions to reach one that "
+            "does, and MERCURY_ROLLBACK_DISPATCH_ARMED=1 for it to send anything."
         )
 
 

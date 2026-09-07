@@ -50,7 +50,7 @@ They are listed so the gap is explicit rather than absent.
 | M-03 | The app runs in the Fire TV emulator | No Android SDK in the build environment | `docs/FIRE_TV_BUILD.md`, emulator section |
 | M-04 | Text is legible from three metres on a large screen | No television was available | Open the cockpit on a TV at 1080p and read it from a sofa |
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
-| M-06 | A rollback reaches a deployment pipeline | Mercury ships no pipeline integration | Implement `RollbackDispatcher` |
+| M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
 | M-07 | The deployment answers at the submitted commit | No deploy of the current commit has been run | `terraform apply`, then `python scripts/probe_deployment.py` |
 
 If you run any of these, `.github/ISSUE_TEMPLATE/firetv_device_report.yml` is the

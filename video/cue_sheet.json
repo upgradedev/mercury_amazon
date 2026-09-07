@@ -103,9 +103,9 @@
       "timestamp_start": 125.0,
       "timestamp_end": 142.0,
       "duration_sec": 17.0,
-      "words_count": 33,
-      "words_per_minute": 116.5,
-      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. Mercury ships no pipeline integration, and the moment of success is where it admits that.",
+      "words_count": 36,
+      "words_per_minute": 127.1,
+      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. This deployment is running the record only dispatcher, and the moment of success is where it admits that.",
       "visual_action": "Press Confirm rollback. Read the EXECUTED output verbatim, including the sentence stating no pipeline was contacted."
     },
     {
