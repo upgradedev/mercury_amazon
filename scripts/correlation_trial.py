@@ -62,6 +62,13 @@ Run command::
     python scripts/correlation_trial.py --json          # machine readable
     python scripts/correlation_trial.py --record        # re-record the commit stream from git log
 
+``--check`` re-scores the corpus and compares it to the recorded summary, which is what CI
+runs. The draws come from ``random.Random`` seeded with a string, so they are identical on
+every platform, but the rates are floating point and a case sitting exactly on the 3.0x
+threshold could in principle fall the other way on a different libm. If that ever happens
+the check will say which figure moved, and the answer is to re-record on the machine that
+publishes, not to loosen the comparison.
+
 Every figure it prints is a property of this corpus on the machine that ran it, and the
 seed that produced it is printed beside it so the run can be repeated exactly.
 """
@@ -577,9 +584,6 @@ def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
     named = [v for v in verdicts if v.outcome in NAMED_A_COMMIT]
     false_attributions = sum(1 for v in uncaused if v.outcome == FALSE_ATTRIBUTION)
     wrong_commit = [v for v in regressions if v.outcome == WRONG_COMMIT]
-    wrong_commit_with_a_later_commit = sum(
-        1 for v in wrong_commit if (by_index[v.index].commits_between_cause_and_reading or 0) > 0
-    )
 
     in_window = [v for v in regressions if by_index[v.index].cause_inside_attribution_window]
     in_window_fresh = [v for v in fresh if by_index[v.index].cause_inside_attribution_window]
@@ -617,10 +621,25 @@ def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
             }
             for name in (STRATUM_FRESH, STRATUM_LATE, STRATUM_EXOGENOUS, STRATUM_HEALTHY, STRATUM_SPARSE)
         },
+        # Cross-tabulated rather than counted one way, because two different things go
+        # wrong and only one of them is the rule's fault. A cause outside the window is
+        # unreachable for any rule with that window. A cause inside it that still got the
+        # wrong name is the rule choosing badly between candidates it had.
+        #
+        # The field this replaced counted "a later commit landed before the reading",
+        # which was 156 of 156 and meant nothing: the rule names the newest commit at or
+        # before the reading, so a wrong name is a later commit by construction.
         "why_the_wrong_commit_was_named": {
             "wrong_commit_attributions": len(wrong_commit),
-            "of_which_a_later_commit_landed_before_the_reading": wrong_commit_with_a_later_commit,
-            "of_which_the_real_cause_was_outside_the_attribution_window": sum(
+            "cause_inside_the_window_and_more_than_one_candidate": sum(
+                1 for v in wrong_commit
+                if by_index[v.index].cause_inside_attribution_window and v.commits_in_window > 1
+            ),
+            "cause_inside_the_window_with_a_single_candidate": sum(
+                1 for v in wrong_commit
+                if by_index[v.index].cause_inside_attribution_window and v.commits_in_window <= 1
+            ),
+            "cause_outside_the_attribution_window": sum(
                 1 for v in wrong_commit if not by_index[v.index].cause_inside_attribution_window
             ),
             "of_which_the_answer_said_it_was_one_of_several": sum(

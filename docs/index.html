@@ -867,9 +867,9 @@
 
       if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) {
         /* Say out loud when the named commit was one of several candidates. Against
-           the labelled corpus in scripts/correlation_trial.py, every attribution the
-           correlator got wrong was a window with more than one change in it, so an
-           operator about to roll back is told which kind of answer this is. */
+           the labelled corpus in scripts/correlation_trial.py, every wrong attribution
+           whose real cause was inside the window had more than one candidate in it, so
+           an operator about to roll back is told which kind of answer this is. */
         var ambiguous = data.attribution && data.attribution.is_ambiguous;
         setHero({
           state: 'alarm',
@@ -1059,7 +1059,7 @@
           ['Candidates in the window', (data.attribution ? data.attribution.commits_in_window : '?')
             + ((data.attribution && data.attribution.is_ambiguous)
               ? ' changes landed inside the window. This names the closest of them, which is the '
-                + 'case every wrong attribution in the correlation trial fell into.'
+                + 'case every wrong attribution in the trial with a reachable cause fell into.'
               : ' change landed inside the window, so there was nothing else it could be.')]
         ]));
       }

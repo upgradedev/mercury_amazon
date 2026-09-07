@@ -105,7 +105,9 @@ corpus whose reading times were drawn without looking at the commit log, and bot
 halves of the result are published: what it names correctly, and how often it
 blames an innocent change. That corpus found a defect nobody had noticed, which is
 that a spike running for three polls is inside its own baseline and reads as
-healthy.
+healthy. It also found that when the correlator had the culprit among its
+candidates and still named the wrong one, there was always more than one candidate
+in the window.
 
 **The refusals work and are tested.** Confirm a rollback twice and the second
 attempt comes back `409 NOT_PENDING`. Let the lease run out and it comes back
@@ -196,8 +198,10 @@ Stated here rather than left for a judge to find:
   falls from the fresh-look figure to almost nothing on a late look. Both numbers
   are in the README.
 * Attribution names the closest change in the window. Every wrong name it gave
-  against the corpus was a window with more than one change in it. The answer now
-  says how many candidates there were; it does not rank them.
+  against the corpus whose real cause was inside that window was a window with more
+  than one change in it; the rest had the cause outside the window, where the rule
+  cannot win. The answer now says how many candidates there were; it does not rank
+  them.
 * That an on-call engineer is in a room with a television during an incident is an
   assumption. It has never been tested with a responder. The same page and the same
   HTTP surface render on a laptop, so what that assumption risks is the surface,

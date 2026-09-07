@@ -16,12 +16,15 @@ Every step reports what it did. When there is no anomaly, or no commit inside th
 attribution window, the correlator says so rather than naming a commit anyway.
 
 Rule 3 is a heuristic and it has a measured failure mode. ``scripts/correlation_trial.py``
-scores this class against a labelled corpus, and every attribution it got wrong was a case
-where more than one change had landed inside the window: naming the newest of several is
-right only when the newest is the culprit. The correlator therefore counts the candidates
-and says how many there were, so an operator is told when the name it gave is one of
-several rather than the only one. It does not silently pick differently, because there is
-nothing in a metric series that says which of two changes in the same window did it.
+scores this class against a labelled corpus. Of the 156 attributions it got wrong there,
+109 had the real cause inside the window and picked another change from the same window,
+and 47 had the cause outside the window entirely, where no rule with this window could
+have named it. Not one had the cause inside the window with only one candidate in it:
+when this rule had the culprit among its candidates and still got it wrong, there was
+always more than one candidate. The correlator therefore counts them and says how many
+there were, so an operator is told when the name it gave was one of several. It does not
+silently pick differently, because nothing in a metric series says which of two changes in
+the same window did it.
 """
 from __future__ import annotations
 
@@ -105,8 +108,9 @@ class IncidentCorrelation:
     def attribution_is_ambiguous(self) -> bool:
         """True when a commit was named but it was not the only candidate.
 
-        Measured, not asserted: in ``correlation_trial_summary.json`` every
-        attribution that named the wrong commit is a case where this is true.
+        Measured, not asserted: in ``correlation_trial_summary.json`` this is true of
+        every wrong attribution whose real cause was inside the attribution window, and
+        of 130 of the 156 wrong attributions overall.
         """
         return self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and self.commits_in_window > 1
 
@@ -254,8 +258,8 @@ class IncidentCorrelator:
         if len(candidates) > 1:
             explanation += (
                 f" It is not the only candidate: {len(candidates)} changes landed inside that window, "
-                "and this rule names the closest one. Every attribution this correlator got wrong in "
-                "scripts/correlation_trial.py was a window with more than one change in it."
+                "and this rule names the closest one. Every wrong attribution in "
+                "scripts/correlation_trial.py whose real cause was inside the window looked like this."
             )
         if rollback_target is None:
             explanation += " No earlier commit is known, so no rollback target can be offered."

@@ -45,7 +45,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-343%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-344%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -103,8 +103,8 @@ against its own baseline, and attributes it to the closest commit that landed
 before it. When it cannot attribute the anomaly to anything, it says so and
 offers no rollback. That refusal is a feature, and it has its own tests. When more
 than one change sits inside the attribution window it names the closest and says
-how many others there were, because that is the case every wrong answer it gave
-against the labelled corpus fell into.
+how many others there were, because every wrong answer it gave against the labelled
+corpus that it could have got right was a window like that.
 
 **Shows engineering velocity and spend.** `POST /mcp/tools/get_dora_velocity_report`,
 `POST /mcp/tools/get_pr_bottlenecks` and `POST /mcp/tools/get_aws_cost_anomalies`
@@ -241,15 +241,23 @@ designed it, the corpus found it, and fixing it needs a baseline drawn from a
 window before the onset rather than from the same six points, which is a change to
 the detector rather than a change to the wording.
 
-**The wrong names have a single cause.** Of the 156 attributions that named an
-innocent commit, **156** were windows with more than one change in them: naming
-the closest change is only right when the closest change is the culprit, and this
-repository commits in bursts of three to eight minutes apart. That is why the
-answer now carries `attribution.commits_in_window` and says on screen that it is
-one of several. It does not silently pick differently, because nothing in a metric
-series says which of two changes in the same window did it. The disclosure covers
-130 of those 156, and it appears on 35 of the 76 correct namings as well, which is
-what it costs.
+**The wrong names split two ways, and only one of them is the rule's fault.** Of
+the 156 attributions that named an innocent commit, **47** had the real cause
+outside the 60 minute window, where no rule with that window could have named it.
+The other **109** had the cause inside the window and picked a different change
+from the same window. Not one of the 156 had the cause inside the window with only
+one candidate in it: when this rule had the culprit among its candidates and still
+got it wrong, there was always more than one candidate, and this repository commits
+in bursts three to eight minutes apart. That is why the answer now carries
+`attribution.commits_in_window` and says on screen that the name is one of several.
+It does not silently pick differently, because nothing in a metric series says
+which of two changes in the same window did it. The disclosure fires on 130 of the
+156, and on 35 of the 76 correct namings as well, which is what it costs.
+
+The corpus treats every commit in the log as an independently deployable change.
+Real deployments often ship a burst of commits as one release, which would collapse
+several of those candidate sets into a single change and raise the hit rate. This
+is the pessimistic reading of the same log, and it is the one published.
 
 **The false-attribution rate is half a number without the commit density.** An
 anomaly with no cause is attributed exactly when some commit happens to fall in the
@@ -399,7 +407,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 343 passed
+# 344 passed
 ```
 
 ### 3. Start the server
@@ -570,7 +578,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 343 passed
+python -m pytest tests/ -q                                    # 344 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1218 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

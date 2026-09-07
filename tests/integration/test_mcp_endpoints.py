@@ -125,9 +125,9 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
 def test_what_changed_reports_how_many_changes_were_candidates(client):
     """The count the correlation trial argued for has to reach the wire.
 
-    Against the labelled corpus in ``scripts/correlation_trial.py`` every attribution the
-    correlator got wrong was a window holding more than one change, so the number of
-    candidates is part of the answer rather than a detail in a log line.
+    Against the labelled corpus in ``scripts/correlation_trial.py`` every wrong attribution
+    whose real cause was inside the attribution window was a window holding more than one
+    change, so the number of candidates is part of the answer rather than a log line.
     """
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
     attribution = data["attribution"]

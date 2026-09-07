@@ -326,16 +326,45 @@ def test_the_rates_are_computed_over_the_right_denominators(scored):
         assert 0.0 <= rate <= 1.0
 
 
-def test_every_wrong_attribution_had_more_than_one_change_before_the_reading(scored):
-    """The finding the ambiguity disclosure was added for, held to the corpus.
+def test_a_reachable_cause_is_only_missed_when_the_window_held_several_changes(scored):
+    """The finding the ambiguity disclosure was actually added for.
 
-    If a wrong attribution ever appears with nothing between the cause and the reading,
-    the explanation in the README is wrong and this fails rather than aging quietly.
+    An earlier version of this test asserted that a later commit landed between the cause
+    and the reading, which is true of every wrong attribution by construction: the rule
+    names the newest commit at or before the reading, so a wrong name is a later commit.
+    It looked like a finding and was arithmetic, and the README quoted it as one.
+
+    The real property is this: when the cause was inside the attribution window, so the
+    rule could have named it, every miss was a window holding more than one change. A
+    wrong name with the cause in the window and a single candidate would mean the rule
+    fails for some other reason, which nothing here would explain.
     """
     cases, verdicts = scored
-    summary = trial.aggregate(cases, verdicts)
-    block = summary["why_the_wrong_commit_was_named"]
-    assert block["of_which_a_later_commit_landed_before_the_reading"] == block["wrong_commit_attributions"]
+    block = trial.aggregate(cases, verdicts)["why_the_wrong_commit_was_named"]
+
+    assert block["cause_inside_the_window_with_a_single_candidate"] == 0
+    assert (
+        block["cause_inside_the_window_and_more_than_one_candidate"]
+        + block["cause_outside_the_attribution_window"]
+        == block["wrong_commit_attributions"]
+    )
+    assert block["of_which_the_answer_said_it_was_one_of_several"] >= (
+        block["cause_inside_the_window_and_more_than_one_candidate"]
+    ), "the disclosure must cover at least the cases it was added for"
+
+
+def test_the_readme_quotes_the_recorded_split_of_the_wrong_names():
+    """The corrected claim, pinned to the file rather than to a memory of it."""
+    block = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))["why_the_wrong_commit_was_named"]
+    section = README.split("## How often it is right")[1].split("\n## ")[0]
+
+    assert f"the {block['wrong_commit_attributions']} attributions that named an" in section
+    assert f"**{block['cause_outside_the_attribution_window']}** had the real cause" in section
+    assert f"**{block['cause_inside_the_window_and_more_than_one_candidate']}** had the cause inside" in section
+    assert block["cause_inside_the_window_with_a_single_candidate"] == 0
+    assert "Not one of the" in section, (
+        "the README no longer states the zero that makes the disclosure claim true"
+    )
 
 
 # ------------------------------------------------------------------ The README
