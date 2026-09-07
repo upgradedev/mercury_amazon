@@ -79,6 +79,7 @@ import json
 import math
 import platform
 import random
+import statistics
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -239,6 +240,36 @@ def commit_density_per_hour(commits: list[CommitRef]) -> float:
         return 0.0
     span_hours = (commits[-1].committed_at - commits[0].committed_at).total_seconds() / 3600.0
     return round(len(commits) / span_hours, 3) if span_hours > 0 else 0.0
+
+
+def burstiness(commits: list[CommitRef]) -> dict:
+    """Describe the clustering of the stream, because the rates depend on it.
+
+    A rate per hour hides a stream that sits idle for a day and then lands eight commits
+    in ten minutes, which is exactly what a repository worked on in sessions does and
+    exactly what makes "the closest change before the reading" ambiguous. These are the
+    figures the README quotes when it explains the wrong names, so they come from here
+    rather than from a shell one-liner nobody committed.
+    """
+    if len(commits) < 2:
+        return {}
+    ordered = sorted(commits, key=lambda c: c.committed_at)
+    gaps = [
+        (b.committed_at - a.committed_at).total_seconds() / 60.0
+        for a, b in zip(ordered, ordered[1:])
+    ]
+    window = timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+    in_window = [
+        sum(1 for other in ordered if 0 <= (c.committed_at - other.committed_at).total_seconds() <= window.total_seconds())
+        for c in ordered
+    ]
+    return {
+        "median_gap_minutes": round(statistics.median(gaps), 2),
+        "gaps": len(gaps),
+        "gaps_under_the_attribution_window": sum(1 for gap in gaps if gap < DEFAULT_ATTRIBUTION_WINDOW_MINUTES),
+        "mean_commits_in_a_window_ending_at_a_commit": round(statistics.mean(in_window), 2),
+        "max_commits_in_a_window_ending_at_a_commit": max(in_window),
+    }
 
 
 # ------------------------------------------------------------------- The corpus
@@ -731,6 +762,7 @@ def build_summary(args) -> dict:
             "commits_per_hour": commit_density_per_hour(stream),
             "span_start_utc": stream[0].committed_at.isoformat(),
             "span_end_utc": stream[-1].committed_at.isoformat(),
+            "burstiness": burstiness(stream),
             "source": recording.get("source"),
         },
         "scope": (
@@ -756,6 +788,12 @@ def print_report(summary: dict) -> None:
           f"{summary['correlator']['attribution_window_minutes']} minute window), seed {summary['seed']}")
     print(f"  commit stream: {stream['commits_in_stream']} real commits, "
           f"{stream['commits_per_hour']} per hour, recorded at {stream['recorded_at_head']}")
+    burst = stream.get("burstiness") or {}
+    if burst:
+        print(f"    median gap {burst['median_gap_minutes']} minutes, "
+              f"{burst['gaps_under_the_attribution_window']} of {burst['gaps']} gaps under the window, "
+              f"{burst['mean_commits_in_a_window_ending_at_a_commit']} commits in a window on average "
+              f"and {burst['max_commits_in_a_window_ending_at_a_commit']} at the worst")
     print(f"  hit rate, all regressions:            {head['hit_rate_all_regressions']}")
     print(f"    on a fresh look:                    {head['hit_rate_fresh_look']}")
     print(f"    on a late look:                     {head['hit_rate_late_look']}")

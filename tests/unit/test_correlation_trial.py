@@ -367,6 +367,22 @@ def test_the_readme_quotes_the_recorded_split_of_the_wrong_names():
     )
 
 
+def test_the_readme_burstiness_figures_come_from_the_recorded_stream():
+    """The explanation for the wrong names quotes the shape of the commit stream.
+
+    Those four figures are the reason the split above is what it is, so they are held to
+    the recording rather than to a shell one-liner nobody committed.
+    """
+    burst = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))["commit_stream"]["burstiness"]
+    # Normalised, because any of these can be split across a line wrap.
+    section = " ".join(README.split("## How often it is right")[1].split("\n## ")[0].split())
+
+    assert f"is {burst['median_gap_minutes']} minutes" in section
+    assert f"{burst['gaps_under_the_attribution_window']} of its {burst['gaps']} gaps" in section
+    assert f"{burst['mean_commits_in_a_window_ending_at_a_commit']} commits on average" in section
+    assert f"and {burst['max_commits_in_a_window_ending_at_a_commit']} at the worst" in section
+
+
 # ------------------------------------------------------------------ The README
 
 

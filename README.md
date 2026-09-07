@@ -45,7 +45,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-344%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-345%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -247,8 +247,10 @@ outside the 60 minute window, where no rule with that window could have named it
 The other **109** had the cause inside the window and picked a different change
 from the same window. Not one of the 156 had the cause inside the window with only
 one candidate in it: when this rule had the culprit among its candidates and still
-got it wrong, there was always more than one candidate, and this repository commits
-in bursts three to eight minutes apart. That is why the answer now carries
+got it wrong, there was always more than one candidate. This repository commits in
+bursts: the median gap between commits in the recorded stream is 20.58 minutes, 42
+of its 58 gaps are under an hour, and a 60 minute window ending on a commit holds
+2.78 commits on average and 9 at the worst. That is why the answer now carries
 `attribution.commits_in_window` and says on screen that the name is one of several.
 It does not silently pick differently, because nothing in a metric series says
 which of two changes in the same window did it. The disclosure fires on 130 of the
@@ -407,7 +409,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 344 passed
+# 345 passed
 ```
 
 ### 3. Start the server
@@ -578,7 +580,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 344 passed
+python -m pytest tests/ -q                                    # 345 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1218 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
