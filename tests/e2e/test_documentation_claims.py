@@ -505,3 +505,295 @@ def test_the_governance_overhead_percentage_is_the_arithmetic_of_the_recorded_ru
     assert float(stated.group(4)) == pytest.approx(
         governance["mean_ms"] / cheapest * 100.0, abs=0.01
     ), "the stated overhead is not the quotient of the two numbers beside it"
+
+
+# ------------------------------------------ The suite's own runtime, which drifted
+
+# This is the claim that did not reproduce. The README published "24.8 to 25.7
+# seconds" for `python -m pytest tests/ -q`; three readers re-timed it on the machine
+# it was measured on and every one of them landed 35 to 90 percent above that ceiling,
+# because the number was typed when the suite was a third of its current size and
+# nothing re-measured it afterwards. The same paragraph also carried a second, smaller
+# figure that contradicted the first two lines above it.
+#
+# The runtime is now recorded by scripts/time_test_suite.py, exactly as the benchmark
+# and coverage numbers are, and these tests compare the README against that record.
+# Measuring inside a test would mean running the suite from inside the suite.
+
+TIMING_PATH = REPO_ROOT / "suite_timing_summary.json"
+
+
+def _live_prose(text: str) -> str:
+    """The document with code fences and inline code removed, whitespace normalised.
+
+    A figure inside backticks is a quotation. A figure in the prose is a claim. Only
+    claims are checked against the recorded measurement, which is what lets the
+    retired figures stay on the page as the record of a correction.
+    """
+    without_fences = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    return " ".join(re.sub(r"`[^`]*`", " ", without_fences).split())
+
+
+def _timing() -> dict:
+    """The recorded measurement, or a skip that says how to produce one.
+
+    A skip rather than a failure, and only when the file is absent: the measuring
+    script refuses to time a red suite, so a hard failure here would mean the record
+    could never be created in the first place. Readiness gate G1 fails while the file
+    is missing, which is where that absence is reported instead.
+    """
+    if not TIMING_PATH.exists():
+        pytest.skip(
+            "suite_timing_summary.json is missing. Run `python scripts/time_test_suite.py`; "
+            "the README's Quickstart figure is compared against it."
+        )
+    return json.loads(TIMING_PATH.read_text(encoding="utf-8"))
+
+
+def _session_low(session: dict) -> float:
+    return min(v for k, v in session.items() if k.endswith("_min_seconds") and v is not None)
+
+
+def _session_high(session: dict) -> float:
+    return max(v for k, v in session.items() if k.endswith("_max_seconds") and v is not None)
+
+
+def test_every_runtime_range_in_every_document_matches_the_recorded_measurement():
+    """Every one of them, in every tracked document, not the first one in the README.
+
+    The original defect was two paragraphs of the same README quoting different
+    figures for the same command, so a test that checked one occurrence would have
+    read straight past it. Whitespace is normalised first because both of the
+    original claims were split across a line wrap.
+    """
+    recorded = _timing()
+    allowed = {(recorded["min_seconds"], recorded["max_seconds"])}
+    previous = recorded.get("previous_measurement")
+    if previous:
+        allowed.add((_session_low(previous), _session_high(previous)))
+
+    seen = 0
+    for path in MARKDOWN_FILES:
+        text = _live_prose(path.read_text(encoding="utf-8"))
+        for low, high in re.findall(r"(\d+(?:\.\d+)?) to (\d+(?:\.\d+)?) seconds", text):
+            seen += 1
+            assert (float(low), float(high)) in allowed, (
+                f"{path.name} publishes {low} to {high} seconds for the test suite. The "
+                f"recorded sessions are {sorted(allowed)}. Re-run "
+                f"`python scripts/time_test_suite.py` and republish what it prints"
+            )
+    assert seen >= 2, (
+        "the Quickstart and the timing section both have to carry the figure; "
+        f"only {seen} runtime ranges were found across the tracked documents"
+    )
+
+
+def test_the_recorded_runtime_belongs_to_the_suite_this_repository_ships():
+    """The pin that stops it drifting again.
+
+    A runtime is a measurement of a particular suite. Add a test and the recorded
+    figure describes a suite that no longer exists, so it must be re-measured rather
+    than left to age the way the last one did.
+    """
+    recorded = _timing()
+    badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
+    assert badge, "the README has no test count badge"
+    assert recorded["tests_collected"] == int(badge.group(1)), (
+        f"the runtime was measured over {recorded['tests_collected']} tests and this suite "
+        f"now has {badge.group(1)}. Re-run `python scripts/time_test_suite.py`"
+    )
+
+
+def test_the_timing_record_says_what_it_timed_and_where():
+    recorded = _timing()
+    assert recorded["measured_by_command"] == "python scripts/time_test_suite.py"
+    assert recorded["equivalent_command"] == "python -m pytest tests/ -q"
+    assert recorded["measured_at_utc"]
+    assert "CPython" in recorded["machine"], "the measurement machine is not named"
+    assert "wall clock" in recorded["note"].lower()
+    assert len(recorded["runs"]) >= 3, "a range needs at least three runs behind it"
+    # Every run records its own exit code and failure count, and the record says
+    # whether the suite was green while it was timed. That last flag cannot be
+    # asserted here: the measuring script refuses to time a red suite, so a test
+    # demanding a green record would be a test no record could ever satisfy after a
+    # suite change. The refusal lives in scripts/time_test_suite.py, which is the only
+    # place that can enforce it without deadlocking against itself.
+    assert "bootstrap" in recorded, "the record does not say whether the suite was green"
+    for run in recorded["runs"]:
+        assert "exit_code" in run and "tests_failed" in run
+
+
+def test_the_published_range_spans_more_than_one_named_condition():
+    """A single-condition figure reads as a ceiling, and that is how this one failed.
+
+    Three readers on three machine states got three different answers. So the record
+    has to carry a loaded run as well as quiet ones, and the README has to name the
+    machine, or the next reader with a browser open sees the same defect again.
+    """
+    recorded = _timing()
+    conditions = {run["condition"] for run in recorded["runs"]}
+    assert conditions == {"quiet", "loaded"}, (
+        f"the record holds only {sorted(conditions)} runs; the published figure must span "
+        "a condition where the machine was busy, measured rather than guessed"
+    )
+    assert recorded["machine"] in README, \
+        "the README does not name the machine the runtime was measured on"
+    assert "moves with machine load" in README, \
+        "the README presents the runtime as a constant, which is what failed before"
+    assert f"{recorded['loaded_max_seconds']} seconds" in README, (
+        f"the README does not publish the loaded run at {recorded['loaded_max_seconds']} s, "
+        "so the quiet range reads as a ceiling"
+    )
+    workers = max(run["background_cpu_workers"] for run in recorded["runs"]
+                  if run["condition"] == "loaded")
+    assert f"{workers} CPU-saturating background processes" in README, \
+        "the README does not say how much background load produced the high figure"
+
+
+def test_the_readme_publishes_how_its_own_runtime_moved_between_sessions():
+    """The record keeps the session it replaced, and the README prints both.
+
+    Replacing a figure that failed to reproduce with a fresh one and saying nothing
+    is the same mistake in a newer coat. The measuring script therefore carries the
+    previous session's headline forward into the file it writes, and this pins the
+    README to it.
+    """
+    recorded = _timing()
+    previous = recorded.get("previous_measurement")
+    if not previous:
+        pytest.skip("no earlier measurement session has been recorded yet")
+    low, high = _session_low(previous), _session_high(previous)
+    assert f"{low} to {high} seconds" in " ".join(README.split()), (
+        f"the README does not say that the previous session measured {low} to {high} s. "
+        "A number that is quietly re-rolled is indistinguishable from a number that was chosen."
+    )
+
+
+#: The figures that did not reproduce, and the clause that contradicted them two lines
+#: later in the same paragraph. They may appear in the documentation only as quoted,
+#: retired text, because deleting them silently would hide that the number moved.
+RETIRED_TIMING_CLAIMS = ["24.8 to 25.7 seconds", "11 to 18 seconds"]
+
+
+@pytest.mark.parametrize("stale", RETIRED_TIMING_CLAIMS)
+def test_a_retired_timing_claim_is_quoted_as_retired_and_never_stated_as_live(stale):
+    """Both halves matter.
+
+    Quietly re-rolling a number that failed to reproduce is the failure mode this
+    repository is trying not to have, so the old figure has to stay on the page. It
+    also must not read as a live claim, so it may live only inside backticks, which
+    is what ``_live_prose`` strips before any figure is checked.
+    """
+    for path in MARKDOWN_FILES:
+        assert stale not in _live_prose(path.read_text(encoding="utf-8")), (
+            f"{path.name} states the retired timing claim {stale!r} as though it were "
+            "current. Quote it in backticks inside the retraction instead."
+        )
+    assert stale in README, (
+        f"the README no longer records that it once published {stale!r}. The correction "
+        "is part of the evidence, not something to tidy away."
+    )
+
+
+def test_the_readme_says_out_loud_that_its_timing_claim_failed_to_reproduce():
+    retraction = README.lower()
+    assert "did not reproduce" in retraction, \
+        "the README does not admit that its published runtime failed to reproduce"
+    assert "contradicted" in retraction, \
+        "the README does not record that the same paragraph contradicted itself"
+
+
+# ---------------------------------- Counts that describe a file, checked against it
+
+def _denial_reasons() -> set[str]:
+    source = (REPO_ROOT / "tests" / "integration" / "test_rollback_authorization.py").read_text(
+        encoding="utf-8")
+    return set(re.findall(r'denial_reason"\]\s*==\s*"(\w+)"', source))
+
+
+def test_every_stated_denial_reason_count_matches_the_tests_that_assert_them():
+    """Two documents said eight. The auditor counts nine, and so does this.
+
+    The count is written in prose in two places and computed in a third, which is the
+    arrangement that produced the drift. Now the prose is compared against the count.
+    """
+    counted = len(_denial_reasons())
+    words = {8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
+    for path in MARKDOWN_FILES:
+        text = path.read_text(encoding="utf-8")
+        for stated in re.findall(r"(\d+|[a-z]+) (?:distinct |rollback )*denial reasons?", text):
+            number = int(stated) if stated.isdigit() else \
+                next((k for k, v in words.items() if v == stated), None)
+            if number is None:
+                continue
+            assert number == counted, (
+                f"{path.name} says {stated} denial reasons, "
+                f"tests/integration/test_rollback_authorization.py asserts {counted}"
+            )
+    assert words[counted] in (REPO_ROOT / "docs" / "PERSONA_REVIEW.md").read_text(encoding="utf-8")
+
+
+# ------------------------------------------- The persona review the I gates read
+
+PERSONA_REVIEW = (REPO_ROOT / "docs" / "PERSONA_REVIEW.md").read_text(encoding="utf-8")
+
+
+def _persona_finding_rows() -> list[list[str]]:
+    rows = []
+    for line in PERSONA_REVIEW.splitlines():
+        if re.match(r"^\|\s*[PK][0-9]{2}-[0-9]+\s*\|", line) or re.match(r"^\|\s*K-[0-9]+\s*\|", line):
+            rows.append([cell.strip() for cell in line.strip().strip("|").split("|")])
+    return rows
+
+
+def test_the_persona_review_counts_match_its_own_findings_table():
+    """The document states how many findings it holds and how many failed. Count them."""
+    rows = _persona_finding_rows()
+    stated = re.search(r"\*\*(\d+) of the (\d+) findings are failures\*\*", PERSONA_REVIEW)
+    assert stated, "the persona review no longer states its failure count"
+    failures = [row for row in rows if row[3] == "FAIL"]
+    assert int(stated.group(2)) == len(rows), \
+        f"the document claims {stated.group(2)} findings and carries {len(rows)}"
+    assert int(stated.group(1)) == len(failures), \
+        f"the document claims {stated.group(1)} failures and carries {len(failures)}"
+
+
+def test_the_persona_review_names_no_person_and_promises_no_endorsement():
+    """The lenses are internal roles operated by the project team.
+
+    Naming the real people the internal instrument anchors its lenses to would read,
+    in a submitted repository, as a claim that those people reviewed this entry. None
+    of them has seen it.
+    """
+    assert "Nobody from Amazon reviewed this repository" in PERSONA_REVIEW
+    assert "They are not people" in PERSONA_REVIEW
+    titles = ["Sr. UX Designer", "Sr. Recruiting Manager", "Bar Raiser"]
+    for title in titles:
+        assert title not in PERSONA_REVIEW, \
+            f"the persona review carries {title!r}, which belongs to a real person"
+
+
+def test_the_persona_review_admits_what_it_could_not_close():
+    open_questions = PERSONA_REVIEW.split("## 4. What this review did not answer")[1]
+    for expected in ["APK", "television", "deployment of this commit"]:
+        assert expected in open_questions, \
+            f"the review no longer records {expected!r} as an open question"
+
+
+def test_no_document_commits_the_workspace_coordination_file():
+    """The protocol forbids it, and the point of the restatement is that it is not needed."""
+    assert not (REPO_ROOT / "STATE.md").exists(), \
+        "a workspace coordination file has been committed into this repository"
+    assert not (REPO_ROOT / "LOG.md").exists()
+
+
+def test_the_readme_points_a_clone_at_the_review_the_gates_read():
+    """Evidence a reader cannot find is evidence a reader does not have.
+
+    The whole point of restating the review inside the repository is that somebody
+    holding only a clone can check the four gates that depend on it, so the README
+    has to name the file.
+    """
+    assert "docs/PERSONA_REVIEW.md" in README,         "the README does not tell a reader where the persona review lives"
+    assert "in a clone" in README.lower() or "from a bare clone" in README.lower(),         "the README does not say that the readiness score is now reproducible from a clone"
+

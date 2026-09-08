@@ -95,7 +95,7 @@
   "regressions_whose_cause_was_inside_the_attribution_window": 340,
   "regressions_whose_cause_was_inside_the_window_before_the_onset": 434,
   "unexpected_outcomes": 0,
-  "measured_at_utc": "2026-09-08T06:10:48.659582+00:00",
+  "measured_at_utc": "2026-09-08T07:12:49.012274+00:00",
   "measured_on": "Windows-10-10.0.26200-SP0",
   "python_version": "3.11.0",
   "measured_by_command": "python scripts/correlation_trial.py",

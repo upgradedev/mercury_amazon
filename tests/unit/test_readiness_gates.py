@@ -180,3 +180,189 @@ def test_the_receipt_shape_is_documented_where_a_reader_will_look():
     assert block, "no JSON skeleton for the receipt in docs/FIRE_TV_BUILD.md"
     skeleton = json.loads(block)
     assert set(readiness.FIRETV_RECEIPT_FIELDS) <= set(skeleton)
+
+
+# ------------------------------------------------------------ I1 to I4: the review
+
+# A minimal document that satisfies all four gates. Every test below removes exactly
+# one thing from it and asserts which gate goes red, which is the only way to know the
+# gates are checking what their titles say they check.
+COMPLETE_REVIEW = """# Persona review
+
+Review date: 2026-09-08
+
+| Step | What it asks | Outcome | Evidence |
+|---|---|---|---|
+| 1 | Does a deployed endpoint answer? | PARTIAL | `python ci/readiness.py` |
+| 2 | What is owner-gated and unmet? | OPEN | `python ci/readiness.py` |
+| 3 | Is the track written down? | PASS | `README.md` |
+| 4 | Do the surfaces match the code? | PASS | `tests/e2e/test_documentation_claims.py` |
+
+| Lens | Owner | What it decides | Verdict |
+|---|---|---|---|
+| Sponsor product owner | maintainer, product row | Is the sponsor product load-bearing? | FAIL |
+| UX designer | maintainer, interface row | Can a cold visitor use it? | PASS |
+| Recruiter | maintainer, engineering bar row | Does it clear an engineering bar? | PASS |
+
+| ID | Lens | Finding | Verdict | Evidence |
+|---|---|---|---|---|
+| P01-1 | Sponsor product owner | No APK exists | FAIL | `docs/FIRE_TV_BUILD.md` |
+| P06-1 | UX designer | The hero action is marked | PASS | `docs/index.html` |
+| P06-2 | UX designer | No control is disabled unexplained | PASS | `docs/index.html` |
+| P08-1 | Recruiter | No em dashes in the prose | PASS | `tests/e2e/test_documentation_claims.py` |
+| P08-2 | Recruiter | The domain imports no SDK | PASS | `python ci/readiness.py` |
+"""
+
+
+def _review(text: str = COMPLETE_REVIEW) -> dict[str, tuple[bool, str]]:
+    return readiness.evaluate_persona_review_gates(text, _exists)
+
+
+def test_a_complete_review_passes_all_four_gates():
+    outcomes = _review()
+    assert [gid for gid, (passed, _) in outcomes.items() if not passed] == []
+    assert "2026-09-08" in outcomes["I4"][1]
+    assert "Sponsor product owner FAIL" in outcomes["I2"][1]
+
+
+def test_the_gates_read_the_document_this_repository_ships():
+    """The gates must point at a file a clone receives, not at a workspace file."""
+    assert readiness.PERSONA_REVIEW_DOC == "docs/PERSONA_REVIEW.md"
+    assert (REPO_ROOT / readiness.PERSONA_REVIEW_DOC).is_file()
+    for gate_id in ("I1", "I2", "I3", "I4"):
+        assert gate_id not in readiness.CI_EXEMPT, (
+            f"{gate_id} reads a file inside this repository now, so it must be able to "
+            "fail the build rather than sit on the exemption list"
+        )
+
+
+def test_the_audit_reports_all_four_as_passing_from_inside_the_repository():
+    """End to end, and with no external-evidence marker on any of the four."""
+    results = {r.gate_id: r for r in readiness.audit_project()}
+    for gate_id in ("I1", "I2", "I3", "I4"):
+        assert results[gate_id].passed is True, results[gate_id].message
+        assert results[gate_id].external_evidence is False, (
+            f"{gate_id} still claims evidence from outside this repository"
+        )
+        assert readiness.PERSONA_REVIEW_DOC in results[gate_id].message
+
+
+def test_a_missing_document_fails_all_four():
+    outcomes = _review("")
+    assert all(not passed for passed, _ in outcomes.values())
+    assert all("is missing" in message for _, message in outcomes.values())
+
+
+def test_fewer_than_four_procedure_steps_fails_i1():
+    trimmed = COMPLETE_REVIEW.replace(
+        "| 4 | Do the surfaces match the code? | PASS | `tests/e2e/test_documentation_claims.py` |\n", "")
+    outcomes = _review(trimmed)
+    assert outcomes["I1"][0] is False
+    assert "3 procedure steps" in outcomes["I1"][1]
+
+
+def test_a_procedure_step_with_no_outcome_fails_i1():
+    outcomes = _review(COMPLETE_REVIEW.replace(
+        "| 3 | Is the track written down? | PASS |", "| 3 | Is the track written down? |  |"))
+    assert outcomes["I1"][0] is False
+    assert "no outcome or no evidence" in outcomes["I1"][1]
+
+
+def test_an_invented_verdict_is_not_a_verdict():
+    outcomes = _review(COMPLETE_REVIEW.replace(
+        "| 1 | Does a deployed endpoint answer? | PARTIAL |",
+        "| 1 | Does a deployed endpoint answer? | LOOKS FINE |"))
+    assert outcomes["I1"][0] is False
+
+
+@pytest.mark.parametrize("lens", readiness.PERSONA_LENSES)
+def test_dropping_any_lens_fails_i2(lens):
+    outcomes = _review("\n".join(
+        line for line in COMPLETE_REVIEW.splitlines() if not line.startswith(f"| {lens} |")))
+    assert outcomes["I2"][0] is False, f"{lens} could be deleted without failing I2"
+    assert lens in outcomes["I2"][1]
+
+
+def test_a_lens_with_no_finding_of_its_own_fails_i2():
+    """A verdict in the ownership table with nothing behind it is not a review."""
+    outcomes = _review("\n".join(
+        line for line in COMPLETE_REVIEW.splitlines() if not line.startswith("| P01-1 |")))
+    assert outcomes["I2"][0] is False
+    assert "Sponsor product owner" in outcomes["I2"][1]
+
+
+def test_a_finding_attributed_to_a_lens_nobody_owns_fails_i3():
+    outcomes = _review(COMPLETE_REVIEW + (
+        "| P99-1 | Passing Stranger | Something | PASS | `README.md` |\n"))
+    assert outcomes["I3"][0] is False
+    assert "Passing Stranger" in outcomes["I3"][1]
+
+
+def test_an_empty_owner_cell_fails_i3():
+    outcomes = _review(COMPLETE_REVIEW.replace("| UX designer | maintainer, interface row |",
+                                               "| UX designer |  |"))
+    assert outcomes["I3"][0] is False
+
+
+def test_fewer_than_five_findings_fails_i4():
+    outcomes = _review("\n".join(
+        line for line in COMPLETE_REVIEW.splitlines() if not line.startswith("| P08-2 |")))
+    assert outcomes["I4"][0] is False
+    assert "records 4 findings" in outcomes["I4"][1]
+
+
+def test_an_undated_review_fails_i4():
+    outcomes = _review(COMPLETE_REVIEW.replace("Review date: 2026-09-08", ""))
+    assert outcomes["I4"][0] is False
+    assert "no review date" in outcomes["I4"][1]
+
+
+def test_a_finding_citing_a_file_that_is_not_there_fails_i4():
+    """The citation is a claim about a file. The gate opens the file."""
+    outcomes = _review(COMPLETE_REVIEW.replace(
+        "| P08-2 | Recruiter | The domain imports no SDK | PASS | `python ci/readiness.py` |",
+        "| P08-2 | Recruiter | The domain imports no SDK | PASS | `tests/unit/test_nothing.py` |"))
+    assert outcomes["I4"][0] is False
+    assert "tests/unit/test_nothing.py" in outcomes["I4"][1]
+
+
+def test_a_finding_with_no_evidence_at_all_fails_i4():
+    outcomes = _review(COMPLETE_REVIEW.replace(
+        "| P06-1 | UX designer | The hero action is marked | PASS | `docs/index.html` |",
+        "| P06-1 | UX designer | The hero action is marked | PASS |  |"))
+    assert outcomes["I4"][0] is False
+    assert "P06-1" in outcomes["I4"][1]
+
+
+def test_the_gates_do_not_reproduce_the_internal_instrument():
+    """The review instrument is a workspace document and is not part of a submission.
+
+    A gate that string-matched its filename would also be pressuring whoever writes the
+    repository-local restatement to paste that filename in to satisfy the match. Neither
+    the auditor nor the shipped document may carry it.
+    """
+    auditor = (REPO_ROOT / "ci" / "readiness.py").read_text(encoding="utf-8")
+    document = (REPO_ROOT / readiness.PERSONA_REVIEW_DOC).read_text(encoding="utf-8")
+    for internal in ("00-RUNBOOK.md", "00-ROSTER.md"):
+        assert internal not in auditor, f"the auditor names the internal instrument {internal}"
+        assert internal not in document, f"the shipped review names the internal instrument {internal}"
+
+
+def test_the_shipped_review_claims_no_endorsement():
+    """The lenses are internal roles. A reader must not be able to read them as judges."""
+    document = (REPO_ROOT / readiness.PERSONA_REVIEW_DOC).read_text(encoding="utf-8")
+    assert "Nobody from Amazon reviewed this repository" in document
+    assert "They are not people" in document
+
+
+def test_the_gates_no_longer_read_anything_above_this_repository():
+    """The defect these gates carried was the path, not the predicate.
+
+    They read a coordination file two directories up, so they passed on the machine that
+    had it and failed for anyone holding only a clone. Nothing in the auditor may climb
+    out of the checkout for I-section evidence again.
+    """
+    auditor = (REPO_ROOT / "ci" / "readiness.py").read_text(encoding="utf-8")
+    section = auditor.split("I: Personas review instrument")[1].split("O: Owner-gated")[0]
+    assert ".." not in section, "the I gates read a path outside this repository again"
+    assert "STATE.md" not in section

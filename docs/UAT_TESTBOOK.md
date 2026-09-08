@@ -70,9 +70,9 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 404 passed |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 440 passed |
 | Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1318 statements |
-| Every rollback denial reason has a failing-input test | Met | 8 distinct reasons asserted in `tests/integration/test_rollback_authorization.py` |
+| Every rollback denial reason has a failing-input test | Met | 9 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | **Not met** | Gate J4 fails: no `firetv_build_receipt.json`, no APK, no device |
 | Verified on a Fire TV device | **Not met** | No hardware run has taken place |

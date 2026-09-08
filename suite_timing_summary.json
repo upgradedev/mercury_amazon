@@ -1,0 +1,67 @@
+{
+  "schema": "mercury.suite_timing/1",
+  "note": "Wall clock around the pytest subprocess, from immediately before it starts to immediately after it exits, which is what a reader with a stopwatch measures. Quiet runs are on an otherwise idle machine. The loaded run is the same command with background CPU workers started and killed by the measuring script, so the published high end was measured rather than guessed. This figure moves with machine load and with the size of the suite; re-run this script after changing either.",
+  "measured_at_utc": "2026-09-08T14:38:49Z",
+  "measured_by_command": "python scripts/time_test_suite.py",
+  "equivalent_command": "python -m pytest tests/ -q",
+  "machine": "Windows 11 (Windows-10-10.0.26200-SP0), CPython 3.11.0",
+  "python_version": "3.11.0",
+  "cpu_count": 8,
+  "bootstrap": false,
+  "tests_collected": 440,
+  "tests_passed": 440,
+  "tests_skipped": 0,
+  "runs": [
+    {
+      "condition": "quiet",
+      "background_cpu_workers": 0,
+      "seconds": 165.78,
+      "tests_passed": 440,
+      "tests_skipped": 0,
+      "tests_failed": 0,
+      "exit_code": 0
+    },
+    {
+      "condition": "quiet",
+      "background_cpu_workers": 0,
+      "seconds": 181.03,
+      "tests_passed": 440,
+      "tests_skipped": 0,
+      "tests_failed": 0,
+      "exit_code": 0
+    },
+    {
+      "condition": "quiet",
+      "background_cpu_workers": 0,
+      "seconds": 132.61,
+      "tests_passed": 440,
+      "tests_skipped": 0,
+      "tests_failed": 0,
+      "exit_code": 0
+    },
+    {
+      "condition": "loaded",
+      "background_cpu_workers": 4,
+      "seconds": 486.63,
+      "tests_passed": 440,
+      "tests_skipped": 0,
+      "tests_failed": 0,
+      "exit_code": 0
+    }
+  ],
+  "quiet_min_seconds": 132.61,
+  "quiet_max_seconds": 181.03,
+  "loaded_min_seconds": 486.63,
+  "loaded_max_seconds": 486.63,
+  "min_seconds": 132.61,
+  "max_seconds": 486.63,
+  "previous_measurement": {
+    "measured_at_utc": "2026-09-08T08:36:50Z",
+    "bootstrap": false,
+    "tests_collected": 440,
+    "quiet_min_seconds": 33.37,
+    "quiet_max_seconds": 37.44,
+    "loaded_min_seconds": 37.0,
+    "loaded_max_seconds": 37.0
+  }
+}

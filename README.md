@@ -39,16 +39,21 @@ python -m src.interfaces.mcp_server
 Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
-secret to its log for you to paste into the cockpit. The test run takes 24.8 to
-25.7 seconds (three wall-clock runs of `python -m pytest tests/ -q` on the
-development machine, timed around the subprocess). The `pip install` before it dominates the total and depends on your
+secret to its log for you to paste into the cockpit. The test run takes 33.37 to
+37.44 seconds on this machine in the quieter of the two recorded measurement
+sessions, and 132.61 to 486.63 seconds in the most recent one, which ran while other
+processes were saturating the CPU. It moves with machine load and with whatever else
+the machine is doing, so read the low figure as a best case rather than as a ceiling.
+Both sessions come from `python scripts/time_test_suite.py`, and
+[Quickstart](#quickstart) names the machine, states the condition of every run, and
+says what the figure used to be. The `pip install` before it dominates the total and depends on your
 network; a clean-environment install here ran past ten minutes, so budget for that
 rather than for a fast one. On PowerShell, set the secret with
 `$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-404%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-440%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -503,12 +508,55 @@ raises rather than reporting success. Firing it for real is an owner action.
 ## Quickstart
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
-rather than guessed: `python -m pytest tests/ -q` takes 24.8 to 25.7 seconds over
-three wall-clock runs, and starting the server and getting an answer on screen is
-immediate after that. It grew from 11 to 18 seconds when the correlation trial and
-the legibility measurement joined the suite, which is what those two cost. The variable is `pip install`, which depends on your
-network. A clean-environment install measured here ran past ten minutes, so it
+rather than guessed. `python -m pytest tests/ -q` took **132.61 to 486.63 seconds**
+across the four runs of the most recent measurement session, and **33.37 to 37.44
+seconds** across the quiet runs of the session before it, on the same machine and
+the same 440-test tree. The gap between those two sessions is machine load, not the
+suite. The latest session ran while other processes on this machine were saturating
+the CPU: a processor-time counter sampled immediately after it
+(`typeperf "\Processor(_Total)\% Processor Time" -sc 5 -si 1`) read 100 percent on
+every one-second sample. The three runs the record labels quiet, meaning no
+background workers of the script's own, landed at 132.61, 165.78 and 181.03
+seconds, and the one at **486.63 seconds** had 4 CPU-saturating background processes
+started and killed by the measuring script on top of whatever else was running. The
+session before it put the same loaded run at 37.0 seconds, inside its own quiet
+range. Starting the server and getting an answer on screen is immediate after the
+suite. The variable before any of this is `pip install`, which depends on your
+network: a clean-environment install measured here ran past ten minutes, so it
 dominates everything else in this section.
+
+Measured on **Windows 11 (Windows-10-10.0.26200-SP0), CPython 3.11.0**, 8 logical
+cores, by `python scripts/time_test_suite.py`. That script times the wall clock
+around the pytest subprocess, which is what a reader with a stopwatch measures, and
+writes every individual run to `suite_timing_summary.json` with its condition, the
+machine, the background load and the collected test count. Readiness gate G1 and
+`tests/e2e/test_documentation_claims.py` both compare the figures in this README
+against that file, and the file records the test count they were measured over, so
+adding a test makes this paragraph fail the build instead of quietly ageing.
+
+**How the figure moved between sessions, published rather than re-rolled.**
+`suite_timing_summary.json` carries the latest session's runs and the previous
+session's headline, so a replaced number leaves a trace instead of vanishing. Every
+session recorded on this tree on 2026-09-08 landed somewhere different. Earlier
+sessions that day are no longer in the shipped record; the one immediately before
+the two it carries measured `40.28 to 74.56 seconds`, with the loaded run slowest,
+and is quoted here rather than claimed. The next measured 33.37 to 37.44 seconds
+across its quiet runs, with the loaded run at 37.0 seconds. The latest, the headline
+above, is the widest by far and was measured on a machine other processes were
+already saturating. The spread between sessions of the same command on the same
+tree is larger than the spread inside any one of them, and the loaded run is not
+reliably the slowest: in the middle session it sat inside the quiet range. That is
+the honest shape of this number, and it is why the range names its runs and their
+conditions instead of implying a constant.
+
+**This is the claim that did not reproduce, and it is worth saying how.** Until
+2026-09-08 this section published `24.8 to 25.7 seconds` and, two lines below it,
+said the suite had grown from `11 to 18 seconds`, a figure that contradicted the one
+above it. Both were typed when the suite was a fraction of its present size, both
+were prose that nothing re-measured, and three readers who re-timed the command on
+this machine all landed well above the published ceiling. Their figures are their own
+measurements and are not reprinted here as this repository's; everything printed above
+is what this repository measured, on the tree that ships, at 440 collected tests.
 
 ### 1. Install
 
@@ -522,7 +570,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 404 passed
+# 440 passed
 ```
 
 ### 3. Start the server
@@ -729,7 +777,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 404 passed
+python -m pytest tests/ -q                                    # 440 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1318 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
@@ -759,6 +807,19 @@ file does not exist, so **J4 fails**, and the published score went down by one.
 `tests/unit/test_readiness_gates.py` drives every missing field through the
 predicate, including the case where it passes, which cannot be reached in this
 checkout because no APK exists.
+
+**The same score in a clone.** Four of these gates, I1 to I4, used to read a
+coordination file that lives in the workspace above this repository. They passed
+here and would have failed for anyone who cloned the repository on its own, so the
+44 above was a number only this machine could reproduce and the audit said so in its
+own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
+persona review in this repository's own voice: the procedure that ran first, the
+three lenses, who owned each row, thirteen findings of which four are failures, and
+the questions nobody could close. The gates check its structure and open every file
+it cites, so deleting a lens or citing a test that is not there turns one of them
+red. `python ci/readiness.py` prints the same 44/53 from a bare clone, and the
+coordination file itself stays out of this repository, where the workspace protocol
+requires it to stay.
 
 ### Data fixtures
 
