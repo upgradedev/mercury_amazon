@@ -5,9 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        The maintainers have not run this on a physical Fire TV device or in the
-        emulator. If you have, this is the most valuable report you can file,
-        whether it worked or not.
+        The maintainers have not run this on a physical Fire TV device, and there
+        is no Fire TV emulator to have run it in. If you have run it on hardware,
+        this is the most valuable report you can file, whether it worked or not.
   - type: input
     id: device
     attributes:

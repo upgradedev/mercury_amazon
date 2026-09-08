@@ -8,17 +8,22 @@ name: Fire TV APK
 # it needs a JDK and the Android SDK. Running it here makes the build result
 # reproducible and checkable by anyone who can open the Actions tab, rather than
 # something the maintainer asserts.
+#
+# It runs on every push to the default branch and on demand from the Actions tab.
+# There is deliberately no paths filter: the first push after this file was
+# written has to produce an APK whatever else that push touches, and a filter
+# that skipped it would leave the repository in the state it is in today, with a
+# workflow that has never executed. The build is a few minutes of runner time.
+#
+# What this workflow proves is that the APK assembles. It does not prove the app
+# runs on a Fire TV: that needs a device, and the receipt gate J4 asks for
+# (firetv_build_receipt.json, written by scripts/write_firetv_receipt.py) is
+# completed by an owner after an adb install and a launch on hardware. The sha256
+# printed below is what that receipt records for the APK this run produced.
 
 on:
   push:
     branches: [master, main]
-    paths:
-      - "app/**"
-      - "*.gradle.kts"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - ".github/workflows/android.yml"
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -53,16 +58,18 @@ jobs:
       - name: Assemble the debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Report what was produced
+      - name: Report what was produced, with the digest the build receipt records
         run: |
           echo "APK files produced by this run:"
           find app/build/outputs -name "*.apk" -print -exec ls -la {} \;
+          echo "sha256 of app-debug.apk (copy into firetv_build_receipt.json via scripts/write_firetv_receipt.py):"
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload the Fire TV APK
         uses: actions/upload-artifact@v4
         with:
           name: mercury-firetv-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
       - name: Upload the unit test report

@@ -16,10 +16,12 @@ running product) both fail, correctly, until a video exists.
 
 ## What a recording would have to show
 
-The Fire TV track requires the product running on a Fire TV device or in the
-official Fire TV emulator. That means the recording cannot be made from a desktop
-browser: it has to show the APK from `.github/workflows/android.yml` installed on
-a device or emulator, driven by a remote or by `adb shell input keyevent`, with
-the D-pad moving focus and the governed rollback being confirmed on screen.
+The Fire TV track requires the product running on a Fire TV device. No Fire TV
+emulator exists and Amazon's own documentation says to test on an actual device
+(`docs/FIRE_TV_BUILD.md` carries the citation), so the recording cannot be made from
+a desktop browser: it has to show the APK from `.github/workflows/android.yml`
+installed on a Fire TV, driven by the remote or by `adb shell input keyevent`, with
+the D-pad moving focus and the governed rollback being confirmed on screen. The
+surface being recorded is a D-pad and a screen; nothing in it listens for speech.
 
 `docs/FIRE_TV_BUILD.md` has the commands to get to that state.
