@@ -95,7 +95,7 @@
   "regressions_whose_cause_was_inside_the_attribution_window": 340,
   "regressions_whose_cause_was_inside_the_window_before_the_onset": 434,
   "unexpected_outcomes": 0,
-  "measured_at_utc": "2026-09-08T05:38:11.720924+00:00",
+  "measured_at_utc": "2026-09-08T06:10:48.659582+00:00",
   "measured_on": "Windows-10-10.0.26200-SP0",
   "python_version": "3.11.0",
   "measured_by_command": "python scripts/correlation_trial.py",
@@ -235,7 +235,9 @@
       "commits_per_hour": 0.405,
       "uncaused_cases": 500,
       "false_attributions": 18,
-      "false_attribution_rate": 0.036
+      "false_attribution_rate": 0.036,
+      "refused_window_too_crowded": 22,
+      "refused_no_candidate": 187
     },
     {
       "commit_stride": 2,
@@ -243,7 +245,9 @@
       "commits_per_hour": 0.206,
       "uncaused_cases": 500,
       "false_attributions": 24,
-      "false_attribution_rate": 0.048
+      "false_attribution_rate": 0.048,
+      "refused_window_too_crowded": 5,
+      "refused_no_candidate": 198
     },
     {
       "commit_stride": 4,
@@ -251,7 +255,9 @@
       "commits_per_hour": 0.103,
       "uncaused_cases": 500,
       "false_attributions": 13,
-      "false_attribution_rate": 0.026
+      "false_attribution_rate": 0.026,
+      "refused_window_too_crowded": 3,
+      "refused_no_candidate": 211
     },
     {
       "commit_stride": 8,
@@ -259,7 +265,9 @@
       "commits_per_hour": 0.055,
       "uncaused_cases": 500,
       "false_attributions": 7,
-      "false_attribution_rate": 0.014
+      "false_attribution_rate": 0.014,
+      "refused_window_too_crowded": 0,
+      "refused_no_candidate": 220
     }
   ]
 }

@@ -53,6 +53,28 @@ def test_a_summary_that_is_not_an_object_is_not_a_measurement(tmp_path):
     assert trial_summary.naming_accuracy(listy)["measured"] is False
 
 
+def test_the_summary_is_cached_for_the_life_of_the_process(tmp_path):
+    """Documents the staleness the cache buys, so it is not found as a surprise.
+
+    A re-run of the trial does not change what a running server reports until it is
+    restarted. That is a deliberate trade: the alternative is reading and parsing a
+    file on every incident request. It is written down here and in the module docstring
+    rather than left for somebody to file as a provenance bug.
+    """
+    path = tmp_path / "summary.json"
+    path.write_text(json.dumps({"cases": 10, "headline": {"naming_precision": 0.5}}), encoding="utf-8")
+    first = trial_summary.naming_accuracy(path)
+    assert first["precision_when_it_names_a_commit"] == 0.5
+
+    path.write_text(json.dumps({"cases": 10, "headline": {"naming_precision": 0.9}}), encoding="utf-8")
+    assert trial_summary.naming_accuracy(path)["precision_when_it_names_a_commit"] == 0.5, (
+        "the cache is no longer holding, so the docstring's warning about needing a "
+        "restart is now wrong and should be removed"
+    )
+    trial_summary._load.cache_clear()
+    assert trial_summary.naming_accuracy(path)["precision_when_it_names_a_commit"] == 0.9
+
+
 def test_the_note_carries_the_denominator_not_only_the_rate():
     """A precision without its sample size is a rate somebody can inflate by naming less."""
     note = trial_summary.naming_accuracy()["note"]

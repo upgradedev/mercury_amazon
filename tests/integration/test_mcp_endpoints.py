@@ -120,13 +120,45 @@ def test_the_metric_behind_a_correlation_is_never_claimed_to_be_live_offline(cli
 def test_an_anchored_simulation_says_it_was_anchored(client):
     """Moving a simulated point to fit a commit must be disclosed, not hidden."""
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
-    if data["offending_commit"] is not None:
-        detail = data["metric_provenance"]["detail"]
-        # Which commit the reading is placed after is itself a choice, so the sentence
-        # has to name the rule that chose it, not merely admit that something moved.
-        assert "placed" in detail
-        assert "alone in its 60 minute attribution window" in detail
-        assert "the commits are real, this metric is not" in detail
+    assert data["offending_commit"] is not None
+    detail = data["metric_provenance"]["detail"]
+    # Which commit the reading is placed after is itself a choice, so the sentence
+    # has to name the rule that chose it, not merely admit that something moved.
+    assert "placed" in detail
+    assert "alone in its 60 minute attribution window" in detail
+    assert "the commits are real, this metric is not" in detail
+
+
+def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(client):
+    """The README's demo table, driven against this checkout's real git log.
+
+    This used to be conditional: the anchored-simulation test above only asserted
+    anything ``if data["offending_commit"] is not None``, so the day checkout-api
+    stopped attributing, the table in the README would have gone stale with the suite
+    still green. It can stop attributing: which commit the fixture anchors to is chosen
+    from the real log, and the log grows every time somebody commits.
+
+    So the verdicts are asserted, not conditioned on. If a burst of commits ever makes
+    the attributing demo unreachable, this fails and the README is corrected rather
+    than quietly wrong.
+    """
+    expected = {
+        "checkout-api": ("ANOMALY_ATTRIBUTED", None),
+        "release-train": ("ANOMALY_WITHOUT_ATTRIBUTION", "WINDOW_TOO_CROWDED"),
+        "search-indexer": ("ANOMALY_WITHOUT_ATTRIBUTION", "NO_CANDIDATE_IN_WINDOW"),
+        "payments-worker": ("NO_ANOMALY", None),
+        "quiet-service": ("INSUFFICIENT_DATA", None),
+    }
+    for service, (verdict, refusal) in expected.items():
+        data = client.post("/mcp/tools/what_changed", json={"service_name": service}).json()
+        assert data["verdict"] == verdict, (
+            f"{service} returned {data['verdict']}, not the {verdict} the README's demo "
+            f"table promises. The fixture anchors to this checkout's real git log, so a "
+            f"burst of commits can move this: fix the anchoring or the table, not this test."
+        )
+        assert data["attribution"]["refusal_reason"] == refusal, service
+        # Only the attributed row may offer a rollback. The refusals must not.
+        assert (data["recommended_action"] is not None) == (verdict == "ANOMALY_ATTRIBUTED"), service
 
 
 def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):

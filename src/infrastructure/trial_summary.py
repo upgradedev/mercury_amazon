@@ -14,6 +14,13 @@ avoid.
 
 When the file is absent or unreadable the accuracy is reported as unknown rather than
 guessed, and the answer says so. A missing measurement is not a good measurement.
+
+The read is cached for the life of the process, because the file only changes when
+somebody re-runs the trial. That has one consequence worth stating rather than
+discovering: **re-running the trial while the server is up does not change the figure
+on screen until the server is restarted.** It is a stale cache, not a provenance bug,
+and the payload always carries the command that produced the number so the two can be
+compared.
 """
 from __future__ import annotations
 

@@ -174,3 +174,84 @@ def test_the_readme_legibility_numbers_match_this_measurement(measurement):
         f"README says the smallest operational text is {operational.group(1)}px, this run "
         f"measured {measurement['smallest_operational_px']}px"
     )
+
+
+def test_the_readme_fold_positions_match_this_measurement(measurement):
+    """The three y positions the README publishes have to come from a run of the script.
+
+    They were published without a pin at first, which in this repository is the whole
+    failure mode: a number in prose drifts the day after it is typed unless something
+    re-runs the command that produced it. These are the positions the fold fix claims,
+    so they are held exactly. They move only if the hero layout moves, which is the
+    change that would make the claim false.
+    """
+    import re
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    fold = measurement["provenance_above_the_fold"]
+
+    quoted = re.search(
+        r"anomaly factor renders at y=(\d+), provenance stamp at y=(\d+), fold at y=(\d+)",
+        readme,
+    )
+    assert quoted, "the README no longer quotes where the figure and the stamp render"
+    assert int(quoted.group(1)) == fold["hero_figure_top_px"], (
+        f"README says the anomaly factor renders at y={quoted.group(1)}, this run measured "
+        f"y={fold['hero_figure_top_px']}"
+    )
+    assert int(quoted.group(2)) == fold["topmost_stamp_top_px"], (
+        f"README says the provenance stamp renders at y={quoted.group(2)}, this run measured "
+        f"y={fold['topmost_stamp_top_px']}"
+    )
+    assert int(quoted.group(3)) == fold["viewport_height_px"]
+
+    stamps = re.search(r"provenance stamps within the first viewport: (\d+) \[(.*?)\]", readme)
+    assert stamps, "the README no longer quotes how many stamps land above the fold"
+    assert int(stamps.group(1)) == fold["stamps_above_the_fold"], (
+        f"README says {stamps.group(1)} stamps land above the fold, this run measured "
+        f"{fold['stamps_above_the_fold']}"
+    )
+    quoted_texts = sorted(part.strip().strip("'\"") for part in stamps.group(2).split(",") if part.strip())
+    assert quoted_texts == fold["stamp_text_above_the_fold"], (
+        f"README says the stamps read {quoted_texts}, this run measured "
+        f"{fold['stamp_text_above_the_fold']}"
+    )
+
+
+def test_the_readme_publishes_the_before_state_of_the_fold_fix(measurement):
+    """The reproduction command has to name a commit that exists and predates the fix.
+
+    The before-and-after is only worth anything if a reader can run the before half.
+    This does not re-run it, which would mean checking out an old page inside a test
+    run; it checks that the sha the README hands them is a real commit in this
+    repository, that the page at that sha has no hero provenance container, and that
+    the current page does. If the fix is ever reverted, the second half fails.
+    """
+    import re
+    import subprocess
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    block = readme.split("**The provenance stamp was below the fold.**")[1].split("```")[1]
+    sha = re.search(r"git show ([0-9a-f]{7,40}):docs/index\.html", block)
+    assert sha, "the README no longer names a commit to reproduce the before state from"
+
+    if not (REPO_ROOT / ".git").exists():
+        pytest.skip("no git checkout to resolve the before-state commit against")
+    # The page carries a multiplication sign, so the console default encoding on the
+    # machine this was written on cannot decode it. Ask for the encoding the file is in.
+    before = subprocess.run(
+        ["git", "show", f"{sha.group(1)}:docs/index.html"],
+        cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=30,
+        encoding="utf-8", errors="replace",
+    )
+    assert before.returncode == 0, (
+        f"the README's before-state command names {sha.group(1)}, which this repository "
+        f"cannot resolve: {before.stderr.strip()[:200]}"
+    )
+    assert 'id="heroSource"' not in before.stdout, (
+        f"{sha.group(1)} already carries the fix, so it is not a before state"
+    )
+    assert 'id="heroSource"' in (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    # And the current page really does land a stamp above the fold, so the pair is a
+    # before and an after rather than two befores.
+    assert measurement["provenance_above_the_fold"]["stamps_above_the_fold"] >= 1

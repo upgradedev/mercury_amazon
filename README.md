@@ -48,7 +48,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-400%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-404%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -374,18 +374,21 @@ in the 60 minutes before the onset, so the rate is a joint property of the windo
 the gate and the stream. `--commit-stride` thins the recorded log and the report
 sweeps it:
 
-| Commits in the stream | Commits per hour | False attribution rate |
-|---|---|---|
-| 59 (every commit) | 0.405 | 3.6% |
-| 30 (every 2nd) | 0.206 | 4.8% |
-| 15 (every 4th) | 0.103 | 2.6% |
-| 8 (every 8th) | 0.055 | 1.4% |
+| Commits in the stream | Commits per hour | False attribution rate | Refused as crowded | Refused as empty |
+|---|---|---|---|---|
+| 59 (every commit) | 0.405 | 3.6% | 22 | 187 |
+| 30 (every 2nd) | 0.206 | 4.8% | 5 | 198 |
+| 15 (every 4th) | 0.103 | 2.6% | 3 | 211 |
+| 8 (every 8th) | 0.055 | 1.4% | 0 | 220 |
 
-That column is no longer monotonic, and the reason is the gate rather than noise:
-thinning a dense stream turns crowded windows, which are refused, into single
-candidate windows, which are named. Thinning it further empties the windows
-altogether. On a stream as dense as this repository's, the crowding gate is doing
-most of the refusing; on a sparser one, the window itself is.
+That rate is no longer monotonic in the density, and the last two columns are there
+because the reason is a claim about mechanism rather than about noise, so it should
+be checkable rather than plausible. Thinning a dense stream turns crowded windows,
+which are refused, into single-candidate windows, which are named: the crowded
+refusals collapse from 22 to 5 between the first two rows, and that is where the
+rate rises. Thinning further empties the windows instead, the crowded refusals reach
+zero and the rate falls. On a stream as dense as this repository's the crowding gate
+is doing most of the refusing; on a sparser one the window itself is.
 
 **What this trial is not.** Not a field trial, and not a claim about production.
 No real error metric appears in it, the noise model and the severity spread are
@@ -519,7 +522,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 400 passed
+# 404 passed
 ```
 
 ### 3. Start the server
@@ -626,7 +629,7 @@ overwrites `docs/index.html` and then throws that copy away, so commit or stash
 anything uncommitted in it first.
 
 ```bash
-git show 1f705a9:docs/index.html > docs/index.html   # the commit before the fix
+git show 1f705a9:docs/index.html > docs/index.html   # the page before the type scale fix
 python scripts/measure_legibility.py
 #   smallest rendered text anywhere: 17.3px (floor 24px)
 #   readings under the floor: 155 of 200
@@ -658,7 +661,7 @@ the fold. Reproduce the failure on a clean checkout, which overwrites the page a
 then throws the copy away, so commit or stash anything uncommitted in it first:
 
 ```bash
-git show 455f60b:docs/index.html > docs/index.html   # the commit before the fix
+git show 455f60b:docs/index.html > docs/index.html   # the page before the fold fix
 python scripts/measure_legibility.py
 #   anomaly factor renders at y=274, provenance stamp at y=None, fold at y=1080
 #   provenance stamps within the first viewport: 0 []
@@ -726,7 +729,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 400 passed
+python -m pytest tests/ -q                                    # 404 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1318 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

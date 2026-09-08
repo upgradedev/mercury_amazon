@@ -70,7 +70,7 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 400 passed |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 404 passed |
 | Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1318 statements |
 | Every rollback denial reason has a failing-input test | Met | 8 distinct reasons asserted in `tests/integration/test_rollback_authorization.py` |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |

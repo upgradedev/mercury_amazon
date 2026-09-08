@@ -928,6 +928,13 @@ def density_sweep(
             "uncaused_cases": len(cases),
             "false_attributions": false_attributions,
             "false_attribution_rate": _rate(false_attributions, len(cases)),
+            # The rate stopped being monotonic in the density when the crowding gate
+            # landed, and the reason is a claim about mechanism rather than about noise:
+            # thinning turns crowded windows, which are refused, into single-candidate
+            # windows, which are named, before it empties them altogether. These two
+            # counts are what makes that checkable instead of plausible.
+            "refused_window_too_crowded": sum(1 for v in verdicts if v.refusal == "WINDOW_TOO_CROWDED"),
+            "refused_no_candidate": sum(1 for v in verdicts if v.refusal == "NO_CANDIDATE_IN_WINDOW"),
         })
     return rows
 
@@ -1068,7 +1075,9 @@ def print_report(summary: dict) -> None:
     for row in summary["density_sweep"]:
         print(f"    stride {row['commit_stride']}: {row['commits_in_stream']:>3} commits, "
               f"{row['commits_per_hour']:>6} per hour -> false attribution rate "
-              f"{row['false_attribution_rate']}")
+              f"{row['false_attribution_rate']} "
+              f"(refused {row['refused_window_too_crowded']} crowded, "
+              f"{row['refused_no_candidate']} empty)")
 
 
 def _gate(value: str) -> int | None:
