@@ -1,26 +1,30 @@
-# Mercury: when not to blame a deploy, and a governed rollback
+# Mercury: when a deploy cannot be named, and a governed rollback
 
-> **Mercury tells an on-call engineer when not to blame a deployment, and refuses to name one unless exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
+> **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
 ```mermaid
 flowchart LR
     Q["Someone asks:<br/>what broke?"]
     Q --> M["1. What broke<br/>the error rate against<br/>a baseline taken from<br/>before the spike started"]
     M --> C["2. Can any one change<br/>be blamed for it?"]
-    C -.->|"reading is inside baseline<br/>(99.5% quiet on healthy series)"| N["Do not revert anything.<br/>Mercury names no commit<br/>and offers no rollback"]
-    C -.->|"no deploy landed before the onset<br/>(62.0% of exogenous spikes)"| N
+    C -.->|"reading is inside baseline<br/>(99.5% quiet on healthy series)"| S["Nothing needs reverting.<br/>The only verdict that<br/>may say so"]
+    C -.->|"no deploy landed before the onset<br/>(62.0% of exogenous spikes)"| N["Cannot attribute, and says why.<br/>Names no commit, offers no rollback,<br/>and does not call any deploy innocent"]
     C -.->|"more than one change landed<br/>(239 of 600 regressions)"| N
     C ==>|"exactly one change landed"| R["3. Name it, and stage a<br/>governed rollback behind<br/>four conditions"]
 ```
 
 **The dotted paths are the product.** Against 1160 labelled incidents, this
 correlator sees an anomaly and names nobody 81.1% of the time, and that refusal is
-the answer an on-call engineer can act on: do not revert anything, this is not a
-deploy. When it does name a change, the change it names is the one that caused the
-reading 52.2% of the time over 113 namings. That is a coin toss, it is published on
-the screen next to the name, and it is why naming is the smaller half of this
-README. The numbers are in [How often it is right](#how-often-it-is-right), which
-is the least flattering section in this file and the one to read first.
+stated as what it is: Mercury cannot attribute this to a change, and here is why. It
+is never stated as proof that a deploy did not cause it, because an empty window says
+nothing about a change that landed outside it and a crowded window says nothing about
+which of its changes did it. The only verdict that says nothing needs reverting is the
+one where the reading is inside its own baseline. When it does name a change, the
+change it names is the one that caused the reading 52.2% of the time over 113
+namings. That is a coin toss, it is published on the screen next to the name, and it
+is why naming is the smaller half of this README. The numbers are in
+[How often it is right](#how-often-it-is-right), which is the least flattering
+section in this file and the one to read first.
 
 Mercury answers on load. The badge saying whether a number was read live or served
 from a recording renders inside the incident card next to the number itself, and
@@ -46,14 +50,17 @@ processes were saturating the CPU. It moves with machine load and with whatever 
 the machine is doing, so read the low figure as a best case rather than as a ceiling.
 Both sessions come from `python scripts/time_test_suite.py`, and
 [Quickstart](#quickstart) names the machine, states the condition of every run, and
-says what the figure used to be. The `pip install` before it dominates the total and depends on your
+says what the figure used to be. Both were measured over 440 collected tests; the
+suite now collects 507 tests and a re-measure on an idle machine is pending,
+because this machine is loaded again and a loaded measurement is what the record
+exists to avoid. The `pip install` before it dominates the total and depends on your
 network; a clean-environment install here ran past ten minutes, so budget for that
 rather than for a fast one. On PowerShell, set the secret with
 `$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-440%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-507%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -98,13 +105,14 @@ asset in this repository is the engine that answers it, scored against a labelle
 corpus rather than demonstrated once.
 
 Scoring it changed what this product claims. The engine's reliable answer is the
-negative one. It stays quiet on 199 of 200 healthy series, refuses outright on 60
-of 60 telemetry gaps, and on a real anomaly it declines to name a change 81.1% of
-the time, because the hour before the spike usually holds either no change or
-several. Those are the answers an on-call engineer can act on at three in the
-morning: do not revert anything yet. Naming one change is the smaller capability,
-it is right about half the times it fires, and Mercury says so on the screen at the
-moment somebody would act on it.
+refusal. It stays quiet on 199 of 200 healthy series, refuses outright on 60 of 60
+telemetry gaps, and on a real anomaly it declines to name a change 81.1% of the
+time, because the hour before the spike usually holds either no change or several.
+Each refusal says which of those it was, and says in the same sentence what it is
+not: Mercury has no way to rule a deploy out, so a refusal is never rendered as a
+deploy having been cleared, and rolling back on a refusal would be a guess. Naming
+one change is the smaller capability, it is right about half the times it fires, and
+Mercury says so on the screen at the moment somebody would act on it.
 
 The screen is a delivery choice, not the product. Mercury renders on a Fire TV in
 a room, and on a laptop browser, from the same HTTP surface and the same page: the
@@ -121,7 +129,10 @@ before that step started. It names one only when exactly one landed there. When
 none landed it says so; when several landed it says how many and names none of
 them, because nothing in a metric series says which of two changes did it. Both
 refusals are the product rather than a fallback, they have their own tests, and
-they are the two most common answers it gives.
+they are the two most common answers it gives. Both are shipped as refusals:
+`attribution.refusal_statement` says Mercury cannot attribute and why,
+`attribution.nothing_to_revert` is true only when the reading is inside its
+baseline, and neither is ever rendered as proof that a deploy is innocent.
 
 **Shows engineering velocity and spend.** `POST /mcp/tools/get_dora_velocity_report`,
 `POST /mcp/tools/get_pr_bottlenecks` and `POST /mcp/tools/get_aws_cost_anomalies`
@@ -185,9 +196,9 @@ and every machine reads the same as this one.
 | Press | Verdict | What it shows |
 |---|---|---|
 | `checkout-api` | `ANOMALY_ATTRIBUTED` | A spike four minutes after a commit that is alone in its window. Names the commit, offers the rollback, and prints the precision that naming was measured at |
-| `release-train` | `ANOMALY_WITHOUT_ATTRIBUTION`, `WINDOW_TOO_CROWDED` | A spike after a burst of changes. Calls it an anomaly, then refuses to name any one of them and offers no rollback |
-| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION`, `NO_CANDIDATE_IN_WINDOW` | A spike placed four hours after the newest commit, outside the 60 minute attribution window. Calls it an anomaly, then declines to blame anything |
-| `payments-worker` | `NO_ANOMALY` | A reading above its baseline but under the 3.0x threshold. Names nothing, offers nothing |
+| `release-train` | `ANOMALY_WITHOUT_ATTRIBUTION`, `WINDOW_TOO_CROWDED` | A spike after a burst of changes. Calls it an anomaly, then says it cannot attribute it to any one of them, names none, and offers no rollback |
+| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION`, `NO_CANDIDATE_IN_WINDOW` | A spike placed four hours after the newest commit, outside the 60 minute attribution window. Calls it an anomaly, then says it cannot attribute it: the window is empty, which is not the same as no deploy being involved |
+| `payments-worker` | `NO_ANOMALY` | A reading above its baseline but under the 3.0x threshold. The one verdict that says nothing needs reverting |
 | `quiet-service` | `INSUFFICIENT_DATA` | A name the fixture does not know. Refused outright rather than given an invented spike |
 
 Reproduce all five from a shell against a running server:
@@ -213,6 +224,25 @@ The fixture used to be two module constants, so every service name returned the
 same spike and no refusal verdict was reachable from any input a reader could
 supply. `tests/integration/test_mcp_endpoints.py` now drives all five through the
 endpoint the cockpit calls.
+
+### A refusal is not an acquittal
+
+An earlier draft of this README glossed every refusal as
+`do not revert anything, this is not a deploy`, and the cockpit headline for both
+refusals read `Do not revert on this.` That was an over-claim, and a reviewer caught
+it: an empty window says nothing about a change that landed outside it, a crowded
+window says nothing about which of its changes did it, and a missing baseline says
+nothing at all. None of the three rules a deploy out, so none of them may be
+rendered as one having been ruled out. The wire, the screen and every document a
+judge reads now say the same thing: Mercury **cannot attribute**, and why.
+`attribution.nothing_to_revert` is true only on `NO_ANOMALY`,
+`attribution.refusal_statement` carries the reason and what the reason is not, the
+domain publishes the forbidden certainty phrasing as `REFUSAL_MUST_NOT_CLAIM`, and
+`tests/e2e/test_refusal_wording.py` scans this README, the Devpost text, the cockpit
+page and the video plan for it and fails the build on any of it. The retired phrases
+stay on this page in backticks, each on a single line, as the record of the
+correction: the scanner strips code spans before it reads, and a span wrapped across
+a line break is read as live prose, so the quotation cannot quietly become a claim.
 
 Those five are a demonstration, not evidence. The evidence is below.
 
@@ -336,7 +366,7 @@ python scripts/correlation_trial.py --no-write --seed 20261231
 fewer than one regression in ten, where before it named the cause of one in five
 and an innocent change in three. The trade is deliberate. An on-call engineer who
 reverts on a name that is wrong 67% of the time is worse off than one who is told
-to look elsewhere.
+that Mercury cannot tell which change did it.
 
 **The failure mode changed, which is the useful part.** Of the 36 attributions that
 named an innocent commit, **35** had the real cause outside the 60 minute window
@@ -532,7 +562,17 @@ writes every individual run to `suite_timing_summary.json` with its condition, t
 machine, the background load and the collected test count. Readiness gate G1 and
 `tests/e2e/test_documentation_claims.py` both compare the figures in this README
 against that file, and the file records the test count they were measured over, so
-adding a test makes this paragraph fail the build instead of quietly ageing.
+adding a test makes this paragraph fail the build unless the gap is disclosed in the
+exact words of the next paragraph; quietly ageing is not one of the options.
+
+**The record predates the suite, and says so.** Both sessions were measured over
+440 collected tests. The suite now collects 507 tests and a re-measure on
+an idle machine is pending: this machine was loaded again when the tests that grew
+the suite were added, and a loaded measurement is the defect this record exists to
+avoid, so the record was left as measured rather than re-rolled under load. Gate G1
+and the documentation test accept the older record only while this paragraph names
+both counts exactly, in the phrases `ci/readiness.py` returns from
+`stale_timing_disclosure`; add a test without updating it and both go red.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -570,7 +610,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 440 passed
+# 507 passed
 ```
 
 ### 3. Start the server
@@ -611,8 +651,11 @@ adb connect <FIRE_TV_IP>:5555
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Full device, emulator and troubleshooting instructions are in
-[`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md).
+Device and troubleshooting instructions are in
+[`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md), which also says why there is no
+emulator step: no Fire TV emulator exists, so the device is the only place this
+runs. After the launch, `python scripts/write_firetv_receipt.py` writes the receipt
+gate J4 reads, and refuses to write it without an APK it can open.
 
 ---
 
@@ -738,8 +781,13 @@ nothing has been pushed since it was added, so there are zero runs and zero
 artifacts. The repository is private, so its Actions tab is not visible externally
 either. It has also **not been built on the maintainer's machine** (no JDK, no
 Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`), and it
-**has never been installed on a physical Fire TV Stick or run in the Fire TV
-emulator**.
+**has never been installed on a physical Fire TV Stick**. There is no emulator step
+to have skipped: Amazon's own Fire TV documentation says to test on an actual Fire
+TV device rather than an emulator, no Fire TV emulator exists, and the Vega Virtual
+Device runs Vega apps on macOS or Ubuntu rather than this APK on Windows, so device
+footage is the only evidence the track accepts; the citations are in
+`docs/FIRE_TV_BUILD.md`. The surface being described is a D-pad and a screen. Nothing
+on it listens for speech.
 
 What *is* verified: the manifest declarations, the Gradle wiring and the key
 handling contract are checked by 30 structural tests, and the D-pad navigation
@@ -777,8 +825,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 440 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1318 statements
+python -m pytest tests/ -q                                    # 507 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1338 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
@@ -801,12 +849,16 @@ had ever been built. It was the one gate in the file that could not fail on the
 axis it exists to test.
 
 It now asks for `firetv_build_receipt.json`: a gradle command that exited 0, an APK
-that exists in the checkout, and a launch recorded on a device or emulator. That
-file does not exist, so **J4 fails**, and the published score went down by one.
-`docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
-`tests/unit/test_readiness_gates.py` drives every missing field through the
-predicate, including the case where it passes, which cannot be reached in this
-checkout because no APK exists.
+that exists in the checkout, and a launch recorded on a Fire TV device.
+`python scripts/write_firetv_receipt.py` writes that file from a real build and a
+real launch, hashes the APK itself, runs the result through the gate's own predicate
+first, and refuses to write anything without an APK it can open, so the receipt
+cannot be typed into existence; `tests/unit/test_write_firetv_receipt.py` drives
+every refusal against a throwaway checkout. The file does not exist here, so **J4
+fails**, and the published score went down by one. `docs/FIRE_TV_BUILD.md` carries
+the receipt's shape, and `tests/unit/test_readiness_gates.py` drives every missing
+field through the predicate, including the case where it passes, which cannot be
+reached in this checkout because no APK exists.
 
 **The same score in a clone.** Four of these gates, I1 to I4, used to read a
 coordination file that lives in the workspace above this repository. They passed
@@ -883,7 +935,9 @@ given a substitute number.
   shows it says so.
 * **No APK and no device run.** The Android CI workflow is configured but has
   never executed, so no APK has been produced. Nothing has been installed on Fire
-  TV hardware or run in the emulator, and the Kotlin has never been compiled.
+  TV hardware, there is no Fire TV emulator to have run it in, and the Kotlin has
+  never been compiled. The TV surface is a D-pad and a screen; it takes no voice
+  input.
 * **The live deployment is stale.** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`
   answers 200 but runs an older build and reports no build SHA, so gate G2 fails.
   Its teardown has never been tested, so gate D2 fails too.
@@ -929,7 +983,8 @@ given a substitute number.
   engine is what this README leads with.
 * **Voice is browser speech synthesis.** The cockpit reads its summaries aloud with
   the browser's `speechSynthesis`. There is no Alexa skill and no Alexa integration
-  in this repository.
+  in this repository, and nothing listens: the TV surface takes D-pad input and
+  shows a screen, and that is the whole of it.
 * **In-memory state.** Staged rollbacks and spent nonces live in the server
   process, so a restart forgets them. A multi-instance deployment needs shared
   storage before the single-use guarantee holds across instances.

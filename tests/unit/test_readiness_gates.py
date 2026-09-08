@@ -169,6 +169,21 @@ def test_the_readme_publishes_the_score_the_auditor_prints():
     assert int(printed.group(2)) == 53
 
 
+# ------------------------------------------ G1: a runtime record older than the suite
+
+def test_the_stale_timing_disclosure_names_both_counts_and_nothing_vaguer():
+    """The README may keep a runtime record that predates the suite only by saying so
+    in two exact phrases: the count the record was measured over, and the count the
+    suite collects now with a re-measure pending. Both carry a number, so a note that
+    says 'roughly current' cannot satisfy the gate, and the second changes with the
+    live count, so adding a test without updating the note fails the gate again."""
+    recorded, live = readiness.stale_timing_disclosure(440, 505)
+    assert recorded == "measured over 440 collected tests"
+    assert live == "the suite now collects 505 tests and a re-measure on an idle machine is pending"
+    assert readiness.stale_timing_disclosure(440, 506)[1] != live
+    assert readiness.stale_timing_disclosure(441, 505)[0] != recorded
+
+
 def test_the_receipt_shape_is_documented_where_a_reader_will_look():
     """The gate names a file. Somebody has to be told what to put in it."""
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")

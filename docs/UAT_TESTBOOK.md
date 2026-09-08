@@ -21,8 +21,9 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-06 | DORA tiers are computed correctly from metrics | `tests/unit/test_dora_metrics.py` | Elite and Medium tier boundaries |
 | A-07 | DORA metrics are derived from real GitHub payload shapes | `tests/unit/test_github_adapter.py` | Deployment frequency, lead time, change failure rate and recovery time against a constructed payload; in-progress runs excluded |
 | A-08 | Spend anomalies are detected and sub-threshold rises are not | `tests/unit/test_aws_adapters.py` | A 300 percent day-over-average jump flags; a 10 percent rise does not |
-| A-09 | An anomaly with no nearby commit blames nothing | `tests/unit/test_incident_correlation.py` | Verdict is `ANOMALY_WITHOUT_ATTRIBUTION`, refusal reason `NO_CANDIDATE_IN_WINDOW`, and no rollback is offered |
-| A-09b | An anomaly with several changes in the window blames none of them | `tests/unit/test_incident_correlation.py`, `tests/unit/test_correlation_trial.py` | Refusal reason `WINDOW_TOO_CROWDED`, the candidate count is reported, no rollback is offered, and the spoken summary says not to roll back |
+| A-09 | An anomaly with no commit in the window is reported as cannot-attribute, not as no-deploy | `tests/unit/test_incident_correlation.py` | Verdict is `ANOMALY_WITHOUT_ATTRIBUTION`, refusal reason `NO_CANDIDATE_IN_WINDOW`, no rollback is offered, and `nothing_to_revert` stays false |
+| A-09b | An anomaly with several changes in the window names none of them | `tests/unit/test_incident_correlation.py`, `tests/unit/test_correlation_trial.py` | Refusal reason `WINDOW_TOO_CROWDED`, the candidate count is reported, no rollback is offered, and the spoken summary says rolling back on it would be a guess rather than that the changes are innocent |
+| A-09g | Every refusal is worded as a refusal on every surface | `tests/unit/test_incident_correlation.py`, `tests/integration/test_mcp_endpoints.py`, `tests/e2e/test_refusal_wording.py` | `nothing_to_revert` is true only on `NO_ANOMALY`; the voice summary, the refusal statement, the cockpit page and the judge-facing documents contain none of the certainty phrasing the domain publishes as `REFUSAL_MUST_NOT_CLAIM`, and the list is proved to catch the retired wording |
 | A-09c | A spike running for three polls is still detected | `tests/unit/test_correlation_trial.py` | The pre-onset baseline calls the identical series an anomaly that the trailing baseline calls healthy, and the trailing mode is still runnable so the before state is reproducible |
 | A-09d | The attribution window ends at the onset, not at the reading | `tests/unit/test_incident_correlation.py` | A change 55 minutes before a reading whose spike began 20 minutes ago is inside the window; a change that landed after the onset is not |
 | A-09e | The crowding gate buys precision on corpora it was not chosen on | `tests/unit/test_correlation_trial.py` | At two held-out seeds the gate raises naming precision and lowers recall and the namings count |
@@ -38,6 +39,7 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-17b | The fixture label is on the same screenful as the number it qualifies | `tests/ux/test_ten_foot_legibility.py` | At 1920x1080 a provenance stamp reading `OFFLINE FIXTURE` or `LIVE` renders inside the first viewport height, measured in Chromium |
 | A-17c | Every file the Android build script names exists | `tests/unit/test_firetv_app_structure.py` | `app/proguard-rules.pro` and every other path named in `app/build.gradle.kts` is present, so the release variant configures |
 | A-17d | The Fire TV readiness gate cannot pass on a string match | `tests/unit/test_readiness_gates.py` | J4 requires a gradle exit code, an APK that exists and a recorded device launch; every missing field is driven through the predicate |
+| A-17e | The Fire TV build receipt cannot be written without evidence | `tests/unit/test_write_firetv_receipt.py` | `scripts/write_firetv_receipt.py` refuses, writes nothing and exits 2 on a missing, empty or non-zip APK, a zip with no `AndroidManifest.xml`, an APK outside the checkout, a non-zero gradle or adb exit code, or an empty device description; the receipt it does write hashes the APK itself and passes the gate's own predicate |
 | A-18 | Running the suite makes no billable AWS call | `tests/unit/test_aws_adapters.py` plus `tests/conftest.py` | `MERCURY_OFFLINE=1` suppresses the call even when a working client is injected |
 | A-19 | The Fire TV manifest is a TV manifest | `tests/unit/test_firetv_app_structure.py` | Leanback required, touchscreen not required, `LEANBACK_LAUNCHER` present, no `package` attribute |
 | A-20 | A hostile cockpit URL cannot redirect the WebView | `app/src/test/kotlin/.../CockpitUrlResolverTest.kt` | `javascript:`, `file:`, `content:` and embedded whitespace all fall back to the safe default |
@@ -55,7 +57,7 @@ They are listed so the gap is explicit rather than absent.
 |---|---|---|---|
 | M-01 | The APK installs on a Fire TV Stick and appears on the home row | No Fire TV hardware was available | `docs/FIRE_TV_BUILD.md`, install section |
 | M-02 | The physical remote D-pad drives focus on a television | No Fire TV hardware was available | Install the APK, press the D-pad |
-| M-03 | The app runs in the Fire TV emulator | No Android SDK in the build environment | `docs/FIRE_TV_BUILD.md`, emulator section |
+| M-03 | A push runs `.github/workflows/android.yml`, which assembles and uploads `app-debug.apk` | Nothing has been pushed since the workflow was written, so it has zero runs. There is no emulator row here because no Fire TV emulator exists; the device rows above are the only way to run it | Push, open the Actions tab, download `mercury-firetv-debug-apk`, then install it on a device and write the receipt with `python scripts/write_firetv_receipt.py` |
 | M-04 | Text is legible from three metres on a large screen | No television was available | Open the cockpit on a TV at 1080p and read it from a sofa |
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
@@ -70,8 +72,8 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 440 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1318 statements |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 507 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1338 statements |
 | Every rollback denial reason has a failing-input test | Met | 9 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | **Not met** | Gate J4 fails: no `firetv_build_receipt.json`, no APK, no device |

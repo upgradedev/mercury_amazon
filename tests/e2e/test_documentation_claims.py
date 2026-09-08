@@ -14,6 +14,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT / "ci") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "ci"))
+
+import readiness  # noqa: E402
+
 README = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 BENCHMARKS = json.loads((REPO_ROOT / "benchmarks_summary.json").read_text(encoding="utf-8"))
 
@@ -175,6 +180,33 @@ def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
     assert "assembleDebug" in workflow
     assert "testDebugUnitTest" in workflow
     assert "if-no-files-found: error" in workflow
+
+
+def test_no_document_claims_a_fire_tv_emulator_exists():
+    """There is no Fire TV emulator, and three documents used to promise a run in one.
+
+    Amazon's documentation says to test on an actual Fire TV device; the Vega Virtual
+    Device runs Vega apps rather than this APK and needs macOS or Ubuntu. So every
+    mention of a Fire TV emulator has to be a denial, the way every mention of Alexa is.
+    """
+    plan_files = [REPO_ROOT / "video" / name for name in ("narration.json", "cue_sheet.json")]
+    for path in MARKDOWN_FILES + plan_files:
+        text = " ".join(path.read_text(encoding="utf-8").split())
+        for match in re.finditer(r"fire tv emulator|emulator image|official fire tv emulator", text, re.IGNORECASE):
+            window = text[max(0, match.start() - 160):match.end() + 160].lower()
+            denies = any(marker in window for marker in [
+                "no fire tv emulator", "none exists", "does not exist", "there is no", "no emulator",
+            ])
+            assert denies, (
+                f"{path.name} mentions a Fire TV emulator without saying none exists: "
+                f"...{text[max(0, match.start() - 80):match.end() + 80]}..."
+            )
+    build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
+    assert "no fire tv emulator exists" in build_doc
+    assert "vega virtual device" in build_doc
+    assert "actual fire tv device" in build_doc
+    # And the surface is described as what it is: a D-pad and a screen.
+    assert "d-pad" in build_doc and "no voice" in build_doc
 
 
 def test_the_readme_states_the_limitation_beside_each_capability():
@@ -594,14 +626,41 @@ def test_the_recorded_runtime_belongs_to_the_suite_this_repository_ships():
     A runtime is a measurement of a particular suite. Add a test and the recorded
     figure describes a suite that no longer exists, so it must be re-measured rather
     than left to age the way the last one did.
+
+    One exception, and it is the same one gate G1 makes: when the machine is too loaded
+    to re-measure honestly, the README may keep the older record provided it says so in
+    prose, naming the count the record was measured over, the count the suite collects
+    now, and that a re-measure on an idle machine is pending. The phrases come from
+    ``ci/readiness.py::stale_timing_disclosure`` so the two checks cannot drift apart,
+    and the second phrase names the live count, so adding a test without updating the
+    note still fails here.
     """
     recorded = _timing()
     badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
     assert badge, "the README has no test count badge"
-    assert recorded["tests_collected"] == int(badge.group(1)), (
-        f"the runtime was measured over {recorded['tests_collected']} tests and this suite "
-        f"now has {badge.group(1)}. Re-run `python scripts/time_test_suite.py`"
-    )
+    collected = int(badge.group(1))
+    if recorded["tests_collected"] == collected:
+        return
+    prose = _live_prose(README)
+    for phrase in readiness.stale_timing_disclosure(recorded["tests_collected"], collected):
+        assert phrase in prose, (
+            f"the runtime was measured over {recorded['tests_collected']} tests and this suite "
+            f"now has {collected}. Re-run `python scripts/time_test_suite.py` on an idle "
+            f"machine, or disclose the gap in the README with the exact phrase {phrase!r}"
+        )
+
+
+def test_the_stale_timing_disclosure_names_the_live_count_and_no_other():
+    """The note is a pin, not a caveat: it has to carry the count the suite has today."""
+    recorded = _timing()
+    badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
+    collected = int(badge.group(1))
+    prose = _live_prose(README)
+    if recorded["tests_collected"] == collected:
+        pytest.skip("the record matches the suite, so there is no disclosure to pin")
+    wrong = readiness.stale_timing_disclosure(recorded["tests_collected"], collected + 1)[1]
+    assert wrong not in prose, "the README names a count the suite does not have"
+    assert "re-measure on an idle machine is pending" in prose
 
 
 def test_the_timing_record_says_what_it_timed_and_where():

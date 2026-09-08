@@ -32,8 +32,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # reason it is out of reach of an automated run. Printed in the output.
 CI_EXEMPT: dict[str, str] = {
     "C5": "needs a real browser driver walking the recorded video path",
-    "J4": "needs a JDK, an Android SDK and a Fire TV device or emulator to produce an APK "
-          "and a recorded launch; none of the three is installed on this machine",
+    "J4": "needs a JDK, an Android SDK and a Fire TV device to produce an APK and a recorded "
+          "launch; none of the three is installed on this machine, and no Fire TV emulator "
+          "exists to stand in for the device",
     "D2": "needs a deployment of this commit; the live endpoint runs an older build",
     "E2": "needs a recorded video for narration and picture to be in sync with",
     "E4": "needs a public video of the running product",
@@ -90,9 +91,10 @@ def get_standards_gate_ids() -> list[str]:
     ]
 
 
-#: Where a Fire TV build receipt would live if one had ever been produced. Nothing in
-#: this repository writes it: it is written by hand from a real build and a real launch,
-#: the way deploy_teardown_receipt.json is, and gate J4 fails while it is absent.
+#: Where a Fire TV build receipt would live if one had ever been produced. It is written
+#: by ``python scripts/write_firetv_receipt.py`` from a real build and a real launch, the
+#: way deploy_teardown_receipt.json is written by its probe, and that script refuses to
+#: write it without an APK file it can open. Gate J4 fails while the receipt is absent.
 FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
 
 #: Every field J4 requires, and what each one is evidence of. A receipt missing any of
@@ -102,13 +104,15 @@ FIRETV_RECEIPT_FIELDS = {
     "gradle_exit_code": "gradle's own exit code, which must be 0",
     "apk_path": "the path of the APK, which must exist in this checkout",
     "apk_sha256": "the digest of that APK, so the file can be identified",
-    "device_run": "a recorded launch on a device or emulator",
+    "device_run": "a recorded launch on a Fire TV device",
 }
 
 #: What a recorded launch has to say. A device that installed the APK but was never
-#: watched running it proves the package installs, not that the app works.
+#: watched running it proves the package installs, not that the app works. The device
+#: is a physical one: no Fire TV emulator exists, and the Vega Virtual Device runs Vega
+#: apps rather than this APK, so the launch has to come from hardware.
 FIRETV_DEVICE_FIELDS = {
-    "device_model": "which Fire TV device or emulator image ran it",
+    "device_model": "which Fire TV device ran it",
     "fire_os_or_android_version": "what it was running",
     "adb_install_exit_code": "adb install's exit code, which must be 0",
     "launched_at_utc": "when it was launched",
@@ -128,9 +132,9 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
     A Fire TV entry is load-bearing when there is a Fire TV binary and somebody has
     watched it run. So the manifest and the README stay as necessary conditions, and the
     sufficient condition is a receipt recording a gradle build that exited 0, an APK that
-    exists in the checkout, and a launch on a device or emulator. There is no such
-    receipt and this gate therefore fails, which is the truth and is why the published
-    score went down by one when this was written.
+    exists in the checkout, and a launch on a Fire TV device. There is no such receipt
+    and this gate therefore fails, which is the truth and is why the published score
+    went down by one when this was written.
 
     ``apk_exists`` is injected so a test can drive every branch without an APK.
     """
@@ -146,9 +150,10 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
         return False, (
             f"A leanback manifest and the word 'Fire TV' are text, not a Fire TV app. This gate "
             f"wants {FIRETV_BUILD_RECEIPT}, recording a gradle build that exited 0, the APK it "
-            f"produced, and a launch on a device or emulator. No such file exists, no APK has "
-            f"been built and nothing has run on Fire TV hardware; docs/FIRE_TV_BUILD.md records "
-            f"the verbatim local failure"
+            f"produced, and a launch on a Fire TV device, written by "
+            f"python scripts/write_firetv_receipt.py. No such file exists, no APK has been "
+            f"built and nothing has run on Fire TV hardware; docs/FIRE_TV_BUILD.md records the "
+            f"verbatim local failure"
         )
 
     problems = []
@@ -163,7 +168,7 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
 
     device = receipt.get("device_run")
     if not isinstance(device, dict) or not device:
-        problems.append("device_run missing (a recorded launch on a device or emulator)")
+        problems.append("device_run missing (a recorded launch on a Fire TV device)")
     else:
         for field, means in FIRETV_DEVICE_FIELDS.items():
             if device.get(field) in (None, "", []):
@@ -188,6 +193,26 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
 #: compares the README against it, because a runtime written as prose is a number that
 #: ages every time a test is added and nobody notices.
 SUITE_TIMING_SUMMARY = "suite_timing_summary.json"
+
+
+def stale_timing_disclosure(recorded_count, collected_count) -> tuple[str, str]:
+    """The two phrases the README must carry when the runtime record predates the suite.
+
+    A runtime is a measurement of a particular suite, and the honest response to the
+    suite growing is to re-measure. When it cannot be re-measured yet, because the machine
+    is loaded and a loaded measurement is the defect the record exists to prevent, the
+    README may keep publishing the record on one condition: it says in prose how many
+    tests the record was measured over, how many the suite collects now, and that a
+    re-measure on an idle machine is pending. Both phrases have to match exactly, so the
+    note cannot age into a vague "roughly current", and the second one names the live
+    count, so adding a test without updating the note still turns G1 red.
+    """
+    return (
+        f"measured over {recorded_count} collected tests",
+        f"the suite now collects {collected_count} tests and a re-measure on an idle machine "
+        f"is pending",
+    )
+
 
 #: Where the persona review is restated in this repository's own voice. Gates I1 to I4
 #: used to read a workspace coordination file two directories up, which meant they
@@ -719,6 +744,7 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
         with open(os.path.join(REPO_ROOT, SUITE_TIMING_SUMMARY), "r", encoding="utf-8") as handle:
             timing = json.load(handle)
     if g1:
+        stale_note = ""
         if not runtime_claims:
             g1, g1_msg = False, "The README no longer says how long its own test suite takes"
         elif not timing:
@@ -726,10 +752,23 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
                 f"The README publishes a suite runtime and {SUITE_TIMING_SUMMARY} is missing, "
                 f"so nothing measured it. Run python scripts/time_test_suite.py")
         elif timing.get("tests_collected") != collected:
-            g1, g1_msg = False, (
-                f"The recorded runtime was measured over {timing.get('tests_collected')} tests "
-                f"and this suite now has {collected}. Re-run python scripts/time_test_suite.py")
-        else:
+            # The record predates the suite. That is allowed only when the README says
+            # so in the two exact phrases stale_timing_disclosure returns; a record that
+            # is quietly older than the suite it describes is the defect this gate exists
+            # to catch.
+            needed = stale_timing_disclosure(timing.get("tests_collected"), collected)
+            missing = [phrase for phrase in needed if phrase not in readme_prose]
+            if missing:
+                g1, g1_msg = False, (
+                    f"The recorded runtime was measured over {timing.get('tests_collected')} tests "
+                    f"and this suite now has {collected}. Re-run python scripts/time_test_suite.py "
+                    f"on an idle machine, or disclose the gap in the README with the exact "
+                    f"phrases {missing}")
+            else:
+                stale_note = (
+                    f"; the runtime record predates the suite ({timing.get('tests_collected')} of "
+                    f"{collected} tests), the README says so, and an idle re-measure is pending")
+        if g1:
             # Two ranges may legitimately appear: this session's, and the session it
             # replaced. The second is there so a replaced figure leaves a trace.
             sessions = {(timing.get("min_seconds"), timing.get("max_seconds"))}
@@ -752,7 +791,8 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
             else:
                 g1_msg += (f", and all {len(runtime_claims)} published runtime ranges match a "
                            f"recorded session ({len(timing.get('runs', []))} runs this session, "
-                           f"{timing.get('min_seconds')} to {timing.get('max_seconds')} s)")
+                           f"{timing.get('min_seconds')} to {timing.get('max_seconds')} s)"
+                           + stale_note)
     gate("G1", "No cross-surface claim discrepancy", g1, g1_msg)
 
     # G2 compares the deployment's own reported build SHA against HEAD and fails
