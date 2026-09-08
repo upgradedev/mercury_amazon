@@ -30,7 +30,7 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-09f | Every answer carries the measured worth of naming a commit | `tests/integration/test_mcp_endpoints.py`, `tests/unit/test_trial_summary.py` | `attribution.measured_accuracy` equals the recorded summary, and a checkout without that summary reports the accuracy as unknown rather than guessing |
 | A-10 | A zero baseline does not manufacture an incident | `tests/unit/test_incident_correlation.py` | Verdict is `NO_ANOMALY` with factor 0.0 |
 | A-11 | Staging a rollback without the secret is refused | `tests/integration/test_rollback_authorization.py` | HTTP 401, and the response does not contain the secret |
-| A-12 | A governance token works exactly once | `tests/integration/test_rollback_authorization.py` | Second use returns 409 with `TOKEN_ALREADY_USED` |
+| A-12 | A governance token works exactly once | `tests/integration/test_rollback_authorization.py` | A token replayed against a re-staged action returns 409 with `TOKEN_ALREADY_USED`; a second confirm of an executed action returns 409 with `NOT_PENDING` |
 | A-13 | Editing the rollback target invalidates the token | `tests/integration/test_rollback_authorization.py` | HTTP 403 with `TOKEN_CONTENT_MISMATCH` |
 | A-14 | A forged token is refused | `tests/integration/test_rollback_authorization.py` | HTTP 403 with `BAD_SIGNATURE` |
 | A-15 | An expired lease is refused | `tests/integration/test_rollback_authorization.py` | HTTP 410 with `LEASE_EXPIRED` |

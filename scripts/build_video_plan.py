@@ -95,11 +95,11 @@ BEATS = [
     (
         "beat_10_confirm_and_replay", 140.0, 154.0,
         "Governance passes, and the product says out loud what it did not do. No "
-        "deployment pipeline was contacted. Press it again and the server refuses by "
-        "name: the token was valid once.",
+        "deployment pipeline was contacted. The confirm control then goes dark: the "
+        "token was valid once, and the server refuses a replay by name.",
         "Press Confirm rollback and read the EXECUTED output verbatim, including the "
-        "sentence stating no pipeline was contacted. Press it a second time and show "
-        "the 409 NOT_PENDING denial.",
+        "sentence stating no pipeline was contacted. Hold on the darkened Confirm "
+        "control and its reason line: the token is spent.",
     ),
     (
         "beat_11_not_built", 154.0, 168.0,

@@ -24,9 +24,11 @@ while a refusal for a crowded window is a decision.
 
 Rule 4 is what naming precision rests on and it was chosen from a published sweep.
 Naming the closest of several changes is where the wrong names came from: of the 36
-attributions this class now gets wrong, 35 had the real cause outside the window
-entirely, where no rule with this window could have reached it, and 0 had the cause
-inside the window with more than one candidate. When it does name a commit, the
+regressions where this class now names the wrong commit, 35 had the real cause outside
+the window entirely, where no rule with this window could have reached it, and 0 had
+the cause inside the window with more than one candidate. A further 18 wrong namings
+blamed a commit for an exogenous spike no commit caused, 54 wrong of 113 in all. When
+it does name a commit, the
 commit it names is the one that caused the reading 52.2% of the time over 113
 namings, which is close enough to a coin toss that the figure travels with the
 answer: see ``src/infrastructure/trial_summary.py``.

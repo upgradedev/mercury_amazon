@@ -141,8 +141,9 @@ which change broke production. Its own harness said that is right about half the
 times it fires, so the headline is now the refusal, which is what the numbers
 support and what an on-call engineer can actually act on.
 
-**The refusals work and are tested.** Confirm a rollback twice and the second
-attempt comes back `409 NOT_PENDING`. Let the lease run out and it comes back
+**The refusals work and are tested.** Confirm a rollback and the cockpit's Confirm
+control goes dark, saying the token is spent; send the same confirm again from a
+shell and the server answers `409 NOT_PENDING`. Let the lease run out and it comes back
 `410 LEASE_EXPIRED`. Edit the target after staging and the token stops applying.
 Each denial is named on the screen rather than swallowed, and each has a test.
 

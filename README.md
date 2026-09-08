@@ -369,12 +369,15 @@ reverts on a name that is wrong 67% of the time is worse off than one who is tol
 that Mercury cannot tell which change did it.
 
 **The failure mode changed, which is the useful part.** Of the 36 attributions that
-named an innocent commit, **35** had the real cause outside the 60 minute window
-entirely, where no rule with that window could have named it. **0** had the cause
-inside the window and more than one candidate, because those are refused now rather
-than guessed at, and **1** had the cause inside the window with a single candidate.
-That last case is the honest residual: one case in 1160 where the rule had the
-culprit alone in front of it and named the wrong thing. This repository
+named the wrong commit for a regression that had a right one, **35** had the real cause
+outside the 60 minute window entirely, where no rule with that window could have
+named it. **0** had the cause inside the window and more than one candidate, because
+those are refused now rather than guessed at, and **1** had the cause inside the window
+with a single candidate. That last case is the honest residual: one case in 1160 where
+the rule had the culprit alone in front of it and named the wrong thing. The other 18
+wrong namings, which make 54 wrong out of 113 in all, blamed a commit for an exogenous
+spike that no commit caused; there was no right commit to miss there, and they are the
+6.0% false-attribution row above. This repository
 commits in bursts, which is why the crowding gate refuses so often: the median gap
 between commits in the recorded stream is 20.58 minutes, 42 of its 58 gaps are
 under an hour, and a 60 minute window ending on a commit holds 2.78 commits on
@@ -497,7 +500,11 @@ sequenceDiagram
    length-prefixed SHA-256 hash of the rollback payload. Edit the target commit
    after staging and the token stops applying, with reason `TOKEN_CONTENT_MISMATCH`.
 3. **Single use.** Each token carries a nonce consumed on the first successful
-   confirm. A replay is refused with `TOKEN_ALREADY_USED`.
+   confirm. A token replayed against a re-staged action is refused with
+   `TOKEN_ALREADY_USED`. A second confirm of an action that has already executed
+   is refused one check earlier, with `NOT_PENDING`, and the cockpit does not even
+   send it: after `EXECUTED` the Confirm control goes dark and says the token is
+   spent.
 4. **Lease.** A staged action expires after `lease_sec` seconds, default 300, and
    then confirms with `LEASE_EXPIRED`.
 
@@ -638,7 +645,9 @@ cockpit. It changes on every restart.
 Open `http://127.0.0.1:8002/`. Press **Check connection** to send a real
 `GET /health` and watch the state pill change from *API not checked*. Then
 **Ask what changed**, paste the governance secret, **Stage governed rollback**,
-and **Confirm rollback**. Confirm a second time to watch it refuse.
+and **Confirm rollback**. After it executes, Confirm goes dark and says why: the
+token is spent. To watch the server refuse a replay itself, send the same confirm
+again from a shell; it answers `409 NOT_PENDING`.
 
 Arrow keys move focus to the nearest control in that direction, which is the same
 code path the Fire TV remote drives.

@@ -160,18 +160,23 @@ a token was issued.
 **Point to make:** the token is an HMAC over the action id and a hash of exactly
 this payload. Edit the target after staging and it stops applying.
 
-### 10. Confirming says what it did not do, and the second press is refused. 2:20 to 2:34
+### 10. Confirming says what it did not do, and the control goes dark. 2:20 to 2:34
 
-**Action:** press **Confirm rollback**, then press it a second time.
-**Expected on screen:** first, status `EXECUTED` and the output verbatim:
+**Action:** press **Confirm rollback**.
+**Expected on screen:** status `EXECUTED` and the output verbatim:
 `Governance passed for 'checkout-api' to commit <sha>. Recorded locally. No
 deployment pipeline was contacted`, followed by the line naming the record-only
-dispatcher. Then, on the second press,
-`Request failed HTTP 409. NOT_PENDING: Action '<id>' is in state EXECUTED, not
-PENDING_CONFIRMATION.`
+dispatcher. Confirm then goes dark, with its reason line underneath:
+`That token has been spent. Confirming again is refused by name. Stage again for a
+new one.` The page does not send a second confirm, so there is no second press to
+record. Single use is enforced by the server too: the same confirm replayed from a
+shell answers `Request failed HTTP 409. NOT_PENDING: Action '<id>' is in state
+EXECUTED, not PENDING_CONFIRMATION.`, which is what
+`tests/integration/test_rollback_authorization.py` asserts.
 **Point to make:** read the first sentence out. The product tells the room it did
 not deploy anything, on the screen, in the moment of success. Single use is then
-enforced by the server and the denial is named rather than swallowed. Leaving the
+enforced on the screen and by the server, and the denial is named rather than
+swallowed. Leaving the
 staging on screen past its lease produces `HTTP 410. LEASE_EXPIRED` in the same
 way.
 
