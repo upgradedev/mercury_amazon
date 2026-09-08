@@ -518,7 +518,7 @@
                     data-tv-label="Ask about search indexer"
                     title="Correlate search-indexer, whose spike is hours away from any commit">
               search-indexer
-              <span class="btn-sub">spike with no change to blame</span>
+              <span class="btn-sub">spike with an empty window</span>
             </button>
             <button class="btn btn-demo" data-service="release-train" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about release train"
@@ -585,7 +585,7 @@
           </div>
           <div id="incidentOutput" aria-live="polite">
             <div class="empty-state-card">No correlation requested yet. Ask what changed in the hero and
-              the full verdict lands here, including the verdicts where nothing can be blamed.</div>
+              the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
           </div>
         </div>
       </section>
@@ -899,6 +899,14 @@
         + ' labelled cases. Reproduce with ' + measured.measured_by_command + '.';
     }
 
+    /* The sentence the server ships with a refusal: what Mercury cannot do and why, and
+       that the reason is not a finding about the deploys. The local fallback is for a
+       server that predates the field, and it is worded to the same rule. */
+    function refusalStatement(data, fallback) {
+      var statement = data.attribution && data.attribution.refusal_statement;
+      return statement || fallback;
+    }
+
     function setReason(buttonId, reasonId, enabled, reason, title) {
       el(buttonId).disabled = !enabled;
       el(buttonId).title = title;
@@ -940,40 +948,51 @@
                  && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
         /* The answer this product is built around: an anomaly is real and Mercury will
            not name a change for it, because a burst of changes landed and nothing in a
-           metric series says which of them did it. */
+           metric series says which of them did it. It is rendered as what it is, a
+           refusal to attribute, never as a finding that the changes are innocent. */
         setHero({
           state: 'alarm',
           eyebrow: 'Incident, too many changes to name one',
           figure: factor + '×',
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: 'Do not revert on this. ' + data.attribution.commits_in_window
+          headline: 'Cannot attribute this. ' + data.attribution.commits_in_window
             + ' changes landed before ' + metric.name + ' rose on ' + data.service,
-          cause: 'Mercury names a change only when exactly one landed inside the attribution window. '
-            + data.attribution.commits_in_window + ' did, so it names none of them and offers no rollback. '
-            + 'Naming the closest of a crowded window is where most of its wrong answers came from.',
+          cause: refusalStatement(data,
+            'Mercury names a change only when exactly one landed inside the attribution window. '
+            + data.attribution.commits_in_window + ' did, so it cannot attribute this to any one of them, '
+            + 'names none, and offers no rollback. That is a refusal to guess, not a finding that none of '
+            + 'them caused it.'),
           badges: badges,
           accuracy: accuracy
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') {
+        /* An empty window. It says nothing about changes outside the window, so the
+           screen says cannot-attribute and never no-deploy. */
         setHero({
           state: 'alarm',
-          eyebrow: 'Incident, nothing to blame',
+          eyebrow: 'Incident, cannot attribute: window empty',
           figure: factor + '×',
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: 'Do not revert on this. No change landed before ' + metric.name
+          headline: 'Cannot attribute this. No change landed in the window before ' + metric.name
             + ' rose on ' + data.service,
-          cause: 'No deployment landed close enough to the onset, so Mercury names no commit and offers no rollback.',
+          cause: refusalStatement(data,
+            'No change landed inside the attribution window before the onset, so Mercury cannot attribute '
+            + 'this to a change, names no commit and offers no rollback. An empty window is not evidence that '
+            + 'no change caused it.'),
           badges: badges,
           accuracy: accuracy
         });
       } else if (data.verdict === 'NO_ANOMALY') {
+        /* The one verdict that may say nothing needs reverting: the reading is inside
+           its own baseline, so there is nothing wrong to revert. */
         setHero({
           state: 'calm',
           eyebrow: 'Steady',
           figure: factor + '×',
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
           headline: data.service + ' is inside its own baseline',
-          cause: 'Nothing changed enough to report. Mercury offers no rollback when it can see no anomaly.',
+          cause: 'Nothing changed enough to report, so nothing needs reverting on this reading. '
+            + 'Mercury offers no rollback when it can see no anomaly.',
           badges: badges
         });
       } else {

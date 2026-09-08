@@ -323,7 +323,8 @@ def test_a_crowded_window_is_refused_rather_than_named():
     assert crowded.offending_commit is None
     assert crowded.rollback_is_available is False
     assert "3 changes landed" in crowded.explanation
-    assert "Do not roll back on this answer" in crowded.to_voice_summary()
+    assert "cannot attribute it to any one of them" in crowded.to_voice_summary()
+    assert "rolling back on this answer would be a guess" in crowded.to_voice_summary()
 
     _, single = _correlation([3, 3, 3, 3, 3, 40], [burst[0]])
     assert single.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED

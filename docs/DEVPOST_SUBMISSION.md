@@ -5,10 +5,10 @@
 
 ---
 
-## Tagline (24 words)
+## Tagline (23 words)
 
-Mercury tells an on-call engineer when not to blame a deployment, and refuses to
-name one unless exactly one change landed in the window.
+Mercury tells an on-call engineer when it cannot blame a deployment, and names one
+only when exactly one change landed in the window.
 
 ---
 
@@ -21,8 +21,11 @@ changed just before this broke?
 
 Mercury answers that question from a real commit history, and then it was scored,
 and the scoring changed what it claims. It turns out the answer worth having is
-usually the negative one: do not revert anything, this is not a deploy. Mercury
-sees an anomaly and names nobody 81.1% of the time, stays quiet on 199 of 200
+usually a refusal: Mercury cannot attribute this to a change, and here is why. That
+refusal is never dressed up as proof that a deploy is innocent, because an empty or
+crowded window says nothing of the kind, and the only verdict that says nothing
+needs reverting is the one where the reading is inside its baseline. Mercury sees an
+anomaly and names nobody 81.1% of the time, stays quiet on 199 of 200
 healthy series, and refuses outright on 60 of 60 telemetry gaps. When it does name
 a change, it is right 52.2% of the time over 113 namings, and it prints that on the
 screen beside the name. Then it renders where the people are. A Fire TV in the room
@@ -34,14 +37,18 @@ delivery; the engine is the thing.
 
 ## What it does
 
-**Says when not to blame a deploy.** Mercury reads an error metric series and a
-commit history, decides whether the metric has stepped up against a baseline taken
-from before the step, and looks for changes in the hour before that step started.
-It names one only when exactly one landed there. When none landed it says so; when
-several landed it says how many and names none of them, because nothing in a metric
-series says which of two changes did it. Both refusals have their own tests,
-because a war room tool that always has an answer is worse than one that admits
-when it does not, and both are more common than the answer that names something.
+**Says when it cannot blame a deploy, and never says more than that.** Mercury reads
+an error metric series and a commit history, decides whether the metric has stepped
+up against a baseline taken from before the step, and looks for changes in the hour
+before that step started. It names one only when exactly one landed there. When none
+landed it says so; when several landed it says how many and names none of them,
+because nothing in a metric series says which of two changes did it. Both refusals
+have their own tests, because a war room tool that always has an answer is worse
+than one that admits when it does not, and both are more common than the answer that
+names something. Each ships as `attribution.refusal_statement`, which names the
+reason and says that the reason is not a finding about the deploys, and
+`attribution.nothing_to_revert` is true only when the reading is inside its
+baseline.
 
 **Publishes how often each answer is right, and ships the figure with the answer.**
 `python scripts/correlation_trial.py` scores the correlator against 1160 labelled
@@ -169,7 +176,7 @@ Stated plainly, because the cockpit shows it anyway.
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`. Naming precision 52.2% over 113 namings, recall 9.8% over 600 regressions, refusal on 81.1% of detected anomalies, all published and shipped in every answer as `attribution.measured_accuracy` |
-| Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware |
+| Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware, and there is no Fire TV emulator to have run it in. The TV surface is a D-pad and a screen, with no voice input |
 
 ---
 
@@ -217,9 +224,10 @@ Stated here rather than left for a judge to find:
 * **No APK exists.** A GitHub Actions workflow to assemble one is written and
   committed, but it has never executed: nothing has been pushed since it was
   added, so there are zero runs and zero artifacts. The Kotlin has never been
-  compiled, and nothing has been installed on a Fire TV device or run in the
-  emulator, because no hardware and no Android SDK were available.
-  `docs/FIRE_TV_BUILD.md` records the verbatim local build failure.
+  compiled, and nothing has been installed on a Fire TV device, because no hardware
+  and no Android SDK were available; there is no Fire TV emulator, so a device is
+  the only place it can run. `docs/FIRE_TV_BUILD.md` records the verbatim local
+  build failure and the receipt a device run would produce.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The live endpoint answers 200 but runs an older build, so the readiness gates
@@ -243,7 +251,8 @@ Stated here rather than left for a judge to find:
   HTTP surface render on a laptop, so what that assumption risks is the surface,
   not the engine.
 * Voice output is the browser's speech synthesis. There is no Alexa skill and no
-  Alexa integration in this repository.
+  Alexa integration in this repository, and no voice input anywhere: the TV surface
+  is a D-pad and a screen.
 
 ---
 

@@ -81,7 +81,7 @@ SIMULATED_SERVICES: dict[str, SimulatedService] = {
     "search-indexer": SimulatedService(
         SHAPE_UNATTRIBUTED,
         "an error spike hours away from any commit, which the correlator calls an anomaly and "
-        "then declines to blame anything for",
+        "then cannot attribute to anything, without saying no deploy was involved",
     ),
     "release-train": SimulatedService(
         SHAPE_CROWDED,
@@ -321,8 +321,9 @@ class CloudWatchMetricAdapter:
             anchoring = (
                 f" The final reading is placed {offset} minutes after the newest known commit, "
                 f"which is deliberately outside the {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute "
-                "attribution window, so the correlator has an anomaly and nothing to blame for it; "
-                "the commits are real, this metric is not."
+                "attribution window, so the correlator has an anomaly and an empty window, which it "
+                "reports as cannot-attribute rather than as no-deploy; the commits are real, this "
+                "metric is not."
             )
         elif shape == SHAPE_CROWDED:
             anchoring = (

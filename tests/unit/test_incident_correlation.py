@@ -82,7 +82,8 @@ def test_spike_with_no_commit_in_the_window_is_not_attributed():
     assert result.incident_detected is True
     assert result.offending_commit is None
     assert result.rollback_is_available is False
-    assert "no deployment landed close enough" in result.to_voice_summary()
+    assert "cannot attribute it to a deploy" in result.to_voice_summary()
+    assert "not a verdict on what caused it" in result.to_voice_summary()
 
 
 def test_spike_with_no_commits_at_all_is_not_attributed():
@@ -227,6 +228,110 @@ def test_turning_the_crowding_gate_off_restores_the_older_behaviour():
         "svc", series([2, 2, 2, 2, 70]), burst)
     assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
     assert result.attribution_is_ambiguous is True
+
+
+# ------------------------------------------ A refusal is a refusal, not an acquittal
+#
+# The finding these close: a refusal to attribute was being rendered as proof that no
+# deploy caused the incident. The correlator cannot rule a deploy out, so none of its
+# refusals may say it has, and only the inside-baseline verdict may say nothing needs
+# reverting.
+
+def _certainty_violations(text: str) -> list[str]:
+    import re
+
+    from src.domain.incident_correlation import REFUSAL_MUST_NOT_CLAIM
+
+    flat = " ".join(text.split())
+    return [pattern for pattern in REFUSAL_MUST_NOT_CLAIM if re.search(pattern, flat, re.IGNORECASE)]
+
+
+def _empty_window():
+    return IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 70]), [commit("old111", 900)])
+
+
+def _crowded_window():
+    burst = [commit(f"burst{i}", 30 + i) for i in range(4)]
+    return IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 70]), burst)
+
+
+def _missing_baseline():
+    return IncidentCorrelator().correlate("svc", series([50]), [commit("aaa", 5)])
+
+
+@pytest.mark.parametrize("make, refusal", [
+    (_empty_window, AttributionRefusal.NO_CANDIDATE_IN_WINDOW),
+    (_crowded_window, AttributionRefusal.WINDOW_TOO_CROWDED),
+    (_missing_baseline, None),
+], ids=["empty-window", "crowded-window", "missing-baseline"])
+def test_a_refusal_is_never_rendered_as_nothing_to_revert(make, refusal):
+    result = make()
+    assert result.attribution_refusal is refusal
+    assert result.can_attribute is False
+    assert result.nothing_to_revert is False, (
+        f"{result.verdict.value} says nothing needs reverting, which only NO_ANOMALY may say"
+    )
+    statement = result.refusal_statement
+    assert statement is not None and "cannot attribute" in statement
+    for surface, text in (
+        ("refusal_statement", statement),
+        ("voice_summary", result.to_voice_summary()),
+        ("explanation", result.explanation),
+    ):
+        assert not _certainty_violations(text), f"{surface} states the refusal as a certainty: {text!r}"
+
+
+def test_the_refusal_statement_says_what_the_refusal_is_not():
+    """Each reason, and in the same sentence, what it does not establish."""
+    empty = _empty_window().refusal_statement
+    assert "no commit landed in the 60 minutes" in empty
+    assert "not evidence that no change caused it" in empty
+
+    crowded = _crowded_window().refusal_statement
+    assert "4 landed in the 60 minutes" in crowded
+    assert "not a finding that none of them caused it" in crowded
+    assert "would be a guess" in crowded
+
+    missing = _missing_baseline().refusal_statement
+    assert "1 reading of" in missing
+    assert "not a finding about any deploy" in missing
+
+
+def test_the_refusal_statement_names_the_window_it_refused_over():
+    correlator = IncidentCorrelator(attribution_window_minutes=45)
+    result = correlator.correlate("svc", series([2, 2, 2, 2, 70]), [commit("old111", 900)])
+    assert result.attribution_window_minutes == 45
+    assert "45 minutes" in result.refusal_statement
+
+
+def test_only_the_inside_baseline_verdict_says_nothing_needs_reverting():
+    result = IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 2]), [commit("aaa", 5)])
+    assert result.verdict is CorrelationVerdict.NO_ANOMALY
+    assert result.nothing_to_revert is True
+    assert result.can_attribute is False
+    assert result.refusal_statement is None
+
+
+def test_an_attribution_is_neither_a_refusal_nor_a_clean_bill():
+    commits = [commit("old111", 400), commit("prev22", 90), commit("bad333", 12)]
+    result = IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 70]), commits)
+    assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert result.can_attribute is True
+    assert result.nothing_to_revert is False
+    assert result.refusal_statement is None
+    assert not _certainty_violations(result.to_voice_summary())
+
+
+def test_the_forbidden_certainty_list_catches_the_wording_that_was_retired():
+    """Negative control on the list itself: the phrases the finding named must all trip it."""
+    for retired in (
+        "do not revert anything, this is not a deploy.",
+        "Do not revert on this. 6 changes landed",
+        "Do not roll back on this answer.",
+        "no deployment landed close enough to blame, so nothing to blame",
+        "told to look elsewhere",
+    ):
+        assert _certainty_violations(retired), f"the list does not catch {retired!r}"
 
 
 # ------------------------------------------------- Local git commit provider

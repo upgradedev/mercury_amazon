@@ -2,7 +2,7 @@
 
 The GitHub adapter needs a token, and Mercury's own repository is private, so a
 judge running the quickstart has no commit history to correlate against and the
-war room can only ever answer "nothing to blame". That is honest, but it hides
+war room can only ever answer "cannot attribute". That is honest, but it hides
 the feature behind a credential.
 
 This adapter closes the gap with real data rather than invented data: it shells

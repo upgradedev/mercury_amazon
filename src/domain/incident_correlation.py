@@ -33,6 +33,17 @@ answer: see ``src/infrastructure/trial_summary.py``.
 
 Every figure above is written by ``python scripts/correlation_trial.py`` into
 ``correlation_trial_summary.json`` and a test compares the two.
+
+**A refusal is a refusal, not an acquittal.** The three verdicts that name nothing
+(``NO_CANDIDATE_IN_WINDOW``, ``WINDOW_TOO_CROWDED``, ``INSUFFICIENT_DATA``) say that
+Mercury cannot attribute the anomaly to a change, and why. None of them is a finding
+that no deploy caused it: an empty window says nothing about changes outside it, a
+crowded window says nothing about which of its changes did it, and a missing baseline
+says nothing at all. The only verdict that may say nothing needs reverting is
+``NO_ANOMALY``, where the reading is inside its own baseline. That contract is carried
+by :attr:`IncidentCorrelation.nothing_to_revert`, worded by
+:attr:`IncidentCorrelation.refusal_statement`, and enforced on every surface by
+:data:`REFUSAL_MUST_NOT_CLAIM`.
 """
 from __future__ import annotations
 
@@ -59,6 +70,27 @@ DEFAULT_MIN_BASELINE_POINTS = 2
 #: ``python scripts/correlation_trial.py --gate-sweep``, and the sweep is published
 #: beside the choice so a reader can see what the other settings cost.
 DEFAULT_MAX_COMMITS_IN_WINDOW = 1
+
+#: What a refusal may never be rendered as, on the wire, on the screen, or in a
+#: document a judge reads. Each is a regular expression matched case-insensitively over
+#: whitespace-normalised text. A refusal says Mercury cannot attribute the anomaly to a
+#: change and why; it has no way to rule a deploy out, so it never says it has, and it
+#: never tells an operator that nothing needs reverting unless the reading is inside its
+#: baseline. ``tests/unit/test_incident_correlation.py`` holds every refusal's wording to
+#: this list and ``tests/e2e/test_refusal_wording.py`` holds the README, the Devpost
+#: text, the cockpit and the video plan to it.
+REFUSAL_MUST_NOT_CLAIM: tuple[str, ...] = (
+    r"\bis not a deploy\b",
+    r"\bnot caused by a deploy",
+    r"\bno deploy caused\b",
+    r"\bdo not revert anything\b",
+    r"\bdo not revert on this\b",
+    r"\bdo not roll back on this\b",
+    r"\bnothing to blame\b",
+    r"\bnot to blame a deploy",
+    r"\brule[sd]? out (?:a|the|any) deploy",
+    r"\blook elsewhere\b",
+)
 
 
 class CorrelationVerdict(str, Enum):
@@ -236,6 +268,62 @@ class IncidentCorrelation:
     #: How many readings the baseline was taken over. Under the pre-onset baseline
     #: this is the count strictly before the onset, which is smaller than the series.
     baseline_points: int = 0
+    #: The attribution window this answer was reached with, so a refusal can say how
+    #: wide the window it refused over was.
+    attribution_window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+
+    @property
+    def can_attribute(self) -> bool:
+        """True only when exactly one change was named. Every other verdict cannot."""
+        return self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and self.offending_commit is not None
+
+    @property
+    def nothing_to_revert(self) -> bool:
+        """True only when the reading is inside its own baseline.
+
+        This is the one verdict that may say nothing needs reverting, because it is the
+        one where nothing is wrong. A refusal to attribute is not it: an empty window, a
+        crowded window and a missing baseline each leave open whether a deploy caused the
+        anomaly, so each is rendered as "cannot attribute" and never as "nothing to
+        revert". Every refusal is driven through this property by a test that asserts it
+        stays False.
+        """
+        return self.verdict is CorrelationVerdict.NO_ANOMALY
+
+    @property
+    def refusal_statement(self) -> str | None:
+        """What a refusal is, and what it is not, in words an operator can act on.
+
+        ``None`` on the two verdicts that are not refusals. On the three that are, the
+        statement names the reason and says in the same breath that the reason is not a
+        finding about the deploys: Mercury has no way to rule a deploy out, so it never
+        says it has.
+        """
+        window = self.attribution_window_minutes
+        ends_at = "the onset" if self.onset_at else "the reading"
+        if self.verdict is CorrelationVerdict.INSUFFICIENT_DATA:
+            plural = "s" if self.sample_size != 1 else ""
+            return (
+                f"Mercury cannot attribute anything for {self.service_name}: it has "
+                f"{self.sample_size} reading{plural} of {self.metric_name} and a baseline needs at "
+                "least two. That is missing data, not a finding about any deploy."
+            )
+        if self.attribution_refusal is AttributionRefusal.NO_CANDIDATE_IN_WINDOW:
+            return (
+                f"Mercury cannot attribute this anomaly to a change: no commit landed in the "
+                f"{window} minutes before {ends_at}. That is an empty window, not evidence that "
+                "no change caused it; a change outside the window, or a cause that is not a "
+                "change at all, are both still open."
+            )
+        if self.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED:
+            return (
+                f"Mercury cannot attribute this anomaly to any one change: "
+                f"{self.commits_in_window} landed in the {window} minutes before {ends_at}, and "
+                "nothing in the metric says which of them did it. That is a refusal to guess, "
+                "not a finding that none of them caused it; rolling back on this answer would "
+                "be a guess."
+            )
+        return None
 
     @property
     def attribution_is_ambiguous(self) -> bool:
@@ -279,12 +367,16 @@ class IncidentCorrelation:
             if self.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED:
                 return (
                     f"{self.metric_name} on {self.service_name} is {self.anomaly_factor:.1f} times its "
-                    f"baseline, but {self.commits_in_window} changes landed in the window before it. "
-                    "Mercury will not pick one of them. Do not roll back on this answer."
+                    f"baseline, and {self.commits_in_window} changes landed in the window before it. "
+                    "Mercury cannot attribute it to any one of them and will not guess. That is not "
+                    "a finding that none of them caused it; rolling back on this answer would be a "
+                    "guess."
                 )
             return (
                 f"{self.metric_name} on {self.service_name} is {self.anomaly_factor:.1f} times its "
-                f"baseline, but no deployment landed close enough to blame. Investigate manually."
+                "baseline, and no change landed in the window before it. Mercury cannot attribute "
+                "it to a deploy. That is an empty window, not a verdict on what caused it. "
+                "Investigate manually."
             )
         commit = self.offending_commit
         target = self.rollback_target
@@ -343,11 +435,13 @@ class IncidentCorrelator:
                 rollback_target=None,
                 explanation=(
                     f"Need at least two {series.metric_name} data points to establish a baseline; "
-                    f"received {len(series.points)}."
+                    f"received {len(series.points)}. With no baseline Mercury cannot attribute "
+                    "anything, and says nothing about whether a deploy is involved."
                 ),
                 metric_provenance=series.provenance,
                 commit_provenance=commit_provenance,
                 sample_size=len(series.points),
+                attribution_window_minutes=self.attribution_window_minutes,
             )
 
         onset_index = (
@@ -395,6 +489,7 @@ class IncidentCorrelator:
                 commit_provenance=commit_provenance,
                 sample_size=len(series.points),
                 baseline_points=baseline_points,
+                attribution_window_minutes=self.attribution_window_minutes,
             )
 
         # The window ends at the onset when there is one, not at the moment somebody
@@ -426,6 +521,7 @@ class IncidentCorrelator:
                 attribution_refusal=refusal,
                 onset_at=onset_at,
                 baseline_points=baseline_points,
+                attribution_window_minutes=self.attribution_window_minutes,
             )
 
         if not candidates:
@@ -433,13 +529,16 @@ class IncidentCorrelator:
                 AttributionRefusal.NO_CANDIDATE_IN_WINDOW,
                 f"{series.metric_name} is {factor:.2f} times baseline, but no commit landed in the "
                 f"{self.attribution_window_minutes} minutes before "
-                f"{'the onset' if onset_at else 'the reading'}, so nothing is blamed.",
+                f"{'the onset' if onset_at else 'the reading'}, so Mercury cannot attribute it to "
+                "a change. An empty window is not evidence that no change caused it: a change "
+                "outside the window, or a cause that is not a change at all, are both still open.",
             )
 
         if self.max_commits_in_window is not None and len(candidates) > self.max_commits_in_window:
             # Naming the closest of a crowded window is what produced most of the wrong
-            # names in scripts/correlation_trial.py. Refusing is the honest answer and
-            # it is the one an on-call engineer can act on: do not revert anything yet.
+            # names in scripts/correlation_trial.py. Refusing is the honest answer, and
+            # the refusal is stated as what it is: Mercury cannot attribute this, not
+            # Mercury has cleared the changes.
             return unattributed(
                 AttributionRefusal.WINDOW_TOO_CROWDED,
                 f"{series.metric_name} is {factor:.2f} times baseline and {len(candidates)} changes "
@@ -447,7 +546,8 @@ class IncidentCorrelator:
                 f"{'the onset' if onset_at else 'the reading'}. That is more than the "
                 f"{self.max_commits_in_window} this correlator will name from, so it names none of "
                 "them. Nothing here says which of those changes did it, and rolling back the closest "
-                "one is as likely to revert an innocent change as the guilty one.",
+                "one is as likely to revert an innocent change as the guilty one. This is a refusal "
+                "to attribute, not a finding that none of them did it.",
             )
 
         offending = candidates[-1]
@@ -490,4 +590,5 @@ class IncidentCorrelator:
             commits_in_window=len(candidates),
             onset_at=onset_at,
             baseline_points=baseline_points,
+            attribution_window_minutes=self.attribution_window_minutes,
         )

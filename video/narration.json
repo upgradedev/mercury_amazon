@@ -1,6 +1,6 @@
 {
   "schema": "mercury.video_narration/1",
-  "status": "PLAN ONLY. No video has been recorded. Durations are intended, not measured against a take. Every beat is an action that exists in the repository today and was performed in a desktop browser against a local server. No beat shows a Fire TV device or the Fire TV emulator, because no APK has been built.",
+  "status": "PLAN ONLY. No video has been recorded. Durations are intended, not measured against a take. Every beat is an action that exists in the repository today and was performed in a desktop browser against a local server. No beat shows a Fire TV device, because no APK has been built, and no Fire TV emulator exists to stand in for one.",
   "project": "mercury_amazon",
   "title": "Mercury: Fire TV Incident Commander",
   "source_of_truth": "video/SHOT_LIST.md",
@@ -18,15 +18,15 @@
       "beat_id": "beat_02_refusal_first",
       "timestamp_start": 13.0,
       "timestamp_end": 31.0,
-      "narration_text": "Mercury answers before anyone clicks, and its most common answer is a refusal. Against eleven hundred and sixty labelled incidents it sees a real anomaly and names nobody eighty one percent of the time. That is the product: do not revert anything, this is not a deploy.",
+      "narration_text": "Mercury answers before anyone clicks, and its most common answer is a refusal. Against eleven hundred and sixty labelled incidents it sees a real anomaly and names nobody eighty one percent of the time. The refusal says what Mercury cannot attribute and why. It never calls the deploy innocent.",
       "visual_action": "Reload the page. The hero renders the correlator's verdict and the anomaly factor as the large figure. Do not click anything yet."
     },
     {
       "beat_id": "beat_03_crowded_refusal",
       "timestamp_start": 31.0,
       "timestamp_end": 47.0,
-      "narration_text": "Here is the refusal that matters. Six changes landed in the hour before this spike started. Nothing in a metric series says which of them did it, so Mercury names none of them and the rollback stays disabled.",
-      "visual_action": "Press release-train. The hero reads Do not revert on this, names the number of changes in the window, and both rollback buttons stay disabled with their reason lines visible."
+      "narration_text": "The refusal that matters. Several changes landed in the hour before this spike, and nothing in a metric series says which of them did it. Mercury cannot attribute this, names none of them, and the rollback stays disabled. Rolling back here would be a guess.",
+      "visual_action": "Press release-train. The hero reads Cannot attribute this, names the number of changes in the window, and both rollback buttons stay disabled with their reason lines visible."
     },
     {
       "beat_id": "beat_04_named_with_odds",

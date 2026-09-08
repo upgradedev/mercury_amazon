@@ -19,10 +19,11 @@ computed on screen from a response.
 the arrow keys and Enter and Escape.
 
 **This does not satisfy the Fire TV track's device requirement.** That track asks
-for the product running on a Fire TV device or in the official Fire TV emulator.
-No APK exists, the Kotlin has never been compiled, and nothing has been installed
-on a device, so a recording made from this shot list shows the cockpit and the
-governance path but not the platform. The arrow keys drive
+for the product running on a Fire TV device, and no Fire TV emulator exists to
+stand in for one. No APK exists, the Kotlin has never been compiled, and nothing has
+been installed on a device, so a recording made from this shot list shows the
+cockpit and the governance path but not the platform. What the platform would add
+is a D-pad and a television; nothing in it listens for speech. The arrow keys drive
 `docs/firetv_nav.js`, which is the same file the Leanback `MainActivity` calls
 through its JavaScript bridge, so the navigation being shown is the navigation the
 APK would drive. That is the honest limit of what this recording proves.
@@ -61,7 +62,8 @@ correlator concluded, with the anomaly factor as the large figure to its left.
 that against 1160 labelled incidents it sees a real anomaly and names nobody 81.1%
 of the time. Say that figure; it is in the README and in
 `correlation_trial_summary.json`, and it is one of only two numbers in this
-document that do not come off the screen.
+document that do not come off the screen. Say what the refusal is and what it is
+not: Mercury cannot attribute, and it never says the deploy is innocent.
 
 The sha and the factor come from the response and change with the checkout. Read
 whatever is on screen. Do not say any other number from this document.
@@ -69,13 +71,16 @@ whatever is on screen. Do not say any other number from this document.
 ### 3. The refusal that carries the product. 0:31 to 0:47
 
 **Action:** press **release-train** in the demo row.
-**Expected on screen:** the hero reads `Do not revert on this.` followed by the
+**Expected on screen:** the hero reads `Cannot attribute this.` followed by the
 number of changes that landed before the spike started, and the eyebrow reads
-`Incident, too many changes to name one`. Both rollback buttons stay disabled and
-their reason lines are visible underneath.
+`Incident, too many changes to name one`. The cause line beneath is the server's
+own refusal statement: a refusal to guess, not a finding that none of them caused
+it, and rolling back on this answer would be a guess. Both rollback buttons stay
+disabled and their reason lines are visible underneath.
 **Point to make:** the anomaly is real and Mercury still names nothing, because a
 burst of changes landed and nothing in a metric series says which of them did it.
-This is the answer an on-call engineer can act on at three in the morning.
+Read the cause line out, because it is the sentence that keeps this honest: the
+refusal is not an acquittal of the changes it refused to choose between.
 
 The number of changes in the window comes from the checkout's own `git log` and
 changes with it. Read what is on screen.

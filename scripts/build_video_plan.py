@@ -26,17 +26,18 @@ BEATS = [
         "beat_02_refusal_first", 13.0, 31.0,
         "Mercury answers before anyone clicks, and its most common answer is a "
         "refusal. Against eleven hundred and sixty labelled incidents it sees a real "
-        "anomaly and names nobody eighty one percent of the time. That is the product: "
-        "do not revert anything, this is not a deploy.",
+        "anomaly and names nobody eighty one percent of the time. The refusal says "
+        "what Mercury cannot attribute and why. It never calls the deploy innocent.",
         "Reload the page. The hero renders the correlator's verdict and the anomaly "
         "factor as the large figure. Do not click anything yet.",
     ),
     (
         "beat_03_crowded_refusal", 31.0, 47.0,
-        "Here is the refusal that matters. Six changes landed in the hour before this "
-        "spike started. Nothing in a metric series says which of them did it, so "
-        "Mercury names none of them and the rollback stays disabled.",
-        "Press release-train. The hero reads Do not revert on this, names the number "
+        "The refusal that matters. Several changes landed in the hour before this "
+        "spike, and nothing in a metric series says which of them did it. Mercury "
+        "cannot attribute this, names none of them, and the rollback stays disabled. "
+        "Rolling back here would be a guess.",
+        "Press release-train. The hero reads Cannot attribute this, names the number "
         "of changes in the window, and both rollback buttons stay disabled with their "
         "reason lines visible.",
     ),
@@ -113,7 +114,8 @@ PLAN_NOTE = (
     "PLAN ONLY. No video has been recorded. Durations are intended, not measured "
     "against a take. Every beat is an action that exists in the repository today "
     "and was performed in a desktop browser against a local server. No beat shows "
-    "a Fire TV device or the Fire TV emulator, because no APK has been built."
+    "a Fire TV device, because no APK has been built, and no Fire TV emulator exists "
+    "to stand in for one."
 )
 
 narration_beats = []

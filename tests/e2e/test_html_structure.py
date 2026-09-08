@@ -107,7 +107,11 @@ def test_the_page_renders_the_crowded_window_refusal(html):
     assert "WINDOW_TOO_CROWDED" in html
     assert "too many changes to name one" in html
     assert 'data-service="release-train"' in html
-    assert "Do not revert on this" in html
+    # A refusal is rendered as a refusal. The headline says Mercury cannot attribute,
+    # and the cause line is the server's own refusal statement when it ships one.
+    assert "Cannot attribute this" in html
+    assert "refusal_statement" in html
+    assert "Do not revert on this" not in html
 
 
 def test_the_page_prints_the_measured_worth_of_a_naming(html):
@@ -287,7 +291,7 @@ def test_static_hosting_is_declared_honestly(html):
 def test_the_hero_answer_is_empty_until_the_api_answers(html):
     """The hero states an incident. None of those states may be in the markup."""
     markup = html.split("<script>")[0]
-    for computed in ["Incident attributed", "Incident, nothing to blame", "Steady",
+    for computed in ["Incident attributed", "Incident, cannot attribute", "Steady",
                      "Rollback staged", "ANOMALY_ATTRIBUTED"]:
         assert computed not in markup, f"{computed!r} is painted into the markup"
     # What the markup may say is that nothing has been asked yet.

@@ -172,7 +172,8 @@ def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client
     detail = data["metric_provenance"]["detail"]
     assert "the commit with the most company" in detail
     assert "the commits are real, this metric is not" in detail
-    assert "Do not roll back on this answer" in data["voice_summary"]
+    assert "cannot attribute it to any one of them" in data["voice_summary"]
+    assert "rolling back on this answer would be a guess" in data["voice_summary"]
 
 
 def test_every_answer_carries_the_measured_worth_of_naming_a_commit(client):
@@ -224,6 +225,50 @@ def test_a_verdict_that_names_nobody_claims_no_candidates(client):
         assert data["offending_commit"] is None
         assert data["attribution"]["commits_in_window"] == 0
         assert data["attribution"]["is_ambiguous"] is False
+
+
+def _certainty_violations(text: str) -> list[str]:
+    from src.domain.incident_correlation import REFUSAL_MUST_NOT_CLAIM
+
+    flat = " ".join((text or "").split())
+    return [pattern for pattern in REFUSAL_MUST_NOT_CLAIM if re.search(pattern, flat, re.IGNORECASE)]
+
+
+def test_a_refusal_on_the_wire_is_a_refusal_and_not_an_acquittal(client):
+    """The three refusing demo services, as the cockpit receives them.
+
+    Each has to say Mercury cannot attribute, and why, and none of them may carry the
+    certainty phrasing the domain forbids or claim that nothing needs reverting. That
+    last flag is the one a downstream consumer would key on, so it is asserted by name.
+    """
+    for service in ("release-train", "search-indexer", "quiet-service"):
+        data = _what_changed(client, service)
+        attribution = data["attribution"]
+        assert attribution["can_attribute"] is False, service
+        assert attribution["nothing_to_revert"] is False, (
+            f"{service} returned {data['verdict']} with nothing_to_revert true; only "
+            "NO_ANOMALY may say that"
+        )
+        assert attribution["refusal_statement"], f"{service} ships no refusal statement"
+        assert "cannot attribute" in attribution["refusal_statement"], service
+        for field in ("refusal_statement", "voice_summary", "explanation"):
+            text = attribution[field] if field == "refusal_statement" else data[field]
+            assert not _certainty_violations(text), f"{service}.{field} states a certainty: {text!r}"
+        assert data["recommended_action"] is None, service
+
+
+def test_only_the_steady_service_says_nothing_needs_reverting(client):
+    steady = _what_changed(client, "payments-worker")
+    assert steady["verdict"] == "NO_ANOMALY"
+    assert steady["attribution"]["nothing_to_revert"] is True
+    assert steady["attribution"]["can_attribute"] is False
+    assert steady["attribution"]["refusal_statement"] is None
+
+    named = _what_changed(client, "checkout-api")
+    assert named["verdict"] == "ANOMALY_ATTRIBUTED"
+    assert named["attribution"]["can_attribute"] is True
+    assert named["attribution"]["nothing_to_revert"] is False
+    assert named["attribution"]["refusal_statement"] is None
 
 
 def test_what_changed_rejects_an_out_of_range_window(client):

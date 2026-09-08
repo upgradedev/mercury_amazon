@@ -330,7 +330,10 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
     """Correlate an error metric anomaly with the deployment that preceded it.
 
     Returns the correlator's verdict as-is, including the verdicts where it
-    cannot attribute the anomaly to any commit.
+    cannot attribute the anomaly to any commit. A refusal is returned as a
+    refusal: ``attribution.refusal_statement`` says Mercury cannot attribute and
+    why, ``attribution.nothing_to_revert`` is true only on ``NO_ANOMALY``, and no
+    refusal is ever rendered as proof that a deploy did not cause the anomaly.
     """
     correlation = incident_use_case.execute(req.service_name, req.time_window_minutes)
 
@@ -356,9 +359,15 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
         "attribution": {
             "commits_in_window": correlation.commits_in_window,
             "is_ambiguous": correlation.attribution_is_ambiguous,
+            "can_attribute": correlation.can_attribute,
+            # True only when the reading is inside its baseline. A refusal to
+            # attribute leaves this False: it says nothing about whether a deploy
+            # caused the anomaly, so it may not be read as "nothing to revert".
+            "nothing_to_revert": correlation.nothing_to_revert,
             "refusal_reason": (
                 correlation.attribution_refusal.value if correlation.attribution_refusal else None
             ),
+            "refusal_statement": correlation.refusal_statement,
             "onset_at": correlation.onset_at.isoformat() if correlation.onset_at else None,
             "baseline_points": correlation.baseline_points,
             "measured_accuracy": naming_accuracy(),
