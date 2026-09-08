@@ -30,7 +30,11 @@ from src.domain.provenance import DataSource, Provenance
 
 class MetricSeriesProvider(Protocol):
     def get_error_series(
-        self, service_name: str, window_minutes: int = 60, anchor_at: datetime | None = None
+        self,
+        service_name: str,
+        window_minutes: int = 60,
+        anchor_at: datetime | None = None,
+        commit_times: list[datetime] | None = None,
     ) -> MetricSeries:
         ...
 
@@ -121,13 +125,18 @@ class DiagnoseIncidentUseCase:
     def execute(self, service_name: str, window_minutes: int = 60) -> IncidentCorrelation:
         commits, commit_provenance = self._gather_commits()
 
-        # Anchor a simulated series just after the newest commit, so the demo path
-        # produces a coherent correlation instead of an anomaly with nothing near
-        # it. Only ever applied to a simulated series; a live CloudWatch reading
-        # keeps its own timestamps.
+        # Anchor a simulated series just after a real commit, so the demo path produces
+        # a coherent correlation instead of an anomaly with nothing near it. The whole
+        # log goes with it, because which commit a shape should sit after depends on how
+        # crowded that commit's attribution window is, and only the fixture knows which
+        # shape it is building. Only ever applied to a simulated series; a live
+        # CloudWatch reading keeps its own timestamps.
         anchor = max((c.committed_at for c in commits), default=None)
         series = self._metrics.get_error_series(
-            service_name, window_minutes=window_minutes, anchor_at=anchor
+            service_name,
+            window_minutes=window_minutes,
+            anchor_at=anchor,
+            commit_times=[c.committed_at for c in commits],
         )
 
         return self._correlator.correlate(service_name, series, commits, commit_provenance)

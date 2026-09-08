@@ -85,6 +85,39 @@ def test_the_operational_text_reads_above_the_body_copy_not_at_the_floor(measure
     )
 
 
+def test_the_provenance_stamp_renders_on_the_same_screenful_as_the_figure(measurement):
+    """A wallboard is never scrolled, so a stamp below the fold is a stamp nobody reads.
+
+    Measured before this was fixed: the anomaly factor rendered at y=274 and the words
+    saying where that number came from were not in the first 1080 pixels at all. A
+    viewer across a room read a locally generated 12.9x as a production number while the
+    README claimed every number on the screen carried a badge saying otherwise.
+
+    Reproduce the failure on a clean checkout, which overwrites the page and then throws
+    the copy away, so stash anything uncommitted in it first::
+
+        git show 455f60b:docs/index.html > docs/index.html
+        python scripts/measure_legibility.py     # exits 1, zero stamps above the fold
+        git checkout -- docs/index.html
+    """
+    fold = measurement["provenance_above_the_fold"]
+    assert fold["hero_figure_top_px"] is not None, "the hero figure did not render at all"
+    assert fold["stamps_above_the_fold"] >= 1, (
+        "no provenance stamp renders within the first "
+        f"{fold['viewport_height_px']}px, while the figure it qualifies renders at "
+        f"y={fold['hero_figure_top_px']}: {fold['stamps']}"
+    )
+    assert fold["topmost_stamp_top_px"] <= fold["viewport_height_px"]
+    # The words themselves, not the machine value. "offline-fixture" is a data source
+    # slug; "OFFLINE FIXTURE" is what a viewer reads.
+    assert any("OFFLINE FIXTURE" in text or "LIVE" in text
+               for text in fold["stamp_text_above_the_fold"]), (
+        f"the stamps above the fold say {fold['stamp_text_above_the_fold']}, none of which "
+        "tells a viewer whether the number was read live or served from a recording"
+    )
+    assert fold["strings_naming_a_source_above_the_fold"] >= 1
+
+
 def test_the_page_never_scrolls_sideways_on_a_television(measurement):
     assert measurement["horizontal_overflow"] is False
 

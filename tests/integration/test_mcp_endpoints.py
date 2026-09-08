@@ -4,9 +4,13 @@ Every telemetry endpoint must return provenance, because the cockpit renders it
 and a judge reads it. These tests assert that contract as hard as they assert the
 numbers.
 """
+import json
 import re
+from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def test_health_reports_the_build_sha_field():
@@ -118,8 +122,45 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
     if data["offending_commit"] is not None:
         detail = data["metric_provenance"]["detail"]
-        assert "placed" in detail and "after the newest known commit" in detail
+        # Which commit the reading is placed after is itself a choice, so the sentence
+        # has to name the rule that chose it, not merely admit that something moved.
+        assert "placed" in detail
+        assert "alone in its 60 minute attribution window" in detail
         assert "the commits are real, this metric is not" in detail
+
+
+def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):
+    """The demo that shows the refusal has to disclose its own staging too."""
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "release-train"}).json()
+    assert data["verdict"] == "ANOMALY_WITHOUT_ATTRIBUTION"
+    assert data["attribution"]["refusal_reason"] == "WINDOW_TOO_CROWDED"
+    assert data["attribution"]["commits_in_window"] > 1
+    assert data["offending_commit"] is None
+    assert data["recommended_action"] is None
+    detail = data["metric_provenance"]["detail"]
+    assert "the commit with the most company" in detail
+    assert "the commits are real, this metric is not" in detail
+    assert "Do not roll back on this answer" in data["voice_summary"]
+
+
+def test_every_answer_carries_the_measured_worth_of_naming_a_commit(client):
+    """An attribution ships the precision it was measured at, next to the name.
+
+    The figure comes from correlation_trial_summary.json, which
+    ``python scripts/correlation_trial.py`` writes, so the number on the wire is the
+    number in the README rather than one recomputed per request.
+    """
+    data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    accuracy = data["attribution"]["measured_accuracy"]
+    assert accuracy["measured_by_command"] == "python scripts/correlation_trial.py"
+    if accuracy["measured"]:
+        summary = json.loads((REPO_ROOT / "correlation_trial_summary.json").read_text(encoding="utf-8"))
+        assert accuracy["precision_when_it_names_a_commit"] == summary["headline"]["naming_precision"]
+        assert accuracy["namings_measured"] == summary["headline"]["times_a_commit_was_named"]
+        assert accuracy["corpus_cases"] == summary["cases"]
+    else:
+        assert accuracy["precision_when_it_names_a_commit"] is None
+        assert "no measured accuracy" in accuracy["note"]
 
 
 def test_what_changed_reports_how_many_changes_were_candidates(client):

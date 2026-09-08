@@ -36,69 +36,89 @@ python -m pytest tests/ -q
 MERCURY_ROLLBACK_SECRET=demo python -m src.interfaces.mcp_server
 ```
 
-Open `http://127.0.0.1:8002/` at 1920x1080. Leave the Secret field empty; beat 7
-depends on it being empty. Do not paste the secret until beat 8.
+Open `http://127.0.0.1:8002/` at 1920x1080. Leave the Secret field empty; beat 8
+depends on it being empty. Do not paste the secret until beat 9.
 
 ---
 
 ## Beats
 
-### 1. The question. 0:00 to 0:12
+### 1. The question, and why it is usually the wrong one. 0:00 to 0:13
 
 **On screen:** the cockpit at rest, one second before the page has answered.
 **Action:** none. Hard cut in on the loaded page.
-**Narration:** an incident starts, somebody asks what broke, and the answer is
-spread across six tabs on six laptops.
+**Narration:** an incident starts, somebody asks what we just deployed, and half
+the time that is the wrong question. Reverting on it costs an hour.
 **Expected result:** the hero fills the frame with a single sentence, not a grid.
 
-### 2. The answer arrives without being asked. 0:12 to 0:30
+### 2. The answer arrives without being asked, and it is usually a refusal. 0:13 to 0:31
 
 **Action:** reload the page. Do not click anything.
 **Expected on screen:** the page calls `GET /health` then
-`POST /mcp/tools/what_changed` on load. The hero reads
-`Commit <sha> raised HTTPCode_Target_5XX_Count on checkout-api`, with the anomaly
-factor as the large figure to its left, the baseline underneath it, and the commit
-message quoted below with its author.
-**Point to make:** nothing was clicked. The wallboard answers the question the
-room walked in with.
+`POST /mcp/tools/what_changed` on load, and the hero renders whatever the
+correlator concluded, with the anomaly factor as the large figure to its left.
+**Point to make:** nothing was clicked, and the headline claim of this product is
+that against 1160 labelled incidents it sees a real anomaly and names nobody 81.1%
+of the time. Say that figure; it is in the README and in
+`correlation_trial_summary.json`, and it is one of only two numbers in this
+document that do not come off the screen.
 
 The sha and the factor come from the response and change with the checkout. Read
-whatever is on screen. Do not say a number from this document.
+whatever is on screen. Do not say any other number from this document.
 
-### 3. Where each half of that answer came from. 0:30 to 0:45
+### 3. The refusal that carries the product. 0:31 to 0:47
 
-**Action:** none. Hold on the two badges in the hero footer.
-**Expected on screen:** two badges, side by side, from the same response:
-`offline-fixture` against *metric series*, and `local-git` against *commit
-history*. Beside them the measured latency line,
-`POST /mcp/tools/what_changed answered 200 in NNN ms`, timed in the page with
-`performance.now()`.
-**Point to make:** the metric is simulated and the screen says so in the same
-place as the number. The commits are real ones read from the checkout. A viewer
-never has to trust the server about which is which.
+**Action:** press **release-train** in the demo row.
+**Expected on screen:** the hero reads `Do not revert on this.` followed by the
+number of changes that landed before the spike started, and the eyebrow reads
+`Incident, too many changes to name one`. Both rollback buttons stay disabled and
+their reason lines are visible underneath.
+**Point to make:** the anomaly is real and Mercury still names nothing, because a
+burst of changes landed and nothing in a metric series says which of them did it.
+This is the answer an on-call engineer can act on at three in the morning.
 
-### 4. The D-pad moves in space. 0:45 to 1:02
+The number of changes in the window comes from the checkout's own `git log` and
+changes with it. Read what is on screen.
 
-**Action:** press Right, Right, Down, Right, Left on the keyboard.
+### 4. When it does name one, it prints its own odds. 0:47 to 1:08
+
+**Action:** press **checkout-api**.
+**Expected on screen:** the hero names the commit, quotes its message with the
+author, and the line beneath reads that when this correlator names a commit it is
+the one that caused the reading 52% of the time, over 113 namings in a corpus of
+1160 labelled cases, with the command that produced the figure.
+**Point to make:** it names a change only when exactly one landed in the window,
+and it still shows the odds at the moment somebody would act. That line is read
+from `correlation_trial_summary.json` and shipped in the response as
+`attribution.measured_accuracy`; the page never computes it.
+
+### 5. Where each half of that answer came from, without scrolling. 1:08 to 1:24
+
+**Action:** none. Hold on the two badges inside the hero card, beside the anomaly
+factor. Do not scroll.
+**Expected on screen:** two badges from the same response: `OFFLINE FIXTURE`
+against *metric series (offline-fixture)*, and `LIVE` against *commit history
+(local-git)*.
+**Point to make:** the words, not the slug, and next to the number rather than
+below the fold. Measured at 1920x1080 the factor renders at y=274 and the stamp at
+y=453, both inside the first screenful, which matters because a wallboard is never
+scrolled. `python scripts/measure_legibility.py` exits 1 if that stops being true.
+
+### 6. The D-pad moves in space, and BACK does not close the room. 1:24 to 1:41
+
+**Action:** press Right, Right, Down, Right, Left, then Enter on the Delivery
+velocity tile, then Escape.
 **Expected on screen:** the amber focus ring jumps to the nearest control in the
-pressed direction, and the label at the right of the key hint bar changes with it:
-`Focused: Ask what changed`, then `Focused: Stage governed rollback`, then
-`Focused: Delivery velocity panel`, then `Focused: Cloud spend panel`.
+pressed direction and the label at the right of the key hint bar changes with it.
+On Enter the tiles are replaced by the Delivery velocity panel and the BACK legend
+changes from `Exit to the Fire TV launcher` to `Back to the wall`. On Escape the
+wall returns and the legend changes back.
 **Point to make:** movement is geometric, not a walk down the DOM. The disabled
 Confirm button is skipped rather than focused, because a ring on a dead control is
-a lie about what the remote can do.
+a lie about what the remote can do, and BACK is answered by the page before it
+would close the application.
 
-### 5. CENTER drills in, BACK returns. 1:02 to 1:18
-
-**Action:** press Enter on the Delivery velocity tile, then Escape.
-**Expected on screen:** on Enter the three tiles are replaced by the Delivery
-velocity panel and the hint bar's BACK legend changes from
-`Exit to the Fire TV launcher` to `Back to the wall`. On Escape the wall returns
-and the legend changes back.
-**Point to make:** BACK is answered by the page before it would close the
-application, so the war room is never shut by accident mid-incident.
-
-### 6. Two data sources, one screen. 1:18 to 1:35
+### 7. Two data sources, one screen. 1:41 to 1:56
 
 **Action:** in the Delivery velocity panel press Enter on **Load DORA velocity**.
 Then Escape, Right to Cloud spend, Enter, then Enter on **Scan AWS spend**.
@@ -112,17 +132,18 @@ same moment, each labelled. Say on camera which machine state you are recording
 in. Do not read the spend figures aloud if they are live: they are a real account's
 numbers.
 
-### 7. The refusal. 1:35 to 1:48
+### 8. The governance refusal. 1:56 to 2:09
 
-**Action:** Escape to the wall, focus **Stage governed rollback**, press Enter with
-the Secret field still empty.
+**Action:** Escape to the wall, press **checkout-api** so a rollback target exists
+again, focus **Stage governed rollback**, press Enter with the Secret field still
+empty.
 **Expected on screen:** the incident panel opens with
 `No governance secret entered. Staging a rollback needs the deployment secret from
 the Secret field.`
 **Point to make:** the one irreversible control on the screen refuses in plain
 words rather than failing silently or pretending to work.
 
-### 8. Staging mints a token bound to the change. 1:48 to 2:05
+### 9. Staging mints a token bound to the change. 2:09 to 2:20
 
 **Action:** type the secret into the Secret field, then press **Stage governed
 rollback** again.
@@ -134,33 +155,28 @@ a token was issued.
 **Point to make:** the token is an HMAC over the action id and a hash of exactly
 this payload. Edit the target after staging and it stops applying.
 
-### 9. Confirming says what it did and did not do. 2:05 to 2:22
+### 10. Confirming says what it did not do, and the second press is refused. 2:20 to 2:34
 
-**Action:** press **Confirm rollback**.
-**Expected on screen:** status `EXECUTED`, and the output verbatim:
+**Action:** press **Confirm rollback**, then press it a second time.
+**Expected on screen:** first, status `EXECUTED` and the output verbatim:
 `Governance passed for 'checkout-api' to commit <sha>. Recorded locally. No
 deployment pipeline was contacted`, followed by the line naming the record-only
-dispatcher this deployment is running.
-**Point to make:** read that sentence out. The product tells the room it did not
-deploy anything, on the screen, in the moment of success.
+dispatcher. Then, on the second press,
+`Request failed HTTP 409. NOT_PENDING: Action '<id>' is in state EXECUTED, not
+PENDING_CONFIRMATION.`
+**Point to make:** read the first sentence out. The product tells the room it did
+not deploy anything, on the screen, in the moment of success. Single use is then
+enforced by the server and the denial is named rather than swallowed. Leaving the
+staging on screen past its lease produces `HTTP 410. LEASE_EXPIRED` in the same
+way.
 
-### 10. The same button, refused by name. 2:22 to 2:35
-
-**Action:** press **Confirm rollback** a second time.
-**Expected on screen:** `Request failed HTTP 409. NOT_PENDING: Action '<id>' is in
-state EXECUTED, not PENDING_CONFIRMATION.` The Confirm reason line reads that the
-token has been spent.
-**Point to make:** single use is enforced by the server and the denial is named,
-not swallowed. Leaving the staging on screen past its lease produces
-`HTTP 410. LEASE_EXPIRED` in the same way.
-
-### 11. What is not built. 2:35 to 2:48
+### 11. What is not built. 2:34 to 2:48
 
 **Action:** cut to `docs/FIRE_TV_BUILD.md` open in an editor, on the recorded
 build failure.
 **Narration:** no APK exists, the Kotlin has never been compiled, and nothing has
-run on Fire TV hardware. The navigation, the correlation and the governance path
-are real and were driven live in this recording. The Fire TV device is not.
+run on Fire TV hardware. The refusals, the correlation and the governance path are
+real and were driven live in this recording. The Fire TV device is not.
 **Point to make:** end on the limitation rather than letting a judge find it.
 
 ---
@@ -168,5 +184,13 @@ are real and were driven live in this recording. The Fire TV device is not.
 ## Numbers policy for the recording
 
 Read numbers off the screen as they appear. Latency, the anomaly factor, the sha,
-the lease and the spend all vary per machine and per run. This document contains
-no measured value for that reason.
+the lease, the number of changes in the window and the spend all vary per machine
+and per run.
+
+Two figures are exceptions and are spoken from the script rather than read off the
+screen, because they describe the labelled corpus and not this run: the 81.1%
+refusal rate in beat 2, and the 52% precision over 113 namings in beat 4. Both are
+written by `python scripts/correlation_trial.py` into
+`correlation_trial_summary.json`, the README quotes the same file, and a test
+compares the two. If a re-run moves them, re-record those beats rather than saying
+the old number.

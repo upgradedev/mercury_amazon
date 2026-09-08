@@ -178,6 +178,52 @@ def test_jvm_unit_tests_are_wired_into_the_build(app_gradle):
     assert 'java.srcDirs("src/test/kotlin")' in app_gradle
 
 
+def test_every_file_the_build_script_names_exists(app_gradle):
+    """A build script naming a file that is not there is a build that fails on a runner.
+
+    ``proguardFiles(getDefaultProguardFile(...), "proguard-rules.pro")`` sat in the
+    release block while ``app/proguard-rules.pro`` did not exist. Gradle resolves that
+    path while configuring the release variant, so the break was real and merely latent:
+    the module has never been compiled here, because there is no JDK and no Android SDK
+    on this machine. This test is what a compiler would have said.
+
+    It reads the paths out of the build script rather than listing them, so adding a
+    second named file without adding the file fails too. ``getDefaultProguardFile``
+    resolves inside the Android SDK and is deliberately not checked here: asserting on a
+    path this machine cannot see would be inventing evidence.
+    """
+    named = set()
+    for match in re.finditer(r'proguardFiles\((.*?)\)\s*\n', app_gradle, re.DOTALL):
+        named.update(re.findall(r'"([^"]+\.pro)"', match.group(1)))
+    named.update(re.findall(r'srcDirs?\("([^"]+)"\)', app_gradle))
+    named.update(re.findall(r'java\.srcDirs\("([^"]+)"\)', app_gradle))
+    assert named, "no file paths were found in app/build.gradle.kts, so this proves nothing"
+    assert "proguard-rules.pro" in named, (
+        "the release block no longer names proguard-rules.pro; if that is deliberate, this "
+        "test should be updated rather than the assertion loosened"
+    )
+
+    missing = sorted(path for path in named if not (APP / path).exists())
+    assert not missing, (
+        f"app/build.gradle.kts names {missing}, which do not exist under app/. Gradle "
+        "resolves these while configuring the variant, so the build fails on the first "
+        "machine that has an SDK."
+    )
+
+
+def test_the_proguard_file_makes_no_claim_about_a_build_that_never_ran(app_gradle):
+    """Empty on purpose. Keep rules nothing has exercised would be untested claims."""
+    rules = (APP / "proguard-rules.pro").read_text(encoding="utf-8")
+    active = [line for line in rules.splitlines()
+              if line.strip() and not line.strip().startswith("#")]
+    assert not active, f"proguard-rules.pro carries unexercised rules: {active}"
+    assert "isMinifyEnabled = false" in app_gradle, (
+        "minification is on, so an empty proguard-rules.pro is no longer the honest file: "
+        "the JavascriptInterface on DpadBridge needs a keep rule, and it needs a run that "
+        "proves it works"
+    )
+
+
 def test_build_config_carries_the_cockpit_url(app_gradle):
     assert "buildConfig = true" in app_gradle
     assert "MERCURY_COCKPIT_URL" in app_gradle

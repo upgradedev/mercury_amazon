@@ -79,6 +79,47 @@ def test_the_page_renders_data_provenance(html):
     assert "OFFLINE FIXTURE" in html
 
 
+def test_the_provenance_badge_sits_inside_the_hero_card(html):
+    """Structure half of the fold fix. The pixel half is tests/ux.
+
+    The badge used to render in ``.hero-foot``, below the demo buttons, which puts it
+    at y=1144 on a 1080 tall screen. It now renders in ``#heroSource`` inside
+    ``.hero-figure``, next to the anomaly factor it qualifies. This asserts the badge
+    goes into that container rather than asserting a pixel, so the layout can move as
+    long as the provenance stays with the number; ``tests/ux`` measures where it
+    actually lands.
+    """
+    hero = html.split('<section id="hero"', 1)[1].split("</section>", 1)[0]
+    figure = hero.split('class="hero-figure"', 1)[1].split("</div>\n            </div>", 1)[0]
+    assert 'id="heroSource"' in figure, (
+        "the provenance container is no longer inside the hero figure block"
+    )
+    assert "el('heroSource')" in html
+    # The badge renders the words, not the machine slug: "offline-fixture" is a value,
+    # "OFFLINE FIXTURE" is what somebody across a room reads.
+    badge = html.split("function sourceBadge(", 1)[1].split("\n    }", 1)[0]
+    assert "display_label" in badge
+    assert "OFFLINE FIXTURE" in badge
+
+
+def test_the_page_renders_the_crowded_window_refusal(html):
+    """The verdict the product is now built around has to have a branch on the screen."""
+    assert "WINDOW_TOO_CROWDED" in html
+    assert "too many changes to name one" in html
+    assert 'data-service="release-train"' in html
+    assert "Do not revert on this" in html
+
+
+def test_the_page_prints_the_measured_worth_of_a_naming(html):
+    """The precision travels with the answer, and is never computed in the page."""
+    assert "measured_accuracy" in html
+    assert "accuracyLine" in html
+    assert "hero-accuracy" in html
+    accuracy = html.split("function accuracyLine(", 1)[1].split("\n    }", 1)[0]
+    assert "precision_when_it_names_a_commit" in accuracy
+    assert "measured_by_command" in accuracy
+
+
 def test_no_hardcoded_telemetry_numbers_remain_in_the_markup(html):
     """The old page hardcoded these next to an API it never called."""
     markup = html.split("<script>")[0]

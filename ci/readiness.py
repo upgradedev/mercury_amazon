@@ -32,6 +32,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # reason it is out of reach of an automated run. Printed in the output.
 CI_EXEMPT: dict[str, str] = {
     "C5": "needs a real browser driver walking the recorded video path",
+    "J4": "needs a JDK, an Android SDK and a Fire TV device or emulator to produce an APK "
+          "and a recorded launch; none of the three is installed on this machine",
     "D2": "needs a deployment of this commit; the live endpoint runs an older build",
     "E2": "needs a recorded video for narration and picture to be in sync with",
     "E4": "needs a public video of the running product",
@@ -90,6 +92,100 @@ def get_standards_gate_ids() -> list[str]:
         "I1", "I2", "I3", "I4", "I5",
         "O1", "O2", "O3",
     ]
+
+
+#: Where a Fire TV build receipt would live if one had ever been produced. Nothing in
+#: this repository writes it: it is written by hand from a real build and a real launch,
+#: the way deploy_teardown_receipt.json is, and gate J4 fails while it is absent.
+FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
+
+#: Every field J4 requires, and what each one is evidence of. A receipt missing any of
+#: them is not evidence, so the gate fails and says which field it wanted.
+FIRETV_RECEIPT_FIELDS = {
+    "built_by_command": "the gradle command that produced the APK",
+    "gradle_exit_code": "gradle's own exit code, which must be 0",
+    "apk_path": "the path of the APK, which must exist in this checkout",
+    "apk_sha256": "the digest of that APK, so the file can be identified",
+    "device_run": "a recorded launch on a device or emulator",
+}
+
+#: What a recorded launch has to say. A device that installed the APK but was never
+#: watched running it proves the package installs, not that the app works.
+FIRETV_DEVICE_FIELDS = {
+    "device_model": "which Fire TV device or emulator image ran it",
+    "fire_os_or_android_version": "what it was running",
+    "adb_install_exit_code": "adb install's exit code, which must be 0",
+    "launched_at_utc": "when it was launched",
+    "observed": "what was seen on the screen, in words",
+}
+
+
+def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tuple[bool, str]:
+    """J4: is the sponsor product load-bearing, or merely mentioned.
+
+    This gate used to pass on ``bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest``,
+    which is a grep over two text files. Mercury is entered in the Fire TV track and its
+    own README says no APK has ever been built, so the gate that decides whether the
+    sponsor product is load-bearing was the one gate in this file that could not fail on
+    the axis it exists to test, and it contributed a PASS to a published score.
+
+    A Fire TV entry is load-bearing when there is a Fire TV binary and somebody has
+    watched it run. So the manifest and the README stay as necessary conditions, and the
+    sufficient condition is a receipt recording a gradle build that exited 0, an APK that
+    exists in the checkout, and a launch on a device or emulator. There is no such
+    receipt and this gate therefore fails, which is the truth and is why the published
+    score went down by one when this was written.
+
+    ``apk_exists`` is injected so a test can drive every branch without an APK.
+    """
+    missing_context = []
+    if not readme_terms:
+        missing_context.append("the README never names Fire TV, Fire OS or leanback")
+    if "LEANBACK_LAUNCHER" not in manifest:
+        missing_context.append("no LEANBACK_LAUNCHER activity in app/src/main/AndroidManifest.xml")
+    if missing_context:
+        return False, "; ".join(missing_context)
+
+    if not isinstance(receipt, dict) or not receipt:
+        return False, (
+            f"A leanback manifest and the word 'Fire TV' are text, not a Fire TV app. This gate "
+            f"wants {FIRETV_BUILD_RECEIPT}, recording a gradle build that exited 0, the APK it "
+            f"produced, and a launch on a device or emulator. No such file exists, no APK has "
+            f"been built and nothing has run on Fire TV hardware; docs/FIRE_TV_BUILD.md records "
+            f"the verbatim local failure"
+        )
+
+    problems = []
+    for field, means in FIRETV_RECEIPT_FIELDS.items():
+        if receipt.get(field) in (None, "", []):
+            problems.append(f"{field} missing ({means})")
+    if receipt.get("gradle_exit_code") not in (None, 0):
+        problems.append(f"gradle exited {receipt.get('gradle_exit_code')}, so no APK was built")
+    apk = receipt.get("apk_path")
+    if apk and not apk_exists(apk):
+        problems.append(f"apk_path {apk!r} is not a file in this checkout")
+
+    device = receipt.get("device_run")
+    if not isinstance(device, dict) or not device:
+        problems.append("device_run missing (a recorded launch on a device or emulator)")
+    else:
+        for field, means in FIRETV_DEVICE_FIELDS.items():
+            if device.get(field) in (None, "", []):
+                problems.append(f"device_run.{field} missing ({means})")
+        if device.get("adb_install_exit_code") not in (None, 0):
+            problems.append(
+                f"adb install exited {device.get('adb_install_exit_code')}, so it never installed"
+            )
+
+    if problems:
+        return False, f"{FIRETV_BUILD_RECEIPT} is not evidence yet: " + "; ".join(sorted(problems))
+
+    return True, (
+        f"{receipt['built_by_command']} exited 0 and produced {apk} (sha256 "
+        f"{str(receipt['apk_sha256'])[:12]}...), which installed and ran on "
+        f"{device['device_model']} on {device['fire_os_or_android_version']} at "
+        f"{device['launched_at_utc']}: {device['observed']}"
+    )
 
 
 def collected_test_count() -> int | None:
@@ -188,10 +284,18 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
 
     j4_terms = [t for t in ["fire tv", "fire os", "leanback"] if t in readme_lower]
     manifest = read("app/src/main/AndroidManifest.xml")
-    j4 = bool(j4_terms) and "LEANBACK_LAUNCHER" in manifest
-    gate("J4", "Sponsor product is load-bearing", j4,
-         "Fire TV named in the README and a LEANBACK_LAUNCHER activity exists in app/" if j4
-         else f"readme_terms={j4_terms} leanback_launcher={'LEANBACK_LAUNCHER' in manifest}")
+    firetv_receipt_text = read(FIRETV_BUILD_RECEIPT)
+    firetv_receipt = None
+    if firetv_receipt_text:
+        try:
+            firetv_receipt = json.loads(firetv_receipt_text)
+        except ValueError:
+            firetv_receipt = {"__invalid__": True}
+    j4, j4_message = evaluate_firetv_gate(
+        j4_terms, manifest, firetv_receipt,
+        lambda path: os.path.isfile(os.path.join(REPO_ROOT, path)),
+    )
+    gate("J4", "Sponsor product is load-bearing", j4, j4_message)
 
     word_count = len(first_sentence.split())
     j5 = bool(first_sentence) and word_count <= 25 and "\u2014" not in first_sentence

@@ -16,45 +16,61 @@ OUT = REPO / "video"
 
 BEATS = [
     (
-        "beat_01_question", 0.0, 12.0,
-        "An incident starts. Somebody asks what broke. The answer is spread across "
-        "six browser tabs on six different laptops, and the one screen everyone in "
-        "the room can see is showing nothing.",
+        "beat_01_question", 0.0, 13.0,
+        "An incident starts. Somebody asks what broke, and the first answer everyone "
+        "reaches for is: what did we just deploy. Half the time that is the wrong "
+        "question, and reverting on it costs an hour.",
         "Cold open on the loaded cockpit at 1920x1080 in a desktop browser. No click yet.",
     ),
     (
-        "beat_02_answer_on_load", 12.0, 30.0,
-        "Mercury answers before anyone clicks. On load it calls its own API and puts "
-        "one sentence on the screen: the commit that raised the error rate, the "
-        "service it raised it on, and how far above baseline the reading is.",
-        "Reload the page. The hero renders the correlator's verdict, the anomaly "
-        "factor as the large figure, and the offending commit message quoted with its author.",
+        "beat_02_refusal_first", 13.0, 31.0,
+        "Mercury answers before anyone clicks, and its most common answer is a "
+        "refusal. Against eleven hundred and sixty labelled incidents it sees a real "
+        "anomaly and names nobody eighty one percent of the time. That is the product: "
+        "do not revert anything, this is not a deploy.",
+        "Reload the page. The hero renders the correlator's verdict and the anomaly "
+        "factor as the large figure. Do not click anything yet.",
     ),
     (
-        "beat_03_provenance", 30.0, 45.0,
-        "Both halves of that answer say where they came from. The metric series is "
-        "simulated, and the badge beside it says so. The commits are real, read from "
-        "the checkout. The latency is timed in the page, not written into it.",
-        "Hold on the two source badges in the hero footer, offline-fixture against "
-        "metric series and local-git against commit history, beside the measured latency line.",
+        "beat_03_crowded_refusal", 31.0, 47.0,
+        "Here is the refusal that matters. Six changes landed in the hour before this "
+        "spike started. Nothing in a metric series says which of them did it, so "
+        "Mercury names none of them and the rollback stays disabled.",
+        "Press release-train. The hero reads Do not revert on this, names the number "
+        "of changes in the window, and both rollback buttons stay disabled with their "
+        "reason lines visible.",
     ),
     (
-        "beat_04_dpad", 45.0, 62.0,
+        "beat_04_named_with_odds", 47.0, 68.0,
+        "It names a change only when exactly one landed in the window. And when it "
+        "does, it prints its own odds: against that same corpus the commit it names "
+        "is the one that caused the reading fifty two percent of the time, over one "
+        "hundred and thirteen namings. The screen says so beside the name.",
+        "Press checkout-api. The hero names the commit, quotes its message, and the "
+        "line under it reads the measured precision and the number of namings it was "
+        "measured over.",
+    ),
+    (
+        "beat_05_provenance", 68.0, 84.0,
+        "Both halves of that answer say where they came from, next to the number "
+        "rather than under the fold. The metric series is generated locally and the "
+        "badge in the card reads OFFLINE FIXTURE. The commits are real, read from the "
+        "checkout.",
+        "Hold on the two source badges inside the hero card beside the anomaly "
+        "factor, OFFLINE FIXTURE against metric series and LIVE against commit "
+        "history. Do not scroll.",
+    ),
+    (
+        "beat_06_dpad", 84.0, 101.0,
         "The remote moves in space, not down a list. Focus jumps to the nearest "
-        "control in the direction pressed, and the hint bar names whatever the ring "
-        "is on. The disabled control is skipped rather than focused.",
-        "Press Right, Right, Down, Right, Left. The focus ring moves and the "
-        "Focused label in the key hint bar changes with each press.",
+        "control in the direction pressed, disabled controls are skipped rather than "
+        "focused, and Back returns to the wall before it would ever close the "
+        "application.",
+        "Press Right, Right, Down, Right, Left, then Enter on the Delivery velocity "
+        "tile and Escape. The Focused label and the BACK legend change with each press.",
     ),
     (
-        "beat_05_center_back", 62.0, 78.0,
-        "Center drills into a panel. Back returns to the wall before it would ever "
-        "close the application, so the war room is not shut by accident during an incident.",
-        "Press Enter on the Delivery velocity tile, then Escape. The BACK legend "
-        "changes to Back to the wall and then back again.",
-    ),
-    (
-        "beat_06_two_sources", 78.0, 95.0,
+        "beat_07_two_sources", 101.0, 116.0,
         "One screen, two kinds of truth. The velocity panel is serving a recording "
         "because no GitHub token is set, and says so. The spend panel, on a machine "
         "with credentials, is a live Cost Explorer read, and says that too.",
@@ -62,38 +78,32 @@ BEATS = [
         "against the LIVE aws-cost-explorer badge. Do not read live spend figures aloud.",
     ),
     (
-        "beat_07_refusal", 95.0, 108.0,
+        "beat_08_refusal", 116.0, 129.0,
         "The only irreversible control on the screen refuses in plain words when the "
         "governance secret is missing. It does not fail silently and it does not pretend.",
-        "With the Secret field empty, press Stage governed rollback. The incident "
-        "panel shows the refusal text.",
+        "Go back to checkout-api. With the Secret field empty, press Stage governed "
+        "rollback. The incident panel shows the refusal text.",
     ),
     (
-        "beat_08_staging", 108.0, 125.0,
+        "beat_09_staging", 129.0, 140.0,
         "With the secret, staging mints a single-use token bound to a hash of exactly "
         "this rollback. Change the target afterwards and the token stops applying.",
         "Type the secret, stage again. Show PENDING_CONFIRMATION, the payload hash, "
         "the lease countdown as the hero figure, and Confirm becoming enabled.",
     ),
     (
-        "beat_09_confirm", 125.0, 142.0,
+        "beat_10_confirm_and_replay", 140.0, 154.0,
         "Governance passes, and the product says out loud what it did not do. No "
-        "deployment pipeline was contacted. This deployment is running the record only "
-        "dispatcher, and the moment of success is where it admits that.",
-        "Press Confirm rollback. Read the EXECUTED output verbatim, including the "
-        "sentence stating no pipeline was contacted.",
+        "deployment pipeline was contacted. Press it again and the server refuses by "
+        "name: the token was valid once.",
+        "Press Confirm rollback and read the EXECUTED output verbatim, including the "
+        "sentence stating no pipeline was contacted. Press it a second time and show "
+        "the 409 NOT_PENDING denial.",
     ),
     (
-        "beat_10_replay_refused", 142.0, 155.0,
-        "Press it again and the server refuses by name. The token was valid once. "
-        "Leave a staging past its lease and it expires the same way.",
-        "Press Confirm rollback a second time. Show the 409 NOT_PENDING denial and "
-        "the reason line saying the token has been spent.",
-    ),
-    (
-        "beat_11_not_built", 155.0, 168.0,
+        "beat_11_not_built", 154.0, 168.0,
         "What is not built: no APK exists, the Kotlin has never been compiled, and "
-        "nothing has run on Fire TV hardware. The navigation, the correlation and the "
+        "nothing has run on Fire TV hardware. The refusals, the correlation and the "
         "governance were driven live here. The device was not.",
         "Cut to docs/FIRE_TV_BUILD.md open on the recorded build failure.",
     ),

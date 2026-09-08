@@ -12,9 +12,11 @@ the properties that make its published figures mean something:
   as a hit, and it recognises each of the three refusals as correct where they are correct;
 * the README quotes the summary the committed script actually wrote.
 
-One test here documents a defect rather than a feature: a spike that has been running for
-three polls is inside its own baseline, and the correlator calls it healthy. That is what
-the late-look stratum measures, and it is in the README beside the hit rate.
+Two tests here run the detector this repository shipped until 2026-09-08, whose baseline
+contained the spike, so the before half of the README's before-and-after is a run of
+committed code rather than a memory of one. That mode is still selectable for exactly
+that reason, and the test that shows it swallowing a tenfold regression sits next to the
+test that shows the current detector catching the identical series.
 """
 from __future__ import annotations
 
@@ -34,11 +36,14 @@ if str(REPO_ROOT / "scripts") not in sys.path:
 import correlation_trial as trial  # noqa: E402
 
 from src.domain.incident_correlation import (  # noqa: E402
+    AttributionRefusal,
+    BaselineMode,
     CommitRef,
     CorrelationVerdict,
     IncidentCorrelator,
     MetricPoint,
     MetricSeries,
+    WindowAnchor,
 )
 
 SUMMARY_PATH = REPO_ROOT / "correlation_trial_summary.json"
@@ -178,14 +183,22 @@ def test_the_truth_labels_do_not_move_when_the_correlator_is_retuned(commits):
     )
 
 
-def _correlation(values, commits, minutes_between=10):
+def _correlation(values, commits, minutes_between=10, correlator=None):
     now = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
     points = [
         MetricPoint(at=now - timedelta(minutes=minutes_between * (len(values) - 1 - i)), value=v)
         for i, v in enumerate(values)
     ]
     series = MetricSeries("HTTPCode_Target_5XX_Count", "AWS/ApplicationELB", points)
-    return now, IncidentCorrelator().correlate("svc", series, commits)
+    return now, (correlator or IncidentCorrelator()).correlate("svc", series, commits)
+
+
+#: The correlator without its crowding gate, which is what it was before 2026-09-08.
+#: The scorer has to keep telling a wrong name apart from a right one, and after the gate
+#: the shipped settings refuse a crowded window instead of naming anything, so the tests
+#: that exercise the naming path build this one explicitly rather than by accident.
+def _ungated() -> IncidentCorrelator:
+    return IncidentCorrelator(max_commits_in_window=None)
 
 
 def test_a_right_verdict_on_the_wrong_commit_is_a_false_attribution_not_a_hit():
@@ -193,7 +206,7 @@ def test_a_right_verdict_on_the_wrong_commit_is_a_false_attribution_not_a_hit():
     now, _ = _correlation([1.0], [])
     innocent = CommitRef("bbbbbbb", "unrelated", "someone", now - timedelta(minutes=5))
     culprit = CommitRef("aaaaaaa", "the one that did it", "someone", now - timedelta(minutes=40))
-    _, correlation = _correlation([3, 3, 3, 3, 3, 40], [culprit, innocent])
+    _, correlation = _correlation([3, 3, 3, 3, 3, 40], [culprit, innocent], correlator=_ungated())
 
     case = trial.TrialCase(
         index=0, stratum=trial.STRATUM_FRESH, truth=trial.TRUTH_REGRESSION,
@@ -251,20 +264,26 @@ def test_blaming_a_commit_for_an_anomaly_nothing_caused_is_a_false_attribution()
     assert trial.score_case(case, correlation).outcome == trial.FALSE_ATTRIBUTION
 
 
-def test_a_spike_running_for_three_polls_is_inside_its_own_baseline():
-    """Documents the defect the late-look stratum measures.
+def test_the_trailing_baseline_still_swallows_a_spike_running_for_three_polls():
+    """The before state, kept runnable rather than remembered.
 
     ``MetricSeries.baseline_mean`` drops only the newest point, so by the third poll after
     onset the spike is most of its own baseline and the factor falls under the threshold.
-    A tenfold regression then reads as healthy. This is a real limitation of the shipped
-    detector, it is in the README, and this test fails if somebody changes the behaviour
-    without changing the published number.
+    A tenfold regression then reads as healthy. That was the shipped detector until
+    2026-09-08 and it is the defect the late-look stratum measured at a 3.3% hit rate. The
+    mode is still selectable, so the README's before-and-after is two runs of committed
+    code rather than a memory of one.
     """
     now, _ = _correlation([1.0], [])
     culprit = CommitRef("eeeeeee", "the one that did it", "someone", now - timedelta(minutes=35))
+    trailing = IncidentCorrelator(
+        baseline_mode=BaselineMode.TRAILING,
+        window_anchor=WindowAnchor.READING,
+        max_commits_in_window=None,
+    )
 
-    _, fresh = _correlation([3, 3, 3, 3, 3, 30], [culprit])
-    _, third_poll = _correlation([3, 3, 3, 30, 30, 30], [culprit])
+    _, fresh = _correlation([3, 3, 3, 3, 3, 30], [culprit], correlator=trailing)
+    _, third_poll = _correlation([3, 3, 3, 30, 30, 30], [culprit], correlator=trailing)
 
     assert fresh.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
     assert fresh.anomaly_factor == pytest.approx(10.0, abs=0.01)
@@ -272,21 +291,87 @@ def test_a_spike_running_for_three_polls_is_inside_its_own_baseline():
     assert third_poll.anomaly_factor < 3.0
 
 
-def test_the_answer_says_when_the_named_commit_was_one_of_several():
-    """The disclosure the corpus argued for, and the case where it must stay quiet."""
+def test_the_pre_onset_baseline_sees_the_same_spike_the_trailing_one_swallowed():
+    """The after state, on the identical series the test above calls healthy."""
+    now, _ = _correlation([1.0], [])
+    culprit = CommitRef("eeeeeee", "the one that did it", "someone", now - timedelta(minutes=35))
+
+    _, third_poll = _correlation([3, 3, 3, 30, 30, 30], [culprit])
+
+    assert third_poll.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert third_poll.anomaly_factor == pytest.approx(10.0, abs=0.01)
+    # The baseline is the three readings before the onset, not the five before the newest.
+    assert third_poll.baseline_points == 3
+    assert third_poll.onset_at == now - timedelta(minutes=20)
+    # And the window ends at the onset, so a commit 35 minutes before the reading is 15
+    # minutes before the onset and still reachable.
+    assert third_poll.offending_commit.sha == "eeeeeee"
+
+
+def test_a_crowded_window_is_refused_rather_than_named():
+    """The gate that carries the naming precision, and the case where it lets one through."""
     now, _ = _correlation([1.0], [])
     burst = [
         CommitRef("1111111", "first of a burst", "someone", now - timedelta(minutes=40)),
         CommitRef("2222222", "second of a burst", "someone", now - timedelta(minutes=38)),
         CommitRef("3333333", "third of a burst", "someone", now - timedelta(minutes=36)),
     ]
-    _, ambiguous = _correlation([3, 3, 3, 3, 3, 40], burst)
+    _, crowded = _correlation([3, 3, 3, 3, 3, 40], burst)
+    assert crowded.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert crowded.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED
+    assert crowded.commits_in_window == 3
+    assert crowded.offending_commit is None
+    assert crowded.rollback_is_available is False
+    assert "3 changes landed" in crowded.explanation
+    assert "Do not roll back on this answer" in crowded.to_voice_summary()
+
+    _, single = _correlation([3, 3, 3, 3, 3, 40], [burst[0]])
+    assert single.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert single.commits_in_window == 1
+    assert single.attribution_is_ambiguous is False
+    assert single.attribution_refusal is None
+
+
+def test_the_two_refusals_are_told_apart_rather_than_pooled():
+    """A crowded window and an empty one are different claims, and score differently."""
+    now, _ = _correlation([1.0], [])
+    burst = [
+        CommitRef("1111111", "first", "someone", now - timedelta(minutes=40)),
+        CommitRef("2222222", "second", "someone", now - timedelta(minutes=38)),
+    ]
+    far_away = CommitRef("ccccccc", "hours earlier", "someone", now - timedelta(hours=9))
+
+    _, crowded = _correlation([3, 3, 3, 3, 3, 40], burst)
+    _, empty = _correlation([3, 3, 3, 3, 3, 40], [far_away])
+    assert empty.attribution_refusal is AttributionRefusal.NO_CANDIDATE_IN_WINDOW
+
+    case = trial.TrialCase(index=0, stratum=trial.STRATUM_EXOGENOUS, truth=trial.TRUTH_EXOGENOUS,
+                           observed_at=now, point_values=(), point_times=())
+    assert trial.score_case(case, crowded).outcome == trial.CORRECT_REFUSAL_CROWDED
+    assert trial.score_case(case, empty).outcome == trial.CORRECT_REFUSAL
+
+    regression = trial.TrialCase(index=1, stratum=trial.STRATUM_FRESH, truth=trial.TRUTH_REGRESSION,
+                                 observed_at=now, point_values=(), point_times=(),
+                                 causing_sha="1111111")
+    assert trial.score_case(regression, crowded).outcome == trial.REFUSED_CROWDED_ON_REGRESSION
+    assert trial.score_case(regression, empty).outcome == trial.REFUSED_ON_REGRESSION
+
+
+def test_the_answer_says_when_the_named_commit_was_one_of_several():
+    """The disclosure is still there for anyone who turns the crowding gate off."""
+    now, _ = _correlation([1.0], [])
+    burst = [
+        CommitRef("1111111", "first of a burst", "someone", now - timedelta(minutes=40)),
+        CommitRef("2222222", "second of a burst", "someone", now - timedelta(minutes=38)),
+        CommitRef("3333333", "third of a burst", "someone", now - timedelta(minutes=36)),
+    ]
+    _, ambiguous = _correlation([3, 3, 3, 3, 3, 40], burst, correlator=_ungated())
     assert ambiguous.commits_in_window == 3
     assert ambiguous.attribution_is_ambiguous is True
     assert "3 changes landed inside that window" in ambiguous.explanation
     assert "may not be the one that did it" in ambiguous.to_voice_summary()
 
-    _, single = _correlation([3, 3, 3, 3, 3, 40], [burst[0]])
+    _, single = _correlation([3, 3, 3, 3, 3, 40], [burst[0]], correlator=_ungated())
     assert single.commits_in_window == 1
     assert single.attribution_is_ambiguous is False
     assert "changes landed inside that window" not in single.explanation
@@ -300,6 +385,100 @@ def test_a_verdict_that_names_nobody_reports_no_candidates():
     assert unattributed.commits_in_window == 0
     assert unattributed.attribution_is_ambiguous is False
     assert quiet.commits_in_window == 0
+
+
+# ------------------------------------------------- The choice of the crowding gate
+
+
+def test_the_crowding_gate_holds_up_on_corpora_it_was_not_chosen_on(commits):
+    """The gate was picked from a sweep on one seed. This is the out-of-sample check.
+
+    Choosing a threshold on the corpus it is then reported on is fitting, and a
+    precision figure chosen that way is worth less than it looks. These seeds took no
+    part in the choice. The claim under test is the direction, not a number: refusing a
+    crowded window has to buy precision on a corpus nobody tuned against, and it has to
+    buy it by naming less rather than by naming better, which is why the namings count
+    is asserted to fall as well.
+    """
+    for seed in (19850717, 20261231):
+        cases = trial.build_corpus(commits, seed=seed)
+        gated = trial.aggregate(cases, trial.run_corpus(cases, commits))["headline"]
+        ungated = trial.aggregate(
+            cases, trial.run_corpus(cases, commits, _ungated()))["headline"]
+
+        assert gated["naming_precision"] > ungated["naming_precision"], (
+            f"seed {seed}: the gate did not improve precision "
+            f"({gated['naming_precision']} against {ungated['naming_precision']})"
+        )
+        assert gated["times_a_commit_was_named"] < ungated["times_a_commit_was_named"]
+        assert gated["naming_recall_on_regressions"] < ungated["naming_recall_on_regressions"], (
+            "the gate bought precision without costing recall, which would mean it is not "
+            "refusing anything and this test is measuring nothing"
+        )
+        assert gated["times_a_commit_was_named"] > 50, (
+            f"seed {seed}: only {gated['times_a_commit_was_named']} namings, too few to carry "
+            "a precision claim"
+        )
+
+
+def test_the_sweep_the_gate_was_chosen_from_is_published(commits):
+    """The choice has to be legible: every setting considered, with what it cost."""
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    sweep = summary["crowding_gate_sweep"]
+    gates = [row["names_when_candidates_at_most"] for row in sweep]
+    assert None in gates, "the sweep does not include the ungated setting it is measured against"
+    assert summary["correlator"]["max_commits_in_window"] in gates, (
+        "the shipped setting is not one of the rows in its own sweep"
+    )
+    for row in sweep:
+        assert row["times_a_commit_was_named"] > 0
+        assert row["naming_precision"] is not None
+        assert row["naming_recall_on_regressions"] is not None
+
+
+def test_the_detectability_ceiling_is_arithmetic_on_the_corpus_not_a_claim(commits):
+    """A six point series cannot show a spike that started five polls ago.
+
+    The pre-onset baseline needs at least two readings before the onset, and a look four
+    polls late leaves one. Those cases are unreachable whatever the detector does, so the
+    hit rate has to be read against the ceiling rather than against 100%. This recomputes
+    the ceiling from the cases' own timestamps.
+    """
+    cases = trial.build_corpus(commits)
+    ceiling = trial.detectability_ceiling(cases, 2)
+    regressions = [c for c in cases if c.truth == trial.TRUTH_REGRESSION]
+    unreachable = [c for c in regressions if (c.pre_onset_points or 0) < 2]
+
+    assert ceiling["regressions"] == len(regressions)
+    assert ceiling["too_few_readings_before_the_onset"] == len(unreachable)
+    assert ceiling["by_stratum"][trial.STRATUM_FRESH]["too_few_readings_before_the_onset"] == 0, (
+        "a fresh look always has five readings before the onset, so none can be out of reach"
+    )
+    assert ceiling["by_stratum"][trial.STRATUM_LATE]["too_few_readings_before_the_onset"] > 0
+    # Every unreachable case is a late look four polls after the onset, by construction.
+    assert all(c.polls_since_onset == 4 for c in unreachable)
+
+    verdicts = trial.run_corpus(cases, commits)
+    head = trial.aggregate(cases, verdicts)["headline"]
+    assert head["hit_rate_all_regressions"] <= ceiling["ceiling_on_hit_rate"]
+
+
+def test_a_crowded_refusal_is_never_counted_as_a_correct_refusal_for_the_right_reason(scored):
+    """The two refusals must not be pooled into one flattering figure."""
+    cases, verdicts = scored
+    summary = trial.aggregate(cases, verdicts)
+    head, why = summary["headline"], summary["why_it_named_nobody"]
+
+    combined = head["correct_refusal_rate_on_exogenous_spikes"]
+    empty = head["correct_refusal_on_exogenous_spikes_no_candidate"]
+    crowded = head["correct_refusal_on_exogenous_spikes_window_too_crowded"]
+    assert combined == pytest.approx(empty + crowded, abs=0.0005), (
+        "the published refusal rate is not the sum of its two reasons"
+    )
+    assert why["window_too_crowded"] == sum(
+        1 for v in verdicts if v.refusal == "WINDOW_TOO_CROWDED")
+    assert why["no_candidate_in_window"] == sum(
+        1 for v in verdicts if v.refusal == "NO_CANDIDATE_IN_WINDOW")
 
 
 # --------------------------------------------------------------- The aggregate
@@ -354,16 +533,27 @@ def test_a_reachable_cause_is_only_missed_when_the_window_held_several_changes(s
 
 
 def test_the_readme_quotes_the_recorded_split_of_the_wrong_names():
-    """The corrected claim, pinned to the file rather than to a memory of it."""
+    """The claim about what still goes wrong, pinned to the file rather than to memory.
+
+    The split moved when the crowding gate landed. Wrong names used to be dominated by
+    "the cause was inside the window and it picked a different change from that same
+    window"; those are refused now, so that count is zero, and what is left is almost
+    entirely causes that fell outside the window, which no rule with this window could
+    have reached. The residual, the cases where the rule had the culprit alone in front
+    of it and still named the wrong thing, is published rather than rounded away.
+    """
     block = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))["why_the_wrong_commit_was_named"]
     section = README.split("## How often it is right")[1].split("\n## ")[0]
 
-    assert f"the {block['wrong_commit_attributions']} attributions that named an" in section
+    assert f"the {block['wrong_commit_attributions']} attributions that" in section
     assert f"**{block['cause_outside_the_attribution_window']}** had the real cause" in section
-    assert f"**{block['cause_inside_the_window_and_more_than_one_candidate']}** had the cause inside" in section
-    assert block["cause_inside_the_window_with_a_single_candidate"] == 0
-    assert "Not one of the" in section, (
-        "the README no longer states the zero that makes the disclosure claim true"
+    assert f"**{block['cause_inside_the_window_and_more_than_one_candidate']}** had the cause" in section
+    assert block["cause_inside_the_window_and_more_than_one_candidate"] == 0, (
+        "the gate is letting a crowded window through, so the README's claim is now false"
+    )
+    assert f"**{block['cause_inside_the_window_with_a_single_candidate']}** had the cause inside" in section, (
+        "the README no longer publishes the residual: the cases where the rule had the "
+        "culprit alone in front of it and still named the wrong thing"
     )
 
 

@@ -40,6 +40,7 @@ from src.infrastructure.github_actions_dispatcher import (
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
+from src.infrastructure.trial_summary import naming_accuracy
 
 logger = logging.getLogger("mercury.mcp")
 
@@ -348,13 +349,19 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
         },
         "metric_provenance": correlation.metric_provenance.to_dict(),
         "commit_provenance": correlation.commit_provenance.to_dict(),
-        # How many changes were candidates, and whether the one named was the only
-        # one. Against the labelled corpus in scripts/correlation_trial.py, every
-        # wrong attribution whose real cause was inside the window had more than one
-        # candidate, so the count is on the wire and on the screen, not in a log line.
+        # How many changes were candidates, why nothing was named when nothing was,
+        # and what naming a commit is measured to be worth. The accuracy travels with
+        # the answer because the moment it matters is the moment somebody is deciding
+        # whether to revert, not the moment they read the README.
         "attribution": {
             "commits_in_window": correlation.commits_in_window,
             "is_ambiguous": correlation.attribution_is_ambiguous,
+            "refusal_reason": (
+                correlation.attribution_refusal.value if correlation.attribution_refusal else None
+            ),
+            "onset_at": correlation.onset_at.isoformat() if correlation.onset_at else None,
+            "baseline_points": correlation.baseline_points,
+            "measured_accuracy": naming_accuracy(),
         },
         "offending_commit": None,
         "recommended_action": None,

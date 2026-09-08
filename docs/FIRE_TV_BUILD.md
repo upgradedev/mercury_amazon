@@ -48,6 +48,47 @@ open the Actions tab, pick a `Fire TV APK` run and download
 `mercury-firetv-debug-apk`. Until then this is a configured intention, not
 evidence.
 
+## The receipt readiness gate J4 wants
+
+`ci/readiness.py` used to pass J4, the gate that decides whether the sponsor product
+is load-bearing, on a string match: the words "Fire TV" somewhere in the README and
+`LEANBACK_LAUNCHER` somewhere in the manifest. Both are text. Mercury is entered in
+the Fire TV track, so that was the one gate in the file that could not fail on the
+axis it exists to test, and it was contributing a PASS to a published score while
+this page said no APK had ever been built.
+
+J4 now asks for evidence of a binary and of somebody watching it run, recorded in
+`firetv_build_receipt.json` at the repository root. **That file does not exist, so
+J4 fails,** and the published readiness score went down by one when the gate was
+rewritten. It is exempt from the CI exit code, with the reason printed in the
+auditor's own output, because a JDK, an Android SDK and a Fire TV device cannot be
+conjured by running code in a checkout.
+
+Write it from a real build and a real launch. Do not write it by hand to turn the
+gate green: `tests/unit/test_readiness_gates.py` asserts the file is absent, and
+whoever produces it is expected to change that test to assert its contents.
+
+```json
+{
+  "built_by_command": "./gradlew :app:assembleRelease",
+  "gradle_exit_code": 0,
+  "apk_path": "app/build/outputs/apk/release/app-release.apk",
+  "apk_sha256": "the sha256sum of that file",
+  "device_run": {
+    "device_model": "Fire TV Stick 4K Max (2nd gen), or the emulator image name",
+    "fire_os_or_android_version": "what it was running",
+    "adb_install_exit_code": 0,
+    "launched_at_utc": "2026-09-08T10:00:00Z",
+    "observed": "what was on the screen, in words"
+  }
+}
+```
+
+Every field is required and each is checked: `gradle_exit_code` must be 0,
+`apk_path` must name a file that exists in the checkout, `adb_install_exit_code`
+must be 0. `tests/unit/test_readiness_gates.py` drives each missing field and each
+failure code against the predicate, including the case where it passes.
+
 The workflow itself is also unverified: whether
 `android-actions/setup-android@v3` resolves platform 34 and accepts its licences
 on the runner has not been observed. The first run may need adjustment.

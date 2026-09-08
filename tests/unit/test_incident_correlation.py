@@ -8,11 +8,14 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.domain.incident_correlation import (
+    AttributionRefusal,
+    BaselineMode,
     CommitRef,
     CorrelationVerdict,
     IncidentCorrelator,
     MetricPoint,
     MetricSeries,
+    WindowAnchor,
 )
 from src.domain.provenance import DataSource, Provenance
 
@@ -134,6 +137,98 @@ def test_baseline_mean_excludes_the_latest_point():
     assert series([1, 2, 3, 100]).baseline_mean(exclude_latest=False) == pytest.approx(26.5)
 
 
+# ------------------------------------------------- The pre-onset baseline (2026-09-08)
+
+def test_the_onset_is_the_first_reading_of_an_elevation_that_is_still_going():
+    """Not the first split that flatters the newest reading.
+
+    An earlier-is-better search would put the onset of ``[2,2,2,2,70]`` at index 2,
+    because 70 is 35 times the mean of the first two readings. That would move the
+    attribution window half an hour off the spike. The onset is the first index from
+    which every later reading is elevated, which for that series is the last one.
+    """
+    assert series([2, 2, 2, 2, 70]).find_onset(3.0) == 4
+    assert series([2, 2, 70, 70, 70]).find_onset(3.0) == 2
+    assert series([2, 2, 2, 2, 2]).find_onset(3.0) is None
+    # A blip that recovered is not an elevation that is still going on.
+    assert series([2, 2, 70, 2, 2]).find_onset(3.0) is None
+
+
+def test_the_pre_onset_detector_is_never_less_sensitive_than_the_trailing_one():
+    """The property the published before-and-after rests on.
+
+    The last index is always a candidate onset, and testing it is arithmetically the
+    same test the trailing baseline applies. So every series the old detector called an
+    anomaly the new one calls an anomaly too, and the healthy-series cost of the change
+    is bounded by the cases where the new one fires and the old one did not.
+    """
+    trailing = IncidentCorrelator(baseline_mode=BaselineMode.TRAILING, max_commits_in_window=None)
+    fresh = IncidentCorrelator(max_commits_in_window=None)
+    shapes = [
+        [2, 2, 2, 2, 70], [2, 2, 70, 70, 70], [2, 2, 2, 2, 2], [5, 5, 5, 5, 6],
+        [1, 1, 1, 1, 3.1], [0, 0, 0, 0, 4], [3, 3, 3, 30, 30, 30], [2, 70, 70, 70, 70],
+    ]
+    for values in shapes:
+        old = trailing.correlate("svc", series(values), [])
+        new = fresh.correlate("svc", series(values), [])
+        if old.incident_detected:
+            assert new.incident_detected, f"{values} was an anomaly before and is not now"
+
+
+def test_the_baseline_stops_at_the_onset_rather_than_at_the_newest_point():
+    result = IncidentCorrelator().correlate("svc", series([4, 4, 4, 40, 40, 40]), [])
+    assert result.baseline_points == 3
+    assert result.baseline_value == pytest.approx(4.0)
+    assert result.anomaly_factor == pytest.approx(10.0)
+
+
+def test_a_two_point_series_still_behaves_like_the_trailing_baseline():
+    """The floor case of the sensitivity property: nowhere earlier to put the onset."""
+    result = IncidentCorrelator().correlate("svc", series([2, 70]), [])
+    assert result.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert result.baseline_value == pytest.approx(2.0)
+
+
+def test_the_attribution_window_ends_at_the_onset_not_at_the_reading():
+    """The half of the change that fixes a late look, isolated.
+
+    The spike started 20 minutes before the reading. A change that landed 55 minutes
+    before the reading is 35 minutes before the onset, so it is inside the window; a
+    change that landed after the spike started cannot have caused it and is outside.
+    """
+    before_onset = commit("before1", 55)
+    after_onset = commit("after11", 5)
+    result = IncidentCorrelator().correlate(
+        "svc", series([4, 4, 4, 40, 40, 40]), [commit("older1", 400), before_onset, after_onset])
+    assert result.offending_commit.sha == "before1"
+    assert result.onset_at == NOW - timedelta(minutes=20)
+
+    anchored_at_the_reading = IncidentCorrelator(window_anchor=WindowAnchor.READING)
+    late = anchored_at_the_reading.correlate(
+        "svc", series([4, 4, 4, 40, 40, 40]), [commit("older1", 400), before_onset, after_onset])
+    # Anchored at the reading, both are candidates, so the gate refuses instead.
+    assert late.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert late.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED
+
+
+def test_a_crowded_window_refuses_and_offers_no_rollback():
+    burst = [commit(f"burst{i}", 30 + i) for i in range(4)]
+    result = IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 70]), burst)
+    assert result.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert result.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED
+    assert result.commits_in_window == 4
+    assert result.rollback_is_available is False
+    assert result.incident_detected is True
+
+
+def test_turning_the_crowding_gate_off_restores_the_older_behaviour():
+    burst = [commit(f"burst{i}", 30 + i) for i in range(4)]
+    result = IncidentCorrelator(max_commits_in_window=None).correlate(
+        "svc", series([2, 2, 2, 2, 70]), burst)
+    assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert result.attribution_is_ambiguous is True
+
+
 # ------------------------------------------------- Local git commit provider
 
 def test_local_git_provider_reads_real_commits_from_this_checkout():
@@ -189,9 +284,11 @@ class _RecordingMetrics:
     def __init__(self, series_to_return):
         self.series = series_to_return
         self.anchor_seen = "unset"
+        self.commit_times_seen = "unset"
 
-    def get_error_series(self, service_name, window_minutes=60, anchor_at=None):
+    def get_error_series(self, service_name, window_minutes=60, anchor_at=None, commit_times=None):
         self.anchor_seen = anchor_at
+        self.commit_times_seen = commit_times
         return self.series
 
 

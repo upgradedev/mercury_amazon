@@ -190,6 +190,11 @@
     }
     .src-badge { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1rem;
                  color: var(--muted); font-size: 0.8rem; }
+    /* Provenance beside the figure it qualifies, inside the hero card and therefore
+       inside the first viewport height at 1920x1080. */
+    .hero-source { margin-top: 0.7rem; display: grid; gap: 0.3rem; justify-items: start; }
+    .hero-source .src-badge { margin-right: 0; }
+    .hero-accuracy { margin-top: 0.5rem; color: var(--muted); font-size: 0.95rem; max-width: 34ch; }
 
     /* --------------------------------------------------------------- Buttons */
     .btn {
@@ -380,6 +385,7 @@
       .state-pill,
       .src-badge,
       .tag,
+      .hero-accuracy,
       .provenance,
       .provenance .src { font-size: 1.08rem; }
       .reason { font-size: 1.15rem; }
@@ -449,6 +455,11 @@
             <div class="hero-figure">
               <div class="hero-figure-value" id="heroFigure">?</div>
               <div class="hero-figure-label" id="heroFigureLabel">Not measured</div>
+              <!-- Where the figure above came from. This lives inside the hero card,
+                   next to the number, because at 1920x1080 the hero footer renders
+                   below the fold and a wallboard is read from across a room without
+                   scrolling. -->
+              <div class="hero-source" id="heroSource"></div>
             </div>
             <div class="hero-text">
               <h1 class="hero-headline" id="heroHeadline">What broke?</h1>
@@ -508,6 +519,12 @@
                     title="Correlate search-indexer, whose spike is hours away from any commit">
               search-indexer
               <span class="btn-sub">spike with no change to blame</span>
+            </button>
+            <button class="btn btn-demo" data-service="release-train" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about release train"
+                    title="Correlate release-train, whose spike follows a burst of changes that Mercury refuses to choose between">
+              release-train
+              <span class="btn-sub">too many changes to name one</span>
             </button>
             <button class="btn btn-demo" data-service="quiet-service" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about a service Mercury does not know"
@@ -764,13 +781,23 @@
     }
 
     /* The data-source badge is the point, not decoration: it says on the screen
-       whether the number beside it was read live or served from a recording. */
+       whether the number beside it was read live or served from a recording.
+
+       It used to print the machine value, "offline-fixture", and it used to sit in
+       the hero's footer. Measured at 1920x1080 that footer rendered at y=1144 while
+       the anomaly factor rendered at y=280, so a wallboard viewer read a fabricated
+       12.9x as a live production number and none of the thirty strings above the fold
+       said otherwise. It now prints display_label, the words OFFLINE FIXTURE, and it
+       renders inside the hero card next to the factor it qualifies.
+       tests/e2e/test_html_structure.py fails the build if it leaves the first
+       viewport height again. */
     function sourceBadge(provenance, label) {
       var wrap = h('span', 'src-badge');
       var live = provenance && provenance.is_live === true;
       wrap.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
-        (provenance && provenance.data_source) || 'unknown'));
-      wrap.appendChild(h('span', null, label));
+        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      wrap.appendChild(h('span', null,
+        label + ((provenance && provenance.data_source) ? ' (' + provenance.data_source + ')' : '')));
       return wrap;
     }
 
@@ -846,9 +873,30 @@
       }
       cause.appendChild(document.createTextNode(config.cause));
 
+      /* Provenance renders inside the hero card, beside the figure, so it is on the
+         same screenful as the number it qualifies. The hero footer it used to live in
+         is below the fold at Fire TV resolution. */
+      var source = el('heroSource');
+      clear(source);
+      (config.badges || []).forEach(function (badge) { source.appendChild(badge); });
+
+      /* What naming a commit is measured to be worth, from the labelled corpus, on the
+         screen at the moment somebody is deciding whether to revert. */
       var prov = el('heroProvenance');
       clear(prov);
-      (config.badges || []).forEach(function (badge) { prov.appendChild(badge); });
+      if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+    }
+
+    /* One sentence about how often this correlator names the right commit, taken from
+       the trial summary the server shipped with the answer. Never computed here. */
+    function accuracyLine(data) {
+      var measured = data.attribution && data.attribution.measured_accuracy;
+      if (!measured) { return ''; }
+      if (!measured.measured) { return measured.note; }
+      return 'Measured: when this correlator names a commit it is the one that caused the '
+        + 'reading ' + Math.round(measured.precision_when_it_names_a_commit * 100) + '% of the time, '
+        + 'over ' + measured.namings_measured + ' namings in a corpus of ' + measured.corpus_cases
+        + ' labelled cases. Reproduce with ' + measured.measured_by_command + '.';
     }
 
     function setReason(buttonId, reasonId, enabled, reason, title) {
@@ -865,11 +913,13 @@
         sourceBadge(data.commit_provenance, 'commit history')
       ];
 
+      var accuracy = accuracyLine(data);
+
       if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) {
-        /* Say out loud when the named commit was one of several candidates. Against
-           the labelled corpus in scripts/correlation_trial.py, every wrong attribution
-           whose real cause was inside the window had more than one candidate in it, so
-           an operator about to roll back is told which kind of answer this is. */
+        /* Say out loud when the named commit was one of several candidates. The shipped
+           correlator refuses a window holding more than one change, so this reads as
+           false unless somebody has turned that gate off, and the branch stays because
+           the disclosure is what an ungated answer owes an operator. */
         var ambiguous = data.attribution && data.attribution.is_ambiguous;
         setHero({
           state: 'alarm',
@@ -878,12 +928,31 @@
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
           headline: 'Commit ' + data.offending_commit.sha + ' raised ' + metric.name + ' on ' + data.service,
           quote: data.offending_commit.message,
-          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the reading.'
+          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the spike started.'
             + (ambiguous
               ? ' It is not the only one: ' + data.attribution.commits_in_window
                 + ' changes landed inside the attribution window, and this rule names the closest.'
               : ' It is the only change inside the attribution window.'),
-          badges: badges
+          badges: badges,
+          accuracy: accuracy
+        });
+      } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION'
+                 && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
+        /* The answer this product is built around: an anomaly is real and Mercury will
+           not name a change for it, because a burst of changes landed and nothing in a
+           metric series says which of them did it. */
+        setHero({
+          state: 'alarm',
+          eyebrow: 'Incident, too many changes to name one',
+          figure: factor + '×',
+          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          headline: 'Do not revert on this. ' + data.attribution.commits_in_window
+            + ' changes landed before ' + metric.name + ' rose on ' + data.service,
+          cause: 'Mercury names a change only when exactly one landed inside the attribution window. '
+            + data.attribution.commits_in_window + ' did, so it names none of them and offers no rollback. '
+            + 'Naming the closest of a crowded window is where most of its wrong answers came from.',
+          badges: badges,
+          accuracy: accuracy
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') {
         setHero({
@@ -891,9 +960,11 @@
           eyebrow: 'Incident, nothing to blame',
           figure: factor + '×',
           figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: metric.name + ' on ' + data.service + ' is above its baseline',
-          cause: 'No deployment landed close enough to the reading, so Mercury names no commit and offers no rollback.',
-          badges: badges
+          headline: 'Do not revert on this. No change landed before ' + metric.name
+            + ' rose on ' + data.service,
+          cause: 'No deployment landed close enough to the onset, so Mercury names no commit and offers no rollback.',
+          badges: badges,
+          accuracy: accuracy
         });
       } else if (data.verdict === 'NO_ANOMALY') {
         setHero({

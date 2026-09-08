@@ -5,10 +5,10 @@
 
 ---
 
-## Tagline (22 words)
+## Tagline (24 words)
 
-Mercury tells an on-call engineer which change broke production, or refuses to
-name one, and puts the rollback behind four governance conditions.
+Mercury tells an on-call engineer when not to blame a deployment, and refuses to
+name one unless exactly one change landed in the window.
 
 ---
 
@@ -19,31 +19,44 @@ is in one, the metrics console is in another, the deployment pipeline is in a
 third, and the one question that matters is spread across all of them: what
 changed just before this broke?
 
-Mercury answers that question from a real commit history, says how confident it is
-entitled to be, and puts the undo behind a governance check. Then it renders where
-the people are. A Fire TV in the room is one of those places and the one this
-entry is built for: a screen everyone can see, driven by a remote, with the
-evidence readable from a sofa. The screen is the delivery; the attribution engine
-is the thing.
+Mercury answers that question from a real commit history, and then it was scored,
+and the scoring changed what it claims. It turns out the answer worth having is
+usually the negative one: do not revert anything, this is not a deploy. Mercury
+sees an anomaly and names nobody 81.1% of the time, stays quiet on 199 of 200
+healthy series, and refuses outright on 60 of 60 telemetry gaps. When it does name
+a change, it is right 52.2% of the time over 113 namings, and it prints that on the
+screen beside the name. Then it renders where the people are. A Fire TV in the room
+is one of those places and the one this entry is built for: a screen everyone can
+see, driven by a remote, with the evidence readable from a sofa. The screen is the
+delivery; the engine is the thing.
 
 ---
 
 ## What it does
 
-**Answers "what changed?"** Mercury reads an error metric series and a commit
-history, decides whether the newest reading is an anomaly against its own
-baseline, and attributes it to the closest commit that landed before it. When it
-cannot attribute the anomaly to anything, it says so and offers no rollback. That
-refusal has its own tests, because a war room tool that always has an answer is
-worse than one that admits when it does not. When more than one change sits in the
-attribution window, the answer says so and names how many.
+**Says when not to blame a deploy.** Mercury reads an error metric series and a
+commit history, decides whether the metric has stepped up against a baseline taken
+from before the step, and looks for changes in the hour before that step started.
+It names one only when exactly one landed there. When none landed it says so; when
+several landed it says how many and names none of them, because nothing in a metric
+series says which of two changes did it. Both refusals have their own tests,
+because a war room tool that always has an answer is worse than one that admits
+when it does not, and both are more common than the answer that names something.
 
-**Publishes how often that is right.** `python scripts/correlation_trial.py`
-scores the correlator against 1160 labelled incidents built on this repository's
-real commit log, with the reading times of every case that has no cause drawn
-without reference to where any commit falls. It reports the hit rate and the
-false-attribution rate side by side, and the numbers are not flattering: the
-README carries them in full.
+**Publishes how often each answer is right, and ships the figure with the answer.**
+`python scripts/correlation_trial.py` scores the correlator against 1160 labelled
+incidents built on this repository's real commit log, with the reading times of
+every case that has no cause drawn without reference to where any commit falls. It
+reports precision and recall together, and splits the refusals by reason so a
+blunter instrument cannot read as better judgement. Every `what_changed` response
+carries `attribution.measured_accuracy`, read from that recorded summary rather
+than recomputed, so the operator sees the odds at the moment they would act.
+
+**Publishes what it used to get wrong.** The late-look hit rate was 3.3% because
+the baseline contained the spike it was measuring. It is 8.3% at the shipped
+settings and 18.7% with the crowding gate off, and the detector that produced the
+old number is still selectable so the before-and-after is two runs of committed
+code rather than a memory of one.
 
 **Shows velocity and spend.** DORA metrics computed from GitHub Actions runs and
 merged pull requests, open pull requests past a 36 hour review SLA, and
@@ -98,16 +111,28 @@ the war room closes mid-incident.
 
 ## Accomplishments we are proud of
 
-**We scored the engine instead of demonstrating it.** The cockpit's demo places a
-simulated spike minutes after a real commit, which is a demonstration that cannot
-fail and therefore proves nothing. So the correlator is also run against a labelled
-corpus whose reading times were drawn without looking at the commit log, and both
-halves of the result are published: what it names correctly, and how often it
-blames an innocent change. That corpus found a defect nobody had noticed, which is
-that a spike running for three polls is inside its own baseline and reads as
-healthy. It also found that when the correlator had the culprit among its
-candidates and still named the wrong one, there was always more than one candidate
-in the window.
+**We scored the engine instead of demonstrating it, and then we believed the
+score.** The cockpit's demo places a simulated spike minutes after a real commit,
+which is a demonstration that cannot fail and therefore proves nothing. So the
+correlator is also run against a labelled corpus whose reading times were drawn
+without looking at the commit log. That corpus found a defect nobody had noticed:
+a spike running for three polls was inside its own baseline and read as healthy,
+which is why the late-look hit rate was 3.3%. It also found that when the
+correlator had the culprit among its candidates and still named the wrong one,
+there was always more than one candidate in the window.
+
+Both are fixed. The baseline now stops at the onset, the attribution window ends
+when the spike started rather than when somebody looked, and the correlator refuses
+to name anything when more than one change landed in the window. The late look went
+from 3.3% to 8.3%, naming precision from 27.9% to 52.2%, and naming recall from
+20.3% to 9.8%, because refusing more means naming less. That trade is published in
+full, with the sweep it was chosen from, and it was checked on two corpus seeds
+that took no part in choosing it.
+
+**We changed the headline to match the numbers.** The old one said Mercury tells you
+which change broke production. Its own harness said that is right about half the
+times it fires, so the headline is now the refusal, which is what the numbers
+support and what an on-call engineer can actually act on.
 
 **The refusals work and are tested.** Confirm a rollback twice and the second
 attempt comes back `409 NOT_PENDING`. Let the lease run out and it comes back
@@ -143,7 +168,7 @@ Stated plainly, because the cockpit shows it anyway.
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
-| Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`, hit rate and false-attribution rate both published |
+| Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`. Naming precision 52.2% over 113 namings, recall 9.8% over 600 regressions, refusal on 81.1% of detected anomalies, all published and shipped in every answer as `attribution.measured_accuracy` |
 | Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware |
 
 ---
@@ -157,11 +182,18 @@ workflow is written and the Kotlin is there; neither has ever executed.
 it to a deployment pipeline turns the governed decision into a governed action
 without touching the governance code.
 
-**Fix what the corpus found.** Draw the baseline from a window before the onset
-rather than from the same six points, so a spike stops hiding inside its own
-baseline, and offer a ranked candidate set instead of a single closest name. Both
-are pointed at directly by the trial results, and both would be re-scored against
-the same corpus.
+**Rank a crowded window instead of refusing it.** The baseline and the window
+anchor are fixed; the remaining half of what the corpus pointed at is not. When
+several changes land together Mercury says how many and names none of them, where a
+better tool would rank them on what they touched against what the metric measures.
+That is the change most likely to move recall off 9.8% without giving back the
+precision the crowding gate bought, and it would be re-scored against the same
+corpus.
+
+**Lengthen the series.** 65 of the 300 late-look cases are undetectable by any rule
+here, because a six point series polled every ten minutes has no readings left
+before an onset four polls back. That ceiling is arithmetic, it is published as
+`detectability_ceiling`, and only more data moves it.
 
 **Persist the governance ledger.** Staged actions live in memory today, so a
 restart forgets them. An audit trail that survives a restart is the difference
@@ -193,15 +225,19 @@ Stated here rather than left for a judge to find:
 * The live endpoint answers 200 but runs an older build, so the readiness gates
   for deployment matching (D2, G2) fail and are reported as failing.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
-  like an anomaly, and a spike that has been running for three polls is inside its
-  own baseline and reads as healthy. Measured on the labelled corpus, the hit rate
-  falls from the fresh-look figure to almost nothing on a late look. Both numbers
-  are in the README.
-* Attribution names the closest change in the window. Every wrong name it gave
-  against the corpus whose real cause was inside that window was a window with more
-  than one change in it; the rest had the cause outside the window, where the rule
-  cannot win. The answer now says how many candidates there were; it does not rank
-  them.
+  like an anomaly. The baseline now stops at the onset rather than containing the
+  spike, but the detector still needs at least two readings before that onset, so 65
+  of the 300 late-look cases in the corpus are undetectable whatever it does. That
+  ceiling is published as `detectability_ceiling`.
+* Naming a change is right 52.2% of the time over 113 namings, and it fires on
+  fewer than one regression in ten. That is why the headline is the refusal. The
+  figure ships with every answer, so nobody has to take the README's word for it at
+  the moment they are deciding whether to revert.
+* When several changes land in the window Mercury says how many and names none of
+  them. It does not rank them. Ranking is the next thing worth building and it is
+  not built.
+* The crowding gate was chosen on the corpus it is reported on. The direction was
+  checked on two held-out seeds and held; the exact 52.2% is an in-sample figure.
 * That an on-call engineer is in a room with a television during an incident is an
   assumption. It has never been tested with a responder. The same page and the same
   HTTP surface render on a laptop, so what that assumption risks is the surface,

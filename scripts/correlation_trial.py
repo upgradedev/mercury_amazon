@@ -35,20 +35,36 @@ window, and the operator's look at the screen is drawn from a distribution that 
 several polls past the onset. Both draws are made without looking at where the neighbouring
 commits are.
 
+Two more figures come out of it and they are the ones this product is now built around:
+
+* the **refusal rates**, split by reason, because refusing for want of a candidate and
+  refusing because too many landed are different claims about the world;
+* the **naming recall**, published beside the precision, because a precision figure can
+  always be bought by naming less and the pair is what says whether it was.
+
 WHAT THE NUMBERS ARE WORTH, WHICH IS NOT THE SAME THING.
 
 * The **hit rate on a fresh look** mostly re-derives an arithmetic rule, and the
-  interesting part of it is only how often the *newest* commit before the reading is not
+  interesting part of it is only how often the *newest* commit before the onset is not
   the one that caused it. This repository commits in bursts, so that happens.
-* The **hit rate on a late look** is the figure that carries information, and it is bad.
-  ``MetricSeries.baseline_mean`` drops only the newest point, so a spike that has been
-  running for three polls is inside its own baseline and the factor collapses below the
-  threshold. Nobody designed that; the corpus found it.
-* The **false-attribution rate** is a joint property of the correlator's 60 minute window
-  and the density of the commit stream it is given, and it is close to meaningless without
-  the second half of that sentence. ``--commit-stride`` thins the recorded log to every
-  k-th commit, and the report prints the sweep, so a reader can see how much of the figure
-  is the window and how much is this repository's commit cadence.
+* The **hit rate on a late look** is the figure that carries information. It was 3.3%
+  until 2026-09-08, because ``MetricSeries.baseline_mean`` dropped only the newest point,
+  so a spike running for three polls was inside its own baseline and the factor collapsed
+  below the threshold. Nobody designed that; the corpus found it.
+  ``--baseline-mode trailing --window-anchor reading --max-commits-in-window none``
+  reproduces that detector, and ``ablation`` in the summary prints it beside the current
+  one so the before-and-after is two runs rather than a memory.
+* Both hit rates are bounded by ``detectability_ceiling``: the pre-onset baseline needs
+  readings before the onset, and a look four polls late does not have them. That is a
+  property of a six point series, not of the rule.
+* The **false-attribution rate** is a joint property of the correlator's 60 minute window,
+  its crowding gate and the density of the commit stream it is given, and it is close to
+  meaningless without the rest of that sentence. ``--commit-stride`` thins the recorded log
+  to every k-th commit, and the report prints the sweep, so a reader can see how much of
+  the figure is the rule and how much is this repository's commit cadence.
+* The **crowding gate** was chosen from ``crowding_gate_sweep``, which this script prints,
+  on this corpus. That is fitting, so the choice is checked on seeds that took no part in
+  it by ``tests/unit/test_correlation_trial.py``.
 
 WHAT THIS IS NOT. Not a field trial. No production incident, no real error metric and no
 deployment pipeline appears anywhere in it: the metric values are generated here from the
@@ -93,11 +109,16 @@ if str(REPO_ROOT) not in sys.path:
 from src.domain.incident_correlation import (  # noqa: E402
     DEFAULT_ANOMALY_FACTOR,
     DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+    DEFAULT_MAX_COMMITS_IN_WINDOW,
+    DEFAULT_MIN_BASELINE_POINTS,
+    AttributionRefusal,
+    BaselineMode,
     CommitRef,
     CorrelationVerdict,
     IncidentCorrelator,
     MetricPoint,
     MetricSeries,
+    WindowAnchor,
 )
 from src.domain.provenance import DataSource, Provenance  # noqa: E402
 from src.infrastructure.cloudwatch_adapter import (  # noqa: E402
@@ -150,12 +171,19 @@ STRATUM_HEALTHY = "healthy"
 STRATUM_SPARSE = "telemetry_gap"
 
 #: Outcomes. Every case scores as exactly one of these.
+#:
+#: The two kinds of refusal are counted apart on purpose. A refusal because nothing
+#: landed in the window is the data being empty; a refusal because too many changes
+#: landed is a decision this correlator makes. Rolling them into one figure would let
+#: a blunter instrument read as better judgement, which is the opposite of the point.
 HIT = "HIT_named_the_commit_that_caused_it"
 WRONG_COMMIT = "FALSE_ATTRIBUTION_named_an_innocent_commit"
-REFUSED_ON_REGRESSION = "REFUSED_saw_the_anomaly_and_blamed_nothing"
+REFUSED_ON_REGRESSION = "REFUSED_saw_the_anomaly_and_had_no_candidate"
+REFUSED_CROWDED_ON_REGRESSION = "REFUSED_saw_the_anomaly_and_the_window_was_too_crowded"
 MISSED_REGRESSION = "MISS_never_called_it_an_anomaly"
 FALSE_ATTRIBUTION = "FALSE_ATTRIBUTION_blamed_a_commit_for_an_anomaly_it_did_not_cause"
-CORRECT_REFUSAL = "CORRECT_REFUSAL_anomaly_with_nothing_blamed"
+CORRECT_REFUSAL = "CORRECT_REFUSAL_anomaly_with_no_candidate_to_blame"
+CORRECT_REFUSAL_CROWDED = "CORRECT_REFUSAL_anomaly_with_the_window_too_crowded_to_name"
 MISSED_EXOGENOUS = "MISS_never_called_the_exogenous_spike_an_anomaly"
 CORRECT_QUIET = "CORRECT_stayed_quiet_on_a_healthy_series"
 FALSE_ANOMALY = "FALSE_ALARM_called_a_healthy_series_an_anomaly"
@@ -164,6 +192,10 @@ UNEXPECTED = "UNEXPECTED"
 
 #: Outcomes in which the correlator named a commit. Used for the naming precision figure.
 NAMED_A_COMMIT = (HIT, WRONG_COMMIT, FALSE_ATTRIBUTION)
+#: Outcomes in which it saw an anomaly and named nobody, whichever reason it gave.
+REFUSED_TO_NAME = (
+    REFUSED_ON_REGRESSION, REFUSED_CROWDED_ON_REGRESSION, CORRECT_REFUSAL, CORRECT_REFUSAL_CROWDED,
+)
 
 
 # --------------------------------------------------------------- The commit stream
@@ -291,9 +323,16 @@ class TrialCase:
     spike_multiplier: float | None = None
     #: Computed from the case's own timestamps, never from anything the correlator said.
     cause_inside_attribution_window: bool | None = None
+    #: The same question asked of the window that ends at the onset rather than at the
+    #: reading. Also computed from the case's own timestamps: the generator knows when
+    #: it made the spike start, and never asks the correlator where it thought it did.
+    cause_inside_window_before_onset: bool | None = None
     #: Commits that landed after the cause and before the reading. A burst of them is how
     #: a correct rule ("the closest change before the reading") names an innocent commit.
     commits_between_cause_and_reading: int | None = None
+    #: How many readings in this case sit strictly before the onset. A detector that
+    #: needs k of them to form a baseline cannot see a case with fewer, whatever it does.
+    pre_onset_points: int | None = None
 
     def to_series(self) -> MetricSeries:
         return MetricSeries(
@@ -400,6 +439,11 @@ def _regression_cases(
         elevated_from = next((i for i, at in enumerate(times) if at >= onset), None)
 
         window_start = observed_at - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+        # The first poll at or after the onset is the earliest reading that can show the
+        # spike, so it is the onset any detector could find. Derived from the generator's
+        # own onset, not from where the correlator thought the onset was.
+        onset_poll = times[elevated_from] if elevated_from is not None else observed_at
+        onset_window_start = onset_poll - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
         between = sum(
             1 for c in commits if cause.committed_at < c.committed_at <= observed_at
         )
@@ -416,7 +460,9 @@ def _regression_cases(
             polls_since_onset=polls_late,
             spike_multiplier=round(multiplier, 3),
             cause_inside_attribution_window=window_start <= cause.committed_at <= observed_at,
+            cause_inside_window_before_onset=onset_window_start <= cause.committed_at <= onset_poll,
             commits_between_cause_and_reading=between,
+            pre_onset_points=elevated_from,
         ))
     return cases
 
@@ -517,6 +563,11 @@ class CaseVerdict:
     #: How many commits the correlator had to choose between, and whether it said so.
     commits_in_window: int = 0
     ambiguity_disclosed: bool = False
+    #: Which of the two refusals it gave, when it refused to name anything.
+    refusal: str | None = None
+    #: Whether the detector found an onset earlier than the newest reading. False on
+    #: every case the trailing baseline would also have caught.
+    detected_before_the_newest_point: bool = False
 
 
 def score_case(case: TrialCase, correlation) -> CaseVerdict:
@@ -528,12 +579,13 @@ def score_case(case: TrialCase, correlation) -> CaseVerdict:
     """
     verdict = correlation.verdict
     named = correlation.offending_commit.sha if correlation.offending_commit else None
+    crowded = correlation.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED
 
     if case.truth == TRUTH_REGRESSION:
         if verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED:
             outcome = HIT if named == case.causing_sha else WRONG_COMMIT
         elif verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION:
-            outcome = REFUSED_ON_REGRESSION
+            outcome = REFUSED_CROWDED_ON_REGRESSION if crowded else REFUSED_ON_REGRESSION
         elif verdict in (CorrelationVerdict.NO_ANOMALY, CorrelationVerdict.INSUFFICIENT_DATA):
             outcome = MISSED_REGRESSION
         else:
@@ -542,7 +594,7 @@ def score_case(case: TrialCase, correlation) -> CaseVerdict:
         if verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED:
             outcome = FALSE_ATTRIBUTION
         elif verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION:
-            outcome = CORRECT_REFUSAL
+            outcome = CORRECT_REFUSAL_CROWDED if crowded else CORRECT_REFUSAL
         elif verdict in (CorrelationVerdict.NO_ANOMALY, CorrelationVerdict.INSUFFICIENT_DATA):
             outcome = MISSED_EXOGENOUS
         else:
@@ -565,6 +617,10 @@ def score_case(case: TrialCase, correlation) -> CaseVerdict:
         outcome=outcome, anomaly_factor=correlation.anomaly_factor,
         commits_in_window=correlation.commits_in_window,
         ambiguity_disclosed=correlation.attribution_is_ambiguous,
+        refusal=correlation.attribution_refusal.value if correlation.attribution_refusal else None,
+        detected_before_the_newest_point=(
+            correlation.onset_at is not None and correlation.onset_at < case.observed_at
+        ),
     )
 
 
@@ -595,6 +651,38 @@ def _rate(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
 
+def detectability_ceiling(cases: list[TrialCase], min_baseline_points: int) -> dict:
+    """How many regressions the pre-onset baseline cannot reach, whatever it does.
+
+    The baseline is the mean of the readings strictly before the onset, and a mean of
+    fewer than ``min_baseline_points`` samples is not one. A six point series polled
+    every ten minutes leaves ``6 - polls_late - 1`` readings before the onset, so a
+    look four polls late leaves one and cannot be detected at all. This counts those
+    cases from the corpus's own timestamps, so the ceiling is measured rather than
+    argued, and the hit rate below it can be read against the right number.
+    """
+    regressions = [c for c in cases if c.truth == TRUTH_REGRESSION]
+    if not regressions:
+        return {}
+    unreachable = [c for c in regressions if (c.pre_onset_points or 0) < min_baseline_points]
+    by_stratum = {}
+    for name in (STRATUM_FRESH, STRATUM_LATE):
+        rows = [c for c in regressions if c.stratum == name]
+        short = [c for c in rows if (c.pre_onset_points or 0) < min_baseline_points]
+        by_stratum[name] = {
+            "cases": len(rows),
+            "too_few_readings_before_the_onset": len(short),
+            "ceiling_on_hit_rate": _rate(len(rows) - len(short), len(rows)),
+        }
+    return {
+        "min_baseline_points": min_baseline_points,
+        "regressions": len(regressions),
+        "too_few_readings_before_the_onset": len(unreachable),
+        "ceiling_on_hit_rate": _rate(len(regressions) - len(unreachable), len(regressions)),
+        "by_stratum": by_stratum,
+    }
+
+
 def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
     """Turn scored cases into the figures the README quotes, plus the breakdown."""
     by_index = {case.index: case for case in cases}
@@ -618,6 +706,7 @@ def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
 
     in_window = [v for v in regressions if by_index[v.index].cause_inside_attribution_window]
     in_window_fresh = [v for v in fresh if by_index[v.index].cause_inside_attribution_window]
+    in_onset_window = [v for v in regressions if by_index[v.index].cause_inside_window_before_onset]
 
     wrong_namings = [v for v in verdicts if v.outcome in (WRONG_COMMIT, FALSE_ATTRIBUTION)]
     disclosed_wrong = sum(1 for v in wrong_namings if v.ambiguity_disclosed)
@@ -633,17 +722,30 @@ def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
                 sum(1 for v in in_window if v.outcome == HIT), len(in_window)),
             "hit_rate_fresh_look_cause_inside_the_window": _rate(
                 sum(1 for v in in_window_fresh if v.outcome == HIT), len(in_window_fresh)),
+            "hit_rate_cause_inside_the_window_before_the_onset": _rate(
+                sum(1 for v in in_onset_window if v.outcome == HIT), len(in_onset_window)),
             "false_attribution_rate_on_uncaused_anomalies": _rate(false_attributions, len(uncaused)),
             "false_attribution_rate_on_exogenous_spikes": _rate(
                 sum(1 for v in exogenous if v.outcome == FALSE_ATTRIBUTION), len(exogenous)),
             "correct_refusal_rate_on_exogenous_spikes": _rate(
+                sum(1 for v in exogenous if v.outcome in (CORRECT_REFUSAL, CORRECT_REFUSAL_CROWDED)),
+                len(exogenous)),
+            "correct_refusal_on_exogenous_spikes_no_candidate": _rate(
                 sum(1 for v in exogenous if v.outcome == CORRECT_REFUSAL), len(exogenous)),
+            "correct_refusal_on_exogenous_spikes_window_too_crowded": _rate(
+                sum(1 for v in exogenous if v.outcome == CORRECT_REFUSAL_CROWDED), len(exogenous)),
             "quiet_rate_on_healthy_series": _rate(
                 sum(1 for v in healthy if v.outcome == CORRECT_QUIET), len(healthy)),
             "refusal_rate_on_a_telemetry_gap": _rate(
                 sum(1 for v in sparse if v.outcome == CORRECT_NO_DATA), len(sparse)),
             "naming_precision": _rate(hits, len(named)),
             "times_a_commit_was_named": len(named),
+            # Precision alone can be bought by naming almost nothing, so the pair is
+            # published together and the denominator above is published with it.
+            "naming_recall_on_regressions": _rate(hits, len(regressions)),
+            "refused_to_name_rate_on_all_anomalies": _rate(
+                sum(1 for v in verdicts if v.outcome in REFUSED_TO_NAME),
+                sum(1 for v in verdicts if v.outcome in REFUSED_TO_NAME) + len(named)),
         },
         "counts_by_stratum": {
             name: {
@@ -688,14 +790,117 @@ def aggregate(cases: list[TrialCase], verdicts: list[CaseVerdict]) -> dict:
             "correct_namings_also_flagged_ambiguous": disclosed_hits,
             "disclosure_cost_on_correct_namings": _rate(disclosed_hits, hits),
         },
+        # Refusing because nothing landed and refusing because too much landed are two
+        # different claims about the world. Counted apart so a crowding gate cannot
+        # inflate a "correct refusal" figure and read as better judgement.
+        "why_it_named_nobody": {
+            "no_candidate_in_window": sum(1 for v in verdicts if v.refusal == "NO_CANDIDATE_IN_WINDOW"),
+            "window_too_crowded": sum(1 for v in verdicts if v.refusal == "WINDOW_TOO_CROWDED"),
+            "on_regressions_no_candidate": sum(1 for v in regressions if v.outcome == REFUSED_ON_REGRESSION),
+            "on_regressions_window_too_crowded": sum(
+                1 for v in regressions if v.outcome == REFUSED_CROWDED_ON_REGRESSION),
+            "on_uncaused_anomalies_no_candidate": sum(1 for v in uncaused if v.outcome == CORRECT_REFUSAL),
+            "on_uncaused_anomalies_window_too_crowded": sum(
+                1 for v in uncaused if v.outcome == CORRECT_REFUSAL_CROWDED),
+        },
+        # How much of the detection came from moving the baseline before the onset. A
+        # case detected at the newest point is one the trailing baseline also caught.
+        "onset_detection": {
+            "anomalies_found": sum(1 for v in verdicts if v.verdict != CorrelationVerdict.NO_ANOMALY.value
+                                   and v.verdict != CorrelationVerdict.INSUFFICIENT_DATA.value),
+            "found_before_the_newest_reading": sum(1 for v in verdicts if v.detected_before_the_newest_point),
+            "on_regressions": sum(1 for v in regressions if v.detected_before_the_newest_point),
+            "on_uncaused_anomalies": sum(1 for v in uncaused if v.detected_before_the_newest_point),
+        },
         "regressions_whose_cause_was_inside_the_attribution_window": len(in_window),
+        "regressions_whose_cause_was_inside_the_window_before_the_onset": len(in_onset_window),
         "unexpected_outcomes": sum(1 for v in verdicts if v.outcome == UNEXPECTED),
     }
 
 
+def correlator_from(args, max_commits_in_window: int | None = "unset") -> IncidentCorrelator:
+    """Build the correlator the run is scoring, from the command line that asked for it.
+
+    Every published figure comes from the defaults. The flags exist so the ablation and
+    the gate sweep below are runs of this same function rather than a second detector,
+    and so the numbers this repository published before 2026-09-08 stay reachable with
+    ``--baseline-mode trailing --window-anchor reading --max-commits-in-window none``.
+    """
+    return IncidentCorrelator(
+        baseline_mode=BaselineMode(args.baseline_mode),
+        window_anchor=WindowAnchor(args.window_anchor),
+        min_baseline_points=args.min_baseline_points,
+        max_commits_in_window=(
+            args.max_commits_in_window if max_commits_in_window == "unset" else max_commits_in_window
+        ),
+    )
+
+
+def ablation(
+    cases: list[TrialCase], commits: list[CommitRef], args,
+) -> list[dict]:
+    """Score the same corpus under each detector setting, so the change can be split up.
+
+    Three rows, each a real run of the shipped class: what this correlator did before
+    2026-09-08, what moving the baseline before the onset alone does, and what also
+    ending the attribution window at the onset does. The crowding gate is swept
+    separately in :func:`gate_sweep` because it is a different kind of decision.
+    """
+    rows = []
+    for label, mode, anchor in (
+        ("trailing baseline, window ends at the reading", BaselineMode.TRAILING, WindowAnchor.READING),
+        ("pre-onset baseline, window ends at the reading", BaselineMode.PRE_ONSET, WindowAnchor.READING),
+        ("pre-onset baseline, window ends at the onset", BaselineMode.PRE_ONSET, WindowAnchor.ONSET),
+    ):
+        correlator = IncidentCorrelator(
+            baseline_mode=mode, window_anchor=anchor,
+            min_baseline_points=args.min_baseline_points, max_commits_in_window=None,
+        )
+        verdicts = run_corpus(cases, commits, correlator)
+        summary = aggregate(cases, verdicts)
+        head = summary["headline"]
+        rows.append({
+            "detector": label,
+            "baseline_mode": mode.value,
+            "window_anchor": anchor.value,
+            "crowding_gate": None,
+            "hit_rate_fresh_look": head["hit_rate_fresh_look"],
+            "hit_rate_late_look": head["hit_rate_late_look"],
+            "naming_precision": head["naming_precision"],
+            "times_a_commit_was_named": head["times_a_commit_was_named"],
+            "quiet_rate_on_healthy_series": head["quiet_rate_on_healthy_series"],
+            "false_attribution_rate_on_uncaused_anomalies":
+                head["false_attribution_rate_on_uncaused_anomalies"],
+        })
+    return rows
+
+
+def gate_sweep(cases: list[TrialCase], commits: list[CommitRef], args, gates: tuple) -> list[dict]:
+    """Score the corpus at each crowding gate, so the precision was chosen in the open.
+
+    ``None`` is no gate at all: name the closest candidate however many landed. The
+    figures move together and against each other, which is the point of printing the
+    pair rather than the precision alone.
+    """
+    rows = []
+    for gate in gates:
+        verdicts = run_corpus(cases, commits, correlator_from(args, max_commits_in_window=gate))
+        head = aggregate(cases, verdicts)["headline"]
+        rows.append({
+            "names_when_candidates_at_most": gate,
+            "naming_precision": head["naming_precision"],
+            "naming_recall_on_regressions": head["naming_recall_on_regressions"],
+            "times_a_commit_was_named": head["times_a_commit_was_named"],
+            "hit_rate_all_regressions": head["hit_rate_all_regressions"],
+            "false_attribution_rate_on_uncaused_anomalies":
+                head["false_attribution_rate_on_uncaused_anomalies"],
+        })
+    return rows
+
+
 def density_sweep(
     commits: list[CommitRef], strides: tuple[int, ...], seed: int, noise_sigma: float,
-    exogenous: int, healthy: int,
+    exogenous: int, healthy: int, correlator: IncidentCorrelator | None = None,
 ) -> list[dict]:
     """Re-score the uncaused strata against thinner commit streams.
 
@@ -714,7 +919,7 @@ def density_sweep(
             _uncaused_cases(exogenous, span, seed, STRATUM_EXOGENOUS, noise_sigma, 0)
             + _uncaused_cases(healthy, span, seed, STRATUM_HEALTHY, noise_sigma, exogenous)
         )
-        verdicts = run_corpus(cases, thinned)
+        verdicts = run_corpus(cases, thinned, correlator)
         false_attributions = sum(1 for v in verdicts if v.outcome == FALSE_ATTRIBUTION)
         rows.append({
             "commit_stride": stride,
@@ -738,7 +943,8 @@ def build_summary(args) -> dict:
         regression_fresh=args.regression_fresh, regression_late=args.regression_late,
         exogenous=args.exogenous, healthy=args.healthy, sparse=args.sparse,
     )
-    verdicts = run_corpus(cases, stream)
+    correlator = correlator_from(args)
+    verdicts = run_corpus(cases, stream, correlator)
     summary = aggregate(cases, verdicts)
     summary.update({
         "measured_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -752,7 +958,14 @@ def build_summary(args) -> dict:
             "attribution_window_minutes": DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
             "series_points": SERIES_POINTS,
             "poll_cadence_minutes": POLL_CADENCE_MINUTES,
+            "baseline_mode": correlator.baseline_mode.value,
+            "window_anchor": correlator.window_anchor.value,
+            "min_baseline_points": correlator.min_baseline_points,
+            "max_commits_in_window": correlator.max_commits_in_window,
         },
+        "detectability_ceiling": detectability_ceiling(cases, args.min_baseline_points),
+        "ablation": ablation(cases, stream, args),
+        "crowding_gate_sweep": gate_sweep(cases, stream, args, tuple(args.gate_sweep) + (None,)),
         "commit_stream": {
             "recorded_at_head": recording.get("recorded_at_head"),
             "recorded_at_utc": recording.get("recorded_at_utc"),
@@ -775,6 +988,7 @@ def build_summary(args) -> dict:
         ),
         "density_sweep": density_sweep(
             commits, tuple(args.sweep), args.seed, args.noise_sigma, args.exogenous, args.healthy,
+            correlator,
         ),
     })
     return summary
@@ -783,9 +997,13 @@ def build_summary(args) -> dict:
 def print_report(summary: dict) -> None:
     head = summary["headline"]
     stream = summary["commit_stream"]
+    conf = summary["correlator"]
     print(f"Scored {summary['cases']} labelled cases against IncidentCorrelator "
-          f"({summary['correlator']['anomaly_factor']}x threshold, "
-          f"{summary['correlator']['attribution_window_minutes']} minute window), seed {summary['seed']}")
+          f"({conf['anomaly_factor']}x threshold, "
+          f"{conf['attribution_window_minutes']} minute window), seed {summary['seed']}")
+    print(f"  detector: {conf['baseline_mode']} baseline over at least {conf['min_baseline_points']} "
+          f"readings, window ends at the {conf['window_anchor']}, names nothing when more than "
+          f"{conf['max_commits_in_window']} changes are in the window")
     print(f"  commit stream: {stream['commits_in_stream']} real commits, "
           f"{stream['commits_per_hour']} per hour, recorded at {stream['recorded_at_head']}")
     burst = stream.get("burstiness") or {}
@@ -805,6 +1023,22 @@ def print_report(summary: dict) -> None:
     print(f"  refused for want of data:             {head['refusal_rate_on_a_telemetry_gap']}")
     print(f"  naming precision (right commit when it named one): {head['naming_precision']} "
           f"over {head['times_a_commit_was_named']} namings")
+    print(f"  naming recall (regressions it named correctly):    "
+          f"{head['naming_recall_on_regressions']}")
+    print(f"  refused to name when it saw an anomaly:            "
+          f"{head['refused_to_name_rate_on_all_anomalies']}")
+    ceiling = summary.get("detectability_ceiling") or {}
+    if ceiling:
+        print(f"  detectability ceiling at {ceiling['min_baseline_points']} baseline readings: "
+              f"{ceiling['ceiling_on_hit_rate']} "
+              f"({ceiling['too_few_readings_before_the_onset']} of {ceiling['regressions']} "
+              f"regressions have too few readings before the onset to be seen at all)")
+        for name, block in ceiling["by_stratum"].items():
+            print(f"    {name}: ceiling {block['ceiling_on_hit_rate']} "
+                  f"({block['too_few_readings_before_the_onset']} of {block['cases']} out of reach)")
+    why = summary["why_it_named_nobody"]
+    print(f"  it named nobody {why['no_candidate_in_window']} times because nothing landed in the "
+          f"window and {why['window_too_crowded']} times because too much did")
     disclosure = summary["ambiguity_disclosure"]
     print(f"  of the {disclosure['wrong_namings']} namings that were wrong, "
           f"{disclosure['wrong_namings_disclosed_as_ambiguous']} were shown as one of several "
@@ -817,11 +1051,29 @@ def print_report(summary: dict) -> None:
         print(f"    {name} ({block['cases']} cases)")
         for outcome, count in block["outcomes"].items():
             print(f"      {count:>5}  {outcome}")
+    print("  what each half of the detector change is worth (no crowding gate in any row):")
+    for row in summary.get("ablation", []):
+        print(f"    {row['detector']:<48} fresh {row['hit_rate_fresh_look']}  "
+              f"late {row['hit_rate_late_look']}  precision {row['naming_precision']} "
+              f"over {row['times_a_commit_was_named']}  quiet {row['quiet_rate_on_healthy_series']}")
+    print("  crowding gate sweep (names nothing when more than N changes are in the window):")
+    for row in summary.get("crowding_gate_sweep", []):
+        gate = "no gate" if row["names_when_candidates_at_most"] is None \
+            else f"N={row['names_when_candidates_at_most']}"
+        print(f"    {gate:<8} precision {row['naming_precision']} over "
+              f"{row['times_a_commit_was_named']:>4} namings, recall "
+              f"{row['naming_recall_on_regressions']}, false attribution "
+              f"{row['false_attribution_rate_on_uncaused_anomalies']}")
     print("  density sweep on the uncaused strata:")
     for row in summary["density_sweep"]:
         print(f"    stride {row['commit_stride']}: {row['commits_in_stream']:>3} commits, "
               f"{row['commits_per_hour']:>6} per hour -> false attribution rate "
               f"{row['false_attribution_rate']}")
+
+
+def _gate(value: str) -> int | None:
+    """Parse a crowding gate: an integer, or 'none' for no gate at all."""
+    return None if value.lower() in ("none", "off") else int(value)
 
 
 def main() -> int:
@@ -832,6 +1084,21 @@ def main() -> int:
     parser.add_argument("--noise-sigma", type=float, default=DEFAULT_NOISE_SIGMA)
     parser.add_argument("--commit-stride", type=int, default=1,
                         help="keep every k-th commit, to vary the density of the deployment stream")
+    parser.add_argument("--baseline-mode", choices=[m.value for m in BaselineMode],
+                        default=BaselineMode.PRE_ONSET.value,
+                        help="'trailing' reproduces the detector this repository published before "
+                             "2026-09-08, whose baseline contained the spike")
+    parser.add_argument("--window-anchor", choices=[a.value for a in WindowAnchor],
+                        default=WindowAnchor.ONSET.value,
+                        help="'reading' ends the attribution window when somebody looked rather "
+                             "than when the spike started")
+    parser.add_argument("--min-baseline-points", type=int, default=DEFAULT_MIN_BASELINE_POINTS,
+                        help="readings that must sit before an onset for their mean to be a baseline")
+    parser.add_argument("--max-commits-in-window", type=_gate, default=DEFAULT_MAX_COMMITS_IN_WINDOW,
+                        help="refuse to name anything when more than this many changes landed in the "
+                             "window; 'none' names the closest however many landed")
+    parser.add_argument("--gate-sweep", type=int, nargs="+", default=[1, 2, 3, 5],
+                        help="crowding gates to sweep naming precision and recall over")
     parser.add_argument("--sweep", type=int, nargs="+", default=[1, 2, 4, 8],
                         help="commit strides to sweep the false-attribution rate over")
     parser.add_argument("--regression-fresh", type=int, default=DEFAULT_REGRESSION_FRESH)

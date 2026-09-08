@@ -48,11 +48,12 @@ TEN_FOOT_FLOOR_PX = 24.0
 #
 #   reason        why a rollback button is enabled or disabled, and what it targets
 #   hero-cause    the correlator's own sentence about what it concluded
+#   hero-accuracy how often naming a commit is right, measured, beside the name
 #   state-pill    whether the API answered
 #   provenance    where a number came from
 #   src / tag     the live-or-fixture chips beside it
 OPERATIONAL_CLASSES = frozenset({
-    "reason", "hero-cause", "state-pill", "provenance", "src", "tag", "src-badge",
+    "reason", "hero-cause", "hero-accuracy", "state-pill", "provenance", "src", "tag", "src-badge",
 })
 
 # Every element that paints text of its own, with the rendered size of that text.
@@ -81,6 +82,47 @@ COLLECT_JS = """
     });
   }
   return out;
+}
+"""
+
+
+# Where the provenance stamp renders, against where the figure it qualifies renders.
+# A judge reading the wall from a sofa never scrolls, so a stamp below the first
+# viewport height is a stamp nobody sees: at 1920x1080 the anomaly factor rendered at
+# y=280 while the only visible chip rendered at y=1144, and the elements carrying the
+# words OFFLINE FIXTURE had height 0. This reports both positions and every string
+# above the fold that names a data source, so the claim in the README is a measurement.
+FOLD_JS = """
+() => {
+  const fold = window.innerHeight;
+  const y = el => {
+    const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top + window.scrollY), height: Math.round(r.height) };
+  };
+  const stamps = [];
+  for (const el of document.querySelectorAll('#heroSource .tag, #hero .tag, .hero-foot .tag')) {
+    const box = y(el);
+    stamps.push({ text: el.textContent.trim(), top: box.top, height: box.height,
+                  above_the_fold: box.top + box.height <= fold && box.height > 0 });
+  }
+  const figure = document.getElementById('heroFigure');
+  const words = ['OFFLINE FIXTURE', 'LIVE', 'offline-fixture', 'simulated', 'generated locally'];
+  const visible = [];
+  for (const el of document.body.querySelectorAll('*')) {
+    const own = Array.from(el.childNodes)
+      .filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length)
+      .map(n => n.textContent.trim()).join(' ');
+    if (!own) continue;
+    const box = y(el);
+    if (box.height <= 0 || box.top + box.height > fold) continue;
+    if (words.some(w => own.indexOf(w) !== -1)) { visible.push({ text: own.slice(0, 60), top: box.top }); }
+  }
+  return {
+    viewport_height: fold,
+    hero_figure_top: figure ? y(figure).top : null,
+    stamps: stamps,
+    strings_naming_a_source_above_the_fold: visible
+  };
 }
 """
 
@@ -126,6 +168,11 @@ def collect(port: int) -> dict[str, object]:
         # part of every view rather than counted once and forgotten.
         views: dict[str, list] = {"wall": page.evaluate(COLLECT_JS)}
 
+        # Measured on the wall view, unscrolled, which is the state a wallboard sits in
+        # all day. Whether the words that say a number was served from a recording are
+        # on the same screenful as the number is a fact about pixels, not about the DOM.
+        provenance = page.evaluate(FOLD_JS)
+
         # The panels are hidden on load and most of their text does not exist
         # until a fetch has returned, so each one is opened and loaded here.
         page.click(".tile[data-panel='incident']")
@@ -152,9 +199,10 @@ def collect(port: int) -> dict[str, object]:
             "  rootFontPx: parseFloat(getComputedStyle(document.documentElement).fontSize)"
             "})"
         )
+
         browser.close()
 
-    return {"views": views, "layout": layout}
+    return {"views": views, "layout": layout, "provenance": provenance}
 
 
 def main() -> int:
@@ -204,6 +252,8 @@ def main() -> int:
 
     views = measurement["views"]
     layout = measurement["layout"]
+    fold = measurement["provenance"]
+    stamps_above = [s for s in fold["stamps"] if s["above_the_fold"]]
     every = [dict(element, view=view) for view, elements in views.items() for element in elements]
     under = sorted((e for e in every if e["px"] < args.floor), key=lambda e: (e["px"], e["view"]))
     smallest = min((e["px"] for e in every), default=0.0)
@@ -233,6 +283,16 @@ def main() -> int:
             operational, key=lambda e: e["px"], default={"tag": "", "cls": ""}
         ).get("cls", ""),
         "per_view": per_view,
+        "provenance_above_the_fold": {
+            "viewport_height_px": fold["viewport_height"],
+            "hero_figure_top_px": fold["hero_figure_top"],
+            "stamps": fold["stamps"],
+            "stamps_above_the_fold": len(stamps_above),
+            "topmost_stamp_top_px": min((s["top"] for s in stamps_above), default=None),
+            "stamp_text_above_the_fold": sorted({s["text"] for s in stamps_above}),
+            "strings_naming_a_source_above_the_fold":
+                len(fold["strings_naming_a_source_above_the_fold"]),
+        },
         "horizontal_overflow": layout["scrollWidth"] > layout["innerWidth"],
         "keybar_height_px": layout["keybarHeight"],
         "body_padding_bottom_px": layout["bodyPaddingBottom"],
@@ -260,12 +320,21 @@ def main() -> int:
               f"(scrollWidth {layout['scrollWidth']}, innerWidth {layout['innerWidth']})")
         print(f"  fixed key bar: {layout['keybarHeight']}px tall, "
               f"body reserves {layout['bodyPaddingBottom']}px below the content")
+        above = result["provenance_above_the_fold"]
+        print(f"  anomaly factor renders at y={above['hero_figure_top_px']}, "
+              f"provenance stamp at y={above['topmost_stamp_top_px']}, "
+              f"fold at y={above['viewport_height_px']}")
+        print(f"  provenance stamps within the first viewport: {above['stamps_above_the_fold']} "
+              f"{above['stamp_text_above_the_fold']}")
         for offender in result["offenders"]:
             print(f"    {offender['px']:>6}px  {offender['view']:<9} "
                   f"{offender['selector']:<32} {offender['text']}")
 
+    # A provenance stamp below the fold is a stamp a wallboard viewer never reads, so
+    # this exits non-zero for it exactly as it does for text under the floor.
     failures = len(under) > 0 or result["horizontal_overflow"] \
-        or layout["keybarHeight"] > layout["bodyPaddingBottom"]
+        or layout["keybarHeight"] > layout["bodyPaddingBottom"] \
+        or result["provenance_above_the_fold"]["stamps_above_the_fold"] < 1
     return 1 if failures else 0
 
 

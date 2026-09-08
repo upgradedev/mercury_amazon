@@ -439,3 +439,107 @@ def test_the_provenance_reports_the_shape_and_the_numbers_it_generated():
     assert f"baseline {series.baseline_mean()}" in detail
     assert f"rising to {series.latest.value}" in detail
     assert "SHA-256 of the service name" in detail
+
+
+# ------------------------------------------- Which commit a simulated reading sits after
+
+def _log(*offsets_minutes: float) -> list[datetime]:
+    """A commit log, given as minutes before a fixed instant, oldest last."""
+    base = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+    return [base - timedelta(minutes=offset) for offset in offsets_minutes]
+
+
+def test_the_attributing_shape_is_anchored_to_a_commit_that_is_alone_in_its_window():
+    """A demo whose verdict moves with somebody's commit cadence is not a demo.
+
+    Anchoring at the newest commit was fine while the correlator named the closest
+    change whatever else was in the window. Once it refuses a crowded window, whether
+    checkout-api attributed or refused depended on how many commits landed in the hour
+    before HEAD, so the same checkout showed different verdicts on different days.
+    """
+    from src.infrastructure.cloudwatch_adapter import SHAPE_ATTRIBUTED, choose_anchor
+
+    # A burst of four at the head, one commit twenty minutes before the burst, and one
+    # six hours before that. The newest commit with nothing else in its own window is
+    # the one twenty minutes back, so that is the one an attributing demo sits after.
+    times = _log(400, 20, 15, 10, 5)
+    alone, burst_head = _log(20)[0], _log(5)[0]
+    chosen = choose_anchor(SHAPE_ATTRIBUTED, max(times), times)
+    assert chosen == alone, "the anchor is not the newest commit that is alone in its window"
+    assert chosen != burst_head, "anchoring at the newest commit puts three others in the window"
+
+
+def test_the_crowded_shape_is_anchored_to_the_commit_with_the_most_company():
+    from src.infrastructure.cloudwatch_adapter import SHAPE_CROWDED, choose_anchor
+
+    times = _log(400, 20, 15, 10, 5)
+    chosen = choose_anchor(SHAPE_CROWDED, max(times), times)
+    assert chosen == max(times), "the crowded anchor must be the end of the burst"
+
+
+def test_choosing_an_anchor_without_a_log_changes_nothing():
+    from src.infrastructure.cloudwatch_adapter import SHAPE_ATTRIBUTED, choose_anchor
+
+    newest = _log(5)[0]
+    assert choose_anchor(SHAPE_ATTRIBUTED, newest, None) == newest
+    assert choose_anchor(SHAPE_ATTRIBUTED, newest, []) == newest
+    assert choose_anchor(SHAPE_ATTRIBUTED, None, None) is None
+
+
+def test_the_attributing_shape_falls_back_when_no_commit_is_ever_alone():
+    """A log with no isolated commit anywhere. The demo then honestly refuses.
+
+    Every commit here has company inside its own window, including the oldest, so there
+    is nothing to anchor an attribution to. The chooser returns the newest rather than
+    inventing a gap, and what the screen then shows is the crowded-window refusal, which
+    is the true answer for a service that ships like that.
+    """
+    from src.infrastructure.cloudwatch_adapter import SHAPE_ATTRIBUTED, choose_anchor
+
+    times = _log(6, 4, 2, 0)
+    assert choose_anchor(SHAPE_ATTRIBUTED, max(times), times) == max(times)
+
+
+def test_the_crowded_shape_discloses_how_it_was_staged():
+    from src.infrastructure.cloudwatch_adapter import SHAPE_CROWDED
+
+    times = _log(400, 20, 15, 10, 5)
+    name = next(n for n, s in SIMULATED_SERVICES.items() if s.shape == SHAPE_CROWDED)
+    series = offline_adapter().get_error_series(name, anchor_at=max(times), commit_times=times)
+    assert "the commit with the most company" in series.provenance.detail
+    assert "the commits are real, this metric is not" in series.provenance.detail
+
+
+def test_every_verdict_the_correlator_can_reach_is_reachable_from_the_fixture():
+    """One named service per answer, driven through the real correlator.
+
+    The fourth and fifth verdicts are refusals, and the refusals are what this product
+    is now built around, so a reviewer has to be able to press each of them.
+    """
+    from src.domain.incident_correlation import (
+        AttributionRefusal,
+        CommitRef,
+        CorrelationVerdict,
+        IncidentCorrelator,
+    )
+
+    times = _log(600, 400, 20, 15, 10, 5)
+    commits = [CommitRef(f"sha{i:04d}", "m", "dev", at) for i, at in enumerate(times)]
+    correlator = IncidentCorrelator()
+    adapter = offline_adapter()
+
+    def verdict_for(name):
+        series = adapter.get_error_series(name, anchor_at=max(times), commit_times=times)
+        return correlator.correlate(name, series, commits)
+
+    assert verdict_for("checkout-api").verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert verdict_for("payments-worker").verdict is CorrelationVerdict.NO_ANOMALY
+    assert verdict_for("quiet-service").verdict is CorrelationVerdict.INSUFFICIENT_DATA
+
+    unattributed = verdict_for("search-indexer")
+    assert unattributed.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert unattributed.attribution_refusal is AttributionRefusal.NO_CANDIDATE_IN_WINDOW
+
+    crowded = verdict_for("release-train")
+    assert crowded.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION
+    assert crowded.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED

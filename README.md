@@ -1,27 +1,30 @@
-# Mercury: what broke, what changed, and a governed rollback
+# Mercury: when not to blame a deploy, and a governed rollback
 
-> **Mercury tells an on-call engineer which change broke production, or refuses to name one, and puts the rollback behind four governance conditions.** It reads a real commit history against an error metric, publishes how often that attribution is right, and renders on a Fire TV as one of its screens.
+> **Mercury tells an on-call engineer when not to blame a deployment, and refuses to name one unless exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
 ```mermaid
 flowchart LR
     Q["Someone asks:<br/>what broke?"]
-    Q --> M["1. What broke<br/>the error rate against<br/>its own baseline"]
-    M --> C["2. What changed<br/>the closest commit that<br/>landed before the reading"]
-    C --> R["3. Governed rollback,<br/>refused unless four<br/>conditions hold"]
-    M -.->|reading is inside baseline| N["Mercury names no commit<br/>and offers no rollback"]
-    C -.->|no deploy landed close enough| N
-    C -.->|more than one change in the window| A["Mercury names the closest<br/>and says it is one of several"]
+    Q --> M["1. What broke<br/>the error rate against<br/>a baseline taken from<br/>before the spike started"]
+    M --> C["2. Can any one change<br/>be blamed for it?"]
+    C -.->|"reading is inside baseline<br/>(99.5% quiet on healthy series)"| N["Do not revert anything.<br/>Mercury names no commit<br/>and offers no rollback"]
+    C -.->|"no deploy landed before the onset<br/>(62.0% of exogenous spikes)"| N
+    C -.->|"more than one change landed<br/>(239 of 600 regressions)"| N
+    C ==>|"exactly one change landed"| R["3. Name it, and stage a<br/>governed rollback behind<br/>four conditions"]
 ```
 
-The dotted paths are the point as much as the solid one, and they are the ones
-that were measured. `python scripts/correlation_trial.py` scores the correlator
-against 1160 labelled incidents and publishes both what it gets right and what it
-gets wrong: see [How often it is right](#how-often-it-is-right), which is the
-least flattering section in this file and the one to read first.
+**The dotted paths are the product.** Against 1160 labelled incidents, this
+correlator sees an anomaly and names nobody 81.1% of the time, and that refusal is
+the answer an on-call engineer can act on: do not revert anything, this is not a
+deploy. When it does name a change, the change it names is the one that caused the
+reading 52.2% of the time over 113 namings. That is a coin toss, it is published on
+the screen next to the name, and it is why naming is the smaller half of this
+README. The numbers are in [How often it is right](#how-often-it-is-right), which
+is the least flattering section in this file and the one to read first.
 
-Mercury answers on load. Each number on the screen carries a badge saying whether
-it was read live or served from a recording, and every attribution says how many
-changes it had to choose between.
+Mercury answers on load. The badge saying whether a number was read live or served
+from a recording renders inside the incident card next to the number itself, and
+every attribution carries its own measured precision.
 
 ### Run it
 
@@ -45,8 +48,8 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-345%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-400%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **No APK exists.** The Android build is
@@ -89,6 +92,15 @@ matters is one question: which change did this, and can it be undone safely. The
 asset in this repository is the engine that answers it, scored against a labelled
 corpus rather than demonstrated once.
 
+Scoring it changed what this product claims. The engine's reliable answer is the
+negative one. It stays quiet on 199 of 200 healthy series, refuses outright on 60
+of 60 telemetry gaps, and on a real anomaly it declines to name a change 81.1% of
+the time, because the hour before the spike usually holds either no change or
+several. Those are the answers an on-call engineer can act on at three in the
+morning: do not revert anything yet. Naming one change is the smaller capability,
+it is right about half the times it fires, and Mercury says so on the screen at the
+moment somebody would act on it.
+
 The screen is a delivery choice, not the product. Mercury renders on a Fire TV in
 a room, and on a laptop browser, from the same HTTP surface and the same page: the
 D-pad ring and the arrow keys are one code path. It is entered in the Fire TV track
@@ -97,14 +109,14 @@ run, and the section on it says exactly what has not.
 
 Three things it does:
 
-**Answers "what changed?"** `POST /mcp/tools/what_changed` reads an error metric
-series and a commit history, decides whether the newest reading is an anomaly
-against its own baseline, and attributes it to the closest commit that landed
-before it. When it cannot attribute the anomaly to anything, it says so and
-offers no rollback. That refusal is a feature, and it has its own tests. When more
-than one change sits inside the attribution window it names the closest and says
-how many others there were, because every wrong answer it gave against the labelled
-corpus that it could have got right was a window like that.
+**Answers "is this a deploy, and which one?"** `POST /mcp/tools/what_changed` reads
+an error metric series and a commit history, decides whether the metric has stepped
+up against a baseline taken from before the step, and looks for changes in the hour
+before that step started. It names one only when exactly one landed there. When
+none landed it says so; when several landed it says how many and names none of
+them, because nothing in a metric series says which of two changes did it. Both
+refusals are the product rather than a fallback, they have their own tests, and
+they are the two most common answers it gives.
 
 **Shows engineering velocity and spend.** `POST /mcp/tools/get_dora_velocity_report`,
 `POST /mcp/tools/get_pr_bottlenecks` and `POST /mcp/tools/get_aws_cost_anomalies`
@@ -160,34 +172,44 @@ exactly that, in the text the screen shows:
 
 ### The refusals are the first thing you can press
 
-Three of the four answers the correlator can give are refusals, so the cockpit
-offers four services on the hero, one per answer. The numbers behind each are
+Four of the five answers the correlator can give are refusals, so the cockpit
+offers five services on the hero, one per answer. The numbers behind each are
 derived from the SHA-256 of the service name, so no two services read the same
 and every machine reads the same as this one.
 
 | Press | Verdict | What it shows |
 |---|---|---|
-| `checkout-api` | `ANOMALY_ATTRIBUTED` | A spike four minutes after a real commit. Names the commit, offers the rollback |
+| `checkout-api` | `ANOMALY_ATTRIBUTED` | A spike four minutes after a commit that is alone in its window. Names the commit, offers the rollback, and prints the precision that naming was measured at |
+| `release-train` | `ANOMALY_WITHOUT_ATTRIBUTION`, `WINDOW_TOO_CROWDED` | A spike after a burst of changes. Calls it an anomaly, then refuses to name any one of them and offers no rollback |
+| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION`, `NO_CANDIDATE_IN_WINDOW` | A spike placed four hours after the newest commit, outside the 60 minute attribution window. Calls it an anomaly, then declines to blame anything |
 | `payments-worker` | `NO_ANOMALY` | A reading above its baseline but under the 3.0x threshold. Names nothing, offers nothing |
-| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION` | A spike placed four hours after the newest commit, outside the 60 minute attribution window. Calls it an anomaly, then declines to blame anything |
 | `quiet-service` | `INSUFFICIENT_DATA` | A name the fixture does not know. Refused outright rather than given an invented spike |
 
-Reproduce all four from a shell against a running server:
+Reproduce all five from a shell against a running server:
 
 ```bash
-for s in checkout-api payments-worker search-indexer quiet-service; do
+for s in checkout-api release-train search-indexer payments-worker quiet-service; do
   curl -s -X POST localhost:8002/mcp/tools/what_changed \
        -H 'Content-Type: application/json' -d "{\"service_name\":\"$s\"}" \
-    | python -c "import json,sys; d=json.load(sys.stdin); print(d['service'], d['verdict'], d['metric'])"
+    | python -c "import json,sys; d=json.load(sys.stdin); print(d['service'], d['verdict'], d['attribution']['refusal_reason'])"
 done
 ```
 
-The fixture used to be two module constants, so every service name returned the
-same spike and neither refusal verdict was reachable from any input a reader
-could supply. `tests/integration/test_mcp_endpoints.py` now drives all four
-through the endpoint the cockpit calls.
+Where each reading is placed is itself a choice, and the response says which choice
+it was. The attributing demo is anchored to the newest commit that is **alone** in
+its own attribution window, and the crowded demo to the commit with the **most**
+company in its window, both picked from the real `git log` of your checkout. That is
+deliberate and it is disclosed in the provenance the screen renders: without it,
+whether `checkout-api` named a commit or refused depended on how often somebody had
+committed in the hour before HEAD, so the same repository demonstrated different
+verdicts on different days.
 
-Those four are a demonstration, not evidence. The evidence is below.
+The fixture used to be two module constants, so every service name returned the
+same spike and no refusal verdict was reachable from any input a reader could
+supply. `tests/integration/test_mcp_endpoints.py` now drives all five through the
+endpoint the cockpit calls.
+
+Those five are a demonstration, not evidence. The evidence is below.
 
 ---
 
@@ -220,62 +242,150 @@ values are generated here and were never read from a monitored service.
 
 | Measure | Value | Over |
 |---|---|---|
-| Hit rate, fresh look | **22.0%** | 300 regressions seen on the first poll after onset |
-| Hit rate, late look | **3.3%** | 300 regressions seen one to four polls later |
-| Correct refusal, exogenous spikes | **62.0%** | 300 anomalies no commit caused |
-| False attribution, exogenous spikes | **13.3%** | the same 300 |
-| Stayed quiet on a healthy series | 99.5% | 200 ordinary series |
-| Refused for want of data | 100% | 60 telemetry gaps |
-| Naming precision | 27.9% | the 272 times it named a commit |
+| Refused to name anything when it saw an anomaly | **81.1%** | the 599 anomalies it detected |
+| Stayed quiet on a healthy series | **99.5%** | 200 ordinary series |
+| Refused for want of data | **100%** | 60 telemetry gaps |
+| Correct refusal, exogenous spikes | **69.3%** | 300 anomalies no commit caused |
+| False attribution, exogenous spikes | **6.0%** | the same 300 |
+| Naming precision | **52.2%** | the 113 times it named a commit |
+| Naming recall | **9.8%** | 600 genuine regressions |
+| Hit rate, fresh look | **11.3%** | 300 regressions seen on the first poll after onset |
+| Hit rate, late look | **8.3%** | 300 regressions seen one to four polls later |
 
-Those are the numbers. They are bad, and each one is bad for a reason that is
-worth more than the number:
+Read the table in that order, because that is the order of what this thing is good
+at. The four refusal rows are the product. The naming rows are a bounded secondary
+capability: when it names a change, it is right about half the time, and it names
+one for fewer than one regression in ten.
 
-**The late look is the real defect.** `MetricSeries.baseline_mean` drops only the
-newest point, so a spike that has been running for three polls is most of its own
-baseline and the factor collapses. A tenfold regression looked at three polls late
-reads as `NO_ANOMALY`: 254 of those 300 cases were missed outright.
-`tests/unit/test_correlation_trial.py::test_a_spike_running_for_three_polls_is_inside_its_own_baseline`
-pins that behaviour with a hand-built series, so it cannot change silently. Nobody
-designed it, the corpus found it, and fixing it needs a baseline drawn from a
-window before the onset rather than from the same six points, which is a change to
-the detector rather than a change to the wording.
+**Naming a commit is a coin toss, and the screen says so.** 52.2% over 113 namings
+is not a number to revert production on, so the answer carries it. Every
+`what_changed` response ships `attribution.measured_accuracy`, read from
+`correlation_trial_summary.json` rather than recomputed, and the cockpit prints it
+under the headline the moment a commit is named. An operator reading the wall sees
+the name and the odds together.
 
-**The wrong names split two ways, and only one of them is the rule's fault.** Of
-the 156 attributions that named an innocent commit, **47** had the real cause
-outside the 60 minute window, where no rule with that window could have named it.
-The other **109** had the cause inside the window and picked a different change
-from the same window. Not one of the 156 had the cause inside the window with only
-one candidate in it: when this rule had the culprit among its candidates and still
-got it wrong, there was always more than one candidate. This repository commits in
-bursts: the median gap between commits in the recorded stream is 20.58 minutes, 42
-of its 58 gaps are under an hour, and a 60 minute window ending on a commit holds
-2.78 commits on average and 9 at the worst. That is why the answer now carries
-`attribution.commits_in_window` and says on screen that the name is one of several.
-It does not silently pick differently, because nothing in a metric series says
-which of two changes in the same window did it. The disclosure fires on 130 of the
-156, and on 35 of the 76 correct namings as well, which is what it costs.
+### What changed on 2026-09-08, and what it cost
+
+The previous published numbers were a 22.0% hit rate on a fresh look, **3.3% on a
+late look**, and 27.9% naming precision over 272 namings. Two defects and one
+editorial decision moved them. Every row below is a run of the committed class with
+different flags, printed by the same command:
+
+```bash
+python scripts/correlation_trial.py     # prints the ablation and the gate sweep
+```
+
+| Detector | Fresh look | Late look | Naming precision | Namings | Quiet on healthy |
+|---|---|---|---|---|---|
+| Trailing baseline, window ends at the reading (before) | 22.0% | **3.3%** | 27.9% | 272 | 99.5% |
+| Pre-onset baseline, window ends at the reading | 22.3% | 9.3% | 27.1% | 350 | 99.5% |
+| Pre-onset baseline, window ends at the onset | 22.0% | **18.7%** | 32.6% | 374 | 99.5% |
+
+**The baseline no longer contains the spike.** `MetricSeries.baseline_mean` dropped
+only the newest point, so a spike that had been running for three polls was most of
+its own baseline and the factor collapsed. `MetricSeries.find_onset` now finds the
+first reading of an elevation that is still going on, and the baseline is the mean
+of the readings strictly before it. That alone took the late look from 3.3% to
+9.3%. The detector is **strictly more sensitive** than the old one, because the
+last index is always a candidate onset and testing it is the same arithmetic the
+trailing mean did, so it fires on everything the old one fired on and on more
+besides. The cost of that extra sensitivity on healthy series was measured and it
+is **zero**: 199 of 200 before, 199 of 200 after. It found an onset earlier than
+the newest reading in 151 cases, 150 of which were genuine regressions and one of
+which was not.
+
+**The window ends when the spike started, not when somebody looked.** A change that
+lands after a spike has begun cannot have caused it, and an engineer who walks up to
+the wallboard forty minutes in was dragging the whole 60 minute window off the
+change that did. Anchoring the window at the onset took the late look from 9.3% to
+18.7%, which is the larger half of the fix.
+
+**Then it was told to refuse a crowded window, which cost recall to buy precision.**
+Naming the closest of several changes was where the wrong names came from. The
+correlator now names a commit only when exactly one landed inside the window. The
+threshold was chosen from this sweep, printed by the same command, and the sweep is
+published so the choice can be argued with:
+
+| Names when at most N landed | Naming precision | Naming recall | Namings | False attribution |
+|---|---|---|---|---|
+| N = 1 (shipped) | **52.2%** | 9.8% | 113 | 3.6% |
+| N = 2 | 47.9% | 16.8% | 211 | 5.4% |
+| N = 3 | 40.6% | 19.0% | 281 | 7.2% |
+| N = 5 | 38.9% | 19.7% | 303 | 7.4% |
+| no gate | 32.6% | 20.3% | 374 | 8.0% |
+
+Choosing a threshold on the corpus you then report it on is fitting, and a figure
+chosen that way is worth less than it looks. So the direction was checked on two
+seeds that took no part in the choice: naming precision at N=1 is **53.3%** over 92
+namings at seed 19850717 and **55.7%** over 115 namings at seed 20261231, against
+32.6% ungated on the reported corpus.
+`tests/unit/test_correlation_trial.py::test_the_crowding_gate_holds_up_on_corpora_it_was_not_chosen_on`
+runs both and fails if the gate stops buying precision.
+
+```bash
+python scripts/correlation_trial.py --no-write --seed 19850717
+python scripts/correlation_trial.py --no-write --seed 20261231
+```
+
+**What it cost.** Recall fell from 20.3% to 9.8%: Mercury now names the cause of
+fewer than one regression in ten, where before it named the cause of one in five
+and an innocent change in three. The trade is deliberate. An on-call engineer who
+reverts on a name that is wrong 67% of the time is worse off than one who is told
+to look elsewhere.
+
+**The failure mode changed, which is the useful part.** Of the 36 attributions that
+named an innocent commit, **35** had the real cause outside the 60 minute window
+entirely, where no rule with that window could have named it. **0** had the cause
+inside the window and more than one candidate, because those are refused now rather
+than guessed at, and **1** had the cause inside the window with a single candidate.
+That last case is the honest residual: one case in 1160 where the rule had the
+culprit alone in front of it and named the wrong thing. This repository
+commits in bursts, which is why the crowding gate refuses so often: the median gap
+between commits in the recorded stream is 20.58 minutes, 42 of its 58 gaps are
+under an hour, and a 60 minute window ending on a commit holds 2.78 commits on
+average and 9 at the worst.
+
+**Refusing more is not the same as judging better, so the refusals are counted
+apart.** Correct refusal on exogenous spikes rose from 62.0% to 69.3%, and the
+whole of that rise is the crowding gate: 62.0% is still "nothing landed in the
+window", and the extra 7.3% is "too much landed". Both figures are published
+separately in `correlation_trial_summary.json` under
+`correct_refusal_on_exogenous_spikes_no_candidate` and
+`correct_refusal_on_exogenous_spikes_window_too_crowded`, so a blunter instrument
+cannot read as better judgement.
+
+**There is a ceiling on the late look and it is arithmetic, not a defect.** The
+pre-onset baseline needs at least two readings before the onset. A six point series
+polled every ten minutes, looked at four polls after onset, leaves one. 65 of the
+300 late-look cases are therefore undetectable by this detector whatever it does,
+capping the late-look hit rate at **78.3%** and the whole-corpus hit rate at 89.2%.
+That ceiling is computed from the corpus's own timestamps and published as
+`detectability_ceiling`. Fixing it needs a longer series, not a better rule.
 
 The corpus treats every commit in the log as an independently deployable change.
 Real deployments often ship a burst of commits as one release, which would collapse
-several of those candidate sets into a single change and raise the hit rate. This
-is the pessimistic reading of the same log, and it is the one published.
+several of those candidate sets into a single change, refuse less often and raise
+the hit rate. This is the pessimistic reading of the same log, and it is the one
+published.
 
 **The false-attribution rate is half a number without the commit density.** An
-anomaly with no cause is attributed exactly when some commit happens to fall in the
-60 minutes before the reading, so the rate is a joint property of the window and of
-the stream. `--commit-stride` thins the recorded log and the report sweeps it:
+anomaly with no cause is attributed exactly when exactly one commit happens to fall
+in the 60 minutes before the onset, so the rate is a joint property of the window,
+the gate and the stream. `--commit-stride` thins the recorded log and the report
+sweeps it:
 
 | Commits in the stream | Commits per hour | False attribution rate |
 |---|---|---|
-| 59 (every commit) | 0.405 | 8.0% |
-| 30 (every 2nd) | 0.206 | 5.8% |
-| 15 (every 4th) | 0.103 | 3.2% |
+| 59 (every commit) | 0.405 | 3.6% |
+| 30 (every 2nd) | 0.206 | 4.8% |
+| 15 (every 4th) | 0.103 | 2.6% |
 | 8 (every 8th) | 0.055 | 1.4% |
 
-Read that as: on a service that deploys as often as this repository commits, one
-anomaly in twelve that no deployment caused will still get a deployment blamed for
-it.
+That column is no longer monotonic, and the reason is the gate rather than noise:
+thinning a dense stream turns crowded windows, which are refused, into single
+candidate windows, which are named. Thinning it further empties the windows
+altogether. On a stream as dense as this repository's, the crowding gate is doing
+most of the refusing; on a sparser one, the window itself is.
 
 **What this trial is not.** Not a field trial, and not a claim about production.
 No real error metric appears in it, the noise model and the severity spread are
@@ -409,7 +519,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 345 passed
+# 400 passed
 ```
 
 ### 3. Start the server
@@ -485,10 +595,12 @@ produced here, for the same reason no APK has.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 220 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 207 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 220
-#   smallest operational text (reasons, provenance, pills): 25.9px over 29 readings
+#   readings under the floor: 0 of 207
+#   smallest operational text (reasons, provenance, pills): 25.9px over 21 readings
+#   anomaly factor renders at y=274, provenance stamp at y=453, fold at y=1080
+#   provenance stamps within the first viewport: 2 ['LIVE', 'OFFLINE FIXTURE']
 ```
 
 That script starts the server, opens the page in Chromium at 1920x1080, drives it
@@ -501,8 +613,8 @@ pinned: it moves with whatever the page rendered on the day, which includes a
 commit message read from `git log`. Reproduce a failing measurement by raising the
 floor: `python scripts/measure_legibility.py --floor 26` exits 1.
 
-Two defects have been fixed here, and the second was invisible while only the
-first was measured.
+Three defects have been fixed here, and each was invisible while only the previous
+one was measured.
 
 **The floor.** The page set a 24px root at the television breakpoint and then wrote
 every label, badge and provenance stamp in fractions of that root, so the headline
@@ -531,6 +643,28 @@ provenance chips and the connection pill now sit a tier above the body copy at
 25.9px and 27.6px, and the measurement reports that tier separately so it cannot
 quietly sink back to the floor.
 
+**The provenance stamp was below the fold.** A floor and a reading order still say
+nothing about *where* text lands, and a wallboard is never scrolled. At 1920x1080
+the anomaly factor rendered at y=274 while the badge saying where that number came
+from rendered in the hero's footer, below the demo buttons, outside the first 1080
+pixels entirely. Worse, the badge printed the machine value `offline-fixture`
+rather than the words: not one of the strings above the fold contained "OFFLINE
+FIXTURE", "simulated" or "generated locally", so a viewer across a room read a
+locally generated 12.9x as a production number while this README claimed every
+number on the screen carried a badge saying otherwise. The badge now renders inside
+the hero card next to the figure, at y=453, and it prints `display_label`. The
+measurement reports both positions and the script exits 1 when no stamp lands above
+the fold. Reproduce the failure on a clean checkout, which overwrites the page and
+then throws the copy away, so commit or stash anything uncommitted in it first:
+
+```bash
+git show 455f60b:docs/index.html > docs/index.html   # the commit before the fix
+python scripts/measure_legibility.py
+#   anomaly factor renders at y=274, provenance stamp at y=None, fold at y=1080
+#   provenance stamps within the first viewport: 0 []
+git checkout -- docs/index.html                      # put the current page back
+```
+
 **The setup form is off the first screen.** The API URL and the governance secret
 were two text inputs in the top bar, which is a form standing between a viewer and
 the incident and the worst thing in this product to operate with a D-pad. They are
@@ -557,7 +691,7 @@ Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`), and i
 emulator**.
 
 What *is* verified: the manifest declarations, the Gradle wiring and the key
-handling contract are checked by 28 structural tests, and the D-pad navigation
+handling contract are checked by 30 structural tests, and the D-pad navigation
 logic the APK drives is tested by executing `docs/firetv_nav.js` in Node against
 a synthetic grid, 17 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
 itself has unit tests written but never compiled or run.
@@ -592,13 +726,36 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 345 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1218 statements
+python -m pytest tests/ -q                                    # 400 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1318 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
 python ci/readiness.py                                        # standards gate audit
 ```
+
+### Readiness gates
+
+```bash
+python ci/readiness.py
+# SUMMARY: 44/53 PASSED, 9/53 FAILED (0 of them blocking)
+```
+
+**44/53 readiness gates**, down one from the 45 published before 2026-09-08. J4 is
+the gate that asks whether the sponsor product is load-bearing, and Mercury is
+entered in the Fire TV track, so J4 is the gate that matters most here. It passed
+on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
+two text files, while the [Fire TV](#fire-tv) section two screens away said no APK
+had ever been built. It was the one gate in the file that could not fail on the
+axis it exists to test.
+
+It now asks for `firetv_build_receipt.json`: a gradle command that exited 0, an APK
+that exists in the checkout, and a launch recorded on a device or emulator. That
+file does not exist, so **J4 fails**, and the published score went down by one.
+`docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
+`tests/unit/test_readiness_gates.py` drives every missing field through the
+predicate, including the case where it passes, which cannot be reached in this
+checkout because no APK exists.
 
 ### Data fixtures
 
@@ -672,18 +829,35 @@ given a substitute number.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.
-* **Anomaly detection is a threshold, not a model.** The newest reading against the
-  mean of the rest, with a fixed factor. It has no seasonality and no trend.
-* **A spike that has been running for three polls hides inside its own baseline.**
-  The baseline is the mean of the same six points minus the newest, so by the third
-  poll after onset a tenfold regression reads as healthy. Measured: **3.3%** hit
-  rate on the late-look stratum against **22.0%** on a fresh look, over 300 cases
-  each. Both numbers are in [How often it is right](#how-often-it-is-right), and
-  the fix is a baseline drawn from before the onset, which is not implemented.
-* **Attribution names the closest change, and often that is the wrong one.** Every
-  wrong name it gave against the labelled corpus was a window holding more than one
-  change. The answer now says how many candidates there were, on the wire and on
-  the screen, but it still names one of them rather than ranking them.
+* **Anomaly detection is a threshold, not a model.** A step up against the mean of
+  the readings before the step, with a fixed factor. It has no seasonality and no
+  trend, and a service whose error rate is legitimately ten times higher at nine in
+  the morning than at four will be called an anomaly every day.
+* **Naming a change is right about half the time.** **52.2%** precision over 113
+  namings. That is published, it travels with every answer in
+  `attribution.measured_accuracy`, and it is why the headline of this README is the
+  refusal rather than the name. It is not good enough to revert on unaided.
+* **Naming a change fires rarely.** **9.8%** recall over 600 genuine regressions.
+  The other nine in ten get a refusal or a miss. Recall was 20.3% before the
+  crowding gate, at 32.6% precision; the gate traded the first for the second on
+  purpose and the whole sweep is published.
+* **The detector cannot see a spike that started five polls ago.** It needs at least
+  two readings before the onset, and a six point series polled every ten minutes
+  does not have them once the spike has been running for forty minutes. **65 of 300**
+  late-look cases are unreachable for that reason alone, capping that stratum at
+  **78.3%**. A longer series would lift the cap; no rule can.
+* **Requiring the elevation to persist is an assumption, and it is partly fitted.**
+  An onset only counts when every reading from it onward stays elevated, which is
+  what stops a single noisy sample reading as an incident. The corpus generates its
+  regressions the same way, applying the multiplier from onset to the end, so some
+  of that suppression is fitted to the generator rather than earned against a real
+  metric. A production spike that has already half recovered is not detected here.
+* **The crowding gate was chosen on the corpus it is reported on.** N=1 came from a
+  sweep over this seed. The direction was checked on two held-out seeds and held
+  (53.3% and 55.7% precision), but the exact 52.2% is an in-sample figure.
+* **A crowded window is refused, not ranked.** Mercury says how many changes landed
+  and names none of them. It does not rank them, diff them, or look at what they
+  touched, all of which would be better than refusing and none of which is here.
 * **The delivery-channel premise is an assumption, not a finding.** That an on-call
   engineer is in a room with a television during an incident has never been tested
   with a responder. Nobody has been asked. If they are all remote, the ten-foot
@@ -712,13 +886,17 @@ The signing name is whoever owns that rota, usually a head of platform or of
 engineering. The user is the responder answering the page at two in the morning,
 and the two are not the same person.
 
-**What is being sold, and what is being assumed.** What is being sold is the
-what-broke, what-changed, governed-rollback path over a real commit history, with
-its accuracy published rather than asserted. What is being assumed is that a
-television is a screen that responder is near. The first is measurable and is
-measured above; the second is a guess about where this work happens, and it has
-never been checked with a responder. Those two are not the same kind of claim and
-this section does not treat them as one.
+**What is being sold, and what is being assumed.** What is being sold is a second
+opinion on the first question of an incident: is this a deploy at all. Mercury
+mostly answers no, with a reason, and when it does name a change it says on the
+screen how often naming is right. Both rates are in
+[How often it is right](#how-often-it-is-right), and they are not restated here
+because this section is a hypothesis and the measured figures should be read where
+the commands that produced them are. What is being assumed is that a television is
+a screen that responder is near. The first is measurable and is measured above; the
+second is a guess about where this work happens, and it has never been checked with
+a responder. Those two are not the same kind of claim and this section does not
+treat them as one.
 
 **The budget line.** The engineering tooling line that already carries the on-call
 paging subscription and the observability subscription. Mercury is not asking for a

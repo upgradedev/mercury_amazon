@@ -50,7 +50,8 @@ SERIES_POINTS = 6
 ANCHOR_OFFSET_MINUTES = 4
 UNATTRIBUTED_ANCHOR_OFFSET_MINUTES = DEFAULT_ATTRIBUTION_WINDOW_MINUTES * 4
 
-SHAPE_ATTRIBUTED = "spike_after_a_commit"
+SHAPE_ATTRIBUTED = "spike_after_a_lone_commit"
+SHAPE_CROWDED = "spike_after_a_burst_of_commits"
 SHAPE_UNATTRIBUTED = "spike_far_from_any_commit"
 SHAPE_INSIDE_BASELINE = "inside_its_own_baseline"
 SHAPE_FLAT = "flat_and_healthy"
@@ -82,11 +83,62 @@ SIMULATED_SERVICES: dict[str, SimulatedService] = {
         "an error spike hours away from any commit, which the correlator calls an anomaly and "
         "then declines to blame anything for",
     ),
+    "release-train": SimulatedService(
+        SHAPE_CROWDED,
+        "an error spike after a burst of changes, which the correlator calls an anomaly and then "
+        "refuses to name any one of them for, because nothing in the metric says which did it",
+    ),
 }
 
 
 def _iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def commits_in_window_before(reading_at: datetime, commit_times: list[datetime]) -> int:
+    """How many of ``commit_times`` fall in the attribution window ending at a reading."""
+    start = reading_at - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+    return sum(1 for at in commit_times if start <= at <= reading_at)
+
+
+def choose_anchor(shape: str, newest: datetime | None, commit_times: list[datetime] | None) -> datetime | None:
+    """Pick the commit a simulated reading is placed after, so a demo does not drift.
+
+    Anchoring every shape at the newest commit was fine while the correlator named the
+    closest change whatever else was in the window. It stopped being fine when the
+    correlator started refusing a crowded window: whether ``checkout-api`` attributed or
+    refused then depended on how many times somebody had committed in the hour before
+    HEAD, so the same checkout demonstrated different verdicts on different days.
+
+    This picks deterministically from the real log instead:
+
+    * an attributing shape is placed after the newest commit that is **alone** in its
+      own attribution window, so the attribution path is reachable;
+    * the crowded shape is placed after the commit with the **most** company in its
+      window, so the refusal path is reachable.
+
+    Both are choices made to make a path demonstrable, which is what a demo is, and the
+    provenance the screen renders says so in the same words. The evidence for how often
+    the correlator is right is the labelled corpus in ``scripts/correlation_trial.py``,
+    never these four buttons.
+    """
+    if not commit_times:
+        return newest
+    ordered = sorted(commit_times)
+    if shape == SHAPE_ATTRIBUTED:
+        alone = [
+            at for at in ordered
+            if commits_in_window_before(at + timedelta(minutes=ANCHOR_OFFSET_MINUTES), ordered) == 1
+        ]
+        return alone[-1] if alone else newest
+    if shape == SHAPE_CROWDED:
+        return max(
+            ordered,
+            key=lambda at: (
+                commits_in_window_before(at + timedelta(minutes=ANCHOR_OFFSET_MINUTES), ordered), at,
+            ),
+        )
+    return newest
 
 
 def _digest(service_name: str) -> bytes:
@@ -225,6 +277,7 @@ class CloudWatchMetricAdapter:
         reason: str,
         window_minutes: int,
         anchor_at: datetime | None = None,
+        commit_times: list[datetime] | None = None,
     ) -> MetricSeries:
         """Build a deterministic local series for one named service.
 
@@ -234,16 +287,20 @@ class CloudWatchMetricAdapter:
         reads the same on every machine.
 
         When ``anchor_at`` is given, the final reading is placed relative to it.
-        The caller passes the newest known commit time, so the attributed demo is
-        coherent, and the unattributed demo is deliberately placed far enough away
-        that no commit falls inside the attribution window. This only ever moves
-        simulated points; a live CloudWatch reading never reaches this method.
+        The caller passes the newest known commit time, and ``commit_times`` when it has
+        the whole log, which lets :func:`choose_anchor` place the attributing shape after
+        a commit that is alone in its window and the crowded shape after a burst. Without
+        that the demonstrated verdict moved with the last hour of somebody's commit
+        history. The unattributed demo is deliberately placed far enough away that no
+        commit falls inside the attribution window. This only ever moves simulated points;
+        a live CloudWatch reading never reaches this method.
         """
         shape = self._shape_for(service_name)
         if shape is None:
             return self._refused_series(service_name, reason)
 
         offset = UNATTRIBUTED_ANCHOR_OFFSET_MINUTES if shape == SHAPE_UNATTRIBUTED else ANCHOR_OFFSET_MINUTES
+        anchor_at = choose_anchor(shape, anchor_at, commit_times)
         end = (anchor_at + timedelta(minutes=offset)) if anchor_at else datetime.now(timezone.utc)
         step = max(window_minutes // SERIES_POINTS, 1)
 
@@ -266,6 +323,21 @@ class CloudWatchMetricAdapter:
                 f"which is deliberately outside the {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute "
                 "attribution window, so the correlator has an anomaly and nothing to blame for it; "
                 "the commits are real, this metric is not."
+            )
+        elif shape == SHAPE_CROWDED:
+            anchoring = (
+                f" The final reading is placed {offset} minutes after the commit with the most "
+                f"company inside the {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute attribution "
+                "window, chosen from the real log so the crowded-window refusal is reachable from "
+                "this screen; the commits are real, this metric is not."
+            )
+        elif shape == SHAPE_ATTRIBUTED:
+            anchoring = (
+                f" The final reading is placed {offset} minutes after the newest commit that is "
+                f"alone in its {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute attribution window, "
+                "chosen from the real log so the attribution is demonstrable and does not change "
+                "with the last hour of somebody's commit history; the commits are real, this "
+                "metric is not."
             )
         else:
             anchoring = (
@@ -301,10 +373,13 @@ class CloudWatchMetricAdapter:
         namespace: str = DEFAULT_NAMESPACE,
         metric_name: str = DEFAULT_METRIC,
         dimension_name: str = "LoadBalancer",
+        commit_times: list[datetime] | None = None,
     ) -> MetricSeries:
         """Return the error metric series for a service over the recent window."""
         if offline_mode_enabled():
-            return self._simulated_series(service_name, OFFLINE_REASON, window_minutes, anchor_at)
+            return self._simulated_series(
+                service_name, OFFLINE_REASON, window_minutes, anchor_at, commit_times
+            )
 
         client = self._resolve_client()
         if client is None:
@@ -313,6 +388,7 @@ class CloudWatchMetricAdapter:
                 "No AWS credentials resolved, so no CloudWatch call was attempted.",
                 window_minutes,
                 anchor_at,
+                commit_times,
             )
 
         try:
@@ -345,6 +421,7 @@ class CloudWatchMetricAdapter:
                     ),
                     window_minutes,
                     anchor_at,
+                    commit_times,
                 )
             return MetricSeries(
                 metric_name=metric_name,
@@ -366,4 +443,5 @@ class CloudWatchMetricAdapter:
                 f"CloudWatch call failed ({type(exc).__name__}: {exc}).",
                 window_minutes,
                 anchor_at,
+                commit_times,
             )
