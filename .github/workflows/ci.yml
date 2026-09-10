@@ -8,6 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
+  manual-apk-build:
+    name: Build this revision's APK (hardware verification remains separate)
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/android.yml
+
   test-and-verify:
     name: Lint, test, benchmark, audit
     runs-on: ubuntu-latest
