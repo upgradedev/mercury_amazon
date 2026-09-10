@@ -4,7 +4,7 @@ Every telemetry response carries the provenance of its data, so the Fire TV
 wallboard can label a live reading differently from a recorded fixture without
 the viewer having to trust the server.
 
-The two rollback endpoints are the only state-changing ones and both require the
+Rollback staging, confirmation and recommendation updates require the
 deployment secret as a bearer token. Confirmation additionally requires a
 single-use, content-bound governance token minted at staging time.
 """
@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -28,7 +28,6 @@ from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
 from src.application.governed_rollback_use_case import GovernedRollbackUseCase
 from src.application.inspect_pr_bottlenecks_use_case import InspectPRBottlenecksUseCase
 from src.domain.governed_rollback import GovernanceTokenError, RollbackDenialReason
-from src.domain.recommendation_invalidator import DynamicRecommendationEngine, EvidenceContract
 from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
@@ -133,7 +132,6 @@ if rollback_dispatcher is not None:
         rollback_dispatcher.disarm_reason,
     )
 rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET, rollback_dispatcher)
-recommendation_engine = DynamicRecommendationEngine()
 telemetry_detector = TelemetryAbsenceDetector()
 devops_events: list[dict[str, Any]] = []
 
@@ -173,6 +171,10 @@ DENIAL_STATUS = {
     RollbackDenialReason.TOKEN_CONTENT_MISMATCH: 403,
     RollbackDenialReason.BAD_SIGNATURE: 403,
     RollbackDenialReason.TOKEN_ALREADY_USED: 409,
+    RollbackDenialReason.TOKEN_SUPERSEDED: 409,
+    RollbackDenialReason.RECOMMENDATION_WITHDRAWN: 409,
+    RollbackDenialReason.RECOMMENDATION_STALE: 410,
+    RollbackDenialReason.RECOMMENDATION_UNAVAILABLE: 409,
 }
 
 
@@ -451,16 +453,6 @@ async def stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
     action, token = rollback_use_case.stage_rollback(
         req.action_id, req.target_service, req.target_commit_sha, req.reason, req.lease_sec
     )
-    recommendation_engine.register_recommendation(
-        rec_id=action.action_id,
-        action=f"Roll back {action.target_service} to {action.target_commit_sha}",
-        evidence=EvidenceContract(
-            metric_name="HTTPCode_Target_5XX_Count",
-            safe_threshold=5.0,
-            comparison="less_than",
-            ttl_seconds=action.lease_sec,
-        ),
-    )
     return {
         "action_id": action.action_id,
         "target_service": action.target_service,
@@ -509,10 +501,16 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/mcp/tools/recommendation_liveness")
-async def recommendation_liveness(action_id: str, current_metric_value: float) -> dict[str, Any]:
-    """Withdraw a staged rollback recommendation when the metric self-resolves."""
-    return recommendation_engine.evaluate_liveness(action_id, current_metric_value)
+@app.post("/mcp/tools/recommendation_liveness", dependencies=[Depends(require_operator)])
+async def recommendation_liveness(
+    action_id: str, current_metric_value: float = Query(..., allow_inf_nan=False),
+) -> dict[str, Any]:
+    """Record an operator reading; recovery permanently withdraws this staged action.
+
+    No telemetry provider is fetched here. Confirmation checks this same state
+    and its TTL before either record-only or external dispatch.
+    """
+    return rollback_use_case.recommendation_liveness(action_id, current_metric_value)
 
 
 # -------------------------------------------------------------- Cockpit files

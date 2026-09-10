@@ -45,7 +45,7 @@ commits are read from the checkout you just cloned, the metric series is simulat
 and labelled as simulated on screen, and the server prints an ephemeral governance
 secret to its log for you to paste into the cockpit. The test run takes 29.83 to
 36.4 seconds on this machine across the four runs of the current recorded
-measurement session, over the 507 tests the suite collects, on an otherwise idle
+measurement session, recorded over 507 tests on 2026-09-08, on an otherwise idle
 machine: the three quiet runs landed at 36.4, 32.91 and 33.87 seconds, and the run
 with 4 CPU-saturating background processes landed at 29.83 seconds, faster than the
 quiet ones, so the high end of that range is a quiet run and not the loaded one. It
@@ -61,7 +61,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-507%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-522%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -473,7 +473,7 @@ and the cockpit assets.
 ## The rollback is the point
 
 A rollback is the one irreversible thing Mercury can do from a sofa, so it is
-guarded by four independent conditions. Each has a test that proves it refuses.
+guarded by five independent conditions. Each has a test that proves it refuses.
 
 ```mermaid
 sequenceDiagram
@@ -508,6 +508,23 @@ sequenceDiagram
    spent.
 4. **Lease.** A staged action expires after `lease_sec` seconds, default 300, and
    then confirms with `LEASE_EXPIRED`.
+5. **Current recommendation.** The same application use case registers the
+   recommendation when staging and checks it before either dispatcher runs.
+   The operator-authenticated `POST /mcp/tools/recommendation_liveness` accepts
+   `action_id` and a finite `current_metric_value` as query parameters. A reading
+   below the existing five-error threshold withdraws that registration permanently;
+   a later high reading cannot reactivate it. Expired recommendation TTL or missing
+   recommendation state also refuses dispatch. Re-stage and review afresh to proceed:
+   an unused token from an earlier staging is refused with `TOKEN_SUPERSEDED`,
+   even if the action id and payload are unchanged.
+
+This liveness reading is operator supplied and is labelled
+`OPERATOR_SUPPLIED_METRIC_NO_LIVE_REFRESH`. Mercury does not fetch fresh service
+telemetry at confirmation. These controls prevent dispatch from advice already
+known to be withdrawn, stale or unavailable; they do not establish a safe deployed
+rollback target or a real health check. Those integration proofs remain open.
+`tests/integration/test_recommendation_execution_boundary.py` exercises the HTTP
+and direct-use-case paths with record-only or counting test dispatchers.
 
 A refused confirmation moves the action to `REJECTED`, so it cannot be confirmed
 afterwards even with the correct token. That is fail-closed on purpose: a
@@ -547,8 +564,8 @@ raises rather than reporting success. Firing it for real is an owner action.
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
 rather than guessed. `python -m pytest tests/ -q` took **29.83 to 36.4 seconds**
-across the four runs of the current measurement session, over the 507 tests this
-tree collects, on an otherwise idle machine (recorded at 2026-09-08T21:32:23Z). The
+across the four runs of the recorded measurement session, over its 507 tests,
+on an otherwise idle machine (recorded at 2026-09-08T21:32:23Z). The
 three runs the record labels quiet, meaning no background workers of the script's
 own, landed at 36.4, 32.91 and 33.87 seconds. The one with **4 CPU-saturating
 background processes** started and killed by the measuring script landed at
@@ -577,8 +594,10 @@ against that file, and the file records the test count they were measured over, 
 adding a test makes this paragraph fail the build until the suite is re-measured,
 unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The current
-record was measured over the 507 tests this tree collects, so no such disclosure is
-in force.
+record was measured over 507 collected tests;
+the suite now collects 522 tests and a re-measure on an idle machine is pending.
+The added invalidation checks are measured separately; the older timing range is
+preserved as evidence for its original suite, not a promised runtime for this one.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -621,7 +640,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 507 passed
+# 522 collected; run the suite to verify the result
 ```
 
 ### 3. Start the server
@@ -838,8 +857,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 507 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1338 statements
+python -m pytest tests/ -q                                    # 522 collected
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1374 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra

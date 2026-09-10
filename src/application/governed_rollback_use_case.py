@@ -15,6 +15,7 @@ from src.domain.governed_rollback import (
     RollbackState,
     mint_governance_token,
 )
+from src.domain.recommendation_invalidator import DynamicRecommendationEngine, EvidenceContract
 
 
 class RollbackDispatcher(Protocol):
@@ -53,6 +54,8 @@ class GovernedRollbackUseCase:
         self._actions: dict[str, GovernedRollbackAction] = {}
         self._spent_nonces: set[str] = set()
         self._dispatcher = dispatcher or RecordOnlyDispatcher()
+        self._recommendations = DynamicRecommendationEngine()
+        self._issued_tokens: dict[str, str] = {}
 
     def stage_rollback(
         self,
@@ -68,10 +71,22 @@ class GovernedRollbackUseCase:
         )
         self._actions[action_id] = action
         token = mint_governance_token(self._secret, action_id, action.payload_hash)
+        self._issued_tokens[action_id] = token
+        self._recommendations.register_recommendation(
+            rec_id=action.action_id,
+            action=f"Roll back {action.target_service} to {action.target_commit_sha}",
+            evidence=EvidenceContract(
+                metric_name="HTTPCode_Target_5XX_Count", safe_threshold=5.0,
+                comparison="less_than", ttl_seconds=action.lease_sec,
+            ),
+        )
         return action, token
 
     def get(self, action_id: str) -> GovernedRollbackAction | None:
         return self._actions.get(action_id)
+
+    def recommendation_liveness(self, action_id: str, metric_value: float) -> dict:
+        return self._recommendations.evaluate_liveness(action_id, metric_value)
 
     def confirm_and_execute(self, action_id: str, governance_token: str) -> tuple[GovernedRollbackAction, str]:
         """Confirm and dispatch, or raise :class:`GovernanceTokenError`."""
@@ -85,6 +100,24 @@ class GovernedRollbackUseCase:
             )
 
         nonce = action.confirm(self._secret, governance_token, self._spent_nonces, current_time=time.time())
+        # A fresh staging of the same payload must not revive an unused old grant.
+        if governance_token != self._issued_tokens.get(action_id):
+            action.state = RollbackState.REJECTED
+            action.denial_reason = RollbackDenialReason.TOKEN_SUPERSEDED
+            raise GovernanceTokenError(
+                action.denial_reason, "This token belongs to an earlier staging; review the fresh proposal."
+            )
+        recommendation = self._recommendations.status(action_id)
+        if recommendation["status"] != "ACTIVE":
+            action.state = RollbackState.REJECTED
+            action.denial_reason = {
+                "WITHDRAWN": RollbackDenialReason.RECOMMENDATION_WITHDRAWN,
+                "STALE": RollbackDenialReason.RECOMMENDATION_STALE,
+            }.get(recommendation["status"], RollbackDenialReason.RECOMMENDATION_UNAVAILABLE)
+            raise GovernanceTokenError(
+                action.denial_reason,
+                f"Recommendation is {recommendation['status']}; nothing dispatched. Stage and review again.",
+            )
         self._spent_nonces.add(nonce)
 
         output = self._dispatcher.dispatch(action)

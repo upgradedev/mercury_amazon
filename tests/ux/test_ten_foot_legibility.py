@@ -19,6 +19,7 @@ rather than fails where neither is present::
     pip install -e ".[ux]" && playwright install chromium
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,8 @@ def measurement() -> dict:
         capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=300,
     )
     if result.returncode == NOTHING_MEASURED:
+        if os.environ.get("MERCURY_REQUIRE_BROWSER") == "1":
+            pytest.fail(f"required browser measurement unavailable: {result.stdout.strip()[:200]}")
         pytest.skip(f"nothing was measured: {result.stdout.strip()[:200]}")
     assert result.stdout.strip(), f"the measurement printed nothing:\n{result.stderr[-2000:]}"
     return json.loads(result.stdout)
