@@ -304,6 +304,8 @@ def test_the_url_resolver_refuses_non_http_schemes():
 def test_an_android_ci_workflow_builds_and_uploads_the_apk():
     workflow = (REPO_ROOT / ".github" / "workflows" / "android.yml").read_text(encoding="utf-8")
     assert "android-actions/setup-android" in workflow
+    assert "packages: platform-tools" in workflow
+    assert "packages: tools platform-tools" not in workflow
     assert "assembleDebug" in workflow
     assert "testDebugUnitTest" in workflow
     assert "actions/upload-artifact" in workflow

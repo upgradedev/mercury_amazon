@@ -46,6 +46,11 @@ jobs:
 
       - name: Set up the Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's legacy default also asks sdkmanager for the removed
+          # package named `tools`. Keep the package list explicit so a runner
+          # image update cannot fail before Gradle resolves platform 34.
+          packages: platform-tools
 
       - name: Make the Gradle wrapper executable
         run: chmod +x ./gradlew
