@@ -32,7 +32,7 @@ on:
 jobs:
   build-apk:
     name: Assemble debug APK and run JVM unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout

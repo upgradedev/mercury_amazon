@@ -15,7 +15,7 @@ jobs:
 
   test-and-verify:
     name: Lint, test, benchmark, audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       MERCURY_REQUIRE_BROWSER: "1"
     strategy:
