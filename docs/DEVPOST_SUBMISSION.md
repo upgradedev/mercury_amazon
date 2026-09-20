@@ -177,7 +177,7 @@ Stated plainly, because the cockpit shows it anyway.
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`. Naming precision 52.2% over 113 namings, recall 9.8% over 600 regressions, refusal on 81.1% of detected anomalies, all published and shipped in every answer as `attribution.measured_accuracy` |
-| Fire TV device | **Not run.** No APK exists and nothing has been installed on hardware, and there is no Fire TV emulator to have run it in. The TV surface is a D-pad and a screen, with no voice input |
+| Fire TV device | **APK built, device not run.** CI run `35500282701` produced and uploaded a verified APK; nothing has been installed on Fire TV hardware, and there is no Fire TV emulator for this Android APK. The TV surface is a D-pad and a screen, with no voice input |
 
 ---
 
@@ -222,13 +222,12 @@ stopped being a compromise and started being the design.
 
 Stated here rather than left for a judge to find:
 
-* **No APK exists.** A GitHub Actions workflow to assemble one is written and
-  committed, but it has never executed: nothing has been pushed since it was
-  added, so there are zero runs and zero artifacts. The Kotlin has never been
-  compiled, and nothing has been installed on a Fire TV device, because no hardware
-  and no Android SDK were available; there is no Fire TV emulator, so a device is
-  the only place it can run. `docs/FIRE_TV_BUILD.md` records the verbatim local
-  build failure and the receipt a device run would produce.
+* **APK built; no Fire TV launch.** GitHub Actions run `35500282701` ran the Kotlin
+  tests, assembled the debug APK and uploaded artifact `10601069697`; the downloaded
+  APK digest matches the build log. Nothing has been installed on a Fire TV device,
+  and there is no Fire TV emulator for this Android APK, so physical hardware is the
+  only route to close the track proof. `docs/FIRE_TV_BUILD.md` records the artifact,
+  the earlier local toolchain limitation and the receipt a device run must produce.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The live endpoint answers 200 but runs an older build, so the readiness gates

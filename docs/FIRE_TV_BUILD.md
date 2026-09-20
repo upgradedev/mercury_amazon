@@ -11,8 +11,8 @@ Stated plainly, because the difference matters when you are judging this.
 | Step | Status |
 |---|---|
 | Kotlin sources, manifest and Gradle project | Written and committed in `app/` |
-| `./gradlew :app:testDebugUnitTest` (D-pad bridge, URL resolver) | **Configured, never executed.** `.github/workflows/android.yml` is committed but has not run |
-| `./gradlew :app:assembleDebug` | **Configured, never executed.** No APK has been produced by anyone |
+| `./gradlew :app:testDebugUnitTest` (D-pad bridge, URL resolver) | **Passed in GitHub Actions.** Run `35500282701`, 2026-09-20 |
+| `./gradlew :app:assembleDebug` | **Passed in GitHub Actions.** Artifact `10601069697`, 9,260,135 bytes, raw APK SHA-256 `6c05dc46cdee7b6ecb49354e5ace06cd7de6913b517882e208acde8f6c296331` |
 | Build on the maintainer's machine | **Not run.** See "Why the build is configured for CI" below |
 | Install on a physical Fire TV Stick | **Not run.** No Fire TV hardware was available |
 | Run on a virtual Fire TV | **Not possible.** No Fire TV emulator exists; see "Why there is no emulator step" below |
@@ -57,17 +57,13 @@ produced. It runs on every push to the default branch, with no paths filter, and
 demand from the Actions tab, so the first push after it was written produces a run
 whatever else that push touches.
 
-**That workflow has not run.** Nothing has been pushed since it was written, so
-there are zero runs, zero artifacts, and no APK exists anywhere. The repository is
-also private, so the Actions tab is not visible to anyone outside the
-organisation. Once the repository is public and a commit is pushed, a reader can
-open the Actions tab, pick a `Fire TV APK` run and download
-`mercury-firetv-debug-apk`. Until then this is a configured intention, not
-evidence.
-
-The workflow itself is also unverified: whether
-`android-actions/setup-android@v3` resolves platform 34 and accepts its licences
-on the runner has not been observed. The first run may need adjustment.
+**That workflow now has executed successfully.** Run `35500282701` used the pinned
+Ubuntu 24.04 runner, `android-actions/setup-android@v4`, JDK 17 and the Android 34
+toolchain. It ran the JVM tests, assembled `app-debug.apk`, printed its digest and
+uploaded `mercury-firetv-debug-apk`. The downloaded APK matches the printed digest.
+The repository remains private, so judges need repository access or a later public
+release to inspect the run and artifact. This evidence closes the build question;
+it does not close the physical-device question.
 
 ## Why there is no emulator step
 
@@ -168,7 +164,7 @@ is load-bearing, on a string match: the words "Fire TV" somewhere in the README 
 `LEANBACK_LAUNCHER` somewhere in the manifest. Both are text. Mercury is entered in
 the Fire TV track, so that was the one gate in the file that could not fail on the
 axis it exists to test, and it was contributing a PASS to a published score while
-this page said no APK had ever been built.
+the earlier version of this page said no APK had ever been built.
 
 J4 now asks for evidence of a binary and of somebody watching it run, recorded in
 `firetv_build_receipt.json` at the repository root. **That file does not exist, so

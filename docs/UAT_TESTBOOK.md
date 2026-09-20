@@ -57,7 +57,7 @@ They are listed so the gap is explicit rather than absent.
 |---|---|---|---|
 | M-01 | The APK installs on a Fire TV Stick and appears on the home row | No Fire TV hardware was available | `docs/FIRE_TV_BUILD.md`, install section |
 | M-02 | The physical remote D-pad drives focus on a television | No Fire TV hardware was available | Install the APK, press the D-pad |
-| M-03 | A push runs `.github/workflows/android.yml`, which assembles and uploads `app-debug.apk` | Nothing has been pushed since the workflow was written, so it has zero runs. There is no emulator row here because no Fire TV emulator exists; the device rows above are the only way to run it | Push, open the Actions tab, download `mercury-firetv-debug-apk`, then install it on a device and write the receipt with `python scripts/write_firetv_receipt.py` |
+| M-03 | A push runs `.github/workflows/android.yml`, which assembles and uploads `app-debug.apk` | **Passed.** Run `35500282701` executed JVM tests and assemble, then uploaded artifact `10601069697`; downloaded SHA-256 matched the log | Use that artifact for M-01/M-02, then write the device receipt with `python scripts/write_firetv_receipt.py` |
 | M-04 | Text is legible from three metres on a large screen | No television was available | Open the cockpit on a TV at 1080p and read it from a sofa |
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
@@ -76,6 +76,6 @@ place to report what happened, whether it worked or not.
 | Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1338 statements |
 | Every rollback denial reason has a failing-input test | Met | 9 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
-| A Fire TV binary that somebody has watched run | **Not met** | Gate J4 fails: no `firetv_build_receipt.json`, no APK, no device |
+| A Fire TV binary that somebody has watched run | **Not met** | A verified APK exists, but gate J4 still fails because there is no `firetv_build_receipt.json` and no device observation |
 | Verified on a Fire TV device | **Not met** | No hardware run has taken place |
 | Verified against a live deployment of this commit | **Not met** | Gates D2 and G2 fail |

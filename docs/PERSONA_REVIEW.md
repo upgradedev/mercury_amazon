@@ -69,7 +69,7 @@ A row that restates an older judgement says so and carries the older date.
 
 | ID | Lens | Finding | Verdict | Evidence |
 |---|---|---|---|---|
-| P01-1 | Sponsor product owner | The sponsor product is not load-bearing yet. This entry is in the Fire TV track, no APK has ever been built, and nothing has run on a device or an emulator. Gate J4 fails on exactly that axis | FAIL | `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
+| P01-1 | Sponsor product owner | The APK now builds in CI, but the sponsor product is not yet proved load-bearing because nothing has installed or run on a physical Fire TV. Gate J4 fails on the missing device receipt | FAIL | GitHub Actions run `35500282701`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
 | P01-2 | Sponsor product owner | The review of 2026-09-04 recorded that "Fire TV spatial navigation and Alexa voice query are load-bearing" for this entry. The Alexa half was never true of this repository. It does not survive restatement, and a test now fails the build if any document claims it | FAIL | `tests/e2e/test_documentation_claims.py` |
 | P01-3 | Sponsor product owner | What is load-bearing and does exist: the D-pad and the arrow keys are one focus code path, driven by the same spec on both inputs | PASS | `tests/e2e/spatial_nav_spec.js`, `tests/e2e/test_html_structure.py` |
 | P06-1 | UX designer | The hero action is marked and the layout carries responsive breakpoints, so the primary action is visible without reading. Gate H1 passes | PASS | `python ci/readiness.py`, `tests/e2e/test_html_structure.py` |
@@ -96,7 +96,7 @@ are listed because a review that reports only what it settled is not a review.
 
 | Question | Why it is open |
 |---|---|
-| Does the APK install and appear on a Fire TV home row? | No APK, no JDK, no Android SDK and no device. `docs/FIRE_TV_BUILD.md` records the verbatim local build failure |
+| Does the APK install and appear on a Fire TV home row? | A verified CI APK exists and portable ADB is prepared, but no Fire TV device has connected. `docs/FIRE_TV_BUILD.md` records the install and receipt procedure |
 | Is the cockpit legible from three metres on a television? | Measured in a 1920x1080 browser viewport, never on a television at distance |
 | Does a deployment of this commit answer? | The live endpoint answers 200 and runs an older build. Gates D2 and G2 fail |
 | Does an on-call engineer find a refusal to name a commit useful at three in the morning? | Nobody outside this project has used it. The README says this in its own words |

@@ -146,13 +146,8 @@ def test_no_document_claims_a_device_run_that_did_not_happen():
     assert "No Fire TV hardware was available" in build_doc
 
 
-def test_no_document_claims_the_apk_has_been_built():
-    """The Android workflow is configured and has never executed.
-
-    Until a push produces a run, no document may imply an APK exists or that a
-    reader can download one today. This test is the pin on that claim, in the
-    same shape as the Alexa one. Delete it once a run exists.
-    """
+def test_documents_distinguish_the_built_apk_from_a_device_run():
+    """The verified CI artifact must never be presented as Fire TV execution."""
     forbidden_phrasings = [
         "the apk is assembled by",
         "the apk builds in ci",
@@ -167,11 +162,15 @@ def test_no_document_claims_the_apk_has_been_built():
             )
 
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
-    assert "never executed" in build_doc
-    assert "zero runs" in build_doc
     readme_lower = README.lower()
-    assert "has never executed" in readme_lower
-    assert "no apk exists" in readme_lower
+    digest = "6c05dc46cdee7b6ecb49354e5ace06cd7de6913b517882e208acde8f6c296331"
+    assert "35500282701" in build_doc
+    assert digest in build_doc
+    assert digest in readme_lower
+    assert "device not run" in readme_lower or "no device run" in readme_lower
+    assert "no fire tv device has connected" in (
+        REPO_ROOT / "docs" / "PERSONA_REVIEW.md"
+    ).read_text(encoding="utf-8").lower()
 
 
 def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
@@ -211,7 +210,7 @@ def test_no_document_claims_a_fire_tv_emulator_exists():
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = README.split("## Known limitations")[-1]
-    for required in ["No rollback dispatch has ever been fired", "No APK and no device run",
+    for required in ["No rollback dispatch has ever been fired", "APK built; no device run",
                      "Cost Explorer lags", "browser speech synthesis", "In-memory state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 

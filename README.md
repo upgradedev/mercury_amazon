@@ -64,12 +64,13 @@ would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**No APK exists.** The Android build is
-[`.github/workflows/android.yml`](.github/workflows/android.yml), a plain file link
-and deliberately not a status badge: that workflow **has never executed**, nothing
-has been pushed since it was added, and a green build badge over zero runs is the
-kind of thing a five second scan reads as a shipped app. Detail in
-[Fire TV](#fire-tv).
+**An APK exists as a verified CI artifact; no Fire TV device run exists yet.**
+[`.github/workflows/android.yml`](.github/workflows/android.yml) ran the Kotlin tests,
+assembled the debug APK and uploaded it on 2026-09-20. Run `35500282701` produced a
+9,260,135-byte APK with SHA-256
+`6c05dc46cdee7b6ecb49354e5ace06cd7de6913b517882e208acde8f6c296331`.
+That proves a build, not installation, launch or D-pad behaviour on Fire TV hardware.
+Detail in [Fire TV](#fire-tv).
 
 The CI badge points at a repository that is currently **private**, so that badge
 will not resolve for anyone outside the organisation until it is made public. It is
@@ -705,8 +706,9 @@ lives in `app/src/debug/AndroidManifest.xml` with `tools:replace`, so the merger
 applies it to debug variants alone. Three tests in
 `tests/unit/test_firetv_app_structure.py` assert that split, including one that
 fails if any manifest outside the debug source set permits cleartext. They assert
-the manifests the merger is given, not its output: no merged manifest has been
-produced here, for the same reason no APK has.
+the manifests the merger is given, while successful run `35500282701` proves that
+the Android merger and compiler accepted them. The merged manifest was not retained
+as a separate artifact.
 
 ### Ten-foot legibility, measured
 
@@ -798,13 +800,12 @@ this measurement, and nothing here has been measured on Fire TV hardware.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**No APK exists.** [`.github/workflows/android.yml`](.github/workflows/android.yml)
-is written and committed to assemble one on a runner with the Android SDK, run the
-Kotlin unit tests, and upload the APK as an artifact. It **has never executed**:
-nothing has been pushed since it was added, so there are zero runs and zero
-artifacts. The repository is private, so its Actions tab is not visible externally
-either. It has also **not been built on the maintainer's machine** (no JDK, no
-Android SDK; the verbatim failure is recorded in `docs/FIRE_TV_BUILD.md`), and it
+**The APK builds; the device journey has not run.**
+[`.github/workflows/android.yml`](.github/workflows/android.yml) executed successfully
+on 2026-09-20. Run `35500282701` ran the JVM unit tests, assembled the debug APK and
+uploaded artifact `10601069697`; the downloaded binary's SHA-256 matches the build
+log. The repository is private, so the Actions artifact is not visible to judges
+without repository access. It has not been built on the maintainer's machine, and it
 **has never been installed on a physical Fire TV Stick**. There is no emulator step
 to have skipped: Amazon's own Fire TV documentation says to test on an actual Fire
 TV device rather than an emulator, no Fire TV emulator exists, and the Vega Virtual
@@ -881,8 +882,9 @@ cannot be typed into existence; `tests/unit/test_write_firetv_receipt.py` drives
 every refusal against a throwaway checkout. The file does not exist here, so **J4
 fails**, and the published score went down by one. `docs/FIRE_TV_BUILD.md` carries
 the receipt's shape, and `tests/unit/test_readiness_gates.py` drives every missing
-field through the predicate, including the case where it passes, which cannot be
-reached in this checkout because no APK exists.
+field through the predicate, including the case where it passes. The CI APK has now
+been downloaded into the ignored build-output path, but the passing branch remains
+unreachable until an actual Fire TV install and observed launch produce the receipt.
 
 **The same score in a clone.** Four of these gates, I1 to I4, used to read a
 coordination file that lives in the workspace above this repository. They passed
@@ -957,11 +959,11 @@ given a substitute number.
   service name rather than from a constant, which makes the four verdicts
   reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **No APK and no device run.** The Android CI workflow is configured but has
-  never executed, so no APK has been produced. Nothing has been installed on Fire
-  TV hardware, there is no Fire TV emulator to have run it in, and the Kotlin has
-  never been compiled. The TV surface is a D-pad and a screen; it takes no voice
-  input.
+* **APK built; no device run.** Android CI run `35500282701` compiled the Kotlin,
+  passed the JVM tests and uploaded an APK whose downloaded SHA-256 matches the build
+  log. Nothing has been installed on Fire TV hardware, and there is no Fire TV
+  emulator for this Android APK. The TV surface is a D-pad and a screen; it takes no
+  voice input.
 * **The live deployment is stale.** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`
   answers 200 but runs an older build and reports no build SHA, so gate G2 fails.
   Its teardown has never been tested, so gate D2 fails too.

@@ -8,9 +8,9 @@ away said no APK had ever been built. It was the one gate in the file that could
 on the axis it exists to test, and it contributed a PASS to a published 45/53.
 
 These drive every branch of the rewritten predicate with fixtures, including the branch
-that passes, which cannot be reached in this checkout because no APK exists. Building
-one needs a JDK, an Android SDK and a Fire TV device, and none is installed here, so the
-passing case is proved against an injected receipt rather than faked into the repository.
+that passes. A verified CI APK now exists, but the passing branch still needs a physical
+Fire TV launch and its receipt, so it is proved against an injected receipt rather than
+faked into the repository.
 """
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     """An honest FAIL must not turn the build red, and must not hide either."""
     assert "J4" in readiness.CI_EXEMPT
     reason = readiness.CI_EXEMPT["J4"]
-    assert "Android SDK" in reason and "Fire TV" in reason
+    assert "verified CI APK" in reason and "physical Fire TV" in reason
 
 
 def test_the_audit_reports_j4_as_failing_in_this_checkout():

@@ -215,7 +215,7 @@ def test_the_command_line_refuses_with_exit_two(checkout):
 
 
 def test_the_real_checkout_still_has_no_receipt():
-    """None of the above may leak into the repository, and nothing here builds an APK."""
+    """A CI artifact and local download must not fabricate a device receipt."""
     assert not (REPO_ROOT / readiness.FIRETV_BUILD_RECEIPT).exists()
 
 
@@ -224,9 +224,9 @@ def test_the_real_checkout_still_has_no_receipt():
 def test_the_android_workflow_builds_on_every_push_and_on_demand():
     """The workflow has to run on the first push, whatever that push touches.
 
-    A paths filter would let a documentation push leave the repository exactly as it is
-    today, with a workflow that has never executed, so there is none. The digest step
-    is what the receipt records for the APK the run produced.
+    A paths filter could let a documentation-only release commit skip the exact-SHA APK
+    build, so there is none. The digest step is what the receipt records for the APK the
+    run produced.
     """
     workflow = (REPO_ROOT / ".github" / "workflows" / "android.yml").read_text(encoding="utf-8")
     on_block = workflow.split("\non:")[1].split("\njobs:")[0]

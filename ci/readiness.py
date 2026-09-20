@@ -32,9 +32,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # reason it is out of reach of an automated run. Printed in the output.
 CI_EXEMPT: dict[str, str] = {
     "C5": "needs a real browser driver walking the recorded video path",
-    "J4": "needs a JDK, an Android SDK and a Fire TV device to produce an APK and a recorded "
-          "launch; none of the three is installed on this machine, and no Fire TV emulator "
-          "exists to stand in for the device",
+    "J4": "a verified CI APK and portable ADB exist, but the gate still needs a physical "
+          "Fire TV install and observed launch; no Fire TV emulator exists to stand in for "
+          "the device",
     "D2": "needs a deployment of this commit; the live endpoint runs an older build",
     "E2": "needs a recorded video for narration and picture to be in sync with",
     "E4": "needs a public video of the running product",
@@ -91,8 +91,8 @@ def get_standards_gate_ids() -> list[str]:
     ]
 
 
-#: Where a Fire TV build receipt would live if one had ever been produced. It is written
-#: by ``python scripts/write_firetv_receipt.py`` from a real build and a real launch, the
+#: Where a Fire TV build-and-device receipt will live. It is written by
+#: ``python scripts/write_firetv_receipt.py`` from a real build and a real launch, the
 #: way deploy_teardown_receipt.json is written by its probe, and that script refuses to
 #: write it without an APK file it can open. Gate J4 fails while the receipt is absent.
 FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
@@ -124,9 +124,9 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
     """J4: is the sponsor product load-bearing, or merely mentioned.
 
     This gate used to pass on ``bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest``,
-    which is a grep over two text files. Mercury is entered in the Fire TV track and its
-    own README says no APK has ever been built, so the gate that decides whether the
-    sponsor product is load-bearing was the one gate in this file that could not fail on
+    which is a grep over two text files. Before the first successful Android workflow,
+    Mercury's own README said no APK had been built, so the gate that decided whether the
+    sponsor product was load-bearing was the one gate in this file that could not fail on
     the axis it exists to test, and it contributed a PASS to a published score.
 
     A Fire TV entry is load-bearing when there is a Fire TV binary and somebody has
@@ -151,9 +151,9 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
             f"A leanback manifest and the word 'Fire TV' are text, not a Fire TV app. This gate "
             f"wants {FIRETV_BUILD_RECEIPT}, recording a gradle build that exited 0, the APK it "
             f"produced, and a launch on a Fire TV device, written by "
-            f"python scripts/write_firetv_receipt.py. No such file exists, no APK has been "
-            f"built and nothing has run on Fire TV hardware; docs/FIRE_TV_BUILD.md records the "
-            f"verbatim local failure"
+            f"python scripts/write_firetv_receipt.py. No such file exists. A verified CI APK "
+            f"exists, but nothing has installed or run on Fire TV hardware; "
+            f"docs/FIRE_TV_BUILD.md records the build and the remaining device procedure"
         )
 
     problems = []
