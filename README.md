@@ -36,22 +36,21 @@ every attribution carries its own measured precision.
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
-python -m pytest tests/ -q
+python -m pytest tests/ -q  # 529 passed
 python -m src.interfaces.mcp_server
 ```
 
 Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
-secret to its log for you to paste into the cockpit. The test run takes 29.83 to
-36.4 seconds on this machine across the four runs of the current recorded
-measurement session, recorded over 507 tests on 2026-09-08, on an otherwise idle
-machine: the three quiet runs landed at 36.4, 32.91 and 33.87 seconds, and the run
-with 4 CPU-saturating background processes landed at 29.83 seconds, faster than the
-quiet ones, so the high end of that range is a quiet run and not the loaded one. It
+secret to its log for you to paste into the cockpit. The current green-suite timing
+record spans 41.46 to 119.83 seconds across four runs of the 529-test tree on
+2026-09-20: the three quiet runs landed at 70.55, 119.83 and 41.46 seconds, and the
+run with 4 CPU-saturating background processes landed at 67.1 seconds. Every run
+reported all 529 tests passing. It
 moves with machine load and with whatever else the machine is doing: the session
 before it, on the same machine while other processes were saturating the CPU,
-measured 132.61 to 486.63 seconds over 440 tests. Both sessions come from
+measured 132.61–486.63 seconds over 440 tests. Both sessions come from
 `python scripts/time_test_suite.py`, and [Quickstart](#quickstart) names the
 machine, states the condition of every run, and says what the figure used to be.
 The `pip install` before it dominates the total and depends on your
@@ -61,7 +60,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-522%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-529%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -563,19 +562,17 @@ raises rather than reporting success. Firing it for real is an owner action.
 ## Quickstart
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
-rather than guessed. `python -m pytest tests/ -q` took **29.83 to 36.4 seconds**
-across the four runs of the recorded measurement session, over its 507 tests,
-on an otherwise idle machine (recorded at 2026-09-08T21:32:23Z). The
-three runs the record labels quiet, meaning no background workers of the script's
-own, landed at 36.4, 32.91 and 33.87 seconds. The one with **4 CPU-saturating
-background processes** started and killed by the measuring script landed at
-**29.83 seconds**, the fastest of the four: the loaded run happened to be faster
-than the quiet ones, so the high end of the published range is the quiet 36.4 and
-the loaded figure is printed as measured rather than moved to the top. The session
-before it, on the same machine and a 440-test tree, measured **132.61 to 486.63
-seconds**, and the gap between those two sessions is machine load, not the suite.
+rather than guessed. The current green-suite record for `python -m pytest tests/ -q`
+spans **41.46 to 119.83 seconds** across four runs of the 529-test tree
+(recorded at 2026-09-20T08:18:00Z). The three quiet runs landed at 70.55, 119.83
+and 41.46 seconds. The run with **4 CPU-saturating background processes** started
+and killed by the measuring script landed at **67.1 seconds**. All four runs
+reported 529 passed and no skipped or failed tests. The immediately preceding
+bootstrap measured **89.03 to 358.91 seconds** over the same 529-test tree and is
+retained by the record as the failed-documentation baseline. An older 440-test session measured
+**132.61–486.63 seconds** and remains historical rather than a release claim.
 That earlier session ran while other processes on this machine were saturating the
-CPU: a processor-time counter sampled immediately after it
+CPU: a processor-time counter sampled immediately after that older session
 (`typeperf "\Processor(_Total)\% Processor Time" -sc 5 -si 1`) read 100 percent on
 every one-second sample; its quiet runs landed at 132.61, 165.78 and 181.03 seconds
 and its loaded run at 486.63 seconds. Starting the server and getting an answer on
@@ -594,24 +591,19 @@ against that file, and the file records the test count they were measured over, 
 adding a test makes this paragraph fail the build until the suite is re-measured,
 unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The current
-record was measured over 507 collected tests;
-the suite now collects 522 tests and a re-measure on an idle machine is pending.
-The added invalidation checks are measured separately; the older timing range is
-preserved as evidence for its original suite, not a promised runtime for this one.
+green record and the suite both contain 529 collected tests.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
 session's headline, so a replaced number leaves a trace instead of vanishing. Every
 session recorded on this tree on 2026-09-08 landed somewhere different. Earlier
 sessions that day are no longer in the shipped record and are quoted here rather
-than claimed: the first measured `40.28 to 74.56 seconds`, with the loaded run
-slowest, and the next measured `33.37 to 37.44 seconds` across its quiet runs with
+than claimed: the first measured `40.28–74.56 seconds`, with the loaded run
+slowest, and the next measured `33.37–37.44 seconds` across its quiet runs with
 the loaded run at `37.0 seconds`, both over 440 collected tests. The session the
-record now keeps as its previous one, 132.61 to 486.63 seconds over 440 tests, is
-the widest by far and was measured on a machine other processes were already
-saturating. The current session, the headline above, is 29.83 to 36.4 seconds over
-507 tests on an idle machine, the narrowest of them all and the only one in which
-the loaded run was the fastest. The spread between sessions of the same command on
+record now keeps as its previous one, 89.03 to 358.91 seconds over 529 tests, was
+the red-documentation bootstrap. The current session is the 41.46 to 119.83 second
+range above and includes the loaded condition. The spread between sessions of the same command on
 the same tree is larger than the spread inside any one of them, and the loaded run
 is not reliably the slowest: in one session it sat inside the quiet range and in
 the current one it sits below it. That is the honest shape of this number, and it
@@ -640,7 +632,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 522 collected; run the suite to verify the result
+# 529 passed
 ```
 
 ### 3. Start the server
@@ -857,7 +849,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 522 collected
+python -m pytest tests/ -q                                    # 529 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1374 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

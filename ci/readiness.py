@@ -804,8 +804,15 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
             receipt = json.loads(receipt_text)
             deployed = receipt.get("deployed_commit_sha")
             if not deployed:
-                g2_msg = (f"The deployment does not report a build SHA from /health, so it cannot be "
-                          f"matched to HEAD ({local_head[:7]})")
+                # The server in this checkout does report build_sha from /health; the
+                # receipt records that the DEPLOYED endpoint did not. Name the URL so
+                # the line cannot be read as a defect in the local server.
+                where = receipt.get("base_url") or "named in deploy_teardown_receipt.json"
+                probed = receipt.get("probed_at_utc") or "an unrecorded time"
+                g2_msg = (f"The deployed endpoint {where} runs an older build whose /health "
+                          f"answered without a build_sha when probed at {probed}, so the "
+                          f"deployment cannot be matched to HEAD ({local_head[:7]}); the server "
+                          f"in this checkout does report build_sha from /health")
             elif deployed == local_head:
                 g2, g2_msg = True, f"Deployed build SHA equals HEAD ({local_head[:7]})"
             else:

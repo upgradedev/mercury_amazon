@@ -9,7 +9,12 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY --from=builder /app/dist/*.whl /app/
 RUN pip install --no-cache-dir /app/*.whl fastapi uvicorn
+# The server resolves the cockpit page as ../../../docs relative to its own file,
+# so the package is present under /app as well as in site-packages and the page
+# is copied beside it. The import below is the one tests/unit/test_container_entrypoint.py
+# performs, so a renamed module fails the suite before it fails the container.
+COPY src/ /app/src/
 COPY docs/index.html /app/docs/index.html
 
-EXPOSE 8000
-CMD ["uvicorn", "src.interfaces.tv_cockpit:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8002
+CMD ["uvicorn", "src.interfaces.mcp_server:app", "--host", "0.0.0.0", "--port", "8002"]

@@ -1,22 +1,22 @@
 {
   "schema": "mercury.suite_timing/1",
   "note": "Wall clock around the pytest subprocess, from immediately before it starts to immediately after it exits, which is what a reader with a stopwatch measures. Quiet runs are on an otherwise idle machine. The loaded run is the same command with background CPU workers started and killed by the measuring script, so the published high end was measured rather than guessed. This figure moves with machine load and with the size of the suite; re-run this script after changing either.",
-  "measured_at_utc": "2026-09-08T21:32:23Z",
+  "measured_at_utc": "2026-09-20T08:18:00Z",
   "measured_by_command": "python scripts/time_test_suite.py",
   "equivalent_command": "python -m pytest tests/ -q",
   "machine": "Windows 11 (Windows-10-10.0.26200-SP0), CPython 3.11.0",
   "python_version": "3.11.0",
   "cpu_count": 8,
   "bootstrap": false,
-  "tests_collected": 507,
-  "tests_passed": 507,
+  "tests_collected": 529,
+  "tests_passed": 529,
   "tests_skipped": 0,
   "runs": [
     {
       "condition": "quiet",
       "background_cpu_workers": 0,
-      "seconds": 36.4,
-      "tests_passed": 507,
+      "seconds": 70.55,
+      "tests_passed": 529,
       "tests_skipped": 0,
       "tests_failed": 0,
       "exit_code": 0
@@ -24,8 +24,8 @@
     {
       "condition": "quiet",
       "background_cpu_workers": 0,
-      "seconds": 32.91,
-      "tests_passed": 507,
+      "seconds": 119.83,
+      "tests_passed": 529,
       "tests_skipped": 0,
       "tests_failed": 0,
       "exit_code": 0
@@ -33,8 +33,8 @@
     {
       "condition": "quiet",
       "background_cpu_workers": 0,
-      "seconds": 33.87,
-      "tests_passed": 507,
+      "seconds": 41.46,
+      "tests_passed": 529,
       "tests_skipped": 0,
       "tests_failed": 0,
       "exit_code": 0
@@ -42,26 +42,26 @@
     {
       "condition": "loaded",
       "background_cpu_workers": 4,
-      "seconds": 29.83,
-      "tests_passed": 507,
+      "seconds": 67.1,
+      "tests_passed": 529,
       "tests_skipped": 0,
       "tests_failed": 0,
       "exit_code": 0
     }
   ],
-  "quiet_min_seconds": 32.91,
-  "quiet_max_seconds": 36.4,
-  "loaded_min_seconds": 29.83,
-  "loaded_max_seconds": 29.83,
-  "min_seconds": 29.83,
-  "max_seconds": 36.4,
+  "quiet_min_seconds": 41.46,
+  "quiet_max_seconds": 119.83,
+  "loaded_min_seconds": 67.1,
+  "loaded_max_seconds": 67.1,
+  "min_seconds": 41.46,
+  "max_seconds": 119.83,
   "previous_measurement": {
-    "measured_at_utc": "2026-09-08T14:38:49Z",
-    "bootstrap": false,
-    "tests_collected": 440,
-    "quiet_min_seconds": 132.61,
-    "quiet_max_seconds": 181.03,
-    "loaded_min_seconds": 486.63,
-    "loaded_max_seconds": 486.63
+    "measured_at_utc": "2026-09-20T08:10:38Z",
+    "bootstrap": true,
+    "tests_collected": 529,
+    "quiet_min_seconds": 89.03,
+    "quiet_max_seconds": 170.87,
+    "loaded_min_seconds": 358.91,
+    "loaded_max_seconds": 358.91
   }
 }

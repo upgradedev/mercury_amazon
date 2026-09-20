@@ -381,3 +381,30 @@ def test_the_gates_no_longer_read_anything_above_this_repository():
     section = auditor.split("I: Personas review instrument")[1].split("O: Owner-gated")[0]
     assert ".." not in section, "the I gates read a path outside this repository again"
     assert "STATE.md" not in section
+
+
+# ---------------------------------- G2: a receipt without a deployed build SHA
+
+def test_g2_blames_the_deployed_endpoint_by_url_and_not_the_local_health_route():
+    """The previous wording, "The deployment does not report a build SHA from /health",
+    read as a defect in this checkout, whose /health does report one. The gate has to
+    name the deployed URL from the receipt and say the older build is what lacks the field.
+    """
+    receipt = json.loads((REPO_ROOT / "deploy_teardown_receipt.json").read_text(encoding="utf-8"))
+    message = {r.gate_id: r for r in readiness.audit_project()}["G2"].message
+    if receipt.get("deployed_commit_sha"):
+        # A receipt that carries the SHA takes the other branch, where G2 is judged on
+        # the equality alone and the wording under test is unreachable.
+        assert "older build" not in message
+        return
+    from fastapi.testclient import TestClient
+
+    from src.interfaces.mcp_server import app
+
+    assert "build_sha" in TestClient(app).get("/health").json(), (
+        "the local /health no longer reports build_sha, so the wording under test would be false"
+    )
+    assert receipt["base_url"] in message, "G2 does not name the deployed URL it probed"
+    assert "older build" in message and "deployed endpoint" in message.lower()
+    assert "this checkout does report build_sha" in message
+    assert "The deployment does not report a build SHA from /health" not in message

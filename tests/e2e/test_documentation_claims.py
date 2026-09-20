@@ -651,16 +651,79 @@ def test_the_recorded_runtime_belongs_to_the_suite_this_repository_ships():
 
 
 def test_the_stale_timing_disclosure_names_the_live_count_and_no_other():
-    """The note is a pin, not a caveat: it has to carry the count the suite has today."""
+    """The note is a pin, not a caveat: it has to carry the count the suite has today.
+
+    And when the record is fresh, the note has to be gone. This test used to skip in
+    that case, which made ``python -m pytest tests/ -q`` print ``506 passed, 1 skipped``
+    against a README that said ``507 passed``: the one skip was this test, skipping by
+    design on every healthy checkout. A fresh record with a stale-record disclosure
+    still on the page is a real defect (the README would be apologising for a gap that
+    closed), so that branch asserts instead of stepping aside, and the suite has no
+    skip left that fires on a complete machine.
+    """
     recorded = _timing()
     badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
     collected = int(badge.group(1))
     prose = _live_prose(README)
+    pending = "re-measure on an idle machine is pending"
     if recorded["tests_collected"] == collected:
-        pytest.skip("the record matches the suite, so there is no disclosure to pin")
+        assert pending not in prose, (
+            "the runtime record matches the suite, yet the README still says a re-measure "
+            "is pending; delete the stale-record disclosure"
+        )
+        for count in (collected - 1, collected + 1):
+            stale = readiness.stale_timing_disclosure(recorded["tests_collected"], count)[1]
+            assert stale not in prose, "the README names a count the suite does not have"
+        return
     wrong = readiness.stale_timing_disclosure(recorded["tests_collected"], collected + 1)[1]
     assert wrong not in prose, "the README names a count the suite does not have"
-    assert "re-measure on an idle machine is pending" in prose
+    assert pending in prose
+
+
+def test_every_passed_count_a_document_quotes_is_the_count_the_suite_records():
+    """``# 507 passed`` beside the command is a claim about what the command prints.
+
+    The badge pins the collected count, but the passed count printed after
+    ``python -m pytest tests/ -q`` was quoted in three documents and pinned by nothing,
+    which is how the README said 507 passed while the tree printed 506 passed and 1
+    skipped. The record ``scripts/time_test_suite.py`` writes carries the passed and
+    skipped counts of every timed run, so that is what the quotation is held to. A
+    bootstrap record was measured over a red suite by the script's own definition, so
+    only its collected count is trusted; a published record has to show every collected
+    test passing and none skipped, or the annotation is not what the command prints.
+    """
+    recorded = _timing()
+    badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
+    collected = int(badge.group(1))
+    assert recorded["tests_collected"] == collected or recorded["bootstrap"], (
+        f"the runtime record was measured over {recorded['tests_collected']} tests and the "
+        f"badge says {collected}; re-run `python scripts/time_test_suite.py`"
+    )
+
+    quoted = []
+    for path in MARKDOWN_FILES:
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"python -m pytest tests/ -q[^\n]*?(?:#|,)\s*(\d+) passed", text):
+            quoted.append((path.name, int(match.group(1))))
+        for match in re.finditer(r"python -m pytest tests/ -q`?\s*\n\s*#\s*(\d+) passed", text):
+            quoted.append((path.name, int(match.group(1))))
+    assert len(quoted) >= 2, (
+        f"expected the Quickstart and the test section to quote a passed count, found {quoted}"
+    )
+
+    if recorded["bootstrap"]:
+        expected = collected
+    else:
+        assert recorded["tests_skipped"] == 0, (
+            f"the recorded run skipped {recorded['tests_skipped']} tests, so the suite does not "
+            f"print '{collected} passed'; the skip has to be removed or the documents changed"
+        )
+        assert recorded["tests_passed"] == collected, (
+            f"the record says {recorded['tests_passed']} passed of {collected} collected"
+        )
+        expected = recorded["tests_passed"]
+    for name, count in quoted:
+        assert count == expected, f"{name} says {count} passed; the command prints {expected} passed"
 
 
 def test_the_timing_record_says_what_it_timed_and_where():
