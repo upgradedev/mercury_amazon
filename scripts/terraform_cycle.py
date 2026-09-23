@@ -52,22 +52,48 @@ def _probe(url: str, path: str, attempts: int = 8) -> dict[str, Any]:
     return last
 
 
-def _absent(command: list[str], expected: str, cwd: Path, log_path: Path) -> bool:
-    result = _run(command, cwd, log_path)
-    return result.returncode != 0 and expected in (result.stdout + result.stderr)
+def _absent(
+    command: list[str], expected: str, cwd: Path, log_path: Path, attempts: int = 8,
+) -> bool:
+    """Wait through AWS control-plane propagation and retain every attempt."""
+    transcripts = []
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120)
+        transcripts.append(
+            f"--- attempt {attempt}/{attempts} ---\n$ {' '.join(command)}\n\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        if result.returncode != 0 and expected in (result.stdout + result.stderr):
+            log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+            return True
+        if attempt < attempts:
+            time.sleep(min(2 ** attempt, 10))
+    log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+    return False
 
 
-def _log_group_absent(name: str, region: str, cwd: Path, log_path: Path) -> bool:
-    result = _run(
-        [
-            "aws", "logs", "describe-log-groups", "--log-group-name-prefix", name,
-            "--region", region, "--query", "logGroups[].logGroupName", "--output", "text",
-        ],
-        cwd,
-        log_path,
-    )
-    names = {line.strip() for line in result.stdout.splitlines() if line.strip()}
-    return result.returncode == 0 and name not in names
+def _log_group_absent(
+    name: str, region: str, cwd: Path, log_path: Path, attempts: int = 8,
+) -> bool:
+    command = [
+        "aws", "logs", "describe-log-groups", "--log-group-name-prefix", name,
+        "--region", region, "--query", "logGroups[].logGroupName", "--output", "text",
+    ]
+    transcripts = []
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120)
+        transcripts.append(
+            f"--- attempt {attempt}/{attempts} ---\n$ {' '.join(command)}\n\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        names = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+        if result.returncode == 0 and name not in names:
+            log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+            return True
+        if attempt < attempts:
+            time.sleep(min(2 ** attempt, 10))
+    log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+    return False
 
 
 def _sha256(path: Path) -> str:
