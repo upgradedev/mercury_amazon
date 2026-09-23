@@ -230,7 +230,9 @@ def evaluate_terraform_cycle_receipt(receipt: object) -> tuple[bool, str]:
             "lambda_absent",
             "dynamodb_absent",
             "iam_role_absent",
+            "iam_policy_absent",
             "cloudwatch_log_group_absent",
+            "terraform_state_empty",
             "teardown_verified",
         ):
             if destroy.get(field) is not True:

@@ -100,7 +100,9 @@ COMPLETE_TERRAFORM_CYCLE_RECEIPT = {
         "lambda_absent": True,
         "dynamodb_absent": True,
         "iam_role_absent": True,
+        "iam_policy_absent": True,
         "cloudwatch_log_group_absent": True,
+        "terraform_state_empty": True,
         "teardown_verified": True,
     },
     "error": None,
@@ -223,6 +225,8 @@ def test_complete_disposable_actions_cycle_passes_d2_predicate():
         (("pre_destroy", "health_build_sha"), "c" * 40, "source_revision"),
         (("destroy", "terraform_exit_code"), 1, "destroy did not exit 0"),
         (("destroy", "lambda_absent"), False, "lambda_absent"),
+        (("destroy", "iam_policy_absent"), False, "iam_policy_absent"),
+        (("destroy", "terraform_state_empty"), False, "terraform_state_empty"),
     ],
 )
 def test_d2_refuses_incomplete_or_non_pipeline_cycle(path, value, expected):

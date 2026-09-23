@@ -96,8 +96,61 @@ def _log_group_absent(
     return False
 
 
+def _iam_policy_absent(name: str, cwd: Path, log_path: Path, attempts: int = 8) -> bool:
+    """Wait until the exact locally managed IAM policy name is no longer listed."""
+    command = [
+        "aws", "iam", "list-policies", "--scope", "Local",
+        "--query", "Policies[].PolicyName", "--output", "text",
+    ]
+    transcripts = []
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120)
+        transcripts.append(
+            f"--- attempt {attempt}/{attempts} ---\n$ {' '.join(command)}\n\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        names = set(result.stdout.split())
+        if result.returncode == 0 and name not in names:
+            log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+            return True
+        if attempt < attempts:
+            time.sleep(min(2 ** attempt, 10))
+    log_path.write_text("\n\n".join(transcripts), encoding="utf-8")
+    return False
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        raise ValueError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _verify_source_provenance(terraform_dir: Path, source_revision: str) -> tuple[Path, str]:
+    """Bind the cycle to a clean checkout and the committed Terraform blob."""
+    repo_root = Path(_git(terraform_dir, "rev-parse", "--show-toplevel")).resolve()
+    head = _git(repo_root, "rev-parse", "HEAD")
+    if head != source_revision:
+        raise ValueError(f"source revision {source_revision} does not match checkout HEAD {head}")
+    tracked_changes = _git(repo_root, "status", "--porcelain", "--untracked-files=no")
+    if tracked_changes:
+        raise ValueError("checkout contains tracked changes; refusing an uncommitted cycle")
+    main_tf = (terraform_dir / "main.tf").resolve()
+    try:
+        relative_main_tf = main_tf.relative_to(repo_root).as_posix()
+    except ValueError as exc:
+        raise ValueError("Terraform directory must be inside the source checkout") from exc
+    committed_blob = _git(repo_root, "rev-parse", f"{source_revision}:{relative_main_tf}")
+    working_blob = _git(repo_root, "hash-object", relative_main_tf)
+    if committed_blob != working_blob:
+        raise ValueError("infra/main.tf does not match the committed source revision")
+    return repo_root, committed_blob
 
 
 def run_cycle(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
@@ -105,10 +158,14 @@ def run_cycle(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         raise ValueError("environment must be the guarded ci-RUN_ID-RUN_ATTEMPT form")
     if not re.fullmatch(r"[0-9a-f]{40}", args.source_revision):
         raise ValueError("source revision must be a full Git SHA")
-    if not args.workflow_run_url.startswith("https://github.com/upgradedev/mercury_amazon/actions/runs/"):
+    if not re.fullmatch(
+        r"https://github\.com/upgradedev/mercury_amazon/actions/runs/[0-9]+",
+        args.workflow_run_url,
+    ):
         raise ValueError("workflow URL must identify a mercury_amazon Actions run")
 
     terraform_dir = args.terraform_dir.resolve()
+    repo_root, infra_git_blob = _verify_source_provenance(terraform_dir, args.source_revision)
     package = args.package.resolve()
     output = args.output.resolve()
     evidence_dir = output.parent
@@ -121,13 +178,14 @@ def run_cycle(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
     function_name = f"mercury-wallboard-euw1-{args.environment}"
     table_name = f"mercury-state-euw1-{args.environment}"
     role_name = f"mercury-lambda-role-euw1-{args.environment}"
+    policy_name = f"mercury-serverless-policy-euw1-{args.environment}"
     log_group_name = f"/aws/lambda/{function_name}"
     receipt: dict[str, Any] = {
         "schema": "mercury.terraform_cycle_receipt/2",
         "note": (
-            "A GitHub Actions pipeline created a uniquely named disposable stack, probed it, "
-            "destroyed it, then verified that its Lambda, DynamoDB table and IAM role were absent. "
-            "The production URL was not destroyed."
+            "This receipt records the attempted disposable deploy, probes, teardown and absence "
+            "checks below. The passed field is true only when every required check succeeded. "
+            "The production URL was not targeted."
         ),
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_revision": args.source_revision,
@@ -139,12 +197,8 @@ def run_cycle(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         "lambda_package": {"sha256": _sha256(package), "bytes": package.stat().st_size},
         "infra": {
             "main_tf_sha256": _sha256(terraform_dir / "main.tf"),
-            "git_blob": subprocess.run(
-                ["git", "hash-object", "infra/main.tf"],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip(),
+            "git_blob": infra_git_blob,
+            "repository_root": str(repo_root),
         },
         "steps": {},
     }
@@ -207,61 +261,81 @@ def run_cycle(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         cycle_error = f"{type(exc).__name__}: {exc}"
     finally:
         if initialized:
-            destroyed = _run(
-                [
-                    "terraform", "destroy", "-auto-approve", "-input=false", "-no-color",
-                    *variables,
-                ],
-                terraform_dir,
-                evidence_dir / "terraform-destroy.log",
-            )
-            receipt["steps"]["destroy_exit_code"] = destroyed.returncode
-            time.sleep(5)
-            url_probe = _probe(endpoint, "/", attempts=2) if endpoint else {
-                "http_status": None,
-                "error": "apply produced no endpoint",
-            }
-            lambda_absent = _absent(
-                ["aws", "lambda", "get-function", "--function-name", function_name, "--region", args.region],
-                "ResourceNotFoundException",
-                terraform_dir,
-                evidence_dir / "post-destroy-lambda.log",
-            )
-            table_absent = _absent(
-                ["aws", "dynamodb", "describe-table", "--table-name", table_name, "--region", args.region],
-                "ResourceNotFoundException",
-                terraform_dir,
-                evidence_dir / "post-destroy-dynamodb.log",
-            )
-            role_absent = _absent(
-                ["aws", "iam", "get-role", "--role-name", role_name],
-                "NoSuchEntity",
-                terraform_dir,
-                evidence_dir / "post-destroy-iam.log",
-            )
-            log_group_absent = _log_group_absent(
-                log_group_name,
-                args.region,
-                terraform_dir,
-                evidence_dir / "post-destroy-cloudwatch.log",
-            )
-            destroy = {
-                "terraform_exit_code": destroyed.returncode,
-                "post_destroy_url_http_status": url_probe.get("http_status"),
-                "post_destroy_url_error": url_probe.get("error"),
-                "lambda_absent": lambda_absent,
-                "dynamodb_absent": table_absent,
-                "iam_role_absent": role_absent,
-                "cloudwatch_log_group_absent": log_group_absent,
-                "teardown_verified": (
-                    destroyed.returncode == 0
-                    and url_probe.get("http_status") != 200
-                    and lambda_absent
-                    and table_absent
-                    and role_absent
-                    and log_group_absent
-                ),
-            }
+            try:
+                destroyed = _run(
+                    [
+                        "terraform", "destroy", "-auto-approve", "-input=false", "-no-color",
+                        "-lock-timeout=60s", *variables,
+                    ],
+                    terraform_dir,
+                    evidence_dir / "terraform-destroy.log",
+                )
+                receipt["steps"]["destroy_exit_code"] = destroyed.returncode
+                time.sleep(5)
+                state = _run(
+                    ["terraform", "state", "list"],
+                    terraform_dir,
+                    evidence_dir / "post-destroy-terraform-state.log",
+                )
+                state_empty = state.returncode == 0 and not state.stdout.strip()
+                url_probe = _probe(endpoint, "/", attempts=2) if endpoint else {
+                    "http_status": None,
+                    "error": "apply produced no endpoint",
+                }
+                lambda_absent = _absent(
+                    ["aws", "lambda", "get-function", "--function-name", function_name, "--region", args.region],
+                    "ResourceNotFoundException",
+                    terraform_dir,
+                    evidence_dir / "post-destroy-lambda.log",
+                )
+                table_absent = _absent(
+                    ["aws", "dynamodb", "describe-table", "--table-name", table_name, "--region", args.region],
+                    "ResourceNotFoundException",
+                    terraform_dir,
+                    evidence_dir / "post-destroy-dynamodb.log",
+                )
+                role_absent = _absent(
+                    ["aws", "iam", "get-role", "--role-name", role_name],
+                    "NoSuchEntity",
+                    terraform_dir,
+                    evidence_dir / "post-destroy-iam.log",
+                )
+                policy_absent = _iam_policy_absent(
+                    policy_name,
+                    terraform_dir,
+                    evidence_dir / "post-destroy-iam-policy.log",
+                )
+                log_group_absent = _log_group_absent(
+                    log_group_name,
+                    args.region,
+                    terraform_dir,
+                    evidence_dir / "post-destroy-cloudwatch.log",
+                )
+                destroy = {
+                    "terraform_exit_code": destroyed.returncode,
+                    "post_destroy_url_http_status": url_probe.get("http_status"),
+                    "post_destroy_url_error": url_probe.get("error"),
+                    "lambda_absent": lambda_absent,
+                    "dynamodb_absent": table_absent,
+                    "iam_role_absent": role_absent,
+                    "iam_policy_absent": policy_absent,
+                    "cloudwatch_log_group_absent": log_group_absent,
+                    "terraform_state_empty": state_empty,
+                    "teardown_verified": (
+                        destroyed.returncode == 0
+                        and url_probe.get("http_status") != 200
+                        and lambda_absent
+                        and table_absent
+                        and role_absent
+                        and policy_absent
+                        and log_group_absent
+                        and state_empty
+                    ),
+                }
+            except Exception as exc:
+                teardown_error = f"{type(exc).__name__}: {exc}"
+                destroy = {"teardown_verified": False, "error": teardown_error}
+                cycle_error = f"{cycle_error}; teardown: {teardown_error}" if cycle_error else teardown_error
 
     receipt["pre_destroy"] = pre_destroy
     receipt["destroy"] = destroy

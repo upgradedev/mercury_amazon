@@ -2,8 +2,10 @@
 
 ## Architecture
 
-`main.tf` declares a serverless deployment on AWS Lambda behind a Function URL,
-reading AWS Cost Explorer and CloudWatch. Nothing runs continuously.
+`main.tf` declares a serverless public demo on AWS Lambda behind a Function URL.
+The deployed role can write only its DynamoDB state and logs. Terraform forces
+`MERCURY_OFFLINE=1`, so anonymous demo traffic receives labelled fixtures and
+cannot read account Cost Explorer or CloudWatch telemetry. Nothing runs continuously.
 
 ## Monthly idle cost
 
@@ -20,8 +22,8 @@ that a Lambda with zero invocations is not billed for compute.
 | Identity | IAM | **$0.00 (ESTIMATE)** | IAM is not billed |
 | **Total idle** | | **$0.00 (ESTIMATE)** | |
 
-Idle is not the same as in use. Two costs accrue the moment the cockpit is used,
-and neither is estimated here because it depends entirely on refresh rate:
+The source adapters can make the following calls in a separately secured operator
+deployment. The public Terraform stack does not grant these permissions:
 
 * **AWS Cost Explorer** bills roughly one cent per API request. This is why
   `AWSCostAdapter` caches a successful response for 15 minutes; see
@@ -29,9 +31,9 @@ and neither is estimated here because it depends entirely on refresh rate:
 * **CloudWatch GetMetricStatistics** bills per metric request beyond the free
   tier.
 
-To replace these estimates with measurements, deploy, leave it idle for a full
-billing period, then run `python scripts/probe_deployment.py` and read the actual
-Cost Explorer report for the account.
+To replace these estimates with measurements, use a separately authenticated
+operator deployment, leave it idle for a full billing period, then read its actual
+Cost Explorer report. Do not enable live account telemetry on the anonymous URL.
 
 ## Deploy and teardown
 
@@ -56,11 +58,19 @@ terraform apply tfplan
 terraform destroy -auto-approve
 ```
 
+The disposable GitHub Actions cycle performs teardown in the runner script and
+again in an `always()` fail-safe step with its own time budget. This covers an
+ordinary failure, primary-step timeout and standard workflow cancellation. A
+force-cancel or lost runner can bypass all runner-side cleanup; every stack uses
+the guarded `ci-RUN_ID-RUN_ATTEMPT` namespace so an operator can identify and
+remove that interrupted run before accepting a D2 receipt.
+
 The public cockpit is deployed at
 `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`.
-`GET /health` publishes the immutable build SHA. The deployment currently uses labelled
-offline fixtures and record-only rollback dispatch; it does not claim live incident telemetry
-or a physical Fire TV run. `deploy_teardown_receipt.json` records a dated HTTP observation.
+`GET /health` publishes the immutable build SHA. The deployment is forced to labelled
+offline fixtures and record-only rollback dispatch; its execution role cannot read live
+account telemetry. It does not claim a physical Fire TV run.
+`deploy_teardown_receipt.json` records a dated HTTP observation.
 
 Set `MERCURY_BUILD_SHA` at deploy time, or deploy from a git checkout, so that
 `GET /health` reports the commit it was built from. `scripts/probe_deployment.py`

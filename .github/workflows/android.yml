@@ -36,16 +36,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up the Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           # The action's legacy default also asks sdkmanager for the removed
           # package named `tools`. Keep the package list explicit so a runner
@@ -74,7 +74,7 @@ jobs:
           sha256sum app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload the Fire TV APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mercury-firetv-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload the unit test report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mercury-firetv-unit-test-report
           path: app/build/reports/tests/

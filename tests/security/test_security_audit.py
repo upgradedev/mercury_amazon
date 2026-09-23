@@ -3,7 +3,7 @@
 Tests:
 - Governed Rollback Shell Injection & Malicious Commit SHA Fuzzing
 - SHA-256 Lease Hash Verification
-- Least Privilege Read-Only Cost Explorer Access Enforcement
+- Public deployment stays fixture-only and holds no account-telemetry permission
 - D-Pad Spatial Nav XSS & DOM Injection Sanitization
 """
 from src.domain.dora_metrics import DORAMetricsReport

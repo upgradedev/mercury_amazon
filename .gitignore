@@ -43,6 +43,13 @@ htmlcov/
 *.swp
 *.swo
 
+# Terraform local state and provider cache
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
 # OS
 .DS_Store
 Thumbs.db

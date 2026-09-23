@@ -1,5 +1,5 @@
 # Pure Serverless Terraform Infrastructure for Mercury Voice CTO Cockpit on AWS (eu-west-1)
-# Architecture: AWS Lambda + Function URL + AWS Cost Explorer API + CloudWatch
+# Architecture: AWS Lambda + public demo Function URL + DynamoDB durable state
 
 terraform {
   required_version = ">= 1.5.0"
@@ -27,6 +27,11 @@ variable "environment" {
   type        = string
   default     = "prod"
   description = "Environment tier"
+
+  validation {
+    condition     = var.environment == "prod" || can(regex("^ci-[0-9]+-[0-9]+$", var.environment))
+    error_message = "Environment must be prod or the guarded ci-RUN_ID-RUN_ATTEMPT form."
+  }
 }
 
 variable "lambda_package_path" {
@@ -38,6 +43,11 @@ variable "lambda_package_path" {
 variable "source_revision" {
   type        = string
   description = "Immutable Git commit deployed in the Lambda package"
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.source_revision))
+    error_message = "source_revision must be a full lowercase 40-character Git SHA."
+  }
 }
 
 resource "aws_dynamodb_table" "mercury_state" {
@@ -90,24 +100,17 @@ resource "aws_iam_role" "mercury_lambda_role" {
   })
 }
 
-# 2. Least-Privilege Read Policy for Cost Explorer & CloudWatch
+# 2. Least-privilege policy for the public, fixture-only demo deployment.
+# The application can use Cost Explorer and CloudWatch in a separately secured
+# operator deployment. This Function URL is anonymous, so its Lambda role must
+# not be able to read account telemetry.
 resource "aws_iam_policy" "mercury_serverless_policy" {
   name        = "mercury-serverless-policy-euw1-${var.environment}"
-  description = "Least privilege read access for AWS Cost Explorer & CloudWatch metrics"
+  description = "Least privilege state and logging access for the public fixture-only demo"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ce:GetCostAndUsage",
-          "ce:GetCostForecast",
-          "ce:GetAnomalies",
-          "cloudwatch:GetMetricData"
-        ]
-        Resource = "*"
-      },
       {
         Effect = "Allow"
         Action = [
@@ -163,6 +166,9 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
       ENVIRONMENT         = var.environment
       MERCURY_BUILD_SHA   = var.source_revision
       MERCURY_STATE_TABLE = aws_dynamodb_table.mercury_state.name
+      # Anonymous demo traffic must never read AWS account telemetry or create
+      # billable Cost Explorer traffic, regardless of resolved role credentials.
+      MERCURY_OFFLINE = "1"
     }
   }
 
