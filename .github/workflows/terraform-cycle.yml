@@ -1,0 +1,48 @@
+name: Disposable deploy and teardown proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mercury-disposable-terraform-cycle
+  cancel-in-progress: false
+
+jobs:
+  deploy-probe-destroy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+      - name: Build content-addressed Lambda package
+        run: python scripts/build_lambda_package.py --output dist/mercury_lambda.zip
+      - name: Deploy, probe, destroy and verify absence
+        run: >-
+          python scripts/terraform_cycle.py
+          --terraform-dir infra
+          --package dist/mercury_lambda.zip
+          --environment ci-${{ github.run_id }}-${{ github.run_attempt }}
+          --source-revision ${{ github.sha }}
+          --workflow-run-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          --output build/terraform-cycle/receipt.json
+      - name: Upload exact cycle evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mercury-terraform-cycle-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/terraform-cycle/
+          if-no-files-found: error

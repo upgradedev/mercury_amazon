@@ -35,6 +35,17 @@ Cost Explorer report for the account.
 
 ## Deploy and teardown
 
+The **Disposable deploy and teardown proof** Actions workflow is the auditable route.
+It refuses any environment name outside `ci-RUN_ID-RUN_ATTEMPT`, builds the Lambda
+package from the checked-out revision, applies this Terraform from nothing, probes
+the emitted URL and build SHA, destroys the stack, then verifies that its Lambda,
+DynamoDB table, IAM role and CloudWatch log group are absent. A passing run uploads
+a content-addressed receipt; it never targets or destroys the production URL.
+
+`infra/.terraform.lock.hcl` pins the reviewed AWS provider 6.66.0. That version owns
+both public Function URL statements, including the URL-only `lambda:InvokeFunction`
+condition. Main CI runs `fmt`, `init` against the lock file and `validate` before tests.
+
 ```bash
 cd infra
 terraform init

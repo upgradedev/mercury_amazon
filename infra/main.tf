@@ -5,8 +5,10 @@ terraform {
   required_version = ">= 1.5.0"
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+      source = "hashicorp/aws"
+      # Provider 6 adds both permissions required for new public Function URLs:
+      # InvokeFunctionUrl and InvokeFunction constrained to URL invocations.
+      version = "~> 6.0"
     }
   }
 }
@@ -133,11 +135,23 @@ resource "aws_iam_role_policy_attachment" "mercury_attach" {
   policy_arn = aws_iam_policy.mercury_serverless_policy.arn
 }
 
-# 3. AWS Lambda Serverless Wallboard API Function ($0.00 Idle Cost)
+# 3. Explicit log group so a disposable cycle removes every resource it creates.
+resource "aws_cloudwatch_log_group" "mercury_lambda_logs" {
+  name              = "/aws/lambda/mercury-wallboard-euw1-${var.environment}"
+  retention_in_days = 14
+
+  tags = {
+    Project     = "mercury"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# 4. AWS Lambda Serverless Wallboard API Function ($0.00 Idle Cost)
 resource "aws_lambda_function" "mercury_wallboard_function" {
-  function_name = "mercury-wallboard-euw1-${var.environment}"
-  role          = aws_iam_role.mercury_lambda_role.arn
-  runtime       = "python3.11"
+  function_name    = "mercury-wallboard-euw1-${var.environment}"
+  role             = aws_iam_role.mercury_lambda_role.arn
+  runtime          = "python3.11"
   handler          = "src.interfaces.lambda_handler.handler"
   filename         = var.lambda_package_path
   source_code_hash = filebase64sha256(var.lambda_package_path)
@@ -146,8 +160,8 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
 
   environment {
     variables = {
-      ENVIRONMENT       = var.environment
-      MERCURY_BUILD_SHA = var.source_revision
+      ENVIRONMENT         = var.environment
+      MERCURY_BUILD_SHA   = var.source_revision
       MERCURY_STATE_TABLE = aws_dynamodb_table.mercury_state.name
     }
   }
@@ -161,18 +175,50 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
   }
 }
 
-# 4. HTTPS Lambda Function URL for Fire TV 10-Foot Wallboard
+# 5. HTTPS Lambda Function URL for Fire TV 10-Foot Wallboard
 resource "aws_lambda_function_url" "mercury_wallboard_url" {
   function_name      = aws_lambda_function.mercury_wallboard_function.function_name
   authorization_type = "NONE"
 
+  # Provider 6 also adds these statements during URL creation. Creating the
+  # tracked permission resources first is safe because the provider treats the
+  # exact duplicate SIDs as already satisfied, while Terraform can still own
+  # and remove both statements deterministically.
+  depends_on = [
+    aws_lambda_permission.mercury_function_url,
+    aws_lambda_permission.mercury_function_url_invoke,
+  ]
+
   cors {
     allow_credentials = false
     allow_origins     = ["*"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
-    allow_headers     = ["content-type", "x-mcp-version"]
-    max_age           = 86400
+    # Lambda handles CORS preflight itself. AllowMethods entries are limited to
+    # six characters, so the seven-character OPTIONS token is rejected by AWS.
+    allow_methods = ["GET", "POST"]
+    allow_headers = ["content-type", "x-mcp-version"]
+    max_age       = 86400
   }
+}
+
+# Public Function URLs created after October 2025 require both resource-policy
+# permissions. The conditions are emitted by the provider from these dedicated
+# arguments, so regular Lambda invocation remains unavailable through this grant.
+resource "aws_lambda_permission" "mercury_function_url" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.mercury_wallboard_function.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+
+}
+
+resource "aws_lambda_permission" "mercury_function_url_invoke" {
+  statement_id             = "FunctionURLAllowInvokeAction"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.mercury_wallboard_function.function_name
+  principal                = "*"
+  invoked_via_function_url = true
+
 }
 
 output "wallboard_endpoint_url" {

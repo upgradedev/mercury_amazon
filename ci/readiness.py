@@ -95,6 +95,7 @@ def get_standards_gate_ids() -> list[str]:
 #: write it without an APK file it can open. Gate J4 fails while the receipt is absent.
 FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
 ANDROID_TV_RUNTIME_RECEIPT = "android_tv_runtime_receipt.json"
+TERRAFORM_CYCLE_RECEIPT = "terraform_cycle_receipt.json"
 
 #: Every field J4 requires, and what each one is evidence of. A receipt missing any of
 #: them is not evidence, so the gate fails and says which field it wanted.
@@ -126,6 +127,7 @@ ANDROID_TV_RECEIPT_FIELDS = {
     "adb_install_exit_code": "the emulator install result, which must be 0",
     "normal_launcher": "proof the normal Leanback launcher used no URL override",
     "endpoint_loaded_without_intent_override": "the compiled HTTPS endpoint seen in logcat",
+    "endpoint_health_build_sha": "proof the loaded web app reports the same release as the APK",
     "runtime": "the emulator model and Android version",
     "remote_journey": "the D-pad journey events and effect boundary",
     "artifacts": "content-addressed APK, logcat and screenshot records",
@@ -138,6 +140,141 @@ ANDROID_TV_REQUIRED_EVENTS = {
     "journey:rollback_confirmed:RECORDED_ONLY:DPAD_RECORD_ONLY_DEMO",
     "journey:handoff_published:checkout-api-active:",
 }
+
+ANDROID_TV_RUNTIME_PATHS = (
+    "app/",
+    "gradle/",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradlew",
+    "gradlew.bat",
+    ".github/workflows/android-tv-emulator.yml",
+    "scripts/android_tv_smoke.sh",
+    "scripts/write_android_tv_runtime_receipt.py",
+)
+
+
+def runtime_receipt_checkout_problem(receipt: dict) -> str | None:
+    """Return why a historical runtime receipt cannot prove this checkout."""
+    build_sha = str(receipt.get("build_sha", ""))
+    if not re.fullmatch(r"[0-9a-f]{40}", build_sha):
+        return "runtime build SHA is not a full Git SHA"
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", build_sha, "HEAD"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if ancestor.returncode != 0:
+        return f"runtime build {build_sha[:7]} is not an ancestor of HEAD"
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", f"{build_sha}..HEAD", "--", *ANDROID_TV_RUNTIME_PATHS],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if changed.returncode != 0:
+        return "could not compare runtime-bearing files with the receipt build"
+    paths = [path for path in changed.stdout.splitlines() if path]
+    if paths:
+        return f"runtime-bearing files changed after the receipt build: {paths}"
+    return None
+
+
+def evaluate_terraform_cycle_receipt(receipt: object) -> tuple[bool, str]:
+    """D2: validate one Actions deploy, live probe, destroy and absence receipt."""
+    if not isinstance(receipt, dict):
+        return False, "Terraform cycle receipt is not a JSON object"
+    problems = []
+    source = str(receipt.get("source_revision", ""))
+    if receipt.get("schema") != "mercury.terraform_cycle_receipt/2":
+        problems.append("unexpected schema")
+    if receipt.get("execution_mode") != "github_actions_pipeline":
+        problems.append("execution_mode is not github_actions_pipeline")
+    expected_run = r"https://github\.com/upgradedev/mercury_amazon/actions/runs/[0-9]+"
+    if not re.fullmatch(expected_run, str(receipt.get("workflow_run_url", ""))):
+        problems.append("workflow_run_url is not a mercury_amazon Actions run")
+    if not re.fullmatch(r"[0-9a-f]{40}", source):
+        problems.append("source_revision is not a full Git SHA")
+    if receipt.get("production_url_destroyed") is not False:
+        problems.append("receipt does not preserve the production URL boundary")
+    package = receipt.get("lambda_package")
+    if not isinstance(package, dict) or not re.fullmatch(r"[0-9a-f]{64}", str(package.get("sha256", ""))):
+        problems.append("lambda package digest is invalid")
+    elif not isinstance(package.get("bytes"), int) or package["bytes"] <= 0:
+        problems.append("lambda package byte count is invalid")
+    pre = receipt.get("pre_destroy")
+    if not isinstance(pre, dict):
+        problems.append("pre_destroy evidence is missing")
+    else:
+        if pre.get("root_http_status") != 200 or pre.get("health_http_status") != 200:
+            problems.append("disposable endpoint did not answer both live probes with HTTP 200")
+        if pre.get("health_build_sha") != source:
+            problems.append("disposable endpoint build SHA does not match source_revision")
+        if pre.get("health_durable_state") is not True:
+            problems.append("disposable endpoint did not report durable state")
+        required_sids = {"FunctionURLAllowPublicAccess", "FunctionURLAllowInvokeAction"}
+        if not required_sids <= set(pre.get("function_policy_statements", [])):
+            problems.append("public Function URL policy is incomplete")
+    destroy = receipt.get("destroy")
+    if not isinstance(destroy, dict):
+        problems.append("destroy evidence is missing")
+    else:
+        if destroy.get("terraform_exit_code") != 0:
+            problems.append("terraform destroy did not exit 0")
+        if destroy.get("post_destroy_url_http_status") == 200:
+            problems.append("disposable endpoint still answered HTTP 200 after destroy")
+        for field in (
+            "lambda_absent",
+            "dynamodb_absent",
+            "iam_role_absent",
+            "cloudwatch_log_group_absent",
+            "teardown_verified",
+        ):
+            if destroy.get(field) is not True:
+                problems.append(f"destroy.{field} is not true")
+    if receipt.get("error") not in (None, ""):
+        problems.append("cycle recorded an execution error")
+    if receipt.get("passed") is not True:
+        problems.append("pipeline did not mark the validated cycle passed")
+    if problems:
+        return False, "; ".join(problems)
+    return True, f"Actions cycle {receipt['workflow_run_url']} deployed and destroyed {source[:7]}"
+
+
+def terraform_cycle_checkout_problem(receipt: dict) -> str | None:
+    """Reject a cycle when IaC or its runner changed after the evidenced revision."""
+    source = str(receipt.get("source_revision", ""))
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", source, "HEAD"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if ancestor.returncode != 0:
+        return f"cycle source {source[:7]} is not an ancestor of HEAD"
+    paths = (
+        "infra/",
+        ".github/workflows/terraform-cycle.yml",
+        "scripts/terraform_cycle.py",
+        "scripts/build_lambda_package.py",
+    )
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", f"{source}..HEAD", "--", *paths],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    changed_paths = [path for path in changed.stdout.splitlines() if path]
+    if changed.returncode != 0:
+        return "could not compare infrastructure files with the cycle source"
+    if changed_paths:
+        return f"infrastructure files changed after the cycle source: {changed_paths}"
+    return None
 
 
 def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tuple[bool, str]:
@@ -184,8 +321,19 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
             problems.append("apk_sha256 is not a SHA-256 digest")
         if not str(receipt.get("workflow_run_url", "")).startswith("https://github.com/"):
             problems.append("workflow_run_url is not a GitHub HTTPS run URL")
+        expected_run = r"https://github\.com/upgradedev/mercury_amazon/actions/runs/[0-9]+"
+        if not re.fullmatch(expected_run, str(receipt.get("workflow_run_url", ""))):
+            problems.append("workflow_run_url is not a mercury_amazon Actions run")
+        if str(receipt.get("build_sha", "")) not in str(receipt.get("artifact_name", "")):
+            problems.append("artifact_name does not contain build_sha")
         if not str(receipt.get("endpoint_loaded_without_intent_override", "")).startswith("https://"):
             problems.append("the compiled endpoint is not HTTPS")
+        if str(receipt.get("endpoint_loaded_without_intent_override", "")) not in str(
+            receipt.get("built_by_command", "")
+        ):
+            problems.append("built_by_command does not identify the compiled endpoint")
+        if receipt.get("endpoint_health_build_sha") != receipt.get("build_sha"):
+            problems.append("endpoint_health_build_sha does not match build_sha")
         if "no COCKPIT_URL intent extra" not in str(receipt.get("normal_launcher", "")):
             problems.append("normal_launcher does not rule out an ADB URL override")
         runtime = receipt.get("runtime")
@@ -205,7 +353,9 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
         if not isinstance(artifacts, dict):
             problems.append("artifacts is missing")
         else:
-            for name in ("apk", "logcat", "screenshot"):
+            for name in (
+                "apk", "logcat", "screenshot", "install_log", "launch_log", "endpoint_health",
+            ):
                 item = artifacts.get(name)
                 if not isinstance(item, dict):
                     problems.append(f"artifacts.{name} is missing")
@@ -214,6 +364,9 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
                     problems.append(f"artifacts.{name}.sha256 is invalid")
                 if not isinstance(item.get("bytes"), int) or item["bytes"] <= 0:
                     problems.append(f"artifacts.{name}.bytes is invalid")
+            apk_artifact = artifacts.get("apk")
+            if isinstance(apk_artifact, dict) and apk_artifact.get("sha256") != receipt.get("apk_sha256"):
+                problems.append("apk_sha256 does not match artifacts.apk.sha256")
         if problems:
             return False, f"{ANDROID_TV_RUNTIME_RECEIPT} is not evidence yet: " + "; ".join(problems)
         return True, (
@@ -254,6 +407,43 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
         f"{device['device_model']} on {device['fire_os_or_android_version']} at "
         f"{device['launched_at_utc']}: {device['observed']}"
     )
+
+
+def evaluate_firetv_receipt_candidates(
+    readme_terms,
+    manifest: str,
+    candidates: list[tuple[str, str]],
+    apk_exists,
+    checkout_validator=runtime_receipt_checkout_problem,
+) -> tuple[bool, str]:
+    """Evaluate Android-emulator and physical-device evidence independently.
+
+    A malformed or stale receipt on one route must not shadow valid evidence on the
+    other. If neither route validates, retain every rejection reason so the repair is
+    actionable rather than determined by file ordering.
+    """
+    failures = []
+    found = False
+    for path, text in candidates:
+        if not text:
+            continue
+        found = True
+        try:
+            receipt = json.loads(text)
+        except (TypeError, ValueError):
+            failures.append(f"{path}: invalid JSON")
+            continue
+        passed, message = evaluate_firetv_gate(readme_terms, manifest, receipt, apk_exists)
+        if passed and receipt.get("schema") == "mercury.android_tv_runtime_receipt/1":
+            checkout_problem = checkout_validator(receipt)
+            if checkout_problem:
+                passed, message = False, checkout_problem
+        if passed:
+            return True, f"{path}: {message}"
+        failures.append(f"{path}: {message}")
+    if found:
+        return False, " | ".join(failures)
+    return evaluate_firetv_gate(readme_terms, manifest, None, apk_exists)
 
 
 #: Where the test suite's own runtime is recorded, by scripts/time_test_suite.py. G1
@@ -528,15 +718,13 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
 
     j4_terms = [t for t in ["fire tv", "fire os", "leanback"] if t in readme_lower]
     manifest = read("app/src/main/AndroidManifest.xml")
-    firetv_receipt_text = read(ANDROID_TV_RUNTIME_RECEIPT) or read(FIRETV_BUILD_RECEIPT)
-    firetv_receipt = None
-    if firetv_receipt_text:
-        try:
-            firetv_receipt = json.loads(firetv_receipt_text)
-        except ValueError:
-            firetv_receipt = {"__invalid__": True}
-    j4, j4_message = evaluate_firetv_gate(
-        j4_terms, manifest, firetv_receipt,
+    j4, j4_message = evaluate_firetv_receipt_candidates(
+        j4_terms,
+        manifest,
+        [
+            (ANDROID_TV_RUNTIME_RECEIPT, read(ANDROID_TV_RUNTIME_RECEIPT)),
+            (FIRETV_BUILD_RECEIPT, read(FIRETV_BUILD_RECEIPT)),
+        ],
         lambda path: os.path.isfile(os.path.join(REPO_ROOT, path)),
     )
     gate("J4", "Sponsor product is load-bearing", j4, j4_message)
@@ -653,26 +841,21 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
     gate("D1", "IaC declared in Terraform/CDK", os.path.exists(os.path.join(REPO_ROOT, "infra/main.tf")),
          "infra/main.tf present")
 
-    # D2 validates the receipt's content, not its existence.
+    # D2 is a separate disposable pipeline. Production probes belong only to G2.
     receipt_text = read("deploy_teardown_receipt.json")
-    d2_reason = "No deployment receipt present"
+    cycle_text = read(TERRAFORM_CYCLE_RECEIPT)
+    d2_reason = f"No {TERRAFORM_CYCLE_RECEIPT} from the disposable Actions pipeline"
     d2 = False
-    if receipt_text:
+    if cycle_text:
         try:
-            receipt = json.loads(receipt_text)
-            probes = receipt.get("probes", [])
-            statuses = [p.get("http_status") for p in probes]
-            reachable = bool(probes) and all(s == 200 for s in statuses)
-            deployed = receipt.get("deployed_commit_sha")
-            local_head = receipt.get("local_head_sha")
-            teardown = receipt.get("teardown_verified") is True
-            d2 = reachable and bool(deployed) and deployed == local_head and teardown
-            d2_reason = (
-                f"probes={statuses} deployed_sha={deployed or 'not reported by the deployment'} "
-                f"receipt_head={(local_head or '')[:7]} teardown_verified={teardown}"
-            )
+            cycle_receipt = json.loads(cycle_text)
+            d2, d2_reason = evaluate_terraform_cycle_receipt(cycle_receipt)
+            if d2:
+                checkout_problem = terraform_cycle_checkout_problem(cycle_receipt)
+                if checkout_problem:
+                    d2, d2_reason = False, checkout_problem
         except ValueError:
-            d2_reason = "Deployment receipt is not valid JSON"
+            d2_reason = f"{TERRAFORM_CYCLE_RECEIPT} is not valid JSON"
     gate("D2", "Tested deploy then teardown with recorded URL", d2,
          "Receipt records a reachable URL at this commit, with teardown verified" if d2 else d2_reason)
 

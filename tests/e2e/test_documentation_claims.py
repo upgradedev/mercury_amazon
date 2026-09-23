@@ -181,8 +181,10 @@ def test_documents_follow_the_official_android_tv_emulator_allowance():
     assert "official faq" in build_doc
     assert "android tv emulator" in build_doc
     assert "physical device is optional" in build_doc
-    assert "target: android-tv" in workflow
+    assert "target: google-tv" in workflow
     assert "scripts/android_tv_smoke.sh" in workflow
+    assert "am start main + leanback_launcher" in build_doc
+    assert "monkey leanback_launcher" not in build_doc
 
 
 def test_the_readme_states_the_limitation_beside_each_capability():

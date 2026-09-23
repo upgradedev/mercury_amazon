@@ -48,7 +48,7 @@ COMPLETE_EMULATOR_RECEIPT = {
     "schema": "mercury.android_tv_runtime_receipt/1",
     "recorded_at_utc": "2026-09-23T10:00:00Z",
     "build_sha": "a" * 40,
-    "workflow_run_url": "https://github.com/upgradedev/mercury-amazon/actions/runs/1",
+    "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/1",
     "artifact_name": "mercury-android-tv-runtime-" + "a" * 40,
     "built_by_command": "./gradlew :app:assembleDebug -PmercuryCockpitUrl=https://example.test/",
     "apk_path": "app/build/outputs/apk/debug/app-debug.apk",
@@ -56,6 +56,7 @@ COMPLETE_EMULATOR_RECEIPT = {
     "adb_install_exit_code": 0,
     "normal_launcher": "monkey LEANBACK_LAUNCHER; no COCKPIT_URL intent extra",
     "endpoint_loaded_without_intent_override": "https://example.test/",
+    "endpoint_health_build_sha": "a" * 40,
     "runtime": {"device_model": "Android TV", "os_version": "Android 11 / API 30"},
     "remote_journey": {
         "input": "ADB keyevents mapped to the Android TV D-pad",
@@ -64,8 +65,46 @@ COMPLETE_EMULATOR_RECEIPT = {
     },
     "artifacts": {
         name: {"path": name, "sha256": char * 64, "bytes": 10000}
-        for name, char in (("apk", "c"), ("logcat", "d"), ("screenshot", "e"))
+        for name, char in (
+            ("apk", "b"),
+            ("logcat", "d"),
+            ("screenshot", "e"),
+            ("install_log", "f"),
+            ("launch_log", "1"),
+            ("endpoint_health", "2"),
+        )
     },
+}
+
+COMPLETE_TERRAFORM_CYCLE_RECEIPT = {
+    "schema": "mercury.terraform_cycle_receipt/2",
+    "source_revision": "a" * 40,
+    "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/1",
+    "execution_mode": "github_actions_pipeline",
+    "environment": "ci-1-1",
+    "production_url_destroyed": False,
+    "lambda_package": {"sha256": "b" * 64, "bytes": 1000},
+    "pre_destroy": {
+        "root_http_status": 200,
+        "health_http_status": 200,
+        "health_build_sha": "a" * 40,
+        "health_durable_state": True,
+        "function_policy_statements": [
+            "FunctionURLAllowPublicAccess",
+            "FunctionURLAllowInvokeAction",
+        ],
+    },
+    "destroy": {
+        "terraform_exit_code": 0,
+        "post_destroy_url_http_status": 403,
+        "lambda_absent": True,
+        "dynamodb_absent": True,
+        "iam_role_absent": True,
+        "cloudwatch_log_group_absent": True,
+        "teardown_verified": True,
+    },
+    "error": None,
+    "passed": True,
 }
 
 
@@ -87,6 +126,61 @@ def test_a_complete_android_tv_emulator_receipt_passes_the_gate():
     assert passed is True
     assert "Android TV" in message
     assert "via D-pad" in message
+
+
+def test_invalid_android_receipt_does_not_shadow_valid_physical_receipt():
+    passed, message = readiness.evaluate_firetv_receipt_candidates(
+        README_TERMS,
+        LEANBACK_MANIFEST,
+        [
+            (readiness.ANDROID_TV_RUNTIME_RECEIPT, "{not-json"),
+            (readiness.FIRETV_BUILD_RECEIPT, json.dumps(COMPLETE_RECEIPT)),
+        ],
+        _exists,
+        checkout_validator=lambda _receipt: None,
+    )
+    assert passed is True
+    assert readiness.FIRETV_BUILD_RECEIPT in message
+
+
+def test_both_invalid_runtime_routes_report_both_rejection_reasons():
+    passed, message = readiness.evaluate_firetv_receipt_candidates(
+        README_TERMS,
+        LEANBACK_MANIFEST,
+        [
+            (readiness.ANDROID_TV_RUNTIME_RECEIPT, "{not-json"),
+            (readiness.FIRETV_BUILD_RECEIPT, json.dumps({"gradle_exit_code": 1})),
+        ],
+        _exists,
+        checkout_validator=lambda _receipt: None,
+    )
+    assert passed is False
+    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in message
+    assert readiness.FIRETV_BUILD_RECEIPT in message
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        (
+            lambda receipt: receipt.update(
+                workflow_run_url="https://github.com/example/other/actions/runs/1"
+            ),
+            "mercury_amazon",
+        ),
+        (lambda receipt: receipt.update(artifact_name="runtime-without-revision"), "artifact_name"),
+        (lambda receipt: receipt.update(apk_sha256="9" * 64), "artifacts.apk.sha256"),
+        (lambda receipt: receipt["artifacts"].pop("launch_log"), "launch_log"),
+    ],
+)
+def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutation, expected):
+    receipt = copy.deepcopy(COMPLETE_EMULATOR_RECEIPT)
+    mutation(receipt)
+    passed, message = readiness.evaluate_firetv_gate(
+        README_TERMS, LEANBACK_MANIFEST, receipt, _exists
+    )
+    assert passed is False
+    assert expected in message
 
 
 def test_the_gate_fails_in_this_repository_until_a_runtime_receipt_exists():
@@ -111,6 +205,35 @@ def test_a_leanback_manifest_alone_no_longer_passes():
     """The exact input that used to pass: the two strings and nothing else."""
     passed, _ = readiness.evaluate_firetv_gate(README_TERMS, LEANBACK_MANIFEST, {}, _exists)
     assert passed is False
+
+
+def test_complete_disposable_actions_cycle_passes_d2_predicate():
+    passed, message = readiness.evaluate_terraform_cycle_receipt(
+        COMPLETE_TERRAFORM_CYCLE_RECEIPT
+    )
+    assert passed is True
+    assert "deployed and destroyed" in message
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "expected"),
+    [
+        (("execution_mode",), "local_manual", "github_actions_pipeline"),
+        (("production_url_destroyed",), True, "production URL"),
+        (("pre_destroy", "health_build_sha"), "c" * 40, "source_revision"),
+        (("destroy", "terraform_exit_code"), 1, "destroy did not exit 0"),
+        (("destroy", "lambda_absent"), False, "lambda_absent"),
+    ],
+)
+def test_d2_refuses_incomplete_or_non_pipeline_cycle(path, value, expected):
+    receipt = copy.deepcopy(COMPLETE_TERRAFORM_CYCLE_RECEIPT)
+    target = receipt
+    for part in path[:-1]:
+        target = target[part]
+    target[path[-1]] = value
+    passed, message = readiness.evaluate_terraform_cycle_receipt(receipt)
+    assert passed is False
+    assert expected in message
 
 
 @pytest.mark.parametrize("field", sorted(readiness.FIRETV_RECEIPT_FIELDS))

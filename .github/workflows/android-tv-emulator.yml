@@ -6,7 +6,7 @@ on:
 jobs:
   emulator-golden-path:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -22,13 +22,24 @@ jobs:
         run: >-
           ./gradlew :app:assembleDebug --stacktrace
           -PmercuryCockpitUrl=https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/
+      - name: Verify the public candidate matches this checkout
+        shell: bash
+        run: |
+          mkdir -p build/android-tv-evidence
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health \
+            --output build/android-tv-evidence/endpoint-health.json
+          python -c 'import json,sys; actual=json.load(open(sys.argv[2], encoding="utf-8")).get("build_sha"); expected=sys.argv[1]; assert actual == expected, f"deployed build {actual!r} != workflow SHA {expected}"' \
+            "${GITHUB_SHA}" build/android-tv-evidence/endpoint-health.json
       - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: android-tv
-          arch: x86
+          api-level: 35
+          target: google-tv
+          arch: x86_64
           profile: tv_1080p
+          ram-size: 3072M
+          heap-size: 512M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash scripts/android_tv_smoke.sh
