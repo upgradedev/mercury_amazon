@@ -917,4 +917,3 @@ def test_the_readme_points_a_clone_at_the_review_the_gates_read():
     """
     assert "docs/PERSONA_REVIEW.md" in README,         "the README does not tell a reader where the persona review lives"
     assert "in a clone" in README.lower() or "from a bare clone" in README.lower(),         "the README does not say that the readiness score is now reproducible from a clone"
-
