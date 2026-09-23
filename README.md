@@ -36,7 +36,7 @@ every attribution carries its own measured precision.
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
-python -m pytest tests/ -q  # 541 passed
+python -m pytest tests/ -q  # 544 passed
 python -m src.interfaces.mcp_server
 ```
 
@@ -60,8 +60,8 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-541%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-544%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **An APK exists as a verified CI artifact; no Fire TV device run exists yet.**
@@ -612,8 +612,10 @@ machine, the background load and the collected test count. Readiness gate G1 and
 against that file, and the file records the test count they were measured over, so
 adding a test makes this paragraph fail the build until the suite is re-measured,
 unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
-`stale_timing_disclosure`; quietly ageing is not one of the options. The current
-green record and the suite both contain 541 collected tests.
+`stale_timing_disclosure`; quietly ageing is not one of the options. The published
+timing record was **measured over 541 collected tests**. The three Lambda bridge
+checks were added afterward: **the suite now collects 544 tests and a re-measure on
+an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -654,7 +656,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 541 passed
+# 544 passed
 ```
 
 ### 3. Start the server
@@ -871,8 +873,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 541 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1597 statements
+python -m pytest tests/ -q                                    # 544 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1646 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
@@ -985,9 +987,9 @@ given a substitute number.
   log. Nothing has been installed on Fire TV hardware, and there is no Fire TV
   emulator for this Android APK. The TV surface is a D-pad and a screen; it takes no
   voice input.
-* **The live deployment is stale.** `https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com`
-  answers 200 but runs an older build and reports no build SHA, so gate G2 fails.
-  Its teardown has never been tested, so gate D2 fails too.
+* **No current public deployment.** The unrelated September 3 API Gateway and Lambda were
+  backed up and removed on 2026-09-23. The old URL no longer resolves. Gates D2 and G2 remain
+  red because removal is not a tested deployment of this commit.
 * **No video.** Gates E2 and E4 fail for that reason.
 * **No browser-driver end-to-end test.** Gate C5 fails. The Node spatial navigation
   spec is a DOM shim, not a browser, and is not counted as one.
