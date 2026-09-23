@@ -1,28 +1,28 @@
 {
   "schema": "mercury.deploy_receipt/2",
   "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
-  "probed_at_utc": "2026-09-23T07:04:57Z",
-  "probed_at_epoch": 1790147097.7397573,
-  "base_url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com",
+  "probed_at_utc": "2026-09-23T07:37:19Z",
+  "probed_at_epoch": 1790149039.3132257,
+  "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws",
   "probes": [
     {
-      "url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com/",
-      "http_status": null,
-      "elapsed_ms": 661.7,
-      "body_excerpt": null,
-      "error": "ConnectError: [Errno 11001] getaddrinfo failed"
+      "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
+      "http_status": 200,
+      "elapsed_ms": 2629.04,
+      "body_excerpt": "<!DOCTYPE html>\r\n<html lang=\"en\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n  <title>Mercury Fire TV Incident Commander</title>\r\n  <meta name=\"description\" content=\"A 10-foot incident war room: what broke, which change caused it, and a governed rollback from the remote.\">\r\n  <link rel=\"manifest\" href=\"manifest.json\">\r\n  <meta name=",
+      "error": null
     },
     {
-      "url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com/health",
-      "http_status": null,
-      "elapsed_ms": 31.27,
-      "body_excerpt": null,
-      "error": "ConnectError: [Errno 11001] getaddrinfo failed"
+      "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
+      "http_status": 200,
+      "elapsed_ms": 264.8,
+      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"ea9acf8b13cc21982b41a688850ec92b1e22a3d6\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\"}",
+      "error": null
     }
   ],
-  "deployed_commit_sha": null,
-  "local_head_sha": "f43bdf0a110873ff910d6748e6ced40ce7c2c52a",
-  "deployed_matches_local_head": false,
+  "deployed_commit_sha": "ea9acf8b13cc21982b41a688850ec92b1e22a3d6",
+  "local_head_sha": "ea9acf8b13cc21982b41a688850ec92b1e22a3d6",
+  "deployed_matches_local_head": true,
   "teardown_verified": false,
   "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."
 }

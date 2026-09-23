@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_URL = "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com"
+DEFAULT_URL = "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws"
 RECEIPT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy_teardown_receipt.json")
 BODY_EXCERPT_CHARS = 400
 

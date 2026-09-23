@@ -35,7 +35,7 @@ CI_EXEMPT: dict[str, str] = {
     "J4": "a verified CI APK and portable ADB exist, but the gate still needs a physical "
           "Fire TV install and observed launch; no Fire TV emulator exists to stand in for "
           "the device",
-    "D2": "needs a deployment of this commit; the live endpoint runs an older build",
+    "D2": "needs a verified deploy-and-teardown cycle for the recorded build",
     "E2": "needs a recorded video for narration and picture to be in sync with",
     "E4": "needs a public video of the running product",
     "G2": "needs a deployment whose reported build SHA equals HEAD",

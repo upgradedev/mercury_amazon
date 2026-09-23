@@ -888,7 +888,7 @@ python ci/readiness.py
 # SUMMARY: 44/53 PASSED, 9/53 FAILED (0 of them blocking)
 ```
 
-**44/53 readiness gates**, down one from the 45 published before 2026-09-08. J4 is
+**44/53 readiness gates**. J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -937,8 +937,8 @@ read so that the accuracy figures above stay attached to the corpus that produce
 them instead of moving on every commit.
 
 `deploy_teardown_receipt.json` is the output of that probe. It records only what
-was observed, and it reports `deployed_commit_sha` as `null` because the deployed
-build does not report one. Gate G2 therefore fails, correctly, and says so.
+was observed, including the immutable `build_sha` published by `/health`. The public
+cockpit is `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`.
 
 ---
 
@@ -987,9 +987,10 @@ given a substitute number.
   log. Nothing has been installed on Fire TV hardware, and there is no Fire TV
   emulator for this Android APK. The TV surface is a D-pad and a screen; it takes no
   voice input.
-* **No current public deployment.** The unrelated September 3 API Gateway and Lambda were
-  backed up and removed on 2026-09-23. The old URL no longer resolves. Gates D2 and G2 remain
-  red because removal is not a tested deployment of this commit.
+* **Public cockpit deployment.** The judge-facing Fire TV web cockpit is live at
+  `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` and `/health`
+  publishes its build SHA. It runs in labelled offline-fixture mode until real telemetry
+  credentials are configured. The APK still requires the separate physical-device proof below.
 * **No video.** Gates E2 and E4 fail for that reason.
 * **No browser-driver end-to-end test.** Gate C5 fails. The Node spatial navigation
   spec is a DOM shim, not a browser, and is not counted as one.
