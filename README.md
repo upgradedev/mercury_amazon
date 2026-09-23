@@ -880,10 +880,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
+# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**45/53 readiness gates**. J4 is
+**46/53 readiness gates**. J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -902,15 +902,15 @@ and every refusal through the predicate.
 **The same score in a clone.** Four of these gates, I1 to I4, used to read a
 coordination file that lives in the workspace above this repository. They passed
 here and would have failed for anyone who cloned the repository on its own, so the
-45 above was a number only this machine could reproduce and the audit said so in its
-own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
+earlier score was a number only this machine could reproduce and the audit said so
+in its own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
 persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which four are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
-coordination file itself stays out of this repository, where the workspace protocol
-requires it to stay.
+red. `python ci/readiness.py` prints the same 46/53 from a bare clone because the
+public deployment receipt identifies this exact commit. The coordination file stays
+out of this repository, where the workspace protocol requires it to stay.
 
 ### Data fixtures
 
