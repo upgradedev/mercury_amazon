@@ -16,6 +16,8 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
       - name: Build the exact public-candidate APK
         run: >-
           ./gradlew :app:assembleDebug --stacktrace
