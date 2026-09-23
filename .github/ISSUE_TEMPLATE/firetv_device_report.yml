@@ -1,0 +1,46 @@
+name: Fire TV device report
+description: Report what happened when you ran the APK on real Fire TV hardware
+labels: ["fire-tv", "hardware"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The maintainers have not run this on a physical Fire TV device, and there
+        is no Fire TV emulator to have run it in. If you have run it on hardware,
+        this is the most valuable report you can file, whether it worked or not.
+  - type: input
+    id: device
+    attributes:
+      label: Device and Fire OS version
+      placeholder: Fire TV Stick 4K Max, Fire OS 8.x
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Did adb install succeed
+      options: ["Yes", "No"]
+    validations:
+      required: true
+  - type: dropdown
+    id: launcher
+    attributes:
+      label: Did the app appear on the Fire TV home row
+      options: ["Yes", "No", "Did not check"]
+    validations:
+      required: true
+  - type: textarea
+    id: dpad
+    attributes:
+      label: D-pad behaviour
+      description: >
+        Did up, down, left and right move focus to the control that is actually
+        in that direction? Did Select activate it? Did Back behave sensibly?
+    validations:
+      required: true
+  - type: textarea
+    id: logcat
+    attributes:
+      label: Relevant logcat
+      description: "adb logcat -s MercuryCockpit"
+      render: shell

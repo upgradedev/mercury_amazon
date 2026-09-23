@@ -1,56 +1,189 @@
-# Amazon Developer Hackathon 2026 — Friction Log: Mercury & Fire TV Track
+# Friction log: building a Fire TV app and an AWS telemetry cockpit
 
-**Track:** Fire TV  
-**Product:** Mercury (Multi-modal Engineering Cockpit on the Big Screen)  
-**Evaluator:** Principal Frontend & Voice Systems Engineer  
-**Submission Bonus:** Stage 1 Friction Log (Up to +10% Bonus Evaluation)
+**Track:** Fire TV
+**Scope of this log:** only things that happened while building this repository.
 
----
+Every entry below points at code in this repository, a command that was run, or an
+error that was observed. Entries about experiences we did not have have been
+removed rather than rewritten, so this log is shorter than it was.
 
-## 1. Executive Summary
-
-Developing **Mercury** as a 10-foot multi-modal engineering cockpit on **Amazon Fire TV** combining voice control (Alexa) and visual DORA / AWS Cost telemetry revealed key insights into TV UX design patterns, D-Pad focus navigation, and cloud observability aggregation.
-
-Below is our structured friction log with architectural workarounds and concrete recommendations for the Fire TV / Amazon Appstore developer platform.
-
----
-
-## 2. Friction Points & Architectural Insights
-
-### Friction Item 1: 10-Foot UI Spatial Focus Traps & D-Pad Ergonomics
-- **Context:** Fire TV applications rely on directional D-Pad remotes (Up/Down/Left/Right/Select). Web applications ported to TV webviews often break when modal popups or dynamic tables trap directional focus.
-- **Observed Friction:** Standard HTML focus management (`autofocus`, `tabindex`) does not map cleanly to 2D spatial TV grids. Users can get stuck inside nested scroll views or complex metric dashboards.
-- **Mercury Workaround:** Implemented a pure CSS/JS 2D spatial grid navigator (`src/interfaces/tv_cockpit.py` and `docs/index.html`) using high-contrast neon borders (`#8b5cf6`), clear visual focus rings, and dedicated remote key listener mapping (`ArrowUp`, `ArrowDown`, `Enter`, `Back`).
-- **Fire TV Recommendation:** Provide an official lightweight JavaScript Spatial Navigation library for Fire TV Web Apps that handles focus wrapping, scroll snapping, and sound effects natively.
+**What we did not exercise, and therefore say nothing about:** we never ran the
+app on Fire TV hardware, never ran a virtual Fire TV (no Fire TV emulator exists,
+and the Vega Virtual Device does not run this APK), never used the Alexa Voice
+Service, and never used the Amazon Appstore submission pipeline. We have no opinion
+on any of them and offer none.
 
 ---
 
-### Friction Item 2: Multi-Modal Voice & Screen Synchronization
-- **Context:** An executive speaks to Alexa ("Alexa, show engineering velocity") while looking at the TV screen.
-- **Observed Friction:** If the voice response takes 1.5 seconds to synthesize while the visual graph updates in 50 milliseconds, the user experiences jarring dissonance.
-- **Mercury Workaround:** Coupled visual state updates with synchronized voice narrations and acoustic cues (`src/domain/dora_metrics.py`), ensuring that the on-screen focus tile highlights at the exact millisecond the spoken metric is announced.
-- **Fire TV Recommendation:** Provide deeper native bindings between Alexa Voice Service (AVS) directives and Fire TV Web App DOM events for declarative multi-modal synchronization.
+## 1. AGP 8 rejects a manifest that names its own package, and the error is late
+
+**What happened.** The manifest carried `package="com.amazon.mercury.wallboard"`
+alongside `namespace` in `app/build.gradle.kts`. Android Gradle Plugin 8 fails the
+build on that combination.
+
+**Why it is friction.** Practically every Fire TV tutorial and sample manifest
+still shows the `package` attribute, because it was correct for years. A developer
+copying a Fire TV sample into a new AGP 8 project gets a build failure at manifest
+merge time, well after project setup, and the error does not say "your tutorial is
+older than your toolchain."
+
+**What we did.** Removed the attribute and left a comment in
+`app/src/main/AndroidManifest.xml` saying why it is absent, plus a test
+(`test_the_manifest_has_no_package_attribute`) so it cannot come back.
+
+**Suggestion.** Date-stamp the Fire TV manifest samples with the AGP version they
+target, or add a note to the Fire TV getting-started page.
 
 ---
 
-### Friction Item 3: AWS Cost Explorer Real-Time Anomaly Granularity
-- **Context:** Mercury monitors AWS Bedrock / ECS spend to detect runaway batch workloads.
-- **Observed Friction:** AWS Cost Explorer API data is aggregated daily with up to a 24-hour reporting delay, making real-time spend spike alerting difficult without CloudWatch Cost Metric Streams.
-- **Mercury Workaround:** Engineered a dual-tier Cost Radar (`src/domain/cost_radar.py`): CloudWatch real-time token/request alarms for immediate anomaly alerts (< 0.005 ms evaluation), cross-referenced with daily Cost Explorer baseline trends.
-- **Fire TV Recommendation:** Offer pre-configured Fire TV CloudWatch Dashboard templates in the AWS Management Console for instant TV operations center setup.
+## 2. Nothing tells you your app will be filtered off a Fire TV Stick
+
+**What happened.** The first manifest declared only `leanback` and `touchscreen`.
+A Fire TV Stick has no GPS, camera or telephony, and any implicitly required
+hardware feature filters the app off devices that lack it.
+
+**Why it is friction.** This is a silent, install-time filter. There is no build
+error and no lint warning. A developer discovers it when the app fails to appear
+for users, not while developing.
+
+**What we did.** Declared `android.hardware.location.gps` and
+`android.hardware.camera` explicitly as `required="false"` in the manifest.
+
+**Suggestion.** A lint check in the Fire TV tooling that flags a Leanback app
+which has not explicitly opted out of the hardware features a Fire TV Stick lacks
+would catch this at build time.
 
 ---
 
-## 3. Developer Experience Scorecard
+## 3. The 10-foot focus problem is not a keyboard problem, and the web platform treats it as one
 
-| Surface | Rating | Strengths | Areas for Improvement |
-|---|:---:|---|---|
-| **Fire TV Web App Platform** | **9.0 / 10** | Standard HTML5/W3C webview, excellent GPU rendering for charts. | Needs official 2D spatial navigation JS library. |
-| **Alexa Voice Remote Integration** | **9.2 / 10** | Seamless hardware voice button, high acoustic clarity. | Bi-directional DOM event binding for TV apps. |
-| **AWS Telemetry Integration** | **8.8 / 10** | Rich CloudWatch / Cost Explorer metrics. | Bridging real-time CloudWatch streams with daily billing. |
+**What happened.** We had a cockpit page with a grid of tiles. `tabindex` and the
+browser's own focus order walk the DOM linearly, so pressing Down from a tile in
+the middle of a row moved focus to the tile to its right, because that is what
+comes next in the document.
+
+**Why it is friction.** On a remote, Down means down. A linear walk is not
+approximately correct on a grid; it is wrong in a way that makes the interface
+feel broken. Every TV web app has to reimplement this. The CSS `spatial-navigation`
+specification exists but is not available in the WebView we target.
+
+**What we did.** Wrote a geometric navigator in `docs/firetv_nav.js`: for a pressed
+direction, keep only the candidates that lie in that direction, score them by
+distance along the axis of travel plus a weighted penalty for perpendicular drift,
+and take the minimum. It holds focus at an edge rather than wrapping, because
+wrapping loses the viewer's place on a large screen. The geometry is tested by
+executing the real file in Node against a synthetic grid:
+`node tests/e2e/spatial_nav_spec.js`, 17 assertions.
+
+**Suggestion.** Ship a small, supported spatial navigation JavaScript library for
+Fire TV web apps and WebView hosts, or enable the CSS specification in the Fire OS
+WebView. Every TV developer is writing this same 120 lines.
 
 ---
 
-## 4. Conclusion
+## 4. Two focus systems is the default failure mode, not an unusual mistake
 
-Mercury proves that Fire TV can transcend entertainment and become an indispensable war room tool for engineering executives when designed with true 10-foot spatial focus ergonomics and synchronized voice telemetry.
+**What happened.** The page had a keydown handler with its own index, and the
+included navigation script had another one with a second index. Both ran on every
+arrow press, and the two disagreed about where focus was.
+
+**Why it is friction.** This is easy to do accidentally the moment a project has
+both a page and a shared navigation include, and it produces a symptom (focus
+jumping two positions, or appearing to be in two places) that looks like a
+rendering bug rather than a duplicated listener.
+
+**What we did.** Deleted the page's handler, made the script the only owner of
+focus, and added a test that fails if a second `keydown` listener ever appears in
+the page (`test_there_is_exactly_one_keydown_handler_in_the_cockpit`).
+
+---
+
+## 5. A WebView can only answer "did you handle that key?" asynchronously, and Back is the key where it matters
+
+**What happened.** `WebView.evaluateJavascript` returns its result on a callback.
+`Activity.onKeyDown` must return a boolean synchronously. For Back, the correct
+behaviour depends on the answer: if the page closed a dialog, the activity must
+not also close; if it did not, the activity should.
+
+**Why it is friction.** The synchronous key API and the asynchronous WebView
+bridge cannot be reconciled directly, so every WebView-hosted TV app has to invent
+a convention. Getting it wrong either traps the viewer inside the app or closes
+the app while they are using it.
+
+**What we did.** `onKeyDown` returns `true` for Back immediately and resolves the
+outcome in the callback, choosing between the page's own handler, WebView history,
+and `finish()`. See `handleBack` in `MainActivity.kt`.
+
+**Suggestion.** A documented pattern for this in the Fire TV WebView guidance, or
+a helper that wraps the round trip, would save every team the same reasoning.
+
+---
+
+## 6. boto3 credential resolution is expensive on a machine that has no credentials
+
+**What happened.** Our own benchmark, `python scripts/benchmark_suite.py`, reported
+a mean of 1154 ms for the AWS cost endpoint against roughly 3 ms for the endpoints
+that did not touch AWS. The cause was calling `boto3.session.Session().get_credentials()`
+on every request. On a machine with no credentials, that walk includes an instance
+metadata probe that has to time out.
+
+**Why it is friction.** The cost is invisible in code review. It looks like a
+cheap capability check, and it is cheap on an EC2 instance, so it can survive
+review and staging and only show up as latency in an environment that does not
+have credentials, which is exactly a developer laptop or a Fire TV on a home
+network.
+
+**What we did.** Cached the resolution outcome per adapter, including the negative
+outcome, with an explicit `reset_credential_cache()`. Mean fell from 1154 ms to
+under 4 ms in fixture mode.
+
+**Suggestion.** Document the cost of `get_credentials()` on the unauthenticated
+path, or provide a cheap, non-probing way to ask whether credentials exist.
+
+---
+
+## 7. Cost Explorer bills per request, which makes the obvious wallboard design wrong
+
+**What happened.** A wallboard refreshes. Cost Explorer charges per API request
+and its underlying data only refreshes daily, so a refreshing wallboard spends
+money to receive the same answer.
+
+**Why it is friction.** The pricing model and the natural design of the surface
+point in opposite directions, and nothing in the API surface signals it. The first
+version of any spend dashboard is likely to poll.
+
+**What we did.** Cached successful responses for 15 minutes
+(`CACHE_TTL_SECONDS` in `src/infrastructure/aws_cost_adapter.py`) and stated the
+reason in the provenance text that the cockpit prints. Failures are deliberately
+not cached, so a transient error cannot pin the display to the fixture.
+
+---
+
+## 8. Daily granularity is the wrong shape for an incident surface, and we could not work around it
+
+**What happened.** We wanted spend anomalies on an incident wallboard. Cost
+Explorer aggregates daily with up to 24 hours of reporting delay.
+
+**Why it is friction.** During an incident, the useful question is what changed in
+the last hour. Cost Explorer cannot answer it by construction. The workaround is
+CloudWatch metric streams, which is a different service with a different setup
+cost.
+
+**What we did.** Nothing, other than saying so. The cost adapter's provenance text
+and the README both state the lag in the same sentence as the capability, so the
+number on screen is not mistaken for a real-time reading. We did not build the
+CloudWatch metric stream path.
+
+---
+
+## What went well
+
+* Leanback is plain Android. `WebView` plus `onKeyDown` was enough to host a real
+  interface, with no TV-specific framework to learn first.
+* `LEANBACK_LAUNCHER` as the single declaration that makes an app a TV app is a
+  good design: one line, one obvious effect.
+* `adb connect <ip>:5555` over the network, without a cable, makes the device
+  loop fast for a device that lives behind a television.
+* GitHub's hosted Android SDK action made the build reproducible for us despite
+  having no local Android toolchain, which is the only reason there is an APK to
+  download at all.

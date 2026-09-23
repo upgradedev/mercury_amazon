@@ -1,0 +1,54 @@
+name: Bug report
+description: Something behaves differently from what the code or the docs say
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The most useful bug reports here quote what the
+        cockpit or the API actually printed, including the provenance line.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did and what you saw.
+      placeholder: I pressed Ask what changed and the verdict was ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: The provenance line, if the problem is about a number
+      description: >
+        Every telemetry response carries one. Paste it verbatim; it says whether
+        the reading was live or a fixture and why.
+      render: text
+  - type: dropdown
+    id: data-mode
+    attributes:
+      label: Data mode
+      options:
+        - Fixture mode (no credentials, or MERCURY_OFFLINE=1)
+        - Live GitHub (GITHUB_TOKEN set)
+        - Live AWS (credentials resolvable)
+        - Mixed
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit SHA
+      description: From GET /health, field build_sha, or git rev-parse HEAD.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Commands to reproduce
+      render: shell

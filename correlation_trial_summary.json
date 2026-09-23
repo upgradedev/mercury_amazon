@@ -1,0 +1,273 @@
+{
+  "cases": 1160,
+  "headline": {
+    "hit_rate_all_regressions": 0.0983,
+    "hit_rate_fresh_look": 0.1133,
+    "hit_rate_late_look": 0.0833,
+    "hit_rate_cause_inside_the_attribution_window": 0.1471,
+    "hit_rate_fresh_look_cause_inside_the_window": 0.1574,
+    "hit_rate_cause_inside_the_window_before_the_onset": 0.1359,
+    "false_attribution_rate_on_uncaused_anomalies": 0.036,
+    "false_attribution_rate_on_exogenous_spikes": 0.06,
+    "correct_refusal_rate_on_exogenous_spikes": 0.6933,
+    "correct_refusal_on_exogenous_spikes_no_candidate": 0.62,
+    "correct_refusal_on_exogenous_spikes_window_too_crowded": 0.0733,
+    "quiet_rate_on_healthy_series": 0.995,
+    "refusal_rate_on_a_telemetry_gap": 1.0,
+    "naming_precision": 0.5221,
+    "times_a_commit_was_named": 113,
+    "naming_recall_on_regressions": 0.0983,
+    "refused_to_name_rate_on_all_anomalies": 0.811
+  },
+  "counts_by_stratum": {
+    "regression_fresh_look": {
+      "cases": 300,
+      "outcomes": {
+        "REFUSED_saw_the_anomaly_and_the_window_was_too_crowded": 142,
+        "MISS_never_called_it_an_anomaly": 80,
+        "HIT_named_the_commit_that_caused_it": 34,
+        "FALSE_ATTRIBUTION_named_an_innocent_commit": 22,
+        "REFUSED_saw_the_anomaly_and_had_no_candidate": 22
+      }
+    },
+    "regression_late_look": {
+      "cases": 300,
+      "outcomes": {
+        "MISS_never_called_it_an_anomaly": 148,
+        "REFUSED_saw_the_anomaly_and_the_window_was_too_crowded": 97,
+        "HIT_named_the_commit_that_caused_it": 25,
+        "REFUSED_saw_the_anomaly_and_had_no_candidate": 16,
+        "FALSE_ATTRIBUTION_named_an_innocent_commit": 14
+      }
+    },
+    "exogenous_spike": {
+      "cases": 300,
+      "outcomes": {
+        "CORRECT_REFUSAL_anomaly_with_no_candidate_to_blame": 186,
+        "MISS_never_called_the_exogenous_spike_an_anomaly": 74,
+        "CORRECT_REFUSAL_anomaly_with_the_window_too_crowded_to_name": 22,
+        "FALSE_ATTRIBUTION_blamed_a_commit_for_an_anomaly_it_did_not_cause": 18
+      }
+    },
+    "healthy": {
+      "cases": 200,
+      "outcomes": {
+        "CORRECT_stayed_quiet_on_a_healthy_series": 199,
+        "FALSE_ALARM_called_a_healthy_series_an_anomaly": 1
+      }
+    },
+    "telemetry_gap": {
+      "cases": 60,
+      "outcomes": {
+        "CORRECT_refused_for_want_of_data": 60
+      }
+    }
+  },
+  "why_the_wrong_commit_was_named": {
+    "wrong_commit_attributions": 36,
+    "cause_inside_the_window_and_more_than_one_candidate": 0,
+    "cause_inside_the_window_with_a_single_candidate": 1,
+    "cause_outside_the_attribution_window": 35,
+    "of_which_the_answer_said_it_was_one_of_several": 0
+  },
+  "ambiguity_disclosure": {
+    "wrong_namings": 54,
+    "wrong_namings_disclosed_as_ambiguous": 0,
+    "disclosure_recall_on_wrong_namings": 0.0,
+    "correct_namings": 59,
+    "correct_namings_also_flagged_ambiguous": 0,
+    "disclosure_cost_on_correct_namings": 0.0
+  },
+  "why_it_named_nobody": {
+    "no_candidate_in_window": 225,
+    "window_too_crowded": 261,
+    "on_regressions_no_candidate": 38,
+    "on_regressions_window_too_crowded": 239,
+    "on_uncaused_anomalies_no_candidate": 186,
+    "on_uncaused_anomalies_window_too_crowded": 22
+  },
+  "onset_detection": {
+    "anomalies_found": 599,
+    "found_before_the_newest_reading": 151,
+    "on_regressions": 150,
+    "on_uncaused_anomalies": 1
+  },
+  "regressions_whose_cause_was_inside_the_attribution_window": 340,
+  "regressions_whose_cause_was_inside_the_window_before_the_onset": 434,
+  "unexpected_outcomes": 0,
+  "measured_at_utc": "2026-09-08T07:12:49.012274+00:00",
+  "measured_on": "Windows-10-10.0.26200-SP0",
+  "python_version": "3.11.0",
+  "measured_by_command": "python scripts/correlation_trial.py",
+  "seed": 20260908,
+  "noise_sigma": 0.4,
+  "correlator": {
+    "anomaly_factor": 3.0,
+    "attribution_window_minutes": 60,
+    "series_points": 6,
+    "poll_cadence_minutes": 10,
+    "baseline_mode": "pre_onset",
+    "window_anchor": "onset",
+    "min_baseline_points": 2,
+    "max_commits_in_window": 1
+  },
+  "detectability_ceiling": {
+    "min_baseline_points": 2,
+    "regressions": 600,
+    "too_few_readings_before_the_onset": 65,
+    "ceiling_on_hit_rate": 0.8917,
+    "by_stratum": {
+      "regression_fresh_look": {
+        "cases": 300,
+        "too_few_readings_before_the_onset": 0,
+        "ceiling_on_hit_rate": 1.0
+      },
+      "regression_late_look": {
+        "cases": 300,
+        "too_few_readings_before_the_onset": 65,
+        "ceiling_on_hit_rate": 0.7833
+      }
+    }
+  },
+  "ablation": [
+    {
+      "detector": "trailing baseline, window ends at the reading",
+      "baseline_mode": "trailing",
+      "window_anchor": "reading",
+      "crowding_gate": null,
+      "hit_rate_fresh_look": 0.22,
+      "hit_rate_late_look": 0.0333,
+      "naming_precision": 0.2794,
+      "times_a_commit_was_named": 272,
+      "quiet_rate_on_healthy_series": 0.995,
+      "false_attribution_rate_on_uncaused_anomalies": 0.08
+    },
+    {
+      "detector": "pre-onset baseline, window ends at the reading",
+      "baseline_mode": "pre_onset",
+      "window_anchor": "reading",
+      "crowding_gate": null,
+      "hit_rate_fresh_look": 0.2233,
+      "hit_rate_late_look": 0.0933,
+      "naming_precision": 0.2714,
+      "times_a_commit_was_named": 350,
+      "quiet_rate_on_healthy_series": 0.995,
+      "false_attribution_rate_on_uncaused_anomalies": 0.08
+    },
+    {
+      "detector": "pre-onset baseline, window ends at the onset",
+      "baseline_mode": "pre_onset",
+      "window_anchor": "onset",
+      "crowding_gate": null,
+      "hit_rate_fresh_look": 0.22,
+      "hit_rate_late_look": 0.1867,
+      "naming_precision": 0.3262,
+      "times_a_commit_was_named": 374,
+      "quiet_rate_on_healthy_series": 0.995,
+      "false_attribution_rate_on_uncaused_anomalies": 0.08
+    }
+  ],
+  "crowding_gate_sweep": [
+    {
+      "names_when_candidates_at_most": 1,
+      "naming_precision": 0.5221,
+      "naming_recall_on_regressions": 0.0983,
+      "times_a_commit_was_named": 113,
+      "hit_rate_all_regressions": 0.0983,
+      "false_attribution_rate_on_uncaused_anomalies": 0.036
+    },
+    {
+      "names_when_candidates_at_most": 2,
+      "naming_precision": 0.4787,
+      "naming_recall_on_regressions": 0.1683,
+      "times_a_commit_was_named": 211,
+      "hit_rate_all_regressions": 0.1683,
+      "false_attribution_rate_on_uncaused_anomalies": 0.054
+    },
+    {
+      "names_when_candidates_at_most": 3,
+      "naming_precision": 0.4057,
+      "naming_recall_on_regressions": 0.19,
+      "times_a_commit_was_named": 281,
+      "hit_rate_all_regressions": 0.19,
+      "false_attribution_rate_on_uncaused_anomalies": 0.072
+    },
+    {
+      "names_when_candidates_at_most": 5,
+      "naming_precision": 0.3894,
+      "naming_recall_on_regressions": 0.1967,
+      "times_a_commit_was_named": 303,
+      "hit_rate_all_regressions": 0.1967,
+      "false_attribution_rate_on_uncaused_anomalies": 0.074
+    },
+    {
+      "names_when_candidates_at_most": null,
+      "naming_precision": 0.3262,
+      "naming_recall_on_regressions": 0.2033,
+      "times_a_commit_was_named": 374,
+      "hit_rate_all_regressions": 0.2033,
+      "false_attribution_rate_on_uncaused_anomalies": 0.08
+    }
+  ],
+  "commit_stream": {
+    "recorded_at_head": "dc800ef",
+    "recorded_at_utc": "2026-09-07T22:59:03.913860+00:00",
+    "commits_recorded": 59,
+    "commit_stride": 1,
+    "commits_in_stream": 59,
+    "commits_per_hour": 0.405,
+    "span_start_utc": "2026-09-01T20:15:30+00:00",
+    "span_end_utc": "2026-09-07T22:00:48+00:00",
+    "burstiness": {
+      "median_gap_minutes": 20.58,
+      "gaps": 58,
+      "gaps_under_the_attribution_window": 42,
+      "mean_commits_in_a_window_ending_at_a_commit": 2.78,
+      "max_commits_in_a_window_ending_at_a_commit": 9
+    },
+    "source": "git log in this checkout. These are real development commits from this repository, not deployments of any monitored service, and they are recorded rather than read live so a published measurement does not move on every commit."
+  },
+  "scope": "A labelled corpus generated by scripts/correlation_trial.py and scored against the committed IncidentCorrelator with its shipped defaults. The commits are real development commits from this repository; the metric values are generated here and were never read from a monitored service. The reading times of every case with no cause are drawn over the span of the commit log without reference to where any commit falls.",
+  "density_sweep": [
+    {
+      "commit_stride": 1,
+      "commits_in_stream": 59,
+      "commits_per_hour": 0.405,
+      "uncaused_cases": 500,
+      "false_attributions": 18,
+      "false_attribution_rate": 0.036,
+      "refused_window_too_crowded": 22,
+      "refused_no_candidate": 187
+    },
+    {
+      "commit_stride": 2,
+      "commits_in_stream": 30,
+      "commits_per_hour": 0.206,
+      "uncaused_cases": 500,
+      "false_attributions": 24,
+      "false_attribution_rate": 0.048,
+      "refused_window_too_crowded": 5,
+      "refused_no_candidate": 198
+    },
+    {
+      "commit_stride": 4,
+      "commits_in_stream": 15,
+      "commits_per_hour": 0.103,
+      "uncaused_cases": 500,
+      "false_attributions": 13,
+      "false_attribution_rate": 0.026,
+      "refused_window_too_crowded": 3,
+      "refused_no_candidate": 211
+    },
+    {
+      "commit_stride": 8,
+      "commits_in_stream": 8,
+      "commits_per_hour": 0.055,
+      "uncaused_cases": 500,
+      "false_attributions": 7,
+      "false_attribution_rate": 0.014,
+      "refused_window_too_crowded": 0,
+      "refused_no_candidate": 220
+    }
+  ]
+}

@@ -1,41 +1,81 @@
-"""Standards Readiness Gate Auditor — Checked dynamically against STANDARDS.md.
+"""Standards readiness auditor for Mercury.
 
-Parses all 53 gate identifiers from STANDARDS.md at runtime:
-J1-J5, A1-A7, B1-B4, C1-C6, D1-D3, E1-E4, F1-F9, G1-G4, H1-H3, I1-I5, O1-O3.
+Enumerates every gate from STANDARDS.md and reports PASS or FAIL for each. Two
+rules govern this file, and they matter more than the score it prints:
 
-Every gate appears in the output. A gate with no implementation or unmet requirement
-reports RED [FAIL], never absent.
+1. A gate that cannot fail is not a gate. Anything hardcoded to True has been
+   replaced with a real check or an honest FAIL. Break something in the repository
+   and the corresponding gate must go red.
+
+2. A gate that reads evidence from outside the repository says so in its own
+   message, because a judge cloning this repository on its own does not have that
+   evidence and must not be shown a PASS that depends on it.
+
+Gates that are not achievable without a deployment, a video upload or hardware are
+reported FAIL and excluded from the CI exit code by an explicit, printed policy
+list, so the failure is visible rather than hidden inside the script.
+
+Run: ``python ci/readiness.py``
 """
+from __future__ import annotations
+
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Gates that report FAIL honestly but do not fail the CI job, each with the
+# reason it is out of reach of an automated run. Printed in the output.
+CI_EXEMPT: dict[str, str] = {
+    "C5": "needs a real browser driver walking the recorded video path",
+    "J4": "a verified CI APK and portable ADB exist, but the gate still needs a physical "
+          "Fire TV install and observed launch; no Fire TV emulator exists to stand in for "
+          "the device",
+    "D2": "needs a deployment of this commit; the live endpoint runs an older build",
+    "E2": "needs a recorded video for narration and picture to be in sync with",
+    "E4": "needs a public video of the running product",
+    "G2": "needs a deployment whose reported build SHA equals HEAD",
+    "O1": "owner action: YouTube upload",
+    "O2": "owner action: Devpost project creation",
+    "O3": "owner action: pressing Submit",
+}
+
 
 class GateResult:
-    def __init__(self, gate_id: str, title: str, passed: bool, message: str):
+    def __init__(self, gate_id: str, title: str, passed: bool, message: str,
+                 external_evidence: bool = False):
         self.gate_id = gate_id
         self.title = title
         self.passed = passed
         self.message = message
+        self.external_evidence = external_evidence
+
+
+def read(path: str) -> str:
+    full = os.path.join(REPO_ROOT, path)
+    if not os.path.exists(full):
+        return ""
+    with open(full, "r", encoding="utf-8") as handle:
+        return handle.read()
 
 
 def get_standards_gate_ids() -> list[str]:
-    """Parse all 53 gate IDs from canonical STANDARDS.md at runtime."""
+    """Parse gate IDs from the canonical STANDARDS.md when it is reachable."""
     candidates = [
         r"C:\dev\solutions\_submission_kit\STANDARDS.md",
-        os.path.join(os.path.dirname(__file__), "../../../_submission_kit/STANDARDS.md"),
-        os.path.join(os.path.dirname(__file__), "../../STANDARDS.md")
+        os.path.join(REPO_ROOT, "../../_submission_kit/STANDARDS.md"),
+        os.path.join(REPO_ROOT, "STANDARDS.md"),
     ]
     for path in candidates:
         if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                text = f.read()
-            gates = re.findall(r"\|\s*([JABCDEFGHOI][0-9]+)\s*\|", text)
+            with open(path, "r", encoding="utf-8") as handle:
+                gates = re.findall(r"\|\s*([JABCDEFGHOI][0-9]+)\s*\|", handle.read())
             if gates:
                 return gates
-
     return [
         "J1", "J2", "J3", "J4", "J5",
         "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -47,282 +87,851 @@ def get_standards_gate_ids() -> list[str]:
         "G1", "G2", "G3", "G4",
         "H1", "H2", "H3",
         "I1", "I2", "I3", "I4", "I5",
-        "O1", "O2", "O3"
+        "O1", "O2", "O3",
     ]
 
 
-def audit_project(repo_root: str = ".") -> list[GateResult]:
-    all_gate_ids = get_standards_gate_ids()
-    evaluated: dict[str, GateResult] = {}
+#: Where a Fire TV build-and-device receipt will live. It is written by
+#: ``python scripts/write_firetv_receipt.py`` from a real build and a real launch, the
+#: way deploy_teardown_receipt.json is written by its probe, and that script refuses to
+#: write it without an APK file it can open. Gate J4 fails while the receipt is absent.
+FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
 
-    readme_path = os.path.join(repo_root, "README.md")
-    readme_content = ""
-    if os.path.exists(readme_path):
-        with open(readme_path, "r", encoding="utf-8") as f:
-            readme_content = f.read()
+#: Every field J4 requires, and what each one is evidence of. A receipt missing any of
+#: them is not evidence, so the gate fails and says which field it wanted.
+FIRETV_RECEIPT_FIELDS = {
+    "built_by_command": "the gradle command that produced the APK",
+    "gradle_exit_code": "gradle's own exit code, which must be 0",
+    "apk_path": "the path of the APK, which must exist in this checkout",
+    "apk_sha256": "the digest of that APK, so the file can be identified",
+    "device_run": "a recorded launch on a Fire TV device",
+}
 
-    # --- Section J: Framing Gate (J1 - J5) ---
-    first_sentence = ""
-    first_p_match = re.search(r">\s*\*\*([^\*]+)\*\*", readme_content)
-    if first_p_match:
-        first_sentence = first_p_match.group(1).strip()
-    
-    banned_markets = ["smbs", "enterprises", "creators", "teams", "everyone"]
-    has_banned = any(b in first_sentence.lower() for b in banned_markets)
-    has_persona = any(p in first_sentence.lower() for p in [
-        "blind and mobility-impaired software developers",
-        "independent elderly residents",
-        "vp of engineering and ctos",
-        "software developers",
-        "caregivers",
-        "busy professionals and families",
-        "home cooks and budget-conscious households"
-    ])
-    j1_passed = bool(first_sentence and has_persona and not has_banned)
-    evaluated["J1"] = GateResult("J1", "One named persona, not a market", j1_passed, f"Persona: '{first_sentence[:55]}...'" if j1_passed else "No valid persona")
+#: What a recorded launch has to say. A device that installed the APK but was never
+#: watched running it proves the package installs, not that the app works. The device
+#: is a physical one: no Fire TV emulator exists, and the Vega Virtual Device runs Vega
+#: apps rather than this APK, so the launch has to come from hardware.
+FIRETV_DEVICE_FIELDS = {
+    "device_model": "which Fire TV device ran it",
+    "fire_os_or_android_version": "what it was running",
+    "adb_install_exit_code": "adb install's exit code, which must be 0",
+    "launched_at_utc": "when it was launched",
+    "observed": "what was seen on the screen, in words",
+}
 
-    j2_passed = any(w in readme_content.lower() for w in ["dual-custody", "governed", "300-second lease", "irreversible", "sha-256 lock", "evidence packet", "rollback"])
-    evaluated["J2"] = GateResult("J2", "Real consequence behind hero action", j2_passed, "Guards high-consequence action" if j2_passed else "No high-consequence action guarded")
 
-    # J3: One headline comparative number (Requires baseline it beats, margin, and sample size n)
-    has_comparative_n = "n=" in readme_content.lower() or "sample size" in readme_content.lower()
-    has_comparative_n = "n=" in readme_content.lower() or "sample size" in readme_content.lower()
-    has_margin = "%" in readme_content or "x faster" in readme_content
-    j3_passed = bool(has_comparative_n and has_margin)
-    evaluated["J3"] = GateResult("J3", "One headline comparative number", j3_passed, "Comparative benchmark verified with sample size n=50" if j3_passed else "Comparative baseline pending owner benchmark with recorded sample size n")
+def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tuple[bool, str]:
+    """J4: is the sponsor product load-bearing, or merely mentioned.
 
-    j4_passed = any(s in readme_content.lower() for s in ["alexa+", "ring", "fire tv", "bee wearable", "bedrock"])
-    evaluated["J4"] = GateResult("J4", "Sponsor product is load-bearing", j4_passed, "Sponsor product integrated" if j4_passed else "Missing sponsor product")
+    This gate used to pass on ``bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest``,
+    which is a grep over two text files. Before the first successful Android workflow,
+    Mercury's own README said no APK had been built, so the gate that decided whether the
+    sponsor product was load-bearing was the one gate in this file that could not fail on
+    the axis it exists to test, and it contributed a PASS to a published score.
 
-    j5_passed = bool(first_sentence and len(first_sentence.split()) <= 28 and "—" not in first_sentence)
-    evaluated["J5"] = GateResult("J5", "One republishable sentence <=25 words, no em dash", j5_passed, f"{len(first_sentence.split())} words, zero em dashes" if j5_passed else "Failed sentence constraint")
+    A Fire TV entry is load-bearing when there is a Fire TV binary and somebody has
+    watched it run. So the manifest and the README stay as necessary conditions, and the
+    sufficient condition is a receipt recording a gradle build that exited 0, an APK that
+    exists in the checkout, and a launch on a Fire TV device. There is no such receipt
+    and this gate therefore fails, which is the truth and is why the published score
+    went down by one when this was written.
 
-    # --- Section A: Engineering Principles (A1 - A7) ---
-    py_files = glob.glob(os.path.join(repo_root, "src/**/*.py"), recursive=True)
-    a1_passed = True
-    for fpath in py_files:
-        with open(fpath, "r", encoding="utf-8") as f:
-            if len(f.readlines()) > 800:
-                a1_passed = False
-                break
-    evaluated["A1"] = GateResult("A1", "SOLID at module level (<800 lines)", a1_passed, f"All {len(py_files)} files < 800 lines" if a1_passed else "File exceeds 800 lines")
-    evaluated["A2"] = GateResult("A2", "YAGNI (Config knobs have active readers)", True, "Verified in domain and interface layers")
-    evaluated["A3"] = GateResult("A3", "KISS (Quickstart reachable in <=5 steps)", "Quickstart" in readme_content, "Quickstart present with <=5 steps")
-    evaluated["A4"] = GateResult("A4", "DRY (Contracts unified in domain)", True, "Domain entities serve as single source of truth")
+    ``apk_exists`` is injected so a test can drive every branch without an APK.
+    """
+    missing_context = []
+    if not readme_terms:
+        missing_context.append("the README never names Fire TV, Fire OS or leanback")
+    if "LEANBACK_LAUNCHER" not in manifest:
+        missing_context.append("no LEANBACK_LAUNCHER activity in app/src/main/AndroidManifest.xml")
+    if missing_context:
+        return False, "; ".join(missing_context)
 
-    domain_files = glob.glob(os.path.join(repo_root, "src/domain/**/*.py"), recursive=True)
-    a5_passed = True
-    for df in domain_files:
-        with open(df, "r", encoding="utf-8") as f:
-            d_code = f.read()
-            if re.search(r"^\s*(import|from)\s+(boto3|requests|fastapi|uvicorn|starlette|botocore)\b", d_code, re.MULTILINE):
-                a5_passed = False
-                break
-    evaluated["A5"] = GateResult("A5", "Separation of Concerns (Domain imports zero SDKs)", a5_passed, f"Domain clean across {len(domain_files)} files" if a5_passed else "Domain imports framework SDK")
-    evaluated["A6"] = GateResult("A6", "Domain Driven Design (Bounded context directories)", os.path.exists(os.path.join(repo_root, "src/domain")), "src/domain and src/application present")
-    evaluated["A7"] = GateResult("A7", "Principle of Least Privilege (Write rejection tested)", True, "Tested in unit/integration suites")
+    if not isinstance(receipt, dict) or not receipt:
+        return False, (
+            f"A leanback manifest and the word 'Fire TV' are text, not a Fire TV app. This gate "
+            f"wants {FIRETV_BUILD_RECEIPT}, recording a gradle build that exited 0, the APK it "
+            f"produced, and a launch on a Fire TV device, written by "
+            f"python scripts/write_firetv_receipt.py. No such file exists. A verified CI APK "
+            f"exists, but nothing has installed or run on Fire TV hardware; "
+            f"docs/FIRE_TV_BUILD.md records the build and the remaining device procedure"
+        )
 
-    # --- Section B: Architecture and Compliance (B1 - B4) ---
-    comp_doc = os.path.join(repo_root, "docs/COMPLIANCE_AND_ARCHITECTURE.md")
-    evaluated["B1"] = GateResult("B1", "Well-Architected 6 Pillars review", os.path.exists(comp_doc), "Documented in docs/COMPLIANCE_AND_ARCHITECTURE.md")
-    evaluated["B2"] = GateResult("B2", "EU AI Act Articles 10, 13, 14, 15, 50", os.path.exists(comp_doc), "Documented with residual gaps")
-    evaluated["B3"] = GateResult("B3", "GDPR Data Map documented", os.path.exists(comp_doc), "Documented data map")
-    evaluated["B4"] = GateResult("B4", "Never write 'compliant' or 'conformity'", "compliant" not in readme_content.lower() and "conformity" not in readme_content.lower(), "Zero forbidden compliance claims")
+    problems = []
+    for field, means in FIRETV_RECEIPT_FIELDS.items():
+        if receipt.get(field) in (None, "", []):
+            problems.append(f"{field} missing ({means})")
+    if receipt.get("gradle_exit_code") not in (None, 0):
+        problems.append(f"gradle exited {receipt.get('gradle_exit_code')}, so no APK was built")
+    apk = receipt.get("apk_path")
+    if apk and not apk_exists(apk):
+        problems.append(f"apk_path {apk!r} is not a file in this checkout")
 
-    # --- Section C: Tests and Coverage (C1 - C6) ---
-    ci_workflow = os.path.join(repo_root, ".github/workflows/ci.yml")
-    c1_passed = False
-    if os.path.exists(ci_workflow):
-        with open(ci_workflow, "r", encoding="utf-8") as f:
-            c1_passed = "--cov-fail-under=85" in f.read() or "cov-fail-under" in f.read()
-    evaluated["C1"] = GateResult("C1", "Coverage above 85% enforced in CI", c1_passed, "Enforced >=85% threshold in GitHub Actions CI (.github/workflows/ci.yml)")
+    device = receipt.get("device_run")
+    if not isinstance(device, dict) or not device:
+        problems.append("device_run missing (a recorded launch on a Fire TV device)")
+    else:
+        for field, means in FIRETV_DEVICE_FIELDS.items():
+            if device.get(field) in (None, "", []):
+                problems.append(f"device_run.{field} missing ({means})")
+        if device.get("adb_install_exit_code") not in (None, 0):
+            problems.append(
+                f"adb install exited {device.get('adb_install_exit_code')}, so it never installed"
+            )
 
-    unit_tests = glob.glob(os.path.join(repo_root, "tests/unit/test_*.py"))
-    evaluated["C2"] = GateResult("C2", "Unit tests running in CI", len(unit_tests) > 0, f"{len(unit_tests)} unit test modules found")
-    int_tests = glob.glob(os.path.join(repo_root, "tests/integration/test_*.py"))
-    evaluated["C3"] = GateResult("C3", "Functional & Integration tests", len(int_tests) > 0, f"{len(int_tests)} integration test modules found")
-    sec_tests = glob.glob(os.path.join(repo_root, "tests/security/test_*.py"))
-    evaluated["C4"] = GateResult("C4", "OWASP / SAST / DAST execution", len(sec_tests) > 0, f"{len(sec_tests)} security test modules found")
+    if problems:
+        return False, f"{FIRETV_BUILD_RECEIPT} is not evidence yet: " + "; ".join(sorted(problems))
 
-    # C5: Browser test (Strict check: real browser driver import + active page navigation)
-    browser_driver_found = False
-    e2e_files = glob.glob(os.path.join(repo_root, "tests/e2e/**/*.py"), recursive=True)
-    for ef in e2e_files:
-        with open(ef, "r", encoding="utf-8") as f:
-            ef_content = f.read()
-            has_import = bool(re.search(r"^\s*(import|from)\s+(playwright|selenium)\b", ef_content, re.MULTILINE | re.IGNORECASE))
-            has_navigation = bool(re.search(r"\.(goto|get)\s*\(", ef_content, re.IGNORECASE))
-            if has_import and has_navigation:
-                browser_driver_found = True
-                break
-    evaluated["C5"] = GateResult("C5", "End-to-end browser user journey test", browser_driver_found, "Browser driver test present with active page navigation" if browser_driver_found else "no real browser driver test walking the video path (test_html_structure.py is DOM assertion only)")
-
-    evaluated["C6"] = GateResult("C6", "Fixture starts at varied parameter offset", True, "Parameterized offset fixtures implemented in tests")
-
-    # --- Section D: Infrastructure (D1 - D3) ---
-    main_tf = os.path.join(repo_root, "infra/main.tf")
-    evaluated["D1"] = GateResult("D1", "IaC declared in Terraform/CDK", os.path.exists(main_tf), "infra/main.tf present")
-    
-    # D2: Honest check: no deploy has been run
-    deploy_receipt = os.path.join(repo_root, "deploy_teardown_receipt.json")
-    has_real_deploy = os.path.exists(deploy_receipt)
-    evaluated["D2"] = GateResult("D2", "Tested deploy then teardown with recorded URL", has_real_deploy, "Deploy and teardown receipt verified" if has_real_deploy else "no deploy has been run")
-
-    evaluated["D3"] = GateResult("D3", "Monthly idle cost recorded with date", os.path.exists(os.path.join(repo_root, "infra/README.md")), "Documented in infra/README.md")
-
-    # --- Section E: Video (E1 - E4) ---
-    narration_file = os.path.join(repo_root, "video/narration.json")
-    cue_file = os.path.join(repo_root, "video/cue_sheet.json")
-    evaluated["E1"] = GateResult("E1", "Video narration script per beat in video/", os.path.exists(narration_file), "video/narration.json present")
-    evaluated["E2"] = GateResult("E2", "Narration and picture in sync gate", os.path.exists(cue_file), "Synced beats with subtitles (.vtt/.srt)")
-    evaluated["E3"] = GateResult("E3", "Single beat re-rendering supported", os.path.exists(narration_file), "Beat schema partitioned")
-    evaluated["E4"] = GateResult("E4", "Public video under 180s with running product", False, "Video upload pending owner action")
-
-    # --- Section F: The README and Repo (F1 - F9) ---
-    badges = re.findall(r"\[!\[.*?\]\((.*?)\)\]", readme_content)
-    f1_passed = len(badges) >= 2
-    evaluated["F1"] = GateResult("F1", "Badges that resolve (HTTP 200 check)", f1_passed, f"{len(badges)} badges present in README")
-    evaluated["F2"] = GateResult("F2", "At least two Mermaid diagrams", len(re.findall(r"```mermaid", readme_content)) >= 2, f"Found {len(re.findall(r'```mermaid', readme_content))} Mermaid diagrams")
-    evaluated["F3"] = GateResult("F3", "Table of contents present", "## Table of Contents" in readme_content, "Table of contents present")
-    evaluated["F4"] = GateResult("F4", "Real numbers with command attribution", "pytest" in readme_content or "infra/README.md" in readme_content, "Benchmark tables cite verification commands")
-    
-    no_buzzwords = not any(w in readme_content.lower() for w in ["seamless", "robust", "leverage", "in today's world"])
-    no_em_dash = "—" not in first_sentence
-    evaluated["F5"] = GateResult("F5", "Zero em dashes and zero AI buzzwords", no_buzzwords and no_em_dash, "Clean prose")
-    evaluated["F6"] = GateResult("F6", "Standard ecosystem repository layout", os.path.exists(os.path.join(repo_root, "src")), "src, tests, LICENSE present")
-    evaluated["F7"] = GateResult("F7", "Every file is relevant and current", True, "Checked against workspace layout")
-    evaluated["F8"] = GateResult("F8", "All artifacts human readable", True, "JSON exports pretty printed, markdown companions")
-    evaluated["F9"] = GateResult("F9", "Quickstart a judge can run", "### 1." in readme_content and "### 5." in readme_content, "Copy-pasteable quickstart in README")
-
-    # --- Section G: Consistency (G1 - G4) ---
-    # G1: Assert README test count matches pytest collected tests
-    g1_passed = True
-    g1_msg = "Cross-surface claims consistent"
-    test_badge_match = re.search(r"Tests:?\s*(\d+)\s*Passed", readme_content, re.IGNORECASE)
-    if test_badge_match:
-        badge_count = int(test_badge_match.group(1))
-        try:
-            res = subprocess.run([sys.executable, "-m", "pytest", "tests", "--collect-only", "-q"], capture_output=True, text=True, cwd=repo_root)
-            collected_match = re.search(r"(\d+)\s+tests? collected", res.stdout)
-            if collected_match:
-                collected_count = int(collected_match.group(1))
-                if badge_count != collected_count:
-                    g1_passed = False
-                    g1_msg = f"Discrepancy: README badge says {badge_count} tests, pytest collected {collected_count} tests"
-        except Exception:
-            pass
-    evaluated["G1"] = GateResult("G1", "No cross-surface claim discrepancy", g1_passed, g1_msg)
-
-    # G2: Deployed SHA matches submitted commit
-    g2_passed = False
-    if os.path.exists(deploy_receipt):
-        try:
-            with open(deploy_receipt, "r", encoding="utf-8") as f:
-                rec = json.load(f)
-                g2_passed = bool(rec.get("deployed_commit_sha"))
-        except Exception:
-            pass
-    evaluated["G2"] = GateResult("G2", "Deployed SHA matches submitted commit", g2_passed, "Deployed commit SHA recorded in deployment receipt" if g2_passed else "no deploy has been run to match commit SHA")
-    evaluated["G3"] = GateResult("G3", "Claimed capabilities reachable in code", True, "Verified in MCP tools registry")
-    evaluated["G4"] = GateResult("G4", "Zero competitor mentions", not any(c in readme_content.lower() for c in ["cockroach", "backblaze", "qwen", "xprize", "kaggle"]), "No competitor mentions")
-
-    # --- Section H: UX (H1 - H3) ---
-    index_html_path = os.path.join(repo_root, "docs/index.html")
-    h1_passed = False
-    h2_passed = False
-    h3_passed = False
-    if os.path.exists(index_html_path):
-        with open(index_html_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-        
-        # H1: Primary action obvious without reading (responsive 375px viewport + prominent hero CTA)
-        has_viewport_meta = 'name="viewport"' in html_content
-        has_mobile_css = "@media" in html_content and any(w in html_content for w in ["480px", "860px", "768px", "600px", "375px"])
-        has_hero_cta = 'data-testid="primary-hero-action"' in html_content or "primary-action" in html_content
-        h1_passed = has_viewport_meta and has_mobile_css and has_hero_cta
-
-        # H2: No control disabled without visible reason beside it
-        disabled_elements = re.findall(r'<[^>]*\bdisabled\b[^>]*>', html_content)
-        unexplained_disabled = [e for e in disabled_elements if 'title="' not in e and 'aria-describedby="' not in e]
-        h2_passed = len(unexplained_disabled) == 0 and ('title="' in html_content or 'aria-label="' in html_content)
-
-        # H3: Never gate a feature to null: render a reason, not an empty state
-        h3_passed = "empty-state-card" in html_content or "empty-state" in html_content
-
-    evaluated["H1"] = GateResult("H1", "Primary action obvious without reading", h1_passed, "Responsive layout (375px/1280px) and prominent hero CTA verified in docs/index.html" if h1_passed else "Hero CTA or responsive layout missing in docs/index.html")
-    evaluated["H2"] = GateResult("H2", "No control is disabled without visible reason", h2_passed, "All interactive controls include descriptive tooltips/labels with zero unexplained disabled states" if h2_passed else "Found disabled controls without explanatory titles")
-    evaluated["H3"] = GateResult("H3", "Never gate a feature to null", h3_passed, "Explicit empty-state and fallback guidance cards rendered in UI" if h3_passed else "No explicit fallback/empty state handling found")
-
-    # --- Section I: Personas Review Instrument (I1 - I5) ---
-    state_md_candidates = [
-        os.path.join(repo_root, "../../STATE.md"),
-        os.path.join(repo_root, "../STATE.md"),
-        os.path.join(repo_root, "STATE.md"),
-    ]
-    state_text = ""
-    for smp in state_md_candidates:
-        if os.path.exists(smp):
-            with open(smp, "r", encoding="utf-8") as f:
-                state_text = f.read()
-            break
-
-    state_has_runbook = "00-RUNBOOK.md" in state_text or "Persona Review" in state_text
-    state_has_three = all(p in state_text for p in ["01 Sponsor Product Owner", "06 UX Designer", "08 Recruiter"])
-    state_has_roster = "00-ROSTER.md" in state_text or "Thomas Dalton" in state_text
-    state_has_findings = "Persona Review Findings" in state_text or "Verdict: **PASS**" in state_text
-
-    kill_criteria_tested = any(
-        any(k in os.path.basename(f).lower() for k in ["security", "privacy", "evidence", "governance", "diff", "webhook", "radar", "consent"])
-        for f in glob.glob(os.path.join(repo_root, "tests/**/*.py"), recursive=True)
+    return True, (
+        f"{receipt['built_by_command']} exited 0 and produced {apk} (sha256 "
+        f"{str(receipt['apk_sha256'])[:12]}...), which installed and ran on "
+        f"{device['device_model']} on {device['fire_os_or_android_version']} at "
+        f"{device['launched_at_utc']}: {device['observed']}"
     )
 
-    evaluated["I1"] = GateResult("I1", "The runbook runs first (00-RUNBOOK.md)", state_has_runbook, "Persona review runbook executed and recorded in STATE.md" if state_has_runbook else "personas review runbook not recorded")
-    evaluated["I2"] = GateResult("I2", "Three personas minimum (01, 06, 08)", state_has_three, "Three required personas (01, 06, 08) evaluated in STATE.md" if state_has_three else "personas review not executed")
-    evaluated["I3"] = GateResult("I3", "Ownership comes from the roster (00-ROSTER.md)", state_has_roster, "Persona anchors verified from 00-ROSTER.md" if state_has_roster else "personas review roster not anchored")
-    evaluated["I4"] = GateResult("I4", "Findings are written down in STATE.md", state_has_findings, "Persona review findings and verdicts recorded in STATE.md" if state_has_findings else "personas review not recorded")
-    evaluated["I5"] = GateResult("I5", "Every kill criterion ships a recorded failing input", kill_criteria_tested, "Kill criteria failure mode defenses verified in test suite" if kill_criteria_tested else "kill criteria not executed")
 
-    # --- Section O: Owner-Gated (O1 - O3) ---
-    evaluated["O1"] = GateResult("O1", "YouTube upload, public not unlisted", False, "owner-gated (YouTube upload pending owner)")
-    evaluated["O2"] = GateResult("O2", "Devpost CAPTCHA on Create Project", False, "owner-gated (Devpost project creation pending owner)")
-    evaluated["O3"] = GateResult("O3", "Pressing Submit", False, "owner-gated (Final submission pending owner)")
-
-    final_results = []
-    for gid in all_gate_ids:
-        if gid in evaluated:
-            final_results.append(evaluated[gid])
-        else:
-            final_results.append(GateResult(gid, f"Gate {gid}", False, "not implemented"))
-
-    return final_results
+#: Where the test suite's own runtime is recorded, by scripts/time_test_suite.py. G1
+#: compares the README against it, because a runtime written as prose is a number that
+#: ages every time a test is added and nobody notices.
+SUITE_TIMING_SUMMARY = "suite_timing_summary.json"
 
 
-def main():
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    results = audit_project(repo_root)
+def stale_timing_disclosure(recorded_count, collected_count) -> tuple[str, str]:
+    """The two phrases the README must carry when the runtime record predates the suite.
 
-    passed_gates = [r for r in results if r.passed]
-    failed_gates = [r for r in results if not r.passed]
+    A runtime is a measurement of a particular suite, and the honest response to the
+    suite growing is to re-measure. When it cannot be re-measured yet, because the machine
+    is loaded and a loaded measurement is the defect the record exists to prevent, the
+    README may keep publishing the record on one condition: it says in prose how many
+    tests the record was measured over, how many the suite collects now, and that a
+    re-measure on an idle machine is pending. Both phrases have to match exactly, so the
+    note cannot age into a vague "roughly current", and the second one names the live
+    count, so adding a test without updating the note still turns G1 red.
+    """
+    return (
+        f"measured over {recorded_count} collected tests",
+        f"the suite now collects {collected_count} tests and a re-measure on an idle machine "
+        f"is pending",
+    )
 
-    total_count = len(results)
-    passed_count = len(passed_gates)
-    failed_count = len(failed_gates)
 
-    print("================================================================")
-    print(f"       STANDARDS.md {total_count}-GATE READINESS AUDIT (EXACT ENUMERATION)  ")
-    print("================================================================")
-    print(f"\n--- PASSED GATES ({passed_count}/{total_count}) ---")
-    for r in passed_gates:
-        print(f"  [PASS] [{r.gate_id}] {r.title}: {r.message}")
+#: Where the persona review is restated in this repository's own voice. Gates I1 to I4
+#: used to read a workspace coordination file two directories up, which meant they
+#: passed here and failed for anyone who cloned this repository on its own. They read
+#: this file instead, so the score they contribute to is reproducible from a clone.
+PERSONA_REVIEW_DOC = "docs/PERSONA_REVIEW.md"
 
-    print(f"\n--- FAILED / PENDING GATES ({failed_count}/{total_count}) ---")
-    for r in failed_gates:
-        print(f"  [FAIL] [{r.gate_id}] {r.title} -> {r.message}")
+#: The three lenses the review is required to carry, by role. The internal instrument
+#: that defines them is a workspace document that is never part of a submission, so it
+#: is not named here and these gates do not string-match its filename. A gate that
+#: checks for a filename it cannot open is checking nothing.
+PERSONA_LENSES = ("Sponsor product owner", "UX designer", "Recruiter")
 
-    print("\n================================================================")
-    print(f"  SUMMARY: {passed_count}/{total_count} PASSED, {failed_count}/{total_count} FAILED/PENDING")
-    print("================================================================")
+#: Outcomes a procedure step or a finding may carry. Anything else is not a verdict.
+PERSONA_VERDICTS = ("PASS", "FAIL", "PARTIAL", "OPEN")
 
+
+def markdown_table(text: str, *required_headers: str) -> list[dict[str, str]]:
+    """Rows of the first markdown table whose header carries every required column.
+
+    Returned as dicts keyed by header cell. A document with no such table yields an
+    empty list, which is what makes the gates below able to fail.
+    """
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not line.strip().startswith("|"):
+            continue
+        headers = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not all(header in headers for header in required_headers):
+            continue
+        if index + 1 >= len(lines) or not re.match(r"^\|[\s:|-]+\|$", lines[index + 1].strip()):
+            continue
+        rows = []
+        for row_line in lines[index + 2:]:
+            if not row_line.strip().startswith("|"):
+                break
+            cells = [cell.strip() for cell in row_line.strip().strip("|").split("|")]
+            if len(cells) < len(headers):
+                cells += [""] * (len(headers) - len(cells))
+            rows.append(dict(zip(headers, cells)))
+        return rows
+    return []
+
+
+def cited_repository_paths(text: str) -> list[str]:
+    """Every repository-relative path cited in backticks anywhere in ``text``.
+
+    A path is a backticked word carrying both a ``/`` and a file extension, which
+    picks ``tests/unit/test_readiness_gates.py`` out of a command line and leaves
+    ``tests/`` and prose alone.
+    """
+    paths = []
+    for span in re.findall(r"`([^`]+)`", text):
+        for word in span.split():
+            word = word.strip("(),;:")
+            if "/" in word and re.search(r"\.[A-Za-z0-9]{1,5}$", word):
+                paths.append(word)
+    return sorted(set(paths))
+
+
+def evaluate_persona_review_gates(doc: str, path_exists) -> dict[str, tuple[bool, str]]:
+    """I1 to I4: was a structured review run, owned, and written down where a clone sees it.
+
+    These four gates used to read ``../../STATE.md``. Each said in its own message that
+    the evidence was outside the repository, which was honest and unusable: a judge with
+    a clone and nothing else got four FAILs where this machine printed four PASSes, so
+    the published readiness score was not reproducible from the artifact submitted.
+
+    They now read ``docs/PERSONA_REVIEW.md`` and check its substance rather than the
+    presence of a phrase. Deleting a lens, attributing a finding to a lens nobody owns,
+    dropping the review date or citing a test file that is not on disk each turns one of
+    them red. ``path_exists`` is injected so a test can drive the citation branch
+    without writing files into the checkout.
+    """
+    outcomes: dict[str, tuple[bool, str]] = {}
+
+    if not doc.strip():
+        missing = f"{PERSONA_REVIEW_DOC} is missing, so no review is recorded in this repository"
+        return {gid: (False, missing) for gid in ("I1", "I2", "I3", "I4")}
+
+    # --- I1: the procedure that runs before any lens opens.
+    steps = markdown_table(doc, "Step", "What it asks", "Outcome", "Evidence")
+    bad_steps = [
+        s["Step"] for s in steps
+        if s["Outcome"] not in PERSONA_VERDICTS or not s["Evidence"]
+    ]
+    i1 = len(steps) >= 4 and not bad_steps
+    outcomes["I1"] = (i1, (
+        f"{len(steps)} procedure steps ran before any lens opened, each with an outcome and a "
+        f"citation, recorded in {PERSONA_REVIEW_DOC}" if i1
+        else f"{PERSONA_REVIEW_DOC} records {len(steps)} procedure steps"
+             + (f"; these carry no outcome or no evidence: {bad_steps}" if bad_steps else "")
+             + ("; at least four are required" if len(steps) < 4 else "")
+    ))
+
+    # --- I2: three lenses, each with a verdict and at least one finding of its own.
+    owners = markdown_table(doc, "Lens", "Owner", "What it decides", "Verdict")
+    findings = markdown_table(doc, "ID", "Lens", "Finding", "Verdict", "Evidence")
+    by_lens = {row["Lens"]: row for row in owners}
+    lenses_with_findings = {row["Lens"] for row in findings}
+    missing_lenses = [
+        lens for lens in PERSONA_LENSES
+        if lens not in by_lens
+        or by_lens[lens]["Verdict"] not in PERSONA_VERDICTS
+        or lens not in lenses_with_findings
+    ]
+    i2 = not missing_lenses
+    scored = ", ".join(
+        "{} {}".format(lens, by_lens[lens]["Verdict"]) for lens in PERSONA_LENSES
+    ) if i2 else ""
+    outcomes["I2"] = (i2, (
+        f"All three required lenses reviewed in {PERSONA_REVIEW_DOC}, each with a verdict "
+        f"and findings of its own: {scored}" if i2
+        else f"Lenses missing from {PERSONA_REVIEW_DOC}, unscored, or with no finding of "
+             f"their own: {missing_lenses}"
+    ))
+
+    # --- I3: ownership is total. A finding attributed to a lens nobody owns fails.
+    unowned = sorted(
+        lens for lens in lenses_with_findings
+        if lens not in by_lens or not by_lens[lens]["Owner"]
+    )
+    i3 = bool(owners) and all(row["Owner"] for row in owners) and not unowned
+    outcomes["I3"] = (i3, (
+        f"Every lens carrying a finding has exactly one owner across {len(owners)} rows "
+        f"of {PERSONA_REVIEW_DOC}" if i3
+        else (f"{PERSONA_REVIEW_DOC} attributes findings to a lens with no owner: {unowned}"
+              if unowned else f"{PERSONA_REVIEW_DOC} records no ownership table")
+    ))
+
+    # --- I4: findings written down, dated, and every citation resolvable on disk.
+    date = re.search(r"Review date:\s*(\d{4}-\d{2}-\d{2})", doc)
+    bad_findings = [
+        f["ID"] for f in findings
+        if not f["Finding"] or f["Verdict"] not in PERSONA_VERDICTS or not f["Evidence"]
+    ]
+    dangling = [path for path in cited_repository_paths(doc) if not path_exists(path)]
+    i4 = len(findings) >= 5 and not bad_findings and not dangling and bool(date)
+    failure_count = sum(1 for f in findings if f["Verdict"] == "FAIL")
+    outcomes["I4"] = (i4, (
+        f"{len(findings)} findings recorded in {PERSONA_REVIEW_DOC} on {date.group(1) if date else ''}, "
+        f"{failure_count} of them failures, every citation resolving to a file in this checkout"
+        if i4 else
+        f"{PERSONA_REVIEW_DOC} records {len(findings)} findings"
+        + ("" if date else "; no review date")
+        + (f"; incomplete rows: {bad_findings}" if bad_findings else "")
+        + (f"; cited paths that are not in this checkout: {dangling}" if dangling else "")
+    ))
+
+    return outcomes
+
+
+def collected_test_count() -> int | None:
+    """Number of tests pytest collects, or None when pytest cannot be run."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests", "--collect-only", "-q"],
+            capture_output=True, text=True, cwd=REPO_ROOT, timeout=300,
+        )
+        match = re.search(r"(\d+)\s+tests?\s+collected", result.stdout)
+        return int(match.group(1)) if match else None
+    except Exception:
+        return None
+
+
+def head_sha() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, cwd=REPO_ROOT, timeout=30,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return ""
+
+
+def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, kept flat on purpose
+    gate_ids = get_standards_gate_ids()
+    results: dict[str, GateResult] = {}
+
+    def gate(gid, title, passed, message, external=False):
+        results[gid] = GateResult(gid, title, passed, message, external)
+
+    readme = read("README.md")
+    readme_lower = readme.lower()
+
+    # ------------------------------------------------------- J: Framing gates
+    # J1 checks the README's actual first sentence rather than a whitelist of
+    # personas. The requirement is a named user, so it looks for a human noun
+    # phrase and rejects the market words.
+    hero = ""
+    hero_match = re.search(r"^>\s*(.+)$", readme, re.MULTILINE)
+    if hero_match:
+        hero = re.sub(r"[*_`]", "", hero_match.group(1)).strip()
+    first_sentence = re.split(r"(?<=[.!?])\s", hero)[0] if hero else ""
+
+    banned_markets = ["smbs", "enterprises", "creators", "teams", "everyone", "businesses", "users"]
+    named_market = next((b for b in banned_markets if re.search(rf"\b{b}\b", first_sentence.lower())), None)
+    persona_pattern = re.compile(
+        r"\b(engineer|engineers|developer|developers|on-call|oncall|responder|"
+        r"maintainer|maintainers|operator|operators|resident|residents|caregiver|caregivers)\b",
+        re.IGNORECASE,
+    )
+    persona_hit = persona_pattern.search(first_sentence)
+    j1 = bool(first_sentence) and persona_hit is not None and named_market is None
+    gate("J1", "One named persona, not a market", j1,
+         f"First sentence names '{persona_hit.group(0)}'" if j1
+         else (f"First sentence names the market '{named_market}'" if named_market
+               else f"No persona in the first sentence: {first_sentence[:70]!r}"))
+
+    # J2: a high-consequence action must exist in code AND be guarded, not merely
+    # be a word in the README.
+    server = read("src/interfaces/mcp_server.py")
+    rollback_domain = read("src/domain/governed_rollback.py")
+    # Check each state-changing route's own decorator, not merely that the string
+    # "Depends(require_operator)" appears somewhere in the file. Guarding one
+    # route and leaving the other open must fail this gate.
+    guarded_routes = set(re.findall(
+        r'@app\.post\("([^"]+)",\s*dependencies=\[Depends\(require_operator\)\]\)', server))
+    all_post_routes = set(re.findall(r'@app\.post\("([^"]+)"', server))
+    must_be_guarded = {"/mcp/tools/stage_rollback", "/mcp/tools/confirm_rollback"}
+    has_rollback_route = must_be_guarded <= all_post_routes
+    unguarded = sorted(must_be_guarded - guarded_routes)
+    rollback_is_guarded = not unguarded and "verify_governance_token" in rollback_domain
+    negative_tests = read("tests/integration/test_rollback_authorization.py")
+    refusal_is_tested = "401" in negative_tests and "TOKEN_ALREADY_USED" in negative_tests
+    j2 = has_rollback_route and rollback_is_guarded and refusal_is_tested
+    gate("J2", "Real consequence behind hero action", j2,
+         "Rollback endpoint exists, requires a bearer secret and a single-use content-bound token, "
+         "and the refusals are tested" if j2
+         else f"routes_present={has_rollback_route} unguarded_routes={unguarded} "
+              f"token_verification={'verify_governance_token' in rollback_domain} "
+              f"refusal_tested={refusal_is_tested}")
+
+    # J3: a headline comparative number needs a baseline, a margin and a sample
+    # size that a committed command actually produces.
+    benchmarks = read("benchmarks_summary.json")
+    has_measured_file = bool(benchmarks) and "measured_by_command" in benchmarks
+    claims_sample = "n=" in readme_lower or "sample size" in readme_lower or "requests)" in readme_lower
+    claims_baseline = "against" in readme_lower or "baseline" in readme_lower
+    j3 = has_measured_file and claims_sample and claims_baseline
+    gate("J3", "One headline comparative number", j3,
+         "benchmarks_summary.json carries the command that produced it, and the README states the "
+         "sample size and the baseline" if j3
+         else f"measured_file={has_measured_file} sample={claims_sample} baseline={claims_baseline}")
+
+    j4_terms = [t for t in ["fire tv", "fire os", "leanback"] if t in readme_lower]
+    manifest = read("app/src/main/AndroidManifest.xml")
+    firetv_receipt_text = read(FIRETV_BUILD_RECEIPT)
+    firetv_receipt = None
+    if firetv_receipt_text:
+        try:
+            firetv_receipt = json.loads(firetv_receipt_text)
+        except ValueError:
+            firetv_receipt = {"__invalid__": True}
+    j4, j4_message = evaluate_firetv_gate(
+        j4_terms, manifest, firetv_receipt,
+        lambda path: os.path.isfile(os.path.join(REPO_ROOT, path)),
+    )
+    gate("J4", "Sponsor product is load-bearing", j4, j4_message)
+
+    word_count = len(first_sentence.split())
+    j5 = bool(first_sentence) and word_count <= 25 and "\u2014" not in first_sentence
+    gate("J5", "One republishable sentence <=25 words, no em dash", j5,
+         f"{word_count} words, zero em dashes" if j5
+         else f"{word_count} words, em dash present: {chr(8212) in first_sentence}")
+
+    # ------------------------------------ A: Engineering principles (A1 - A7)
+    py_files = glob.glob(os.path.join(REPO_ROOT, "src/**/*.py"), recursive=True)
+    oversized = []
+    for path in py_files:
+        with open(path, "r", encoding="utf-8") as handle:
+            if len(handle.readlines()) > 800:
+                oversized.append(os.path.basename(path))
+    gate("A1", "SOLID at module level (<800 lines)", not oversized,
+         f"All {len(py_files)} source files under 800 lines" if not oversized else f"Oversized: {oversized}")
+
+    env_readers = [os.path.basename(p) for p in py_files
+                   if "os.environ" in open(p, "r", encoding="utf-8").read()]
+    gate("A2", "YAGNI (Config knobs have active readers)", bool(env_readers),
+         f"{len(env_readers)} modules read configuration from the environment")
+
+    steps = re.findall(r"^###\s+(\d+)\.", readme, re.MULTILINE)
+    a3 = bool(steps) and len(steps) <= 5
+    gate("A3", "KISS (Quickstart reachable in <=5 steps)", a3,
+         f"Quickstart has {len(steps)} numbered steps" if a3
+         else f"Quickstart has {len(steps)} numbered steps, over the limit of 5")
+
+    app_files = glob.glob(os.path.join(REPO_ROOT, "src/application/**/*.py"), recursive=True)
+    a4 = bool(app_files) and any("from src.domain" in open(f, "r", encoding="utf-8").read() for f in app_files)
+    gate("A4", "DRY (Contracts unified in domain)", a4,
+         "Application layer imports its contracts from src/domain" if a4 else "Application does not import domain")
+
+    domain_files = glob.glob(os.path.join(REPO_ROOT, "src/domain/**/*.py"), recursive=True)
+    dirty_domain = []
+    for path in domain_files:
+        with open(path, "r", encoding="utf-8") as handle:
+            if re.search(r"^\s*(import|from)\s+(boto3|httpx|requests|fastapi|uvicorn|starlette|botocore)\b",
+                         handle.read(), re.MULTILINE):
+                dirty_domain.append(os.path.basename(path))
+    gate("A5", "Separation of Concerns (Domain imports zero SDKs)", not dirty_domain,
+         f"{len(domain_files)} domain modules import no SDK or framework" if not dirty_domain
+         else f"Domain imports an SDK: {dirty_domain}")
+
+    a6 = all(os.path.isdir(os.path.join(REPO_ROOT, "src", layer))
+             for layer in ["domain", "application", "infrastructure", "interfaces"])
+    gate("A6", "Domain Driven Design (Bounded context directories)", a6,
+         "src/domain, src/application, src/infrastructure and src/interfaces all present")
+
+    a7 = "401" in negative_tests and "BAD_SIGNATURE" in negative_tests and "TOKEN_CONTENT_MISMATCH" in negative_tests
+    gate("A7", "Principle of Least Privilege (Write rejection tested)", a7,
+         "Unauthorized, forged, replayed and tampered rollbacks each have a failing-input test" if a7
+         else "Rejection tests missing from tests/integration/test_rollback_authorization.py")
+
+    # ---------------------------------- B: Architecture and compliance (B1-B4)
+    compliance = read("docs/COMPLIANCE_AND_ARCHITECTURE.md").lower()
+    gate("B1", "Well-Architected 6 Pillars review", "well-architected" in compliance,
+         "Documented in docs/COMPLIANCE_AND_ARCHITECTURE.md" if "well-architected" in compliance
+         else "No Well-Architected review found")
+    b2 = "eu ai act" in compliance and "article 14" in compliance
+    gate("B2", "EU AI Act Articles 10, 13, 14, 15, 50", b2,
+         "Documented with residual gaps named" if b2 else "No EU AI Act section found")
+    gate("B3", "GDPR Data Map documented", "gdpr" in compliance,
+         "Data map documented" if "gdpr" in compliance else "No GDPR data map found")
+    forbidden = [w for w in ["compliant", "conformity"] if w in readme_lower]
+    gate("B4", "Never write 'compliant' or 'conformity'", not forbidden,
+         "Neither word appears in the README" if not forbidden else f"README uses {forbidden}")
+
+    # ------------------------------------------- C: Tests and coverage (C1-C6)
+    ci_workflow = read(".github/workflows/ci.yml")
+    gate("C1", "Coverage above 85% enforced in CI", "cov-fail-under=85" in ci_workflow,
+         "CI runs pytest with --cov-fail-under=85" if "cov-fail-under=85" in ci_workflow
+         else "CI does not enforce a coverage floor of 85%")
+
+    unit_tests = glob.glob(os.path.join(REPO_ROOT, "tests/unit/test_*.py"))
+    gate("C2", "Unit tests running in CI", bool(unit_tests) and "pytest tests/" in ci_workflow,
+         f"{len(unit_tests)} unit test modules, run by .github/workflows/ci.yml")
+    integration_tests = glob.glob(os.path.join(REPO_ROOT, "tests/integration/test_*.py"))
+    gate("C3", "Functional & Integration tests", bool(integration_tests),
+         f"{len(integration_tests)} integration test modules")
+    security_tests = glob.glob(os.path.join(REPO_ROOT, "tests/security/test_*.py"))
+    gate("C4", "OWASP / SAST / DAST execution", bool(security_tests),
+         f"{len(security_tests)} security test modules, plus ruff in CI")
+
+    # C5 is left as the strict check it was: a real browser driver navigating the
+    # product. The Node spatial-navigation spec is genuinely useful but it is a
+    # DOM shim, not a browser, and relabelling it would be moving the goalposts.
+    browser_driver = False
+    for path in glob.glob(os.path.join(REPO_ROOT, "tests/e2e/**/*.py"), recursive=True):
+        with open(path, "r", encoding="utf-8") as handle:
+            content = handle.read()
+        if re.search(r"^\s*(import|from)\s+(playwright|selenium)\b", content, re.MULTILINE) \
+                and re.search(r"\.(goto|get)\s*\(", content):
+            browser_driver = True
+            break
+    gate("C5", "End-to-end browser user journey test", browser_driver,
+         "Browser driver test present" if browser_driver
+         else "No playwright or selenium journey test. tests/e2e runs DOM structure assertions and a "
+              "Node-executed spatial navigation spec, neither of which drives a browser")
+
+    # C6: the fixture-offset requirement, checked by looking for parameterised
+    # tests that vary a starting parameter rather than asserting it is so.
+    parametrised = 0
+    for path in glob.glob(os.path.join(REPO_ROOT, "tests/**/*.py"), recursive=True):
+        parametrised += len(re.findall(r"@pytest\.mark\.parametrize", open(path, "r", encoding="utf-8").read()))
+    gate("C6", "Fixture starts at varied parameter offset", parametrised >= 3,
+         f"{parametrised} parameterised test groups vary their starting parameters" if parametrised >= 3
+         else f"Only {parametrised} parameterised test groups found")
+
+    # ------------------------------------------------ D: Infrastructure (D1-D3)
+    gate("D1", "IaC declared in Terraform/CDK", os.path.exists(os.path.join(REPO_ROOT, "infra/main.tf")),
+         "infra/main.tf present")
+
+    # D2 validates the receipt's content, not its existence.
+    receipt_text = read("deploy_teardown_receipt.json")
+    d2_reason = "No deployment receipt present"
+    d2 = False
+    if receipt_text:
+        try:
+            receipt = json.loads(receipt_text)
+            probes = receipt.get("probes", [])
+            statuses = [p.get("http_status") for p in probes]
+            reachable = bool(probes) and all(s == 200 for s in statuses)
+            deployed = receipt.get("deployed_commit_sha")
+            local_head = receipt.get("local_head_sha")
+            teardown = receipt.get("teardown_verified") is True
+            d2 = reachable and bool(deployed) and deployed == local_head and teardown
+            d2_reason = (
+                f"probes={statuses} deployed_sha={deployed or 'not reported by the deployment'} "
+                f"receipt_head={(local_head or '')[:7]} teardown_verified={teardown}"
+            )
+        except ValueError:
+            d2_reason = "Deployment receipt is not valid JSON"
+    gate("D2", "Tested deploy then teardown with recorded URL", d2,
+         "Receipt records a reachable URL at this commit, with teardown verified" if d2 else d2_reason)
+
+    infra_readme = read("infra/README.md")
+    d3 = "ESTIMATE" in infra_readme or "estimate" in infra_readme.lower()
+    gate("D3", "Monthly idle cost recorded with date", d3,
+         "infra/README.md records the idle cost and labels it ESTIMATE where nothing measured it" if d3
+         else "infra/README.md presents cost figures without saying whether they were measured")
+
+    # ------------------------------------------------------------ E: Video
+    narration = read("video/narration.json")
+    cue_sheet = read("video/cue_sheet.json")
+    e1 = bool(narration) and "beats" in narration
+    gate("E1", "Video narration script per beat in video/", e1,
+         "video/narration.json holds a per-beat script" if e1 else "No per-beat narration script")
+    # E2 requires narration and picture to be in sync, which can only be true once
+    # a video exists. The cue sheet is a plan for one.
+    gate("E2", "Narration and picture in sync gate", False,
+         "No video exists, so nothing is in sync with anything. video/cue_sheet.json is a shot plan, "
+         "not a record of a recorded take")
+    e3 = bool(cue_sheet) and "beat_id" in cue_sheet
+    gate("E3", "Single beat re-rendering supported", e3,
+         "Beats carry stable ids, so one can be re-recorded alone" if e3 else "Beats are not individually addressable")
+    gate("E4", "Public video under 180s with running product", False,
+         "No video has been recorded or uploaded")
+
+    # ------------------------------------------- F: The README and repo (F1-F9)
+    # F1 is renamed to what it truly checks. It counts badges and reports that
+    # their targets are not fetched, rather than implying an HTTP 200 check.
+    badges = re.findall(r"\[!\[.*?\]\((.*?)\)\]", readme)
+    # The requirement is that a reader is told why a badge may not resolve, not
+    # that the README uses one particular sentence.
+    states_reachability = "badge" in readme_lower and "private" in readme_lower
+    f1_note = "" if states_reachability else \
+        " The README does not say the repository is private, so a judge clicking a badge will not know why it fails."
+    f1 = len(badges) >= 2 and states_reachability
+    gate("F1", "Badges are present and their reachability is stated (not fetched)", f1,
+         f"{len(badges)} badges; the README states that repository-scoped badges do not resolve while "
+         f"the repository is private. No HTTP request is made by this gate." if f1
+         else f"{len(badges)} badges.{f1_note}")
+
+    mermaid = len(re.findall(r"```mermaid", readme))
+    gate("F2", "At least two Mermaid diagrams", mermaid >= 2, f"{mermaid} Mermaid diagrams in the README")
+    gate("F3", "Table of contents present", "## Table of Contents" in readme, "Table of contents present")
+
+    # F4: every number in the benchmark table must cite a command, and that
+    # command must be a file that exists.
+    cited_commands = re.findall(r"`(python scripts/[a-z_]+\.py[^`]*)`", readme)
+    missing_scripts = [c for c in cited_commands
+                       if not os.path.exists(os.path.join(REPO_ROOT, c.split()[1]))]
+    f4 = bool(cited_commands) and not missing_scripts
+    gate("F4", "Real numbers with command attribution", f4,
+         f"{len(cited_commands)} cited commands, all of which exist" if f4
+         else f"cited={len(cited_commands)} missing={missing_scripts}")
+
+    buzzwords = [w for w in ["seamless", "robust", "leverage", "in today's world", "cutting-edge",
+                             "game-chang", "revolutionary", "effortless"] if w in readme_lower]
+    em_dashes = readme.count("\u2014")
+    f5 = not buzzwords and em_dashes == 0
+    gate("F5", "Zero em dashes and zero AI buzzwords", f5,
+         "No em dashes and no buzzwords in the README" if f5
+         else f"em_dashes={em_dashes} buzzwords={buzzwords}")
+
+    f6 = all(os.path.exists(os.path.join(REPO_ROOT, p))
+             for p in ["src", "tests", "LICENSE", "README.md", "CONTRIBUTING.md", "pyproject.toml"])
+    gate("F6", "Standard ecosystem repository layout", f6,
+         "src, tests, LICENSE, README.md, CONTRIBUTING.md and pyproject.toml all present" if f6
+         else "Standard repository files are missing")
+
+    # F7: every source module must be reachable from an entry point, so an
+    # ornamental module that nothing imports fails this gate.
+    entry_points = read("src/interfaces/mcp_server.py")
+    reachable: set[str] = set()
+    frontier = ["src/interfaces/mcp_server.py"]
+    seen = set()
+    while frontier:
+        current = frontier.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        source = read(current)
+        for module in re.findall(r"from (src\.[\w.]+) import", source):
+            path = module.replace(".", "/") + ".py"
+            reachable.add(path)
+            frontier.append(path)
+    all_modules = {os.path.relpath(p, REPO_ROOT).replace("\\", "/") for p in py_files}
+    orphans = sorted(all_modules - reachable - {"src/interfaces/mcp_server.py"})
+    gate("F7", "Every file is relevant and current", not orphans,
+         f"All {len(all_modules)} source modules are reachable from the server entry point" if not orphans
+         else f"Modules nothing imports: {orphans}")
+
+    # F8: machine-readable artifacts must be pretty printed and carry provenance.
+    unreadable = []
+    for artifact in ["benchmarks_summary.json", "deploy_teardown_receipt.json",
+                     "src/infrastructure/fixtures/github_telemetry_fixture.json",
+                     "src/infrastructure/fixtures/aws_cost_fixture.json"]:
+        text = read(artifact)
+        if not text:
+            unreadable.append(f"{artifact} (missing)")
+        elif "\n  " not in text:
+            unreadable.append(f"{artifact} (not indented)")
+        elif not any(k in text for k in ["note", "measured_by_command", "recorded_by_command"]):
+            unreadable.append(f"{artifact} (no provenance field)")
+    gate("F8", "All artifacts human readable", not unreadable,
+         "Every committed JSON artifact is indented and carries a provenance or note field"
+         if not unreadable else f"Problems: {unreadable}")
+
+    f9 = bool(steps) and "```bash" in readme
+    gate("F9", "Quickstart a judge can run", f9,
+         f"{len(steps)} copy-pasteable steps in the README" if f9 else "No runnable quickstart found")
+
+    # ----------------------------------------------------- G: Consistency (G1-G4)
+    badge_match = re.search(r"tests-(\d+)(?:%20|[\s_+-])*(?:passing|collected)", readme, re.IGNORECASE)
+    collected = collected_test_count()
+    if badge_match is None:
+        g1, g1_msg = False, "No test count badge found in the README to cross-check"
+    elif collected is None:
+        g1, g1_msg = False, "pytest could not be run to verify the README test count"
+    else:
+        claimed = int(badge_match.group(1))
+        g1 = claimed == collected
+        g1_msg = (f"README badge says {claimed} tests, pytest collected {collected}"
+                  if not g1 else f"README badge and pytest agree at {collected} tests")
+
+    # The other cross-surface number is how long that suite takes. It was prose, it
+    # went stale as the suite tripled in size, and it is the one claim in this
+    # repository that three readers failed to reproduce. It is recorded by
+    # scripts/time_test_suite.py now, and G1 checks the README against the record.
+    # Figures inside backticks are quotations, not claims: the README quotes the two
+    # retired figures so the correction stays visible. Strip code before reading claims.
+    readme_prose = " ".join(re.sub(
+        r"`[^`]*`", " ", re.sub(r"```.*?```", " ", readme, flags=re.DOTALL)).split())
+    runtime_claims = re.findall(r"(\d+(?:\.\d+)?) to (\d+(?:\.\d+)?) seconds", readme_prose)
+    timing = {}
+    if os.path.exists(os.path.join(REPO_ROOT, SUITE_TIMING_SUMMARY)):
+        with open(os.path.join(REPO_ROOT, SUITE_TIMING_SUMMARY), "r", encoding="utf-8") as handle:
+            timing = json.load(handle)
+    if g1:
+        stale_note = ""
+        if not runtime_claims:
+            g1, g1_msg = False, "The README no longer says how long its own test suite takes"
+        elif not timing:
+            g1, g1_msg = False, (
+                f"The README publishes a suite runtime and {SUITE_TIMING_SUMMARY} is missing, "
+                f"so nothing measured it. Run python scripts/time_test_suite.py")
+        elif timing.get("tests_collected") != collected:
+            # The record predates the suite. That is allowed only when the README says
+            # so in the two exact phrases stale_timing_disclosure returns; a record that
+            # is quietly older than the suite it describes is the defect this gate exists
+            # to catch.
+            needed = stale_timing_disclosure(timing.get("tests_collected"), collected)
+            missing = [phrase for phrase in needed if phrase not in readme_prose]
+            if missing:
+                g1, g1_msg = False, (
+                    f"The recorded runtime was measured over {timing.get('tests_collected')} tests "
+                    f"and this suite now has {collected}. Re-run python scripts/time_test_suite.py "
+                    f"on an idle machine, or disclose the gap in the README with the exact "
+                    f"phrases {missing}")
+            else:
+                stale_note = (
+                    f"; the runtime record predates the suite ({timing.get('tests_collected')} of "
+                    f"{collected} tests), the README says so, and an idle re-measure is pending")
+        if g1:
+            # Two ranges may legitimately appear: this session's, and the session it
+            # replaced. The second is there so a replaced figure leaves a trace.
+            sessions = {(timing.get("min_seconds"), timing.get("max_seconds"))}
+            previous = timing.get("previous_measurement") or {}
+            lows = [v for k, v in previous.items() if k.endswith("_min_seconds") and v is not None]
+            highs = [v for k, v in previous.items() if k.endswith("_max_seconds") and v is not None]
+            if lows and highs:
+                sessions.add((min(lows), max(highs)))
+            unmatched = [c for c in runtime_claims
+                         if (float(c[0]), float(c[1])) not in sessions]
+            if unmatched:
+                g1, g1_msg = False, (
+                    f"The README publishes {unmatched} for the suite runtime; the recorded "
+                    f"sessions measured {sorted(sessions)} s")
+            elif f"{timing.get('loaded_max_seconds')} seconds" not in readme_prose:
+                g1, g1_msg = False, (
+                    f"The README publishes a runtime range with no loaded-machine figure "
+                    f"beside it, so it reads as a ceiling. The loaded run measured "
+                    f"{timing.get('loaded_max_seconds')} s")
+            else:
+                g1_msg += (f", and all {len(runtime_claims)} published runtime ranges match a "
+                           f"recorded session ({len(timing.get('runs', []))} runs this session, "
+                           f"{timing.get('min_seconds')} to {timing.get('max_seconds')} s)"
+                           + stale_note)
+    gate("G1", "No cross-surface claim discrepancy", g1, g1_msg)
+
+    # G2 compares the deployment's own reported build SHA against HEAD and fails
+    # when they differ, which is the whole point of the gate.
+    local_head = head_sha()
+    g2, g2_msg = False, "No deployment receipt to compare against HEAD"
+    if receipt_text:
+        try:
+            receipt = json.loads(receipt_text)
+            deployed = receipt.get("deployed_commit_sha")
+            if not deployed:
+                # The server in this checkout does report build_sha from /health; the
+                # receipt records that the DEPLOYED endpoint did not. Name the URL so
+                # the line cannot be read as a defect in the local server.
+                where = receipt.get("base_url") or "named in deploy_teardown_receipt.json"
+                probed = receipt.get("probed_at_utc") or "an unrecorded time"
+                g2_msg = (f"The deployed endpoint {where} runs an older build whose /health "
+                          f"answered without a build_sha when probed at {probed}, so the "
+                          f"deployment cannot be matched to HEAD ({local_head[:7]}); the server "
+                          f"in this checkout does report build_sha from /health")
+            elif deployed == local_head:
+                g2, g2_msg = True, f"Deployed build SHA equals HEAD ({local_head[:7]})"
+            else:
+                g2_msg = f"Deployed {deployed[:7]} does not equal HEAD {local_head[:7]}"
+        except ValueError:
+            g2_msg = "Deployment receipt is not valid JSON"
+    gate("G2", "Deployed SHA matches submitted commit", g2, g2_msg)
+
+    routes = re.findall(r'@app\.(?:get|post)\("([^"]+)"', entry_points)
+    uses_use_cases = "_use_case." in entry_points
+    readme_routes = [r for r in routes if r.startswith("/mcp/") and r in readme]
+    g3 = bool(routes) and uses_use_cases and len(readme_routes) >= 3
+    gate("G3", "Claimed capabilities reachable in code", g3,
+         f"{len(routes)} routes wired to application use cases, {len(readme_routes)} of them named in the README"
+         if g3 else f"routes={len(routes)} use_cases={uses_use_cases} documented={len(readme_routes)}")
+
+    competitors = [c for c in ["cockroach", "backblaze", "qwen", "xprize", "kaggle"] if c in readme_lower]
+    gate("G4", "Zero competitor mentions", not competitors,
+         "No competitor mentions" if not competitors else f"Mentions {competitors}")
+
+    # ------------------------------------------------------------- H: UX (H1-H3)
+    html = read("docs/index.html")
+    h1 = ('name="viewport"' in html and "@media" in html
+          and 'data-testid="primary-hero-action"' in html)
+    gate("H1", "Primary action obvious without reading", h1,
+         "Responsive breakpoints and a marked hero action in docs/index.html" if h1
+         else "Hero action or responsive layout missing")
+
+    disabled_controls = re.findall(r"<button[^>]*\bdisabled\b[^>]*>", html)
+    unexplained = [c for c in disabled_controls if 'title="' not in c]
+    h2 = bool(disabled_controls) and not unexplained
+    gate("H2", "No control is disabled without visible reason", h2,
+         f"{len(disabled_controls)} disabled controls, each carrying a title that says why" if h2
+         else f"{len(unexplained)} disabled controls give no reason")
+
+    h3 = html.count("empty-state-card") >= 3 and "error-card" in html and "loading-card" in html
+    gate("H3", "Never gate a feature to null", h3,
+         "Empty, loading and error states all render an explanation rather than nothing" if h3
+         else "Missing an explicit empty, loading or error state")
+
+    # ------------------------------------- I: Personas review instrument (I1-I5)
+    # These four used to read a coordination file two directories above this
+    # repository. They passed on this machine and would have failed in a clone,
+    # which made a quarter of the failing surface unauditable from the artifact
+    # submitted. They read docs/PERSONA_REVIEW.md now and check its substance.
+    persona_doc = read(PERSONA_REVIEW_DOC)
+    persona_outcomes = evaluate_persona_review_gates(
+        persona_doc, lambda path: os.path.exists(os.path.join(REPO_ROOT, path)))
+
+    gate("I1", "The review procedure runs before any lens opens",
+         *persona_outcomes["I1"])
+    gate("I2", "Three lenses minimum (sponsor product owner, UX designer, recruiter)",
+         *persona_outcomes["I2"])
+    gate("I3", "Every lens carrying a finding has an owner",
+         *persona_outcomes["I3"])
+    gate("I4", f"Findings are written down in {PERSONA_REVIEW_DOC}",
+         *persona_outcomes["I4"])
+
+    # I5 asks for a recorded failing input per kill criterion. Mercury's kill
+    # criteria are the rollback refusals, so this counts the tests that assert one.
+    denial_reasons = set(re.findall(r'denial_reason"\]\s*==\s*"(\w+)"', negative_tests))
+    i5 = len(denial_reasons) >= 5
+    gate("I5", "Every kill criterion ships a recorded failing input", i5,
+         f"{len(denial_reasons)} distinct rollback denial reasons each have a failing-input test: "
+         f"{sorted(denial_reasons)}" if i5
+         else f"Only {len(denial_reasons)} denial reasons have failing-input tests")
+
+    # ---------------------------------------------------------- O: Owner-gated
+    gate("O1", "YouTube upload, public not unlisted", False, "Owner action, not yet done")
+    gate("O2", "Devpost CAPTCHA on Create Project", False, "Owner action, not yet done")
+    gate("O3", "Pressing Submit", False, "Owner action, not yet done")
+
+    return [results.get(gid, GateResult(gid, f"Gate {gid}", False, "not implemented")) for gid in gate_ids]
+
+
+def main() -> None:
+    results = audit_project()
+    passed = [r for r in results if r.passed]
+    failed = [r for r in results if not r.passed]
+    total = len(results)
+
+    print("=" * 78)
+    print(f"  STANDARDS READINESS AUDIT: {len(passed)}/{total} PASSED, {len(failed)}/{total} FAILED")
+    print("=" * 78)
+
+    print(f"\n--- PASSED ({len(passed)}/{total}) ---")
+    for result in passed:
+        marker = "  [external evidence] " if result.external_evidence else "  "
+        print(f"{marker}[PASS] [{result.gate_id}] {result.title}: {result.message}")
+
+    print(f"\n--- FAILED ({len(failed)}/{total}) ---")
+    for result in failed:
+        exempt = f"  (not counted against CI: {CI_EXEMPT[result.gate_id]})" if result.gate_id in CI_EXEMPT else ""
+        print(f"  [FAIL] [{result.gate_id}] {result.title} -> {result.message}{exempt}")
+
+    external = [r for r in results if r.external_evidence]
+    if external:
+        print(f"\n--- READ FROM OUTSIDE THIS REPOSITORY ({len(external)}) ---")
+        print("  These gates were evaluated against a coordination file that is not in this")
+        print("  repository. Anyone cloning this repository alone should treat them as unproven.")
+        for result in external:
+            print(f"    [{result.gate_id}] {result.title}")
+
+    print(f"\n--- CI EXEMPTION POLICY ({len(CI_EXEMPT)} gates) ---")
+    print("  These gates still report FAIL above. They do not fail the CI job because they")
+    print("  cannot be satisfied by running code in a checkout:")
+    for gate_id, reason in CI_EXEMPT.items():
+        print(f"    {gate_id}: {reason}")
+
+    blocking = [r for r in failed if r.gate_id not in CI_EXEMPT]
+    print("\n" + "=" * 78)
+    print(f"  SUMMARY: {len(passed)}/{total} PASSED, {len(failed)}/{total} FAILED "
+          f"({len(blocking)} of them blocking)")
+    print("=" * 78)
+
+    if blocking:
+        print(f"\n[FAIL-GATE] {len(blocking)} blocking gate(s) failed: "
+              f"{', '.join(r.gate_id for r in blocking)}")
+        sys.exit(1)
     sys.exit(0)
 
 

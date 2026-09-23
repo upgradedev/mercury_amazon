@@ -1,301 +1,1507 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#00e5ff">
-    <script src="webmcp_bridge.js"></script>
-    <script src="firetv_nav.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mercury — Fire TV Voice CTO Cockpit</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Mercury Fire TV Incident Commander</title>
+  <meta name="description" content="A 10-foot incident war room: what broke, which change caused it, and a governed rollback from the remote.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0A0D12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap">
   <style>
+    /* ------------------------------------------------------------------ Theme
+       Dark is the default on purpose. This page's first home is a television on
+       a wall in a room with the lights down, and most TV browsers report no
+       colour-scheme preference at all. A viewer who has asked for light gets it.
+    */
     :root {
-      --bg: #060913;
-      --surface: #0f172a;
-      --surface-border: #1e293b;
-      --primary: #8b5cf6;
-      --primary-glow: rgba(139, 92, 246, 0.4);
-      --secondary: #38bdf8;
-      --success: #10b981;
-      --danger: #ef4444;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
+      color-scheme: dark light;
+      --bg:        #0A0D12;
+      --panel:     #11151D;
+      --inset:     #161B24;
+      --line:      #273040;
+      --line-soft: #1C2330;
+      --text:      #EEF2F6;
+      --muted:     #97A3B4;
+      --focus:     #FFC145;
+      --focus-ink: #0A0D12;
+      --alarm:     #FF5A47;
+      --alarm-dim: rgba(255, 90, 71, 0.14);
+      --calm:      #3CD68A;
+      --calm-dim:  rgba(60, 214, 138, 0.14);
+      --info:      #6FB6FF;
+      --info-dim:  rgba(111, 182, 255, 0.14);
+      --amber-dim: rgba(255, 193, 69, 0.14);
+      --shadow:    0 18px 48px rgba(0, 0, 0, 0.45);
+      --sans: "Archivo", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 30px 20px; line-height: 1.6; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding-bottom: 24px; border-bottom: 1px solid var(--surface-border); margin-bottom: 24px;
-      flex-wrap: wrap; gap: 16px;
-    }
-    .brand h1 { font-size: 2.2rem; font-weight: 800; color: #fff; }
-    .brand h1 span { color: var(--primary); text-shadow: 0 0 25px var(--primary-glow); }
-    .brand p { color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; }
-    .badge {
-      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4);
-      color: #c4b5fd; padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:        #F3F5F8;
+        --panel:     #FFFFFF;
+        --inset:     #EDF0F4;
+        --line:      #CBD3DD;
+        --line-soft: #DFE4EB;
+        --text:      #0A0D12;
+        --muted:     #56616F;
+        --focus:     #8A4B00;
+        --focus-ink: #FFFFFF;
+        --alarm:     #B3271A;
+        --alarm-dim: rgba(179, 39, 26, 0.10);
+        --calm:      #0A6E45;
+        --calm-dim:  rgba(10, 110, 69, 0.10);
+        --info:      #14549E;
+        --info-dim:  rgba(20, 84, 158, 0.10);
+        --amber-dim: rgba(138, 75, 0, 0.10);
+        --shadow:    0 10px 30px rgba(10, 13, 18, 0.10);
+      }
     }
 
-    .dpad-banner {
-      background: linear-gradient(90deg, #2e1065 0%, #0f172a 100%);
-      border: 1px solid #7c3aed; border-radius: 10px; padding: 12px 18px;
-      margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.85rem; color: #ddd6fe;
+    /* ------------------------------------------------------------------ Base */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 17px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 5.5rem; /* room for the fixed key hint bar */
     }
-    .dpad-keys { display: inline-flex; gap: 6px; }
-    .key-badge {
-      background: #0f172a; border: 1px solid #6d28d9; padding: 2px 8px; border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #fff;
+    .shell { max-width: 2200px; margin: 0 auto; padding: 3vh 4vw 2rem; }
+    .mono { font-family: var(--mono); }
+    h1, h2, h3 { font-weight: 800; letter-spacing: -0.015em; line-height: 1.1; }
+
+    .skip-link {
+      position: absolute; left: 0.5rem; top: -4rem; z-index: 50;
+      background: var(--focus); color: var(--focus-ink);
+      padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 700; text-decoration: none;
+    }
+    .skip-link:focus { top: 0.5rem; }
+
+    /* Keyboard focus for anyone not using the D-pad ring. */
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
     }
 
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-    .stat-tile {
-      background: #0a0f1d; border: 2px solid var(--surface-border); padding: 18px 14px;
-      border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s;
-    }
-    .stat-tile:hover, .stat-tile.tv-focused {
-      border-color: var(--primary); transform: scale(1.03);
-      box-shadow: 0 0 20px var(--primary-glow); background: #17112d;
-    }
-    .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--secondary); }
-    .stat-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+    /* The fixed key hint bar must never cover the control the cursor moved to. */
+    [data-tv-focusable] { scroll-margin: 2rem 0 7rem; }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-    @media (max-width: 480px) {
-      body { padding: 12px 8px; }
-      header { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .brand h1 { font-size: 1.4rem; }
-      .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-      .dpad-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
-      button, .tv-btn { width: 100%; justify-content: center; }
-      .actions-bar { flex-direction: column; }
+    /* 10-foot focus ring. Deliberately loud: it has to read from a sofa. */
+    .tv-focused {
+      outline: 4px solid var(--focus) !important;
+      outline-offset: 4px !important;
+      box-shadow: 0 0 0 4px var(--amber-dim), 0 0 30px rgba(255, 193, 69, 0.35) !important;
+      border-radius: 12px;
     }
-    .empty-state-card {
-      background: rgba(15, 23, 42, 0.6); border: 1px dashed #334155; border-radius: 6px;
-      padding: 14px; color: var(--text-muted); font-size: 0.85rem; text-align: center;
-    }
-    .card {
-      background: var(--surface); border: 1px solid var(--surface-border);
-      border-radius: 14px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
-    .card-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 18px; }
 
-    .actions-bar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    button, .tv-btn {
-      background: var(--primary); color: white; border: 2px solid transparent; padding: 10px 18px;
-      border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem;
-      transition: all 0.2s;
+    /* ---------------------------------------------------------------- Header */
+    .topbar {
+      display: flex; flex-wrap: wrap; gap: 1rem 1.5rem;
+      align-items: center; justify-content: space-between;
+      padding-bottom: 1rem; border-bottom: 1px solid var(--line-soft); margin-bottom: 1.5rem;
     }
-    button:hover, button.tv-focused {
-      background: #7c3aed; transform: translateY(-1px);
-      box-shadow: 0 4px 20px var(--primary-glow); border-color: #fff;
+    .wordmark { display: flex; align-items: baseline; gap: 0.6rem; }
+    .wordmark strong { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.02em; }
+    .wordmark span { color: var(--muted); font-size: 0.82rem; letter-spacing: 0.09em; text-transform: uppercase; }
+
+    .conn-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem; }
+    /* The setup fields, off the first screen until asked for. */
+    .setup-row {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem;
+      background: var(--inset); border: 1px solid var(--line); border-radius: 0.6rem;
+      padding: 0.8rem 1rem; margin-bottom: 0.8rem;
     }
-    .btn-secondary { background: #1e293b; border: 2px solid #334155; color: var(--text); }
-    .btn-secondary:hover, .btn-secondary.tv-focused { background: #334155; border-color: var(--secondary); }
-    
-    .console-box {
-      background: #070a13; border: 1px solid var(--surface-border); border-radius: 8px;
-      padding: 16px; margin-top: 16px; min-height: 140px; font-size: 0.9rem;
+    .setup-row[hidden] { display: none; }
+    .setup-row .note { flex-basis: 100%; }
+    .conn-bar label, .setup-row label { color: var(--muted); }
+    .setup-row input {
+      background: var(--panel); border: 1px solid var(--line); color: var(--text);
+      padding: 0.45rem 0.6rem; border-radius: 0.4rem; font: inherit; font-size: 0.82rem; min-width: 13rem;
+    }
+    .state-pill {
+      padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.07em; text-transform: uppercase; border: 1px solid;
+    }
+    .state-unknown     { color: var(--muted); border-color: var(--line); background: transparent; }
+    .state-checking    { color: var(--info);  border-color: var(--info);  background: var(--info-dim); }
+    .state-reachable   { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
+    .state-unreachable { color: var(--alarm); border-color: var(--alarm); background: var(--alarm-dim); }
+    .note { color: var(--muted); font-size: 0.78rem; }
+
+    /* ------------------------------------------------------------------ Hero */
+    .hero {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 8px solid var(--line); border-radius: 1rem;
+      padding: 1.4rem 1.5rem 1.2rem; box-shadow: var(--shadow); margin-bottom: 1.2rem;
+    }
+    .hero[data-state="alarm"] { border-left-color: var(--alarm); }
+    .hero[data-state="calm"]  { border-left-color: var(--calm); }
+    .hero[data-state="busy"]  { border-left-color: var(--info); }
+
+    .hero-eyebrow {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.7rem;
+    }
+    .hero[data-state="alarm"] .hero-eyebrow { color: var(--alarm); }
+    .hero[data-state="calm"]  .hero-eyebrow { color: var(--calm); }
+    .hero[data-state="busy"]  .hero-eyebrow { color: var(--info); }
+
+    .hero-answer { display: flex; gap: 1.8rem; align-items: flex-start; flex-wrap: wrap; }
+    .hero-figure { flex: 0 0 auto; min-width: 7ch; }
+    .hero-figure-value {
+      font-family: var(--mono); font-weight: 700; line-height: 0.9;
+      font-size: clamp(3.2rem, 6.6vw, 7rem); letter-spacing: -0.04em;
+    }
+    .hero[data-state="alarm"] .hero-figure-value { color: var(--alarm); }
+    .hero[data-state="calm"]  .hero-figure-value { color: var(--calm); }
+    .hero-figure-label {
+      color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .hero-text { flex: 1 1 24ch; min-width: 0; }
+    .hero-headline { font-size: clamp(1.5rem, 2.9vw, 2.9rem); margin-bottom: 0.5rem; overflow-wrap: break-word; }
+    .hero-cause { font-size: clamp(1.15rem, 1.3vw, 1.4rem); color: var(--muted); overflow-wrap: break-word; }
+    .hero-cause .quote { color: var(--text); }
+
+    .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1.2rem; }
+    .demo-states { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px dashed var(--line-soft); }
+    .demo-states-label {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.6rem;
+    }
+    .demo-states-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+    .btn-demo { font-family: var(--mono); font-size: 0.85rem; }
+    .btn-demo[aria-pressed="true"] { border-color: var(--focus); color: var(--focus); }
+    .btn-sub {
+      display: block; font-family: var(--sans); font-weight: 400;
+      color: var(--muted); font-size: 0.78rem; margin-top: 0.2rem;
+    }
+    .btn-demo[aria-pressed="true"] .btn-sub { color: var(--text); }
+    .hero-reasons { margin-top: 0.6rem; display: grid; gap: 0.15rem; }
+    .hero-foot {
+      margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--line-soft);
+      display: flex; gap: 0.5rem 1.2rem; flex-wrap: wrap; align-items: center;
+    }
+    .src-badge { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1rem;
+                 color: var(--muted); font-size: 0.8rem; }
+    /* Provenance beside the figure it qualifies, inside the hero card and therefore
+       inside the first viewport height at 1920x1080. */
+    .hero-source { margin-top: 0.7rem; display: grid; gap: 0.3rem; justify-items: start; }
+    .hero-source .src-badge { margin-right: 0; }
+    .hero-accuracy { margin-top: 0.5rem; color: var(--muted); font-size: 0.95rem; max-width: 34ch; }
+
+    /* --------------------------------------------------------------- Buttons */
+    .btn {
+      font: inherit; font-weight: 700; cursor: pointer;
+      background: var(--inset); color: var(--text);
+      border: 2px solid var(--line); border-radius: 0.6rem;
+      padding: 0.7rem 1.1rem; text-align: left;
+    }
+    .btn:hover { border-color: var(--muted); }
+    .btn-primary {
+      background: var(--focus); color: var(--focus-ink); border-color: var(--focus);
+      font-size: 1.05rem; padding: 0.85rem 1.4rem;
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-danger { background: var(--alarm); color: #FFFFFF; border-color: var(--alarm); }
+    .btn-danger:hover { filter: brightness(1.08); }
+    .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .btn[disabled]:hover { border-color: var(--line); filter: none; }
+    .reason { color: var(--muted); font-size: 0.82rem; }
+
+    /* ------------------------------------------------------------------ Wall */
+    .wall { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .tile {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 1rem;
+      padding: 1.25rem 1.35rem; color: inherit; font: inherit;
+    }
+    .tile:hover { border-color: var(--muted); }
+    .tile-eyebrow {
+      display: block; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); font-weight: 700;
+    }
+    .tile-headline { display: block; font-size: 1.15rem; font-weight: 800; margin: 0.5rem 0 0.35rem; }
+    .tile-sub { display: block; color: var(--muted); font-size: 0.88rem; }
+    .tile-open { display: block; margin-top: 0.9rem; font-size: 0.78rem; letter-spacing: 0.1em;
+                 text-transform: uppercase; color: var(--focus); font-weight: 700; }
+
+    /* --------------------------------------------------------------- Panels */
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 1rem;
+      padding: 1.5rem; box-shadow: var(--shadow);
+    }
+    .panel h2 { font-size: 1.4rem; margin-bottom: 0.4rem; }
+    .panel-desc { color: var(--muted); font-size: 0.92rem; margin-bottom: 1.1rem; max-width: 80ch; }
+    .actions-bar { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 1rem; }
+
+    .console {
+      background: var(--inset); border: 1px solid var(--line-soft);
+      border-radius: 0.7rem; padding: 1rem; min-height: 8rem;
     }
     .console-header {
-      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between;
+      display: flex; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
+      font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.8rem; font-weight: 700;
     }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    .tag-elite { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); color: #6ee7b7; }
-    .tag-warn { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: #fca5a5; }
+    .latency { color: var(--muted); font-size: 0.78rem; letter-spacing: 0; text-transform: none; font-weight: 400; }
+
+    .empty-state-card { border: 1px dashed var(--line); border-radius: 0.5rem; padding: 0.9rem;
+                        color: var(--muted); font-size: 0.9rem; }
+    .loading-card { border: 1px dashed var(--info); border-radius: 0.5rem; padding: 0.9rem;
+                    color: var(--info); font-size: 0.9rem; }
+    .error-card { border: 1px solid var(--alarm); background: var(--alarm-dim); border-radius: 0.5rem;
+                  padding: 0.9rem; color: var(--text); font-size: 0.9rem; }
+    .error-card strong { color: var(--alarm); display: block; margin-bottom: 0.3rem; }
+    .error-detail { display: block; margin-top: 0.4rem; color: var(--muted); font-size: 0.82rem; }
+
+    .tag { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 0.3rem;
+           font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; border: 1px solid; }
+    .tag-ok      { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
+    .tag-warn    { color: var(--alarm); border-color: var(--alarm); background: var(--alarm-dim); }
+    .tag-live    { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
+    .tag-fixture { color: var(--focus); border-color: var(--focus); background: var(--amber-dim); }
+
+    .provenance { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+                  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--line-soft);
+                  color: var(--muted); font-size: 0.8rem; }
+    .provenance .src { font-family: var(--mono); color: var(--text); font-size: 0.8rem; }
+    .provenance .detail { flex: 1 1 20ch; min-width: 0; }
+
+    dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1.1rem; margin-top: 0.7rem; }
+    dl.kv dt { color: var(--muted); font-size: 0.85rem; }
+    dl.kv dd { font-size: 0.95rem; overflow-wrap: anywhere; }
+    .row { margin-top: 0.6rem; }
+    .row .sub { color: var(--muted); font-size: 0.82rem; display: block; }
+
+    /* ----------------------------------------------------------- Key hint bar */
+    .keybar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: var(--panel); border-top: 1px solid var(--line);
+      padding: 0.7rem 4vw; display: flex; gap: 0.6rem 1.4rem;
+      align-items: center; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted);
+    }
+    .keybar .hint { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    /* The note explains a remote nuance and is the one item long enough to push
+       the bar sideways on a phone. It wraps instead. */
+    .keybar .hint-note { white-space: normal; }
+    .key {
+      font-family: var(--mono); font-weight: 700; font-size: 0.78rem;
+      background: var(--inset); border: 1px solid var(--line); color: var(--text);
+      border-radius: 0.3rem; padding: 0.1rem 0.45rem;
+    }
+    .keybar .focused-label { margin-left: auto; color: var(--text); font-weight: 700; }
+
+    [hidden] { display: none !important; }
+
+    /* ----------------------------------------------------------- Breakpoints */
+    @media (max-width: 600px) {
+      .shell { padding: 2vh 5vw 1.5rem; }
+      .hero { padding: 1.25rem; border-left-width: 6px; }
+      .hero-answer { gap: 1rem; }
+      .hero-actions .btn { width: 100%; }
+      .setup-row input { min-width: 0; width: 100%; }
+      .conn-bar, .setup-row { width: 100%; }
+      .keybar { padding: 0.6rem 5vw; font-size: 0.75rem; }
+      .keybar .focused-label { margin-left: 0; width: 100%; }
+      /* A phone has no D-pad, and at this width the note alone made the fixed
+         bar 139px tall, which covered the answer it sits under. The keys and the
+         focused control still show; only the aside goes. */
+      .keybar .hint-note { display: none; }
+      body { padding-bottom: 7rem; }
+    }
+    @media (min-width: 1000px) {
+      .wall { grid-template-columns: repeat(3, 1fr); }
+    }
+    /* 10-foot mode. Root type goes to 24px, which is the floor for reading at
+       three metres, and the padding becomes a TV title-safe margin.
+
+       Raising the root alone was not enough, and that was the defect this block
+       now fixes. Every label, badge, provenance stamp and console line on this
+       page is set in fractions of a rem, so at a 24px root the headline read
+       across a room at 55.7px while the evidence under it rendered at 17.3px to
+       19.7px. The rules below put a floor of 1rem under all of it, in two tiers
+       so the reading order survives: supporting labels at the floor, panel body
+       copy a little above it.
+
+       Measured, not eyeballed: python scripts/measure_legibility.py opens this
+       page in Chromium at 1920x1080, drives it until the panels have content,
+       and prints the smallest rendered size on screen. */
+    @media (min-width: 1400px) {
+      html { font-size: 24px; }
+      .shell { padding: 3.5vh 5vw 1.5rem; }
+      .keybar { padding: 0.7rem 5vw; }
+      .topbar { padding-bottom: 0.7rem; margin-bottom: 0.9rem; }
+      /* The key bar wraps onto a second line once its own text clears the floor,
+         and it is fixed, so the page has to reserve more room under the content
+         than it did. The measurement script fails when it stops clearing. */
+      body { padding-bottom: 7rem; }
+
+      /* Tier one: decoration. Eyebrows, keys, section labels and one-line notes,
+         at the floor. Nothing here changes what a viewer is about to do. */
+      .wordmark span,
+      .conn-bar,
+      .setup-row,
+      .setup-row input,
+      .note,
+      .hero-eyebrow,
+      .hero-figure-label,
+      .demo-states-label,
+      .btn-demo,
+      .btn-sub,
+      .tile-eyebrow,
+      .tile-open,
+      .console-header,
+      .latency,
+      .error-detail,
+      dl.kv dt,
+      .row .sub,
+      .keybar,
+      .key { font-size: 1rem; }
+
+      /* Tier two: the sentences a viewer actually reads off the wall. */
+      .panel-desc,
+      .tile-sub,
+      .empty-state-card,
+      .loading-card,
+      .error-card,
+      dl.kv dd { font-size: 1.08rem; }
+
+      /* Tier three: the operational text. Not a floor problem, a reading order
+         problem. These were at the floor, which put the sentence saying what the
+         D-pad is about to do at the same size as the decorative wordmark caption:
+         "Ready to stage a rollback of checkout-api to b485c43" is the last thing
+         read before an irreversible action, and the two provenance chips beside it
+         are what say whether the number driving it was live or a fixture. They now
+         sit above the body copy rather than under it. Measured by
+         python scripts/measure_legibility.py, which reports the smallest
+         operational reading separately from the smallest reading anywhere. */
+      .state-pill,
+      .src-badge,
+      .tag,
+      .hero-accuracy,
+      .provenance,
+      .provenance .src { font-size: 1.08rem; }
+      .reason { font-size: 1.15rem; }
+
+      /* Both inputs sit on one row with three controls beside them, and at 24px
+         the old 13rem minimum pushed the whole bar onto a second line. */
+      .setup-row input { min-width: 9rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+    }
   </style>
-    <script src="suite_companion_enhancements.js"></script>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="brand">
-        <h1>⚡ <span>Mercury</span> Voice Cockpit</h1>
-        <p>10-Foot Multi-modal Engineering Cockpit on Fire TV & Alexa Voice Control</p>
+  <a class="skip-link" href="#hero">Skip to the incident answer</a>
+
+  <div class="shell">
+    <header class="topbar">
+      <div class="wordmark">
+        <strong>MERCURY</strong>
+        <span>Fire TV Incident Commander</span>
       </div>
-      <div class="badges-row">
-        <span class="badge">Fire TV 10-Foot UI</span>
-        <span class="badge">D-Pad Spatial Nav</span>
-        <span class="badge">DORA Metrics Radar</span>
-        <span class="badge">AWS Cost Explorer</span>
+
+      <!-- Two text fields used to sit here, on the first screen. On a television
+           that is a form standing between the viewer and the incident, and typing
+           into it with a D-pad is the worst interaction in the product. The page
+           defaults the API to its own origin and keeps both fields behind this
+           toggle, which is also opened automatically the moment an action needs
+           the governance secret. -->
+      <div class="conn-bar">
+        <button id="btnCheck" class="btn" data-tv-focusable data-tv-label="Check connection"
+                title="Send a real GET /health to the API and report the result">Check</button>
+        <button id="btnSpeak" class="btn" data-tv-focusable data-tv-label="Read summaries aloud"
+                aria-pressed="false"
+                title="Read each answer aloud with the browser's own speech synthesis">Read aloud: off</button>
+        <button id="btnSetup" class="btn" data-tv-focusable data-tv-label="Open connection setup"
+                aria-expanded="false" aria-controls="setupRow"
+                title="Show the API URL and governance secret fields. They are hidden so the first screen on a television is the incident, not a form.">Setup</button>
+        <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
     </header>
 
-    <!-- TV D-Pad Remote Banner -->
-    <div class="dpad-banner">
-      <div>🎮 <strong>10-Foot TV Spatial Navigation Active:</strong> Use your keyboard Arrow keys & Enter to navigate like a Fire TV Remote!</div>
-      <div class="dpad-keys">
-        <span class="key-badge">▲</span>
-        <span class="key-badge">▼</span>
-        <span class="key-badge">◄</span>
-        <span class="key-badge">►</span>
-        <span class="key-badge">ENTER</span>
-      </div>
+    <div class="setup-row" id="setupRow" hidden>
+      <label for="apiBase">API</label>
+      <input id="apiBase" type="text" spellcheck="false" autocomplete="off"
+             title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
+             placeholder="http://127.0.0.1:8002">
+      <label for="opSecret">Secret</label>
+      <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
+             title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
+             placeholder="MERCURY_ROLLBACK_SECRET">
+      <p class="note">The API defaults to the origin this page was served from, so it is
+        usually already right. The secret is MERCURY_ROLLBACK_SECRET: the server prints an
+        ephemeral one at startup when the variable is unset.</p>
     </div>
 
-    <div class="stats-row">
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">2.4 / day</div>
-        <div class="stat-lbl">Deploy Frequency</div>
-      </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">14.5 h</div>
-        <div class="stat-lbl">Lead Time</div>
-      </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">3.2%</div>
-        <div class="stat-lbl">Change Failure</div>
-      </div>
-      <div class="stat-tile tv-nav" tabindex="0" onclick="inspectDora()">
-        <div class="stat-val">0.8 h</div>
-        <div class="stat-lbl">Mean Recovery</div>
-      </div>
-    </div>
+    <p class="note" id="connDetail">The page has not called the API yet. The governance secret
+       is sent as an Authorization: Bearer header on the two rollback calls only. Never stored.</p>
 
-    <div class="grid">
-      <!-- Panel 1: DORA & PR Radar -->
-      <div class="card">
-        <h2>📊 Engineering Velocity & Pull Request Radar</h2>
-        <p class="card-desc">
-          Aggregates DORA velocity and highlights stale PRs across production repositories on the big screen.
-        </p>
-
-        <div class="actions-bar" style="margin-top: 0;">
-          <button data-testid="primary-hero-action" class="primary-action tv-nav" tabindex="0" title="Calculate engineering velocity and DORA performance tiers" onclick="inspectDora()">🚀 Calculate DORA Velocity</button>
-          <button class="btn-secondary tv-nav" tabindex="0" title="Scan repositories for pull requests exceeding 36-hour review SLA" onclick="inspectPrs()">🔍 Scan Stale PRs (>36h)</button>
-        </div>
-
-        <div class="console-box">
-          <div class="console-header">
-            <span>DORA Velocity Assessment</span>
-            <span id="doraTag" class="tag tag-elite">ELITE PERFORMER</span>
+    <main>
+      <!-- ------------------------------------------------------------- Hero -->
+      <section id="hero" class="hero" data-state="idle" aria-labelledby="heroHeadline">
+        <div id="heroLive" aria-live="polite">
+          <p class="hero-eyebrow" id="heroEyebrow">No answer yet</p>
+          <div class="hero-answer">
+            <div class="hero-figure">
+              <div class="hero-figure-value" id="heroFigure">?</div>
+              <div class="hero-figure-label" id="heroFigureLabel">Not measured</div>
+              <!-- Where the figure above came from. This lives inside the hero card,
+                   next to the number, because at 1920x1080 the hero footer renders
+                   below the fold and a wallboard is read from across a room without
+                   scrolling. -->
+              <div class="hero-source" id="heroSource"></div>
+            </div>
+            <div class="hero-text">
+              <h1 class="hero-headline" id="heroHeadline">What broke?</h1>
+              <p class="hero-cause" id="heroCause">
+                Mercury has not called its API yet, so it is claiming nothing. Press
+                <strong>Ask what changed</strong> and this line will be replaced by the commit the
+                server attributes the anomaly to, or by its refusal to attribute it to anything.
+              </p>
+            </div>
           </div>
-          <div id="doraOutput"><div class="empty-state-card"><span>ℹ️ Ready for DORA evaluation. Press Enter or click Calculate DORA above.</span></div></div>
-        </div>
-      </div>
-
-      <!-- Panel 2: Cost Radar & Governed Rollback -->
-      <div class="card">
-        <h2>💰 AWS Cost Anomaly & Governed Rollback</h2>
-        <p class="card-desc">
-          Detects runaway AWS Bedrock / ECS spend and executes governed production rollbacks with 300s leases.
-        </p>
-
-        <div class="actions-bar" style="margin-top: 0;">
-          <button class="tv-nav" tabindex="0" title="Scan AWS Cost Explorer for spend surges (>200% burn rate)" onclick="scanCostAnomalies()">📊 Scan AWS Cost Explorer</button>
-          <button class="btn-secondary tv-nav" tabindex="0" title="Stage production rollback under SHA-256 lock & 300s lease" onclick="initiateRollback()">⏪ Execute Governed Rollback</button>
         </div>
 
-        <div class="console-box">
-          <div class="console-header">
-            <span>AWS Telemetry & Rollback Lease</span>
-            <span id="costTag">MONITORING</span>
+        <div class="hero-actions">
+          <button data-testid="primary-hero-action" id="btnWhatChanged" class="btn btn-primary"
+                  data-tv-focusable data-tv-label="Ask what changed"
+                  title="Call POST /mcp/tools/what_changed and render the correlator's verdict">
+            Ask what changed
+          </button>
+          <button id="btnStage" class="btn btn-danger" data-tv-focusable data-tv-label="Stage governed rollback" disabled
+                  aria-describedby="stageReason"
+                  title="Disabled until a correlation returns a rollback target">
+            Stage governed rollback
+          </button>
+          <button id="btnConfirm" class="btn btn-danger" data-tv-focusable data-tv-label="Confirm rollback" disabled
+                  aria-describedby="confirmReason"
+                  title="Disabled until a rollback has been staged and a governance token issued">
+            Confirm rollback
+          </button>
+        </div>
+
+        <div class="hero-reasons">
+          <span class="reason" id="stageReason">Staging is off until the server returns a rollback target.</span>
+          <span class="reason" id="confirmReason">Confirming is off until staging mints a single-use governance token.</span>
+        </div>
+
+        <!-- The four services the offline fixture knows about, one per answer the
+             correlator can give. Three of them make it refuse. The names are the
+             ones in SIMULATED_SERVICES in src/infrastructure/cloudwatch_adapter.py,
+             and a test fails the build if the two lists drift apart. -->
+        <div class="demo-states" role="group" aria-labelledby="demoStatesLabel">
+          <p class="demo-states-label" id="demoStatesLabel">Ask about another service</p>
+          <div class="demo-states-row">
+            <button class="btn btn-demo" data-service="checkout-api" aria-pressed="true" data-tv-focusable
+                    data-tv-label="Ask about checkout-api"
+                    title="Correlate checkout-api, whose simulated spike lands minutes after a real commit">
+              checkout-api
+              <span class="btn-sub">spike just after a commit</span>
+            </button>
+            <button class="btn btn-demo" data-service="payments-worker" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about payments worker"
+                    title="Correlate payments-worker, whose reading stays under the anomaly threshold">
+              payments-worker
+              <span class="btn-sub">reading inside its own baseline</span>
+            </button>
+            <button class="btn btn-demo" data-service="search-indexer" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about search indexer"
+                    title="Correlate search-indexer, whose spike is hours away from any commit">
+              search-indexer
+              <span class="btn-sub">spike with an empty window</span>
+            </button>
+            <button class="btn btn-demo" data-service="release-train" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about release train"
+                    title="Correlate release-train, whose spike follows a burst of changes that Mercury refuses to choose between">
+              release-train
+              <span class="btn-sub">too many changes to name one</span>
+            </button>
+            <button class="btn btn-demo" data-service="quiet-service" aria-pressed="false" data-tv-focusable
+                    data-tv-label="Ask about a service Mercury does not know"
+                    title="Ask about a name the offline fixture does not know, and watch it refuse">
+              quiet-service
+              <span class="btn-sub">a name the fixture refuses</span>
+            </button>
           </div>
-          <div id="costOutput"><div class="empty-state-card"><span>ℹ️ Ready for cloud cost audit. Click Scan Cost Explorer or Stage Rollback.</span></div></div>
+          <p class="note">Without AWS credentials the metric series is generated locally, and it is
+            generated from the name of the service, so these four answers differ. A name that is not
+            on this list is refused rather than given an invented reading.</p>
         </div>
-      </div>
-    </div>
+
+        <div class="hero-foot">
+          <span class="latency" id="heroLatency">No call measured yet.</span>
+          <span id="heroProvenance"></span>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------- Wall -->
+      <section id="wall" class="wall" aria-label="War room panels">
+        <button class="tile" data-tv-focusable data-panel="incident" data-tv-label="Incident evidence panel">
+          <span class="tile-eyebrow">Incident evidence</span>
+          <span class="tile-headline" id="tileIncidentHeadline">Not loaded</span>
+          <span class="tile-sub" id="tileIncidentSub">Metric series, baseline, attribution window and both provenance stamps.</span>
+          <span class="tile-open">Center to open</span>
+        </button>
+
+        <button class="tile" data-tv-focusable data-panel="velocity" data-tv-label="Delivery velocity panel">
+          <span class="tile-eyebrow">Delivery velocity</span>
+          <span class="tile-headline" id="tileVelocityHeadline">Not loaded</span>
+          <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog.</span>
+          <span class="tile-open">Center to open</span>
+        </button>
+
+        <button class="tile" data-tv-focusable data-panel="spend" data-tv-label="Cloud spend panel">
+          <span class="tile-eyebrow">Cloud spend</span>
+          <span class="tile-headline" id="tileSpendHeadline">Not loaded</span>
+          <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing.</span>
+          <span class="tile-open">Center to open</span>
+        </button>
+      </section>
+
+      <!-- ----------------------------------------------------------- Panels -->
+      <section id="panel-incident" class="panel" data-panel-body hidden aria-labelledby="incidentTitle">
+        <h2 id="incidentTitle">Incident evidence</h2>
+        <p class="panel-desc">Everything the correlator used to reach the answer in the hero: the metric
+          series and its baseline, the attribution window, the commit it landed on, and where each half
+          of that came from. The rollback controls stay in the hero, so the action is never buried.</p>
+        <div class="actions-bar">
+          <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
+                  title="Return to the three panels">Back to wall</button>
+        </div>
+        <div class="console">
+          <div class="console-header">
+            <span>POST /mcp/tools/what_changed</span>
+            <span id="incidentLatency" class="latency"></span>
+          </div>
+          <div id="incidentOutput" aria-live="polite">
+            <div class="empty-state-card">No correlation requested yet. Ask what changed in the hero and
+              the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-velocity" class="panel" data-panel-body hidden aria-labelledby="velocityTitle">
+        <h2 id="velocityTitle">Delivery velocity</h2>
+        <p class="panel-desc">DORA proxies computed from GitHub Actions runs and merged pull requests, and
+          the open pull requests past the 36 hour review SLA. Every figure arrives from the API call named
+          in the console header below.</p>
+        <div class="actions-bar">
+          <button class="btn btn-primary" data-tv-focusable data-tv-label="Load DORA velocity" data-action="dora"
+                  title="Call POST /mcp/tools/get_dora_velocity_report and render the response">Load DORA velocity</button>
+          <button class="btn" data-tv-focusable data-tv-label="Scan stale pull requests" data-action="prs"
+                  title="Call POST /mcp/tools/get_pr_bottlenecks and render the response">Scan stale pull requests</button>
+          <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
+                  title="Return to the three panels">Back to wall</button>
+        </div>
+        <div class="console">
+          <div class="console-header">
+            <span id="doraEndpoint">POST /mcp/tools/get_dora_velocity_report</span>
+            <span id="doraLatency" class="latency"></span>
+          </div>
+          <div id="doraOutput" aria-live="polite">
+            <div class="empty-state-card">Nothing loaded yet. Choose an action above and the response
+              body appears here with the data source it came from.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-spend" class="panel" data-panel-body hidden aria-labelledby="spendTitle">
+        <h2 id="spendTitle">Cloud spend</h2>
+        <p class="panel-desc">Month-to-date spend per service from Cost Explorer with day-over-average
+          anomalies. Cost Explorer aggregates daily and lags up to 24 hours, so this never shows the last
+          hour, and the response says so on screen.</p>
+        <div class="actions-bar">
+          <button class="btn btn-primary" data-tv-focusable data-tv-label="Scan AWS spend" data-action="cost"
+                  title="Call POST /mcp/tools/get_aws_cost_anomalies and render the response">Scan AWS spend</button>
+          <button class="btn" data-tv-focusable data-tv-label="Audit observability gaps" data-action="observability"
+                  title="Call POST /mcp/tools/audit_observability for the current service">Audit observability gaps</button>
+          <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
+                  title="Return to the three panels">Back to wall</button>
+        </div>
+        <div class="console">
+          <div class="console-header">
+            <span id="costEndpoint">POST /mcp/tools/get_aws_cost_anomalies</span>
+            <span id="costLatency" class="latency"></span>
+          </div>
+          <div id="costOutput" aria-live="polite">
+            <div class="empty-state-card">Nothing loaded yet. Choose an action above and the response
+              body appears here with the data source it came from.</div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
+  <footer class="keybar">
+    <span class="hint"><span class="key">&#9650;</span><span class="key">&#9660;</span><span class="key">&#9668;</span><span class="key">&#9658;</span> Move</span>
+    <span class="hint"><span class="key">CENTER</span> Select</span>
+    <span class="hint"><span class="key">BACK</span> <span id="hintBack">Exit to the Fire TV launcher</span></span>
+    <span class="hint hint-note">Text fields are outside the D-pad ring, so the remote cannot get stuck in one.</span>
+    <span class="focused-label" id="hintFocus">Focused: nothing yet</span>
+  </footer>
+
+  <script src="webmcp_bridge.js"></script>
+  <script src="firetv_nav.js"></script>
   <script>
-    function speakVoiceDigest(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const ut = new SpeechSynthesisUtterance(text);
-        ut.rate = 1.05;
-        window.speechSynthesis.speak(ut);
+  /* global WebMCPBridge */
+  var Mercury = (function () {
+    'use strict';
+
+    var DEFAULT_SERVICE = 'checkout-api';
+
+    var state = {
+      view: 'wall',
+      lastPanel: null,
+      staged: null,
+      lastCorrelation: null,
+      connection: 'unknown',
+      speak: false,
+      /* Which service the next correlation asks about. Changed only by the demo
+         state buttons, so the screen always names the service it answered for. */
+      service: DEFAULT_SERVICE
+    };
+
+    function el(id) { return document.getElementById(id); }
+
+    /* Every value that comes back from the API reaches the DOM through
+       textContent on a node built here. Nothing on this page assigns innerHTML,
+       so there is no escaping rule for a future edit to forget. */
+    function h(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined && text !== null) node.textContent = String(text);
+      return node;
+    }
+    function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+    function render(targetId, node) {
+      var host = el(targetId);
+      clear(host);
+      host.appendChild(node);
+    }
+    function kv(pairs) {
+      var list = document.createElement('dl');
+      list.className = 'kv';
+      pairs.forEach(function (pair) {
+        list.appendChild(h('dt', null, pair[0]));
+        list.appendChild(h('dd', null, pair[1]));
+      });
+      return list;
+    }
+
+    // ------------------------------------------------------------- Connection
+
+    function apiBase() {
+      var typed = el('apiBase').value.trim();
+      if (typed) { return typed.replace(/\/$/, ''); }
+      // A page opened from the file system has no origin worth calling. Say so
+      // rather than pointing at something that serves only static files.
+      if (window.location.protocol === 'file:') { return ''; }
+      return window.location.origin;
+    }
+
+    /* The setup fields are off the first screen. Show them when the viewer asks,
+       and show them by themselves the moment an action cannot proceed without
+       what is in them, so a refusal to stage points at the field it needs. */
+    function setSetupVisible(visible) {
+      el('setupRow').hidden = !visible;
+      var button = el('btnSetup');
+      button.setAttribute('aria-expanded', visible ? 'true' : 'false');
+      button.textContent = visible ? 'Hide setup' : 'Setup';
+      button.setAttribute('data-tv-label', visible ? 'Hide connection setup' : 'Open connection setup');
+    }
+
+    function toggleSetup() { setSetupVisible(el('setupRow').hidden); }
+
+    function requireSecret() {
+      var secret = el('opSecret').value.trim();
+      if (!secret) {
+        setSetupVisible(true);
+        try { el('opSecret').focus(); } catch (ignored) { /* no focus on a TV WebView */ }
       }
+      return secret;
     }
 
-    function inspectDora() {
-      document.getElementById('doraTag').className = 'tag tag-elite';
-      document.getElementById('doraTag').innerText = 'ELITE PERFORMER';
-      document.getElementById('doraOutput').innerHTML = 
-        '<strong>DORA Rating:</strong> Elite Performer<br>' +
-        '<strong>Deploy Frequency:</strong> 2.4 deploys/day (Industry top decile)<br>' +
-        '<strong>Change Failure Rate:</strong> 3.2% (Target < 15%)<br>' +
-        '<strong>Voice Summary:</strong> "Team velocity is healthy with 2.4 daily deploys and 0.8h MTTR."';
-      speakVoiceDigest("Team velocity is rated Elite Performer with 2.4 daily deploys and 0.8 hour recovery time.");
+    function setConnection(kind, detail) {
+      state.connection = kind;
+      var pill = el('connState');
+      pill.className = 'state-pill state-' + kind;
+      pill.textContent = {
+        unknown: 'API not checked',
+        checking: 'Checking',
+        reachable: 'API reachable',
+        unreachable: 'API unreachable'
+      }[kind];
+      el('connDetail').textContent = detail;
     }
 
-    function inspectPrs() {
-      document.getElementById('doraOutput').innerHTML = 
-        '<strong>Total Open PRs:</strong> 18<br>' +
-        '<span class="tag tag-warn">ATTENTION</span> <strong>PR #342:</strong> Implement Stripe Webhook Retry Logic (<code>backend-payments</code>)<br>' +
-        'Open for 48.0 hours without review. Author: <code>dev_alex</code>';
-      speakVoiceDigest("Attention: Pull Request 342 in payments backend has been open for 48 hours without review.");
+    // ----------------------------------------------------------- Async states
+
+    function showLoading(targetId, message) {
+      render(targetId, h('div', 'loading-card', message));
     }
 
-    function scanCostAnomalies() {
-      document.getElementById('costTag').innerHTML = '<span class="tag tag-warn">ANOMALY DETECTED</span>';
-      document.getElementById('costOutput').innerHTML = 
-        '<span class="tag tag-warn">COST SPIKE +311%</span> <strong>Amazon Bedrock & ECS Staging</strong><br>' +
-        '<strong>Daily Spend:</strong> $185.00 / day (Previous avg: $45.00 / day)<br>' +
-        '<strong>Root Cause:</strong> Unclosed load test tasks in staging cluster.<br>' +
-        '<strong>Spoken Digest:</strong> "Warning: Staging Bedrock tasks increased daily burn by 311%."';
-      speakVoiceDigest("Warning: Staging Bedrock tasks increased daily burn by 311 percent to 185 dollars per day.");
-    }
-
-    function initiateRollback() {
-      document.getElementById('costOutput').innerHTML = 
-        '<span class="tag tag-warn">ROLLBACK LEASE INITIATED</span> <strong>Service: payments-api</strong><br>' +
-        '<strong>Target Commit:</strong> <code>git checkout HEAD~1</code> (SHA <code>12443b59</code>)<br>' +
-        '<strong>Lease Duration:</strong> 300 seconds.<br>' +
-        '<strong>Voice Confirmation Prompt:</strong> "Alexa, approve rollback for payments-api."';
-      speakVoiceDigest("Production rollback lease staged for payments API. 300 second lease active. Say: Alexa, approve rollback.");
-    }
-
-    // 10-Foot D-Pad Keyboard Spatial Navigation
-    let navElements = [];
-    let currentFocus = 0;
-
-    window.addEventListener('DOMContentLoaded', () => {
-      navElements = Array.from(document.querySelectorAll('.tv-nav'));
-      if (navElements.length > 0) {
-        navElements[0].classList.add('tv-focused');
+    function showError(targetId, message, url) {
+      var card = h('div', 'error-card');
+      card.appendChild(h('strong', null, 'Request failed'));
+      card.appendChild(h('span', null, message));
+      if (url) { card.appendChild(h('span', 'error-detail', url)); }
+      if (state.connection === 'unreachable' || !apiBase()) {
+        card.appendChild(h('span', 'error-detail',
+          'This page is static unless a Mercury API is running. Start it with '
+          + 'python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.'));
       }
-    });
+      render(targetId, card);
+    }
 
-    window.addEventListener('keydown', (e) => {
-      if (!navElements.length) return;
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
-        e.preventDefault();
-        navElements[currentFocus].classList.remove('tv-focused');
+    function provenanceBlock(provenance) {
+      var box = h('div', 'provenance');
+      if (!provenance) {
+        box.appendChild(h('span', 'detail', 'This response carried no provenance stamp.'));
+        return box;
+      }
+      var live = provenance.is_live === true;
+      box.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
+        provenance.display_label || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      box.appendChild(h('span', 'src', provenance.data_source || 'unknown'));
+      box.appendChild(h('span', 'detail', provenance.detail || ''));
+      if (provenance.observed_at_utc) {
+        box.appendChild(h('span', 'detail', 'Observed ' + provenance.observed_at_utc + '.'));
+      }
+      return box;
+    }
 
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          currentFocus = (currentFocus + 1) % navElements.length;
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          currentFocus = (currentFocus - 1 + navElements.length) % navElements.length;
-        } else if (e.key === 'Enter') {
-          navElements[currentFocus].click();
+    /* The data-source badge is the point, not decoration: it says on the screen
+       whether the number beside it was read live or served from a recording.
+
+       It used to print the machine value, "offline-fixture", and it used to sit in
+       the hero's footer. Measured at 1920x1080 that footer rendered at y=1144 while
+       the anomaly factor rendered at y=280, so a wallboard viewer read a fabricated
+       12.9x as a live production number and none of the thirty strings above the fold
+       said otherwise. It now prints display_label, the words OFFLINE FIXTURE, and it
+       renders inside the hero card next to the factor it qualifies.
+       tests/e2e/test_html_structure.py fails the build if it leaves the first
+       viewport height again. */
+    function sourceBadge(provenance, label) {
+      var wrap = h('span', 'src-badge');
+      var live = provenance && provenance.is_live === true;
+      wrap.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
+        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      wrap.appendChild(h('span', null,
+        label + ((provenance && provenance.data_source) ? ' (' + provenance.data_source + ')' : '')));
+      return wrap;
+    }
+
+    /**
+     * One real HTTP call. The duration is measured around the fetch with
+     * performance.now(), so the number on screen is the latency this page
+     * experienced, not a number written into the page.
+     */
+    async function call(path, options, latencyTargetId) {
+      var base = apiBase();
+      if (!base) { throw new Error('No Mercury API URL is set, so no request was sent.'); }
+      var url = base + path;
+      var started = performance.now();
+      var response;
+      try {
+        response = await fetch(url, options || {});
+      } catch (networkError) {
+        setConnection('unreachable', 'Last call to ' + url + ' failed: ' + networkError.message);
+        throw networkError;
+      }
+      var elapsed = performance.now() - started;
+      if (latencyTargetId) {
+        el(latencyTargetId).textContent = 'HTTP ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms';
+      }
+      var body = null;
+      try { body = await response.json(); } catch (parseError) { body = null; }
+      if (!response.ok) {
+        var detail = body && body.detail !== undefined ? body.detail : response.statusText;
+        if (detail && typeof detail === 'object') {
+          detail = (detail.denial_reason ? detail.denial_reason + ': ' : '')
+            + (detail.message || 'the server sent no message');
         }
-        navElements[currentFocus].classList.add('tv-focused');
-        navElements[currentFocus].focus();
+        var failure = new Error('HTTP ' + response.status + '. ' + detail);
+        failure.status = response.status;
+        throw failure;
       }
-    });
+      setConnection('reachable',
+        'Last call: ' + path + ' returned ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms.');
+      return { body: body, elapsedMs: elapsed, status: response.status, url: url };
+    }
+
+    function post(path, payload, latencyTargetId, secret) {
+      var headers = { 'Content-Type': 'application/json' };
+      if (secret) { headers['Authorization'] = 'Bearer ' + secret; }
+      return call(path, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload === undefined ? {} : payload)
+      }, latencyTargetId);
+    }
+
+    function speak(text) {
+      if (!state.speak || !text || !('speechSynthesis' in window)) { return; }
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+
+    // ------------------------------------------------------------------ Hero
+
+    function setHero(config) {
+      var hero = el('hero');
+      hero.setAttribute('data-state', config.state);
+      el('heroEyebrow').textContent = config.eyebrow;
+      el('heroFigure').textContent = config.figure;
+      el('heroFigureLabel').textContent = config.figureLabel;
+      el('heroHeadline').textContent = config.headline;
+
+      var cause = el('heroCause');
+      clear(cause);
+      if (config.quote) {
+        cause.appendChild(h('span', 'quote', '“' + config.quote + '”'));
+        cause.appendChild(document.createTextNode(' '));
+      }
+      cause.appendChild(document.createTextNode(config.cause));
+
+      /* Provenance renders inside the hero card, beside the figure, so it is on the
+         same screenful as the number it qualifies. The hero footer it used to live in
+         is below the fold at Fire TV resolution. */
+      var source = el('heroSource');
+      clear(source);
+      (config.badges || []).forEach(function (badge) { source.appendChild(badge); });
+
+      /* What naming a commit is measured to be worth, from the labelled corpus, on the
+         screen at the moment somebody is deciding whether to revert. */
+      var prov = el('heroProvenance');
+      clear(prov);
+      if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+    }
+
+    /* One sentence about how often this correlator names the right commit, taken from
+       the trial summary the server shipped with the answer. Never computed here. */
+    function accuracyLine(data) {
+      var measured = data.attribution && data.attribution.measured_accuracy;
+      if (!measured) { return ''; }
+      if (!measured.measured) { return measured.note; }
+      return 'Measured: when this correlator names a commit it is the one that caused the '
+        + 'reading ' + Math.round(measured.precision_when_it_names_a_commit * 100) + '% of the time, '
+        + 'over ' + measured.namings_measured + ' namings in a corpus of ' + measured.corpus_cases
+        + ' labelled cases. Reproduce with ' + measured.measured_by_command + '.';
+    }
+
+    /* The sentence the server ships with a refusal: what Mercury cannot do and why, and
+       that the reason is not a finding about the deploys. The local fallback is for a
+       server that predates the field, and it is worded to the same rule. */
+    function refusalStatement(data, fallback) {
+      var statement = data.attribution && data.attribution.refusal_statement;
+      return statement || fallback;
+    }
+
+    function setReason(buttonId, reasonId, enabled, reason, title) {
+      el(buttonId).disabled = !enabled;
+      el(buttonId).title = title;
+      el(reasonId).textContent = reason;
+    }
+
+    function heroFromCorrelation(data) {
+      var metric = data.metric;
+      var factor = metric.anomaly_factor;
+      var badges = [
+        sourceBadge(data.metric_provenance, 'metric series'),
+        sourceBadge(data.commit_provenance, 'commit history')
+      ];
+
+      var accuracy = accuracyLine(data);
+
+      if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) {
+        /* Say out loud when the named commit was one of several candidates. The shipped
+           correlator refuses a window holding more than one change, so this reads as
+           false unless somebody has turned that gate off, and the branch stays because
+           the disclosure is what an ungated answer owes an operator. */
+        var ambiguous = data.attribution && data.attribution.is_ambiguous;
+        setHero({
+          state: 'alarm',
+          eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Incident attributed',
+          figure: factor + '×',
+          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          headline: 'Commit ' + data.offending_commit.sha + ' raised ' + metric.name + ' on ' + data.service,
+          quote: data.offending_commit.message,
+          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the spike started.'
+            + (ambiguous
+              ? ' It is not the only one: ' + data.attribution.commits_in_window
+                + ' changes landed inside the attribution window, and this rule names the closest.'
+              : ' It is the only change inside the attribution window.'),
+          badges: badges,
+          accuracy: accuracy
+        });
+      } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION'
+                 && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
+        /* The answer this product is built around: an anomaly is real and Mercury will
+           not name a change for it, because a burst of changes landed and nothing in a
+           metric series says which of them did it. It is rendered as what it is, a
+           refusal to attribute, never as a finding that the changes are innocent. */
+        setHero({
+          state: 'alarm',
+          eyebrow: 'Incident, too many changes to name one',
+          figure: factor + '×',
+          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          headline: 'Cannot attribute this. ' + data.attribution.commits_in_window
+            + ' changes landed before ' + metric.name + ' rose on ' + data.service,
+          cause: refusalStatement(data,
+            'Mercury names a change only when exactly one landed inside the attribution window. '
+            + data.attribution.commits_in_window + ' did, so it cannot attribute this to any one of them, '
+            + 'names none, and offers no rollback. That is a refusal to guess, not a finding that none of '
+            + 'them caused it.'),
+          badges: badges,
+          accuracy: accuracy
+        });
+      } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') {
+        /* An empty window. It says nothing about changes outside the window, so the
+           screen says cannot-attribute and never no-deploy. */
+        setHero({
+          state: 'alarm',
+          eyebrow: 'Incident, cannot attribute: window empty',
+          figure: factor + '×',
+          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          headline: 'Cannot attribute this. No change landed in the window before ' + metric.name
+            + ' rose on ' + data.service,
+          cause: refusalStatement(data,
+            'No change landed inside the attribution window before the onset, so Mercury cannot attribute '
+            + 'this to a change, names no commit and offers no rollback. An empty window is not evidence that '
+            + 'no change caused it.'),
+          badges: badges,
+          accuracy: accuracy
+        });
+      } else if (data.verdict === 'NO_ANOMALY') {
+        /* The one verdict that may say nothing needs reverting: the reading is inside
+           its own baseline, so there is nothing wrong to revert. */
+        setHero({
+          state: 'calm',
+          eyebrow: 'Steady',
+          figure: factor + '×',
+          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          headline: data.service + ' is inside its own baseline',
+          cause: 'Nothing changed enough to report, so nothing needs reverting on this reading. '
+            + 'Mercury offers no rollback when it can see no anomaly.',
+          badges: badges
+        });
+      } else {
+        // The refusal reason lives in the metric provenance, and it is the part
+        // a viewer needs: the correlator's own sentence only says the series was
+        // too short, not why the server declined to produce one.
+        var why = data.metric_provenance && data.metric_provenance.detail;
+        setHero({
+          state: 'idle',
+          eyebrow: 'Cannot answer',
+          figure: 'n/a',
+          figureLabel: metric.sample_size + ' data points',
+          headline: 'Not enough data to answer for ' + data.service,
+          cause: data.explanation + (why ? ' ' + why : ''),
+          badges: badges
+        });
+      }
+    }
+
+    function heroFromFailure(message) {
+      setHero({
+        state: 'idle',
+        eyebrow: 'No answer',
+        figure: '?',
+        figureLabel: 'Not measured',
+        headline: 'No Mercury API answered',
+        cause: message + ' This page is static unless a Mercury API is running. '
+          + 'Start it with python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.',
+        badges: []
+      });
+    }
+
+    // ------------------------------------------------------------- Navigation
+
+    function panels() { return document.querySelectorAll('[data-panel-body]'); }
+
+    function showWall() {
+      state.view = 'wall';
+      Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = true; });
+      el('wall').hidden = false;
+      el('hintBack').textContent = 'Exit to the Fire TV launcher';
+      window.scrollTo(0, 0);
+      var origin = state.lastPanel
+        ? document.querySelector('.tile[data-panel="' + state.lastPanel + '"]')
+        : null;
+      if (window.mercuryNav) { window.mercuryNav.setFocus(origin || document.querySelector('.tile')); }
+    }
+
+    function showPanel(name) {
+      var target = el('panel-' + name);
+      if (!target) { return; }
+      state.view = name;
+      state.lastPanel = name;
+      Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = panel !== target; });
+      el('wall').hidden = true;
+      el('hintBack').textContent = 'Back to the wall';
+      if (window.mercuryNav) {
+        window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));
+      }
+    }
+
+    // ---------------------------------------------------------------- Actions
+
+    async function checkConnection() {
+      var base = apiBase();
+      if (!base) {
+        setSetupVisible(true);
+        setConnection('unreachable', 'No API URL. Press Setup and enter one, or open this page from a running Mercury server.');
+        return;
+      }
+      setConnection('checking', 'Sending GET ' + base + '/health');
+      try {
+        var result = await call('/health', { method: 'GET' }, null);
+        var sha = result.body.build_sha ? result.body.build_sha.slice(0, 7) : 'unreported';
+        setConnection('reachable',
+          'GET /health returned ' + result.status + ' in ' + result.elapsedMs.toFixed(0)
+          + ' ms. Build ' + sha + '. GitHub live: '
+          + (result.body.github_live ? 'yes' : 'no, fixture mode') + '.');
+      } catch (error) {
+        setConnection('unreachable', 'GET ' + base + '/health failed: ' + error.message);
+      }
+    }
+
+    async function loadWhatChanged() {
+      setHero({
+        state: 'busy',
+        eyebrow: 'Asking',
+        figure: '...',
+        figureLabel: 'call in flight',
+        headline: 'Asking the Mercury API what changed',
+        cause: 'POST /mcp/tools/what_changed for ' + state.service + ' over the last 60 minutes.',
+        badges: []
+      });
+      el('heroLatency').textContent = 'Measuring.';
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/what_changed ...');
+      setReason('btnStage', 'stageReason', false,
+        'Staging is off until the server returns a rollback target.',
+        'Disabled until a correlation returns a rollback target');
+      setReason('btnConfirm', 'confirmReason', false,
+        'Confirming is off until staging mints a single-use governance token.',
+        'Disabled until a rollback has been staged and a governance token issued');
+      state.staged = null;
+
+      try {
+        var res = await post('/mcp/tools/what_changed',
+          { service_name: state.service, time_window_minutes: 60 }, 'incidentLatency');
+        var data = res.body;
+        state.lastCorrelation = data;
+        el('heroLatency').textContent =
+          'POST /mcp/tools/what_changed answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+        heroFromCorrelation(data);
+        renderIncidentDetail(data);
+        el('tileIncidentHeadline').textContent = data.verdict.split('_').join(' ').toLowerCase();
+        el('tileIncidentSub').textContent =
+          data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';
+
+        if (data.recommended_action) {
+          setReason('btnStage', 'stageReason', true,
+            'Ready to stage a rollback of ' + data.recommended_action.target_service
+            + ' to ' + data.recommended_action.target_commit_sha + '. Needs the governance secret.',
+            'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
+        } else {
+          setReason('btnStage', 'stageReason', false,
+            'This correlation produced no rollback target, so there is nothing to stage.',
+            'Disabled until a correlation returns a rollback target');
+        }
+        speak(data.voice_summary);
+      } catch (error) {
+        heroFromFailure(error.message);
+        el('heroLatency').textContent = 'The call did not complete.';
+        showError('incidentOutput', error.message);
+        el('tileIncidentHeadline').textContent = 'Call failed';
+        el('tileIncidentSub').textContent = error.message;
+      }
+    }
+
+    function renderIncidentDetail(data) {
+      var box = document.createElement('div');
+      box.appendChild(h('span', 'tag ' + (data.incident_detected ? 'tag-warn' : 'tag-ok'), data.verdict));
+      box.appendChild(kv([
+        ['Service', data.service],
+        ['Metric', data.metric.name],
+        ['Baseline mean', data.metric.baseline],
+        ['Current reading', data.metric.current],
+        ['Factor', data.metric.anomaly_factor + 'x over ' + data.metric.sample_size + ' points']
+      ]));
+      box.appendChild(h('p', 'row', data.explanation));
+
+      if (data.offending_commit) {
+        box.appendChild(kv([
+          ['Closest commit', data.offending_commit.sha + ' ' + data.offending_commit.message],
+          ['Author', data.offending_commit.author],
+          ['Committed', data.offending_commit.committed_at],
+          ['Candidates in the window', (data.attribution ? data.attribution.commits_in_window : '?')
+            + ((data.attribution && data.attribution.is_ambiguous)
+              ? ' changes landed inside the window. This names the closest of them, which is the '
+                + 'case every wrong attribution in the trial with a reachable cause fell into.'
+              : ' change landed inside the window, so there was nothing else it could be.')]
+        ]));
+      }
+      if (data.recommended_action) {
+        var rec = h('div', 'row');
+        rec.appendChild(h('strong', null,
+          'Rollback target ' + data.recommended_action.target_commit_sha));
+        rec.appendChild(h('span', 'sub', data.recommended_action.note));
+        box.appendChild(rec);
+      } else {
+        box.appendChild(h('div', 'empty-state-card',
+          'No rollback is offered for this verdict. That is the correlator refusing, not a missing feature.'));
+      }
+      box.appendChild(provenanceBlock(data.metric_provenance));
+      box.appendChild(provenanceBlock(data.commit_provenance));
+      render('incidentOutput', box);
+    }
+
+    async function stageRollback() {
+      var secret = requireSecret();
+      var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
+      if (!rec) {
+        showError('incidentOutput', 'No rollback target. Ask what changed first.');
+        showPanel('incident');
+        return;
+      }
+      if (!secret) {
+        showError('incidentOutput',
+          'No governance secret entered. Staging a rollback needs the deployment secret, and the '
+          + 'Setup fields have been opened above for it. The server prints an ephemeral one at startup.');
+        showPanel('incident');
+        return;
+      }
+
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/stage_rollback ...');
+      try {
+        var res = await post('/mcp/tools/stage_rollback', {
+          action_id: 'tv-' + Date.now(),
+          target_service: rec.target_service,
+          target_commit_sha: rec.target_commit_sha,
+          reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
+          lease_sec: 300
+        }, 'incidentLatency', secret);
+        state.staged = res.body;
+
+        setHero({
+          state: 'busy',
+          eyebrow: 'Rollback staged',
+          figure: Math.round(res.body.lease_seconds_remaining) + 's',
+          figureLabel: 'lease remaining',
+          headline: 'Roll back ' + res.body.target_service + ' to ' + res.body.target_commit_sha,
+          cause: res.body.confirmation_prompt,
+          badges: []
+        });
+        el('heroLatency').textContent =
+          'POST /mcp/tools/stage_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+        setReason('btnConfirm', 'confirmReason', true,
+          'Token issued for action ' + res.body.action_id + '. It is valid once, for this exact change.',
+          'Confirm rollback ' + res.body.action_id + ' with its single-use token');
+
+        var box = document.createElement('div');
+        box.appendChild(h('span', 'tag tag-warn', res.body.state));
+        box.appendChild(kv([
+          ['Action', res.body.action_id],
+          ['Target', res.body.target_service + ' at ' + res.body.target_commit_sha],
+          ['Payload hash', res.body.payload_hash.slice(0, 24) + '...'],
+          ['Lease left', res.body.lease_seconds_remaining + ' s']
+        ]));
+        box.appendChild(h('p', 'row', res.body.confirmation_prompt));
+        render('incidentOutput', box);
+        speak(res.body.confirmation_prompt);
+      } catch (error) {
+        showError('incidentOutput', error.message);
+        showPanel('incident');
+      }
+    }
+
+    async function confirmRollback() {
+      var secret = requireSecret();
+      if (!state.staged) {
+        showError('incidentOutput', 'Nothing is staged.');
+        showPanel('incident');
+        return;
+      }
+      showLoading('incidentOutput', 'Calling POST /mcp/tools/confirm_rollback ...');
+      try {
+        var res = await post('/mcp/tools/confirm_rollback', {
+          action_id: state.staged.action_id,
+          governance_token: state.staged.governance_token
+        }, 'incidentLatency', secret);
+
+        setHero({
+          state: 'calm',
+          eyebrow: 'Rollback ' + res.body.status.toLowerCase(),
+          figure: 'OK',
+          figureLabel: 'governance passed',
+          headline: res.body.target_service + ' rolled back to ' + res.body.target_commit_sha,
+          cause: res.body.output,
+          badges: []
+        });
+        el('heroLatency').textContent =
+          'POST /mcp/tools/confirm_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+        setReason('btnConfirm', 'confirmReason', false,
+          'That token has been spent. Confirming again is refused by name. Stage again for a new one.',
+          'Disabled until a rollback has been staged and a governance token issued');
+
+        var box = document.createElement('div');
+        box.appendChild(h('span', 'tag tag-ok', res.body.status));
+        box.appendChild(kv([
+          ['Action', res.body.action_id],
+          ['Service', res.body.target_service],
+          ['Commit', res.body.target_commit_sha]
+        ]));
+        box.appendChild(h('p', 'row', res.body.output));
+        render('incidentOutput', box);
+        speak('Rollback confirmed for ' + res.body.target_service + '.');
+      } catch (error) {
+        showError('incidentOutput', error.message);
+        showPanel('incident');
+      }
+    }
+
+    async function loadDora() {
+      el('doraEndpoint').textContent = 'POST /mcp/tools/get_dora_velocity_report';
+      showLoading('doraOutput', 'Calling POST /mcp/tools/get_dora_velocity_report ...');
+      try {
+        var res = await post('/mcp/tools/get_dora_velocity_report', {}, 'doraLatency');
+        var data = res.body;
+        var m = data.metrics;
+        var box = document.createElement('div');
+        box.appendChild(h('span', 'tag tag-ok', data.tier));
+        box.appendChild(kv([
+          ['Deploys per day', m.deployment_frequency_per_day],
+          ['Lead time', m.lead_time_hours + ' h'],
+          ['Change failure rate', m.change_failure_rate_pct + '%'],
+          ['Recovery time', m.mttr_hours + ' h'],
+          ['Records used', data.sample_size + ' over ' + data.window_days + ' days']
+        ]));
+        box.appendChild(provenanceBlock(data.provenance));
+        render('doraOutput', box);
+        el('tileVelocityHeadline').textContent = m.deployment_frequency_per_day + ' deploys per day';
+        el('tileVelocitySub').textContent =
+          data.tier + ', from ' + data.sample_size + ' records over ' + data.window_days + ' days.';
+        speak(data.voice_summary);
+      } catch (error) {
+        showError('doraOutput', error.message);
+        el('tileVelocityHeadline').textContent = 'Call failed';
+        el('tileVelocitySub').textContent = error.message;
+      }
+    }
+
+    async function loadPrs() {
+      el('doraEndpoint').textContent = 'POST /mcp/tools/get_pr_bottlenecks';
+      showLoading('doraOutput', 'Calling POST /mcp/tools/get_pr_bottlenecks ...');
+      try {
+        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, 'doraLatency');
+        var data = res.body;
+        var box = document.createElement('div');
+        box.appendChild(kv([['Open', data.total_open], ['Past the 36 hour SLA', data.stale_count]]));
+        if (!data.stale_prs.length) {
+          box.appendChild(h('div', 'empty-state-card', 'No pull request is past the 36 hour review SLA.'));
+        } else {
+          data.stale_prs.forEach(function (pull) {
+            var row = h('div', 'row');
+            row.appendChild(h('span', 'tag tag-warn', pull.hours_open + ' h'));
+            row.appendChild(document.createTextNode(' #' + pull.id + ' ' + pull.title));
+            row.appendChild(h('span', 'sub', pull.author + ' in ' + pull.repo));
+            box.appendChild(row);
+          });
+          if (data.truncated_for_display) {
+            box.appendChild(h('div', 'row',
+              'Showing ' + data.stale_prs.length + ' of ' + data.stale_count + ' stale pull requests.'));
+          }
+        }
+        box.appendChild(provenanceBlock(data.provenance));
+        render('doraOutput', box);
+        el('tileVelocityHeadline').textContent = data.stale_count + ' reviews past SLA';
+        el('tileVelocitySub').textContent = data.total_open + ' pull requests open.';
+        speak(data.voice_summary);
+      } catch (error) {
+        showError('doraOutput', error.message);
+        el('tileVelocityHeadline').textContent = 'Call failed';
+        el('tileVelocitySub').textContent = error.message;
+      }
+    }
+
+    async function loadCost() {
+      el('costEndpoint').textContent = 'POST /mcp/tools/get_aws_cost_anomalies';
+      showLoading('costOutput', 'Calling POST /mcp/tools/get_aws_cost_anomalies ...');
+      try {
+        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, 'costLatency');
+        var data = res.body;
+        var box = document.createElement('div');
+        box.appendChild(kv([
+          ['Month to date', '$' + data.month_to_date_usd],
+          ['Projected month end', '$' + data.projected_usd]
+        ]));
+        if (!data.anomalies.length) {
+          box.appendChild(h('div', 'empty-state-card', 'No service exceeded the anomaly threshold.'));
+        } else {
+          data.anomalies.forEach(function (anomaly) {
+            var row = h('div', 'row');
+            row.appendChild(h('span', 'tag tag-warn', '+' + anomaly.increase_pct + '%'));
+            row.appendChild(document.createTextNode(' ' + anomaly.service + ' at $'
+              + anomaly.current_daily_usd + ' per day against a $'
+              + anomaly.previous_daily_avg_usd + ' average.'));
+            row.appendChild(h('span', 'sub', anomaly.root_cause));
+            box.appendChild(row);
+          });
+        }
+        box.appendChild(provenanceBlock(data.provenance));
+        render('costOutput', box);
+        el('tileSpendHeadline').textContent = '$' + data.month_to_date_usd + ' month to date';
+        el('tileSpendSub').textContent = data.anomalies.length + ' service anomalies over the day average.';
+        speak(data.voice_summary);
+      } catch (error) {
+        showError('costOutput', error.message);
+        el('tileSpendHeadline').textContent = 'Call failed';
+        el('tileSpendSub').textContent = error.message;
+      }
+    }
+
+    async function loadObservability() {
+      el('costEndpoint').textContent = 'POST /mcp/tools/audit_observability';
+      showLoading('costOutput', 'Calling POST /mcp/tools/audit_observability ...');
+      try {
+        var res = await post('/mcp/tools/audit_observability',
+          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
+        var data = res.body;
+        var box = document.createElement('div');
+        box.appendChild(kv([
+          ['Service', data.service],
+          ['Fully observable', data.is_fully_observable ? 'yes' : 'no'],
+          ['Gap score', data.observability_gap_score],
+          ['Missing signals', data.missing_signals.join(', ') || 'none']
+        ]));
+        box.appendChild(h('div', 'empty-state-card',
+          'The received signals in this call are the two the cockpit knows it sends. '
+          + 'Mercury does not discover a service’s real signal set.'));
+        render('costOutput', box);
+        el('tileSpendHeadline').textContent = data.missing_signals.length + ' signals missing';
+        el('tileSpendSub').textContent = 'Observability gap score ' + data.observability_gap_score + '.';
+      } catch (error) {
+        showError('costOutput', error.message);
+        el('tileSpendHeadline').textContent = 'Call failed';
+        el('tileSpendSub').textContent = error.message;
+      }
+    }
+
+    // -------------------------------------------------------------- Wiring up
+
+    var ACTIONS = {
+      dora: loadDora,
+      prs: loadPrs,
+      cost: loadCost,
+      observability: loadObservability
+    };
+
+    /* The demo state buttons change which service the next correlation asks
+       about. They exist because three of the four answers the correlator can
+       give are refusals, and a refusal nobody can reach is not a control. */
+    function selectService(name) {
+      state.service = name;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-service]'), function (button) {
+        button.setAttribute('aria-pressed', button.getAttribute('data-service') === name ? 'true' : 'false');
+      });
+      loadWhatChanged();
+    }
+
+    function onClick(event) {
+      var node = event.target.closest ? event.target.closest('button') : null;
+      if (!node) { return; }
+      if (node.hasAttribute('data-back')) { showWall(); return; }
+      if (node.hasAttribute('data-panel')) { showPanel(node.getAttribute('data-panel')); return; }
+      if (node.hasAttribute('data-service')) { selectService(node.getAttribute('data-service')); return; }
+      var action = node.getAttribute('data-action');
+      if (action && ACTIONS[action]) { ACTIONS[action](); }
+    }
+
+    function toggleSpeech() {
+      state.speak = !state.speak;
+      var button = el('btnSpeak');
+      button.setAttribute('aria-pressed', state.speak ? 'true' : 'false');
+      button.textContent = 'Read aloud: ' + (state.speak ? 'on' : 'off');
+      if (!state.speak && 'speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+    }
+
+    function init() {
+      if (window.location.protocol !== 'file:') { el('apiBase').value = window.location.origin; }
+
+      document.addEventListener('click', onClick);
+      el('btnCheck').addEventListener('click', checkConnection);
+      el('btnSetup').addEventListener('click', toggleSetup);
+      el('btnSpeak').addEventListener('click', toggleSpeech);
+      el('btnWhatChanged').addEventListener('click', loadWhatChanged);
+      el('btnStage').addEventListener('click', stageRollback);
+      el('btnConfirm').addEventListener('click', confirmRollback);
+
+      // The navigator owns the only key handler on this page. It announces each
+      // focus change, and the hint bar listens. A second key listener here would
+      // fight the remote.
+      document.addEventListener('mercury:focuschange', function (event) {
+        var label = event.detail && event.detail.label;
+        el('hintFocus').textContent = 'Focused: ' + (label || 'nothing yet');
+      });
+
+      // BACK on the remote leaves a panel before it leaves the application.
+      window.mercuryOnBack = function () {
+        if (state.view !== 'wall') { showWall(); return true; }
+        return false;
+      };
+
+      // WebMCP tools call the same endpoints the buttons do, so an agent driving
+      // this page gets exactly what a person pressing the remote gets.
+      if (typeof WebMCPBridge === 'function') {
+        var bridge = new WebMCPBridge('mercury_war_room');
+        bridge.registerTool('what_changed',
+          'Correlate the newest error metric reading with the deployment that preceded it',
+          { service_name: 'string' },
+          async function (args) {
+            var res = await post('/mcp/tools/what_changed',
+              { service_name: (args && args.service_name) || state.service }, null);
+            return res.body;
+          });
+        bridge.registerTool('get_dora_velocity_report',
+          'Read DORA velocity metrics with their data provenance', {},
+          async function () { return (await post('/mcp/tools/get_dora_velocity_report', {}, null)).body; });
+      }
+
+      // The D-pad cursor starts on the one thing the room came here to press,
+      // not on whatever happens to be first in the DOM.
+      if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnWhatChanged')); }
+
+      // A wallboard that waits for a click cannot be read in five seconds. Ask on
+      // load when there is an origin to ask, and show the honest failure when
+      // there is not. Nothing is painted before the answer arrives.
+      if (apiBase()) {
+        checkConnection().then(loadWhatChanged);
+      } else {
+        heroFromFailure('This page was opened from the file system, so it has no API origin.');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    return {
+      loadDora: loadDora, loadPrs: loadPrs, loadCost: loadCost,
+      loadObservability: loadObservability, loadWhatChanged: loadWhatChanged,
+      stageRollback: stageRollback, confirmRollback: confirmRollback,
+      checkConnection: checkConnection, showPanel: showPanel, showWall: showWall
+    };
+  })();
   </script>
-
-    <script>
-    window.addEventListener('DOMContentLoaded', () => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
-        
-        const bridge = new WebMCPBridge('mercury_war_room');
-        bridge.registerTool('query_post_mortem_rag', 'Queries institutional memory vector RAG for similar past incidents', { incident_text: 'string' }, async (args) => {
-            return { matches: 4, top_rca: 'Lambda connection pool exhaustion on spike', recommended_action: 'Increase pool max_connections & add circuit breaker' };
-        });
-        bridge.registerTool('audit_telemetry_completeness', 'Detects missing metrics and log streams during SEV-1 incident', { service: 'string' }, async (args) => {
-            return { service: args.service, gap_score: 0.0, is_fully_observable: true };
-        });
-        
-    });
-    </script>
 </body>
 </html>

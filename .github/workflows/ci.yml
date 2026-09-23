@@ -1,4 +1,4 @@
-name: Enterprise CI/CD Pipeline & Quality Gate
+name: CI
 
 on:
   push:
@@ -8,19 +8,29 @@ on:
   workflow_dispatch:
 
 jobs:
+  manual-apk-build:
+    name: Build this revision's APK (hardware verification remains separate)
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/android.yml
+
   test-and-verify:
-    name: Test, Security & Build Verification
-    runs-on: ubuntu-latest
+    name: Lint, test, benchmark, audit
+    runs-on: ubuntu-24.04
+    env:
+      MERCURY_REQUIRE_BROWSER: "1"
     strategy:
       matrix:
         python-version: ["3.11"]
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          # Browser evidence tests resolve the documented before-state commit.
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -28,28 +38,49 @@ jobs:
       - name: Install Build & Test Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov ruff build pydantic fastapi httpx boto3
+          pip install -e ".[dev,ux]"
+          pip install build
 
-      - name: Code Quality & Linting (Ruff)
-        run: |
-          ruff check src/ tests/ --ignore E501
+      - name: Install Chromium for required browser measurements
+        run: python -m playwright install --with-deps chromium
 
-      - name: Execute Full Test Suite & Enforce Coverage (>=85%)
+      - name: Lint
         run: |
-          python -m pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=85
+          ruff check src/ tests/ scripts/ ci/ --ignore E501
 
-      - name: Run Performance & Latency Benchmark
+      - name: Test suite with the coverage floor
         run: |
-          if [ -d "tests/performance" ]; then
-            python -m pytest tests/performance/ -v
-          fi
+          python -m pytest tests/ -q --cov=src --cov-report=term-missing --cov-fail-under=85
 
-      - name: Build Local Production Artifacts (Wheel & Sdist)
-        run: |
-          if [ -f "pyproject.toml" ]; then
-            python -m build --wheel --sdist --outdir dist
-          fi
+      - name: Coverage summary agrees with the README
+        # The README quotes a coverage percentage and a statement count. A test
+        # pins them to coverage_summary.json cheaply; this step is what proves
+        # that recorded file still matches a real measurement, and fails the job
+        # when either number has drifted.
+        run: python scripts/record_coverage_summary.py --check
 
-      - name: Verify Readiness Gate (ci/readiness.py)
-        run: |
-          python ci/readiness.py
+      - name: Correlation trial agrees with the recorded summary
+        # The README quotes correlation_trial_summary.json and a test pins the two
+        # together. This step is what proves that recorded file is still what the
+        # committed correlator produces against the committed corpus, so a change
+        # to the detector cannot leave a stale accuracy figure in the README.
+        run: python scripts/correlation_trial.py --check
+
+      - name: D-pad spatial navigation spec (real navigator, executed in Node)
+        run: node tests/e2e/spatial_nav_spec.js
+
+      - name: Latency benchmark
+        # Order matters. This rewrites benchmarks_summary.json, and a test in
+        # tests/e2e/test_documentation_claims.py holds the README table to that
+        # file, so it must run after the test suite. Lower iteration counts than
+        # the local default keep the job short; the committed numbers come from
+        # a local run at 60/2000.
+        run: python scripts/benchmark_suite.py 20 500
+
+      - name: Build wheel and sdist
+        run: python -m build --wheel --sdist --outdir dist
+
+      - name: Standards readiness audit
+        # Fails the job on any blocking gate. Gates that need a deployment, a
+        # video or hardware still print FAIL, with the reason they are exempt.
+        run: python ci/readiness.py

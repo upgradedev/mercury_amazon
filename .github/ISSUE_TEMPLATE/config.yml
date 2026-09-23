@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How to build and install the Fire TV app
+    url: https://github.com/upgradedev/mercury_amazon/blob/master/docs/FIRE_TV_BUILD.md
+    about: Build commands, adb install, why there is no emulator step, and what has not been run.
+  - name: Contributing guide
+    url: https://github.com/upgradedev/mercury_amazon/blob/master/CONTRIBUTING.md
+    about: Layout, test commands, and the rule about never writing an unmeasured number.

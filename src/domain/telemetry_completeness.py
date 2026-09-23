@@ -4,7 +4,8 @@ Flags missing log streams, absent health metrics, and unobserved dependencies du
 """
 
 from dataclasses import dataclass
-from typing import List, Set, Dict
+from typing import List, Set
+
 
 @dataclass
 class TelemetryCoverageReport:

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only manifest overlay.
+
+  A Fire TV stick on a home network usually reaches the cockpit over plain http
+  from a laptop, so a debug build has to permit cleartext. A release build must
+  not, and app/src/main/AndroidManifest.xml declares `false` for exactly that
+  reason. The manifest merger applies this file to debug variants only, so the
+  permission is scoped to the build type that needs it.
+
+  `tools:replace` is required because the main manifest declares the same
+  attribute; without it the merger fails on the conflict rather than choosing.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+</manifest>

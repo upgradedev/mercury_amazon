@@ -23,6 +23,14 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.2.0",
+    "pyyaml>=6.0",
+]
+# Kept out of dev on purpose: this pulls a browser download, and the whole test
+# suite must stay installable and runnable without one. The legibility
+# measurement skips when it is absent.
+#   pip install -e ".[ux]" && playwright install chromium
+ux = [
+    "playwright>=1.44.0",
 ]
 
 [tool.setuptools.packages.find]
