@@ -39,16 +39,16 @@ Cost Explorer report for the account.
 cd infra
 terraform init
 terraform validate
-terraform plan -out=tfplan
+terraform plan -var="source_revision=$(git rev-parse HEAD)" -out=tfplan
 terraform apply tfplan
 
 terraform destroy -auto-approve
 ```
 
-**Neither `apply` nor `destroy` has been executed for the current commit.** The
-endpoint recorded in `deploy_teardown_receipt.json` answers HTTP 200 but runs an
-older build and does not report a build SHA, so readiness gates D2 and G2 both
-fail. That is the correct result and it is not suppressed.
+**No deployment has been executed for the current commit.** The unrelated September 3 API
+Gateway and Lambda were backed up and deleted on 2026-09-23. The endpoint recorded in
+`deploy_teardown_receipt.json` no longer resolves. Readiness gates D2 and G2 still fail because
+removing an old build is not a tested deployment of this commit.
 
 Set `MERCURY_BUILD_SHA` at deploy time, or deploy from a git checkout, so that
 `GET /health` reports the commit it was built from. `scripts/probe_deployment.py`

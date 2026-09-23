@@ -677,9 +677,18 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
 
     # F7: every source module must be reachable from an entry point, so an
     # ornamental module that nothing imports fails this gate.
+    # Runtime entry points include both the local ASGI server and any callable
+    # referenced by Terraform. Lambda imports its handler from the IaC string,
+    # so a Python-only import graph would incorrectly call that adapter an orphan.
     entry_points = read("src/interfaces/mcp_server.py")
+    terraform = read("infra/main.tf")
+    terraform_entry_points = {
+        module.replace(".", "/") + ".py"
+        for module in re.findall(r'handler\s*=\s*"([\w.]+)\.[\w]+"', terraform)
+    }
+    root_entry_points = {"src/interfaces/mcp_server.py", *terraform_entry_points}
     reachable: set[str] = set()
-    frontier = ["src/interfaces/mcp_server.py"]
+    frontier = list(root_entry_points)
     seen = set()
     while frontier:
         current = frontier.pop()
@@ -692,7 +701,7 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
             reachable.add(path)
             frontier.append(path)
     all_modules = {os.path.relpath(p, REPO_ROOT).replace("\\", "/") for p in py_files}
-    orphans = sorted(all_modules - reachable - {"src/interfaces/mcp_server.py"})
+    orphans = sorted(all_modules - reachable - root_entry_points)
     gate("F7", "Every file is relevant and current", not orphans,
          f"All {len(all_modules)} source modules are reachable from the server entry point" if not orphans
          else f"Modules nothing imports: {orphans}")

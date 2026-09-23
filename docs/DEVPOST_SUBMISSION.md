@@ -230,8 +230,8 @@ Stated here rather than left for a judge to find:
   the earlier local toolchain limitation and the receipt a device run must produce.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
-* The live endpoint answers 200 but runs an older build, so the readiness gates
-  for deployment matching (D2, G2) fail and are reported as failing.
+* The unrelated September 3 endpoint was removed on 2026-09-23 and no longer resolves. The
+  readiness gates for deployment matching (D2, G2) remain red until this commit is deployed.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
   like an anomaly. The baseline now stops at the onset rather than containing the
   spike, but the detector still needs at least two readings before that onset, so 65

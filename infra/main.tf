@@ -27,6 +27,17 @@ variable "environment" {
   description = "Environment tier"
 }
 
+variable "lambda_package_path" {
+  type        = string
+  default     = "../dist/mercury_lambda.zip"
+  description = "Path to the built Lambda deployment package"
+}
+
+variable "source_revision" {
+  type        = string
+  description = "Immutable Git commit deployed in the Lambda package"
+}
+
 # 1. IAM Execution Role for Lambda
 resource "aws_iam_role" "mercury_lambda_role" {
   name = "mercury-lambda-role-euw1-${var.environment}"
@@ -86,13 +97,16 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
   function_name = "mercury-wallboard-euw1-${var.environment}"
   role          = aws_iam_role.mercury_lambda_role.arn
   runtime       = "python3.11"
-  handler       = "src.interfaces.mcp_server.handler"
-  memory_size   = 256
-  timeout       = 15
+  handler          = "src.interfaces.lambda_handler.handler"
+  filename         = var.lambda_package_path
+  source_code_hash = filebase64sha256(var.lambda_package_path)
+  memory_size      = 256
+  timeout          = 15
 
   environment {
     variables = {
-      ENVIRONMENT = var.environment
+      ENVIRONMENT       = var.environment
+      MERCURY_BUILD_SHA = var.source_revision
     }
   }
 

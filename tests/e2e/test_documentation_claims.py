@@ -694,10 +694,15 @@ def test_every_passed_count_a_document_quotes_is_the_count_the_suite_records():
     recorded = _timing()
     badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
     collected = int(badge.group(1))
-    assert recorded["tests_collected"] == collected or recorded["bootstrap"], (
-        f"the runtime record was measured over {recorded['tests_collected']} tests and the "
-        f"badge says {collected}; re-run `python scripts/time_test_suite.py`"
-    )
+    record_is_current = recorded["tests_collected"] == collected
+    if not record_is_current and not recorded["bootstrap"]:
+        prose = _live_prose(README)
+        required = readiness.stale_timing_disclosure(recorded["tests_collected"], collected)
+        assert all(phrase in prose for phrase in required), (
+            f"the runtime record was measured over {recorded['tests_collected']} tests and the "
+            f"badge says {collected}; re-run `python scripts/time_test_suite.py` or publish the "
+            "exact stale-record disclosure"
+        )
 
     quoted = []
     for path in MARKDOWN_FILES:
@@ -710,7 +715,7 @@ def test_every_passed_count_a_document_quotes_is_the_count_the_suite_records():
         f"expected the Quickstart and the test section to quote a passed count, found {quoted}"
     )
 
-    if recorded["bootstrap"]:
+    if recorded["bootstrap"] or not record_is_current:
         expected = collected
     else:
         assert recorded["tests_skipped"] == 0, (

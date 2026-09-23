@@ -1,27 +1,27 @@
 {
   "schema": "mercury.deploy_receipt/2",
   "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
-  "probed_at_utc": "2026-09-05T05:25:33Z",
-  "probed_at_epoch": 1788585933.831792,
+  "probed_at_utc": "2026-09-23T07:04:57Z",
+  "probed_at_epoch": 1790147097.7397573,
   "base_url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com",
   "probes": [
     {
       "url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com/",
-      "http_status": 200,
-      "elapsed_ms": 428.86,
-      "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mercury: Fire TV & Voice CTO War Room</title>\n  <style>\n    :root {\n      --bg: #090d16;\n      --card-bg: #111827;\n      --card-focus: #1f2937;\n      --accent: #a855f7;\n      --accent-hover: #9333ea;\n      --text: #f9fafb;\n      --text-muted: #9ca3af;\n ",
-      "error": null
+      "http_status": null,
+      "elapsed_ms": 661.7,
+      "body_excerpt": null,
+      "error": "ConnectError: [Errno 11001] getaddrinfo failed"
     },
     {
       "url": "https://t7h6us4q0f.execute-api.eu-west-1.amazonaws.com/health",
-      "http_status": 200,
-      "elapsed_ms": 233.06,
-      "body_excerpt": "{\"status\": \"HEALTHY\", \"region\": \"eu-west-1\", \"serverless\": true}",
-      "error": null
+      "http_status": null,
+      "elapsed_ms": 31.27,
+      "body_excerpt": null,
+      "error": "ConnectError: [Errno 11001] getaddrinfo failed"
     }
   ],
   "deployed_commit_sha": null,
-  "local_head_sha": "7b99905071281096cc7f32bb7647417cfd52565c",
+  "local_head_sha": "f43bdf0a110873ff910d6748e6ced40ce7c2c52a",
   "deployed_matches_local_head": false,
   "teardown_verified": false,
   "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."

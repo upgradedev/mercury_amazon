@@ -98,7 +98,7 @@ are listed because a review that reports only what it settled is not a review.
 |---|---|
 | Does the APK install and appear on a Fire TV home row? | A verified CI APK exists and portable ADB is prepared, but no Fire TV device has connected. `docs/FIRE_TV_BUILD.md` records the install and receipt procedure |
 | Is the cockpit legible from three metres on a television? | Measured in a 1920x1080 browser viewport, never on a television at distance |
-| Does a deployment of this commit answer? | The live endpoint answers 200 and runs an older build. Gates D2 and G2 fail |
+| Does a deployment of this commit answer? | No. The unrelated September 3 endpoint was removed on 2026-09-23. Gates D2 and G2 remain red until this commit is deployed. |
 | Does an on-call engineer find a refusal to name a commit useful at three in the morning? | Nobody outside this project has used it. The README says this in its own words |
 
 ## 5. Where the gates read this
