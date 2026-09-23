@@ -7,11 +7,11 @@ Every entry below points at code in this repository, a command that was run, or 
 error that was observed. Entries about experiences we did not have have been
 removed rather than rewritten, so this log is shorter than it was.
 
-**What we did not exercise, and therefore say nothing about:** we never ran the
-app on Fire TV hardware, never ran a virtual Fire TV (no Fire TV emulator exists,
-and the Vega Virtual Device does not run this APK), never used the Alexa Voice
-Service, and never used the Amazon Appstore submission pipeline. We have no opinion
-on any of them and offer none.
+**What we did not exercise, and therefore say nothing about:** the candidate Android
+TV workflow has not yet run, we never used the Alexa Voice Service, and we never used
+the Amazon Appstore submission pipeline. The event FAQ permits Android TV Emulator
+or Fire TV/Vega simulator; our runtime workflow uses the first and physical hardware
+is optional.
 
 ---
 

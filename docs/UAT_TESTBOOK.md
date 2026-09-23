@@ -40,7 +40,7 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-17 | Fixture mode is labelled as fixture mode | `tests/integration/test_mcp_endpoints.py` | `display_label` is `OFFLINE FIXTURE` when no token is set |
 | A-17b | The fixture label is on the same screenful as the number it qualifies | `tests/ux/test_ten_foot_legibility.py` | At 1920x1080 a provenance stamp reading `OFFLINE FIXTURE` or `LIVE` renders inside the first viewport height, measured in Chromium |
 | A-17c | Every file the Android build script names exists | `tests/unit/test_firetv_app_structure.py` | `app/proguard-rules.pro` and every other path named in `app/build.gradle.kts` is present, so the release variant configures |
-| A-17d | The Fire TV readiness gate cannot pass on a string match | `tests/unit/test_readiness_gates.py` | J4 requires a gradle exit code, an APK that exists and a recorded device launch; every missing field is driven through the predicate |
+| A-17d | The Fire TV readiness gate cannot pass on a string match | `tests/unit/test_readiness_gates.py` | J4 accepts only a content-addressed Android TV workflow receipt or the legacy physical-device receipt; every missing field is driven through the predicate |
 | A-17e | The Fire TV build receipt cannot be written without evidence | `tests/unit/test_write_firetv_receipt.py` | `scripts/write_firetv_receipt.py` refuses, writes nothing and exits 2 on a missing, empty or non-zip APK, a zip with no `AndroidManifest.xml`, an APK outside the checkout, a non-zero gradle or adb exit code, or an empty device description; the receipt it does write hashes the APK itself and passes the gate's own predicate |
 | A-18 | Running the suite makes no billable AWS call | `tests/unit/test_aws_adapters.py` plus `tests/conftest.py` | `MERCURY_OFFLINE=1` suppresses the call even when a working client is injected |
 | A-19 | The Fire TV manifest is a TV manifest | `tests/unit/test_firetv_app_structure.py` | Leanback required, touchscreen not required, `LEANBACK_LAUNCHER` present, no `package` attribute |
@@ -52,14 +52,14 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 
 ## 2. Manual scenarios, not executed
 
-These need hardware, a network or a person, and none of them has been performed.
+These need a dispatched workflow, a network or a person, and none of them has been performed.
 They are listed so the gap is explicit rather than absent.
 
 | ID | Scenario | Why it has not been run | How to run it |
 |---|---|---|---|
-| M-01 | The APK installs on a Fire TV Stick and appears on the home row | No Fire TV hardware was available | `docs/FIRE_TV_BUILD.md`, install section |
-| M-02 | The physical remote D-pad drives focus on a television | No Fire TV hardware was available | Install the APK, press the D-pad |
-| M-03 | A push runs `.github/workflows/android.yml`, which assembles and uploads `app-debug.apk` | **Passed.** Run `35500282701` executed JVM tests and assemble, then uploaded artifact `10601069697`; downloaded SHA-256 matched the log | Use that artifact for M-01/M-02, then write the device receipt with `python scripts/write_firetv_receipt.py` |
+| M-01 | The candidate APK installs and normally launches on an allowed target | The new Android TV workflow has not yet been dispatched | Run `.github/workflows/android-tv-emulator.yml`; physical hardware is optional under the official FAQ |
+| M-02 | D-pad drives attribution, record-only confirmation and handoff in the APK | The new Android TV workflow has not yet been dispatched | The workflow runs `scripts/android_tv_smoke.sh` and rejects missing native journey events |
+| M-03 | CI assembles and retains the exact candidate APK | Previous Android builds passed; the candidate run is pending | Use the APK included in the Android TV runtime artifact and verify its receipt digest |
 | M-04 | Text is legible from three metres on a large screen | No television was available | Open the cockpit on a TV at 1080p and read it from a sofa |
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
@@ -75,10 +75,10 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 544 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 93 percent of 1646 statements |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 559 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 92 percent of 1922 statements |
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
-| Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
-| A Fire TV binary that somebody has watched run | **Not met** | A verified APK exists, but gate J4 still fails because there is no `firetv_build_receipt.json` and no device observation |
-| Verified on a Fire TV device | **Not met** | No hardware run has taken place |
+| Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 45/53 passed, 0 blocking |
+| A Fire TV binary that somebody has watched run | **Not met** | Gate J4 awaits `android_tv_runtime_receipt.json` from the dispatched emulator workflow |
+| Verified on an allowed Fire TV track target | **Not met** | Android TV Emulator run pending; physical hardware is optional |
 | Verified against a live web deployment | Met | Root and `/health` answer; the deployment publishes its build SHA |

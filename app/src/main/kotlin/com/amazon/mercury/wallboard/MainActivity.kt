@@ -46,6 +46,14 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun appVersion(): String = BuildConfig.VERSION_NAME
+
+        /** Bounded, non-secret journey evidence consumed by the emulator smoke job. */
+        @JavascriptInterface
+        fun reportJourney(event: String, detail: String) {
+            val safeEvent = event.take(64).replace(Regex("[^A-Za-z0-9_.:-]"), "_")
+            val safeDetail = detail.take(256).replace(Regex("[\r\n]"), " ")
+            Log.i(TAG, "journey:$safeEvent:$safeDetail")
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
@@ -82,6 +90,7 @@ class MainActivity : Activity() {
     private inner class CockpitWebViewClient : WebViewClient() {
         override fun onPageFinished(view: WebView?, url: String?) {
             pageLoaded = true
+            Log.i(TAG, "journey:page_loaded:${url ?: cockpitUrl}")
         }
 
         override fun onReceivedError(

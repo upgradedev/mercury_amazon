@@ -177,14 +177,14 @@ Stated plainly, because the cockpit shows it anyway.
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured.** 1160 labelled cases scored by `python scripts/correlation_trial.py`. Naming precision 52.2% over 113 namings, recall 9.8% over 600 regressions, refusal on 81.1% of detected anomalies, all published and shipped in every answer as `attribution.measured_accuracy` |
-| Fire TV device | **APK built, device not run.** CI run `35500282701` produced and uploaded a verified APK; nothing has been installed on Fire TV hardware, and there is no Fire TV emulator for this Android APK. The TV surface is a D-pad and a screen, with no voice input |
+| Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. The official event FAQ permits this target; no physical device is required |
 
 ---
 
 ## What's next
 
-**Build the APK and run it on hardware.** This is the gap that matters most. The
-workflow is written and the Kotlin is there; neither has ever executed.
+**Run the candidate APK workflow and retain its receipt.** This is the remaining
+track proof: install, normal launch, D-pad journey, logs, screenshot and APK digest.
 
 **Make the dispatch real.** `RollbackDispatcher` is a one-method protocol. Wiring
 it to a deployment pipeline turns the governed decision into a governed action
@@ -203,9 +203,9 @@ here, because a six point series polled every ten minutes has no readings left
 before an onset four polls back. That ceiling is arithmetic, it is published as
 `detectability_ceiling`, and only more data moves it.
 
-**Persist the governance ledger.** Staged actions live in memory today, so a
-restart forgets them. An audit trail that survives a restart is the difference
-between a demo and something an on-call rota would rely on.
+**Validate the durable governance ledger under deployed concurrency.** DynamoDB now
+stores staged actions, spent nonces, deployment markers and handoffs with conditional
+writes. The remaining work is operational evidence under concurrent Lambda instances.
 
 ---
 
@@ -222,12 +222,9 @@ stopped being a compromise and started being the design.
 
 Stated here rather than left for a judge to find:
 
-* **APK built; no Fire TV launch.** GitHub Actions run `35500282701` ran the Kotlin
-  tests, assembled the debug APK and uploaded artifact `10601069697`; the downloaded
-  APK digest matches the build log. Nothing has been installed on a Fire TV device,
-  and there is no Fire TV emulator for this Android APK, so physical hardware is the
-  only route to close the track proof. `docs/FIRE_TV_BUILD.md` records the artifact,
-  the earlier local toolchain limitation and the receipt a device run must produce.
+* **Candidate runtime receipt pending.** `.github/workflows/android-tv-emulator.yml`
+  is the allowed-target path: it retains the exact APK, logs, screenshot and receipt.
+  `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is live at

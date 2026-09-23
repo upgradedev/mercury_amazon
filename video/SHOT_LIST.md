@@ -18,17 +18,13 @@ computed on screen from a response.
 (`python -m src.interfaces.mcp_server` on `http://127.0.0.1:8002/`), driven with
 the arrow keys and Enter and Escape.
 
-**This does not satisfy the Fire TV track's device requirement.** That track asks
-for the product running on a Fire TV device, and no Fire TV emulator exists to
-stand in for one. No APK exists, the Kotlin has never been compiled, and nothing has
-been installed on a device, so a recording made from this shot list shows the
-cockpit and the governance path but not the platform. What the platform would add
-is a D-pad and a television; nothing in it listens for speech. The arrow keys drive
-`docs/firetv_nav.js`, which is the same file the Leanback `MainActivity` calls
-through its JavaScript bridge, so the navigation being shown is the navigation the
-APK would drive. That is the honest limit of what this recording proves.
-`docs/FIRE_TV_BUILD.md` records the verbatim build failure that stops it going
-further.
+**The desktop rehearsal is not the final Fire TV track proof.** The event FAQ accepts
+Android TV Emulator, and `.github/workflows/android-tv-emulator.yml` installs the
+exact APK, launches it normally and drives the same D-pad path. The final recording
+should use that allowed target after its receipt exists. Arrow keys in this rehearsal
+still drive `docs/firetv_nav.js`, the same navigator the Leanback `MainActivity`
+calls through its bridge; they prove the interaction before the APK runtime proof,
+not in place of it.
 
 ## Setup before recording
 
@@ -137,21 +133,18 @@ same moment, each labelled. Say on camera which machine state you are recording
 in. Do not read the spend figures aloud if they are live: they are a real account's
 numbers.
 
-### 8. The governance refusal. 1:56 to 2:09
+### 8. Fixture boundary: the public control stays effect-free. 1:56 to 2:09
 
 **Action:** Escape to the wall, press **checkout-api** so a rollback target exists
-again, focus **Stage governed rollback**, press Enter with the Secret field still
-empty.
-**Expected on screen:** the incident panel opens with
-`No governance secret entered. Staging a rollback needs the deployment secret from
-the Secret field.`
-**Point to make:** the one irreversible control on the screen refuses in plain
-words rather than failing silently or pretending to work.
+again, focus **Stage governed rollback**, and press Enter with the Secret field empty.
+**Expected on screen:** `PENDING_CONFIRMATION`, `DPAD_RECORD_ONLY_DEMO` and the
+explicit `NONE` external effect. Confirm becomes enabled.
+**Point to make:** this route accepts only the labelled recorded fixture and is
+disabled whenever any external dispatcher is selected.
 
 ### 9. Staging mints a token bound to the change. 2:09 to 2:20
 
-**Action:** type the secret into the Secret field, then press **Stage governed
-rollback** again.
+**Action:** hold on the staged proposal produced by the previous D-pad press.
 **Expected on screen:** state `PENDING_CONFIRMATION`, the action id, the target
 service and commit, a truncated SHA-256 payload hash, and the lease in seconds.
 The hero figure becomes the lease remaining and the confirmation prompt appears
@@ -160,19 +153,16 @@ a token was issued.
 **Point to make:** the token is an HMAC over the action id and a hash of exactly
 this payload. Edit the target after staging and it stops applying.
 
-### 10. Confirming says what it did not do, and the control goes dark. 2:20 to 2:34
+### 10. Confirm, then publish the responder handoff. 2:20 to 2:34
 
-**Action:** press **Confirm rollback**.
-**Expected on screen:** status `EXECUTED` and the output verbatim:
+**Action:** press **Confirm rollback**, then **Publish handoff**.
+**Expected on screen:** status `RECORDED_ONLY` and the output verbatim:
 `Governance passed for 'checkout-api' to commit <sha>. Recorded locally. No
 deployment pipeline was contacted`, followed by the line naming the record-only
 dispatcher. Confirm then goes dark, with its reason line underneath:
 `That token has been spent. Confirming again is refused by name. Stage again for a
-new one.` The page does not send a second confirm, so there is no second press to
-record. Single use is enforced by the server too: the same confirm replayed from a
-shell answers `Request failed HTTP 409. NOT_PENDING: Action '<id>' is in state
-EXECUTED, not PENDING_CONFIRMATION.`, which is what
-`tests/integration/test_rollback_authorization.py` asserts.
+new one.` The handoff shows its fixed responder, confirmed facts, next step and
+revision. Single use is enforced by the server too.
 **Point to make:** read the first sentence out. The product tells the room it did
 not deploy anything, on the screen, in the moment of success. Single use is then
 enforced on the screen and by the server, and the denial is named rather than
@@ -180,14 +170,13 @@ swallowed. Leaving the
 staging on screen past its lease produces `HTTP 410. LEASE_EXPIRED` in the same
 way.
 
-### 11. What is not built. 2:34 to 2:48
+### 11. Runtime evidence boundary. 2:34 to 2:48
 
-**Action:** cut to `docs/FIRE_TV_BUILD.md` open in an editor, on the recorded
-build failure.
-**Narration:** no APK exists, the Kotlin has never been compiled, and nothing has
-run on Fire TV hardware. The refusals, the correlation and the governance path are
-real and were driven live in this recording. The Fire TV device is not.
-**Point to make:** end on the limitation rather than letting a judge find it.
+**Action:** cut to `docs/FIRE_TV_BUILD.md` and the Android TV workflow.
+**Narration:** the exact APK must complete the same normal-launch D-pad journey in
+Android TV Emulator before a runtime receipt is claimed. The official FAQ permits
+this route and makes physical hardware optional.
+**Point to make:** end on the current evidence boundary rather than implying it.
 
 ---
 

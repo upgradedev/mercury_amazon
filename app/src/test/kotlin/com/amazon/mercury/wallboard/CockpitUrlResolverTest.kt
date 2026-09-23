@@ -33,6 +33,12 @@ class CockpitUrlResolverTest {
     }
 
     @Test
+    fun `compiled public candidate can be launched without an adb override`() {
+        val publicCandidate = "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/"
+        assertEquals(publicCandidate, CockpitUrlResolver.resolve(null, publicCandidate))
+    }
+
+    @Test
     fun `non http schemes are refused so the webview cannot be redirected`() {
         assertFalse(CockpitUrlResolver.isAcceptable("javascript:alert(1)"))
         assertFalse(CockpitUrlResolver.isAcceptable("file:///sdcard/evil.html"))

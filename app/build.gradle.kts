@@ -15,13 +15,14 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // The cockpit this build points at. Override per build with
+        // The cockpit this build points at. The normal artifact opens the exact
+        // public candidate without an adb intent override. Override per build with
         //   ./gradlew assembleDebug -PmercuryCockpitUrl=http://192.168.1.20:8002/
         // or per launch with the COCKPIT_URL intent extra.
         buildConfigField(
             "String",
             "MERCURY_COCKPIT_URL",
-            "\"${project.findProperty("mercuryCockpitUrl") ?: "http://10.0.2.2:8002/"}\"",
+            "\"${project.findProperty("mercuryCockpitUrl") ?: "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/"}\"",
         )
     }
 

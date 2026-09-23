@@ -61,8 +61,10 @@ jobs:
       - name: Run the JVM unit tests (DpadBridge, CockpitUrlResolver)
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
-      - name: Assemble the debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Assemble the debug APK for the public candidate
+        run: >-
+          ./gradlew :app:assembleDebug --stacktrace
+          -PmercuryCockpitUrl=https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/
 
       - name: Report what was produced, with the digest the build receipt records
         run: |

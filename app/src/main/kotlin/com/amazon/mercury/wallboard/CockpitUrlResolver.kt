@@ -17,7 +17,7 @@ package com.amazon.mercury.wallboard
 object CockpitUrlResolver {
 
     const val EXTRA_COCKPIT_URL = "COCKPIT_URL"
-    const val DEFAULT_URL = "http://10.0.2.2:8002/"
+    const val DEFAULT_URL = "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/"
 
     private val ALLOWED_SCHEMES = listOf("http://", "https://")
 

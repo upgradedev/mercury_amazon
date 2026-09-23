@@ -38,6 +38,38 @@ variable "source_revision" {
   description = "Immutable Git commit deployed in the Lambda package"
 }
 
+resource "aws_dynamodb_table" "mercury_state" {
+  name         = "mercury-state-euw1-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Project     = "mercury"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
 # 1. IAM Execution Role for Lambda
 resource "aws_iam_role" "mercury_lambda_role" {
   name = "mercury-lambda-role-euw1-${var.environment}"
@@ -82,6 +114,15 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/mercury-wallboard-euw1-${var.environment}:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query"
+        ]
+        Resource = aws_dynamodb_table.mercury_state.arn
       }
     ]
   })
@@ -107,6 +148,7 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
     variables = {
       ENVIRONMENT       = var.environment
       MERCURY_BUILD_SHA = var.source_revision
+      MERCURY_STATE_TABLE = aws_dynamodb_table.mercury_state.name
     }
   }
 

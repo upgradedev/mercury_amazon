@@ -5,7 +5,7 @@ actually did with each one. It reports failures as failures and exits non-zero,
 so it is a check rather than a demonstration.
 
 What it verifies:
-  1. Every state-changing route refuses an unauthenticated request.
+  1. Every operator state-changing route refuses an unauthenticated request.
   2. Hostile strings in a rollback payload are stored as opaque data and never
      interpolated into a shell, a template or a query.
   3. A governance token cannot be forged, replayed, retargeted, or made to apply
@@ -112,7 +112,7 @@ def main() -> int:
     print("  MERCURY SECURITY AUDIT")
     print("=" * 70)
 
-    print("\n[1] Every state-changing route refuses an unauthenticated request")
+    print("\n[1] Every operator state-changing route refuses an unauthenticated request")
     for route in STATE_CHANGING:
         response = client.post(route, json={})
         audit.check(response.status_code == 401, f"{route} without a bearer header returns 401",

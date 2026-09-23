@@ -140,10 +140,8 @@ def test_no_document_claims_an_alexa_integration_that_does_not_exist():
 
 def test_no_document_claims_a_device_run_that_did_not_happen():
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "Not run" in build_doc
-    assert "JAVA_HOME is not set" in build_doc, "the verbatim local build error must be recorded"
-    assert "never been installed on a physical Fire TV Stick" in README
-    assert "No Fire TV hardware was available" in build_doc
+    assert "Pending the workflow-dispatch run" in build_doc
+    assert "Physical Fire TV" in build_doc and "Optional and not run" in build_doc
 
 
 def test_documents_distinguish_the_built_apk_from_a_device_run():
@@ -163,14 +161,9 @@ def test_documents_distinguish_the_built_apk_from_a_device_run():
 
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
     readme_lower = README.lower()
-    digest = "6c05dc46cdee7b6ecb49354e5ace06cd7de6913b517882e208acde8f6c296331"
-    assert "35500282701" in build_doc
-    assert digest in build_doc
-    assert digest in readme_lower
-    assert "device not run" in readme_lower or "no device run" in readme_lower
-    assert "no fire tv device has connected" in (
-        REPO_ROOT / "docs" / "PERSONA_REVIEW.md"
-    ).read_text(encoding="utf-8").lower()
+    assert "pending the workflow-dispatch run" in build_doc
+    assert "runtime evidence pending" in readme_lower
+    assert "physical fire tv" in build_doc and "optional" in build_doc
 
 
 def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
@@ -181,37 +174,21 @@ def test_the_android_workflow_exists_and_is_configured_to_fail_without_an_apk():
     assert "if-no-files-found: error" in workflow
 
 
-def test_no_document_claims_a_fire_tv_emulator_exists():
-    """There is no Fire TV emulator, and three documents used to promise a run in one.
-
-    Amazon's documentation says to test on an actual Fire TV device; the Vega Virtual
-    Device runs Vega apps rather than this APK and needs macOS or Ubuntu. So every
-    mention of a Fire TV emulator has to be a denial, the way every mention of Alexa is.
-    """
-    plan_files = [REPO_ROOT / "video" / name for name in ("narration.json", "cue_sheet.json")]
-    for path in MARKDOWN_FILES + plan_files:
-        text = " ".join(path.read_text(encoding="utf-8").split())
-        for match in re.finditer(r"fire tv emulator|emulator image|official fire tv emulator", text, re.IGNORECASE):
-            window = text[max(0, match.start() - 160):match.end() + 160].lower()
-            denies = any(marker in window for marker in [
-                "no fire tv emulator", "none exists", "does not exist", "there is no", "no emulator",
-            ])
-            assert denies, (
-                f"{path.name} mentions a Fire TV emulator without saying none exists: "
-                f"...{text[max(0, match.start() - 80):match.end() + 80]}..."
-            )
+def test_documents_follow_the_official_android_tv_emulator_allowance():
+    """The event FAQ explicitly accepts Android TV Emulator for the Fire TV track."""
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
-    assert "no fire tv emulator exists" in build_doc
-    assert "vega virtual device" in build_doc
-    assert "actual fire tv device" in build_doc
-    # And the surface is described as what it is: a D-pad and a screen.
-    assert "d-pad" in build_doc and "no voice" in build_doc
+    workflow = (REPO_ROOT / ".github" / "workflows" / "android-tv-emulator.yml").read_text(encoding="utf-8")
+    assert "official faq" in build_doc
+    assert "android tv emulator" in build_doc
+    assert "physical device is optional" in build_doc
+    assert "target: android-tv" in workflow
+    assert "scripts/android_tv_smoke.sh" in workflow
 
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = README.split("## Known limitations")[-1]
-    for required in ["No rollback dispatch has ever been fired", "APK built; no device run",
-                     "Cost Explorer lags", "browser speech synthesis", "In-memory state"]:
+    for required in ["No rollback dispatch has ever been fired", "Runtime evidence pending",
+                     "Cost Explorer lags", "browser speech synthesis", "Local quickstart state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 
 
@@ -288,8 +265,8 @@ def test_the_video_plan_and_shot_list_agree_and_fit_the_time_limit():
     """A beat list that outruns the limit is a plan for a rejected submission."""
     shot_list = (REPO_ROOT / "video" / "SHOT_LIST.md").read_text(encoding="utf-8")
     assert "PLAN ONLY" in shot_list, "the shot list does not declare itself a plan"
-    assert "does not satisfy the Fire TV track's device requirement" in shot_list, \
-        "the shot list must state that a browser recording is not a device run"
+    assert "desktop rehearsal is not the final Fire TV track proof" in shot_list, \
+        "the shot list must state that a browser rehearsal is not the APK runtime proof"
 
     cue = json.loads((REPO_ROOT / "video" / "cue_sheet.json").read_text(encoding="utf-8"))
     narration = json.loads((REPO_ROOT / "video" / "narration.json").read_text(encoding="utf-8"))
