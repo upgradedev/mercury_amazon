@@ -7,10 +7,9 @@ so J4 is the gate that decides whether the sponsor product is load-bearing, and 
 away said no APK had ever been built. It was the one gate in the file that could not fail
 on the axis it exists to test, and it contributed a PASS to a published 45/53.
 
-These drive every branch of the rewritten predicate with fixtures, including the branch
-that passes. A verified CI APK now exists, but the passing branch still needs a physical
-Fire TV launch and its receipt, so it is proved against an injected receipt rather than
-faked into the repository.
+These drive every branch of the predicate with fixtures, including both accepted runtime
+routes: a physical Fire TV receipt and the Android TV Emulator receipt allowed by the
+event's official FAQ.
 """
 from __future__ import annotations
 
@@ -45,6 +44,30 @@ COMPLETE_RECEIPT = {
     },
 }
 
+COMPLETE_EMULATOR_RECEIPT = {
+    "schema": "mercury.android_tv_runtime_receipt/1",
+    "recorded_at_utc": "2026-09-23T10:00:00Z",
+    "build_sha": "a" * 40,
+    "workflow_run_url": "https://github.com/upgradedev/mercury-amazon/actions/runs/1",
+    "artifact_name": "mercury-android-tv-runtime-" + "a" * 40,
+    "built_by_command": "./gradlew :app:assembleDebug -PmercuryCockpitUrl=https://example.test/",
+    "apk_path": "app/build/outputs/apk/debug/app-debug.apk",
+    "apk_sha256": "b" * 64,
+    "adb_install_exit_code": 0,
+    "normal_launcher": "monkey LEANBACK_LAUNCHER; no COCKPIT_URL intent extra",
+    "endpoint_loaded_without_intent_override": "https://example.test/",
+    "runtime": {"device_model": "Android TV", "os_version": "Android 11 / API 30"},
+    "remote_journey": {
+        "input": "ADB keyevents mapped to the Android TV D-pad",
+        "events": sorted(readiness.ANDROID_TV_REQUIRED_EVENTS),
+        "external_effect": "NONE; record-only fixture journey",
+    },
+    "artifacts": {
+        name: {"path": name, "sha256": char * 64, "bytes": 10000}
+        for name, char in (("apk", "c"), ("logcat", "d"), ("screenshot", "e"))
+    },
+}
+
 
 def _exists(path: str) -> bool:
     return (REPO_ROOT / path).is_file()
@@ -58,18 +81,29 @@ def test_a_complete_receipt_passes_the_gate():
     assert "assembleRelease" in message
 
 
-def test_the_gate_fails_in_this_repository_because_no_apk_exists():
+def test_a_complete_android_tv_emulator_receipt_passes_the_gate():
+    passed, message = readiness.evaluate_firetv_gate(
+        README_TERMS, LEANBACK_MANIFEST, COMPLETE_EMULATOR_RECEIPT, _exists)
+    assert passed is True
+    assert "Android TV" in message
+    assert "via D-pad" in message
+
+
+def test_the_gate_fails_in_this_repository_until_a_runtime_receipt_exists():
     """The honest FAIL, asserted against the real checkout rather than a fixture."""
-    receipt_path = REPO_ROOT / readiness.FIRETV_BUILD_RECEIPT
-    assert not receipt_path.exists(), (
-        f"{readiness.FIRETV_BUILD_RECEIPT} now exists. If a real APK was built and run, this "
+    receipt_paths = [
+        REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT,
+        REPO_ROOT / readiness.FIRETV_BUILD_RECEIPT,
+    ]
+    assert not any(path.exists() for path in receipt_paths), (
+        "A runtime receipt now exists. If a real APK was built and run, this "
         "test should assert the receipt's contents; it must not be written by hand to turn "
         "the gate green."
     )
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, None, _exists)
     assert passed is False
-    assert readiness.FIRETV_BUILD_RECEIPT in message
+    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in message
     assert "not a Fire TV app" in message
 
 
@@ -139,7 +173,7 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     """An honest FAIL must not turn the build red, and must not hide either."""
     assert "J4" in readiness.CI_EXEMPT
     reason = readiness.CI_EXEMPT["J4"]
-    assert "verified CI APK" in reason and "physical Fire TV" in reason
+    assert "official FAQ" in reason and "Android TV" in reason
 
 
 def test_the_audit_reports_j4_as_failing_in_this_checkout():
@@ -147,7 +181,7 @@ def test_the_audit_reports_j4_as_failing_in_this_checkout():
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
     assert results["J4"].passed is False
-    assert readiness.FIRETV_BUILD_RECEIPT in results["J4"].message
+    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in results["J4"].message
 
 
 def test_the_readme_publishes_the_score_the_auditor_prints():
@@ -188,13 +222,14 @@ def test_the_receipt_shape_is_documented_where_a_reader_will_look():
     """The gate names a file. Somebody has to be told what to put in it."""
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
     assert readiness.FIRETV_BUILD_RECEIPT in doc
-    for field in readiness.FIRETV_RECEIPT_FIELDS:
+    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in doc
+    for field in readiness.ANDROID_TV_RECEIPT_FIELDS:
         assert field in doc, f"docs/FIRE_TV_BUILD.md does not say what {field} is"
     # The document has to carry a copyable skeleton, not a prose description of one.
     block = doc.split("```json")[1].split("```")[0] if "```json" in doc else ""
     assert block, "no JSON skeleton for the receipt in docs/FIRE_TV_BUILD.md"
     skeleton = json.loads(block)
-    assert set(readiness.FIRETV_RECEIPT_FIELDS) <= set(skeleton)
+    assert set(readiness.ANDROID_TV_RECEIPT_FIELDS) <= set(skeleton)
 
 
 # ------------------------------------------------------------ I1 to I4: the review

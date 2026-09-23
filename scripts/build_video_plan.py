@@ -80,42 +80,44 @@ BEATS = [
     ),
     (
         "beat_08_refusal", 116.0, 129.0,
-        "The only irreversible control on the screen refuses in plain words when the "
-        "governance secret is missing. It does not fail silently and it does not pretend.",
-        "Go back to checkout-api. With the Secret field empty, press Stage governed "
-        "rollback. The incident panel shows the refusal text.",
+        "This public path is constrained before it is convenient. It accepts only the "
+        "labelled recorded fixture, selects no external dispatcher, and says on screen "
+        "that approval will contact no deployment pipeline.",
+        "Go back to checkout-api. Leave the Secret field empty and press Stage governed "
+        "rollback with the D-pad. Show DPAD_RECORD_ONLY_DEMO and external effect NONE.",
     ),
     (
         "beat_09_staging", 129.0, 140.0,
-        "With the secret, staging mints a single-use token bound to a hash of exactly "
-        "this rollback. Change the target afterwards and the token stops applying.",
-        "Type the secret, stage again. Show PENDING_CONFIRMATION, the payload hash, "
+        "Staging still mints a single-use token bound to a hash of exactly this "
+        "proposal. Change the target afterwards and the token stops applying.",
+        "Show PENDING_CONFIRMATION, the payload hash, "
         "the lease countdown as the hero figure, and Confirm becoming enabled.",
     ),
     (
         "beat_10_confirm_and_replay", 140.0, 154.0,
         "Governance passes, and the product says out loud what it did not do. No "
-        "deployment pipeline was contacted. The confirm control then goes dark: the "
-        "token was valid once, and the server refuses a replay by name.",
+        "deployment pipeline was contacted. The token is spent, then the same remote "
+        "publishes a fixed responder handoff with the facts and next step.",
         "Press Confirm rollback and read the EXECUTED output verbatim, including the "
-        "sentence stating no pipeline was contacted. Hold on the darkened Confirm "
-        "control and its reason line: the token is spent.",
+        "sentence stating no pipeline was contacted. Press Publish handoff and hold "
+        "on the shared revision, facts and next step.",
     ),
     (
-        "beat_11_not_built", 154.0, 168.0,
-        "What is not built: no APK exists, the Kotlin has never been compiled, and "
-        "nothing has run on Fire TV hardware. The refusals, the correlation and the "
-        "governance were driven live here. The device was not.",
-        "Cut to docs/FIRE_TV_BUILD.md open on the recorded build failure.",
+        "beat_11_runtime_evidence", 154.0, 168.0,
+        "The source includes a normal-launch Android TV proof that installs this exact "
+        "APK and replays the same D-pad journey. A receipt is claimed only after that "
+        "workflow succeeds; physical hardware is optional under the event FAQ.",
+        "Cut to docs/FIRE_TV_BUILD.md and the Android TV runtime workflow. Do not show "
+        "a receipt until the recorded run exists.",
     ),
 ]
 
 PLAN_NOTE = (
     "PLAN ONLY. No video has been recorded. Durations are intended, not measured "
     "against a take. Every beat is an action that exists in the repository today "
-    "and was performed in a desktop browser against a local server. No beat shows "
-    "a Fire TV device, because no APK has been built, and no Fire TV emulator exists "
-    "to stand in for one."
+    "and was performed in a desktop browser against a local server. The candidate "
+    "Android TV Emulator receipt is still pending; the event FAQ permits that route "
+    "and does not require physical hardware."
 )
 
 narration_beats = []

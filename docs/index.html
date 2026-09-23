@@ -492,6 +492,10 @@
                   title="Disabled until a rollback has been staged and a governance token issued">
             Confirm rollback
           </button>
+          <button id="btnHandoff" class="btn" data-tv-focusable data-tv-label="Publish responder handoff" disabled
+                  title="Disabled until a correlation produces incident facts to share">
+            Publish handoff
+          </button>
         </div>
 
         <div class="hero-reasons">
@@ -687,6 +691,7 @@
       staged: null,
       lastCorrelation: null,
       connection: 'unknown',
+      dpadDemoApproval: false,
       handoffRevision: 0,
       speak: false,
       /* Which service the next correlation asks about. Changed only by the demo
@@ -695,6 +700,14 @@
     };
 
     function el(id) { return document.getElementById(id); }
+
+    function reportHostEvent(eventName, detail) {
+      try {
+        if (window.MercuryHost && typeof window.MercuryHost.reportJourney === 'function') {
+          window.MercuryHost.reportJourney(String(eventName), String(detail || ''));
+        }
+      } catch (ignored) { /* Browser preview has no native host. */ }
+    }
 
     /* Every value that comes back from the API reaches the DOM through
        textContent on a node built here. Nothing on this page assigns innerHTML,
@@ -1089,6 +1102,7 @@
       setConnection('checking', 'Sending GET ' + base + '/health');
       try {
         var result = await call('/health', { method: 'GET' }, null);
+        state.dpadDemoApproval = result.body.dpad_demo_approval === true;
         var sha = result.body.build_sha ? result.body.build_sha.slice(0, 7) : 'unreported';
         setConnection('reachable',
           'GET /health returned ' + result.status + ' in ' + result.elapsedMs.toFixed(0)
@@ -1124,6 +1138,9 @@
           { service_name: state.service, time_window_minutes: 60 }, 'incidentLatency');
         var data = res.body;
         state.lastCorrelation = data;
+        reportHostEvent('what_changed', data.verdict + ':'
+          + (data.commit_provenance ? data.commit_provenance.data_source : 'unknown') + ':'
+          + (data.recommended_action ? 'target-ready' : 'no-target'));
         el('heroLatency').textContent =
           'POST /mcp/tools/what_changed answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
         heroFromCorrelation(data);
@@ -1135,7 +1152,10 @@
         if (data.recommended_action) {
           setReason('btnStage', 'stageReason', true,
             'Ready to stage a rollback of ' + data.recommended_action.target_service
-            + ' to ' + data.recommended_action.target_commit_sha + '. Needs the governance secret.',
+            + ' to ' + data.recommended_action.target_commit_sha
+            + (state.dpadDemoApproval
+              ? '. D-pad demo approval is record-only and contacts no deployment pipeline.'
+              : '. Needs the governance secret.'),
             'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
         } else {
           setReason('btnStage', 'stageReason', false,
@@ -1144,6 +1164,10 @@
               : 'This correlation produced no rollback target, so there is nothing to stage.',
             'Disabled until verified deployment evidence returns a rollback target');
         }
+        el('btnHandoff').disabled = false;
+        el('btnHandoff').title = state.dpadDemoApproval
+          ? 'Publish the fixed, record-only fixture handoff with the D-pad'
+          : 'Publish the current incident facts using the operator secret';
         speak(data.voice_summary);
       } catch (error) {
         heroFromFailure(error.message);
@@ -1200,14 +1224,14 @@
     }
 
     async function stageRollback() {
-      var secret = requireSecret();
       var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
       if (!rec) {
         showError('incidentOutput', 'No rollback target. Ask what changed first.');
         showPanel('incident');
         return;
       }
-      if (!secret) {
+      var secret = state.dpadDemoApproval ? '' : requireSecret();
+      if (!state.dpadDemoApproval && !secret) {
         showError('incidentOutput',
           'No governance secret entered. Staging a rollback needs the deployment secret, and the '
           + 'Setup fields have been opened above for it. The server prints an ephemeral one at startup.');
@@ -1217,8 +1241,9 @@
 
       showLoading('incidentOutput', 'Calling POST /mcp/tools/stage_rollback ...');
       try {
-        var res = await post('/mcp/tools/stage_rollback', {
-          action_id: 'tv-' + Date.now(),
+        var res = await post(state.dpadDemoApproval
+          ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback', {
+          action_id: (state.dpadDemoApproval ? 'tv-demo-' : 'tv-') + Date.now(),
           target_service: rec.target_service,
           target_commit_sha: rec.target_commit_sha,
           environment: rec.environment,
@@ -1258,6 +1283,8 @@
         box.appendChild(h('p', 'row', res.body.confirmation_prompt));
         render('incidentOutput', box);
         speak(res.body.confirmation_prompt);
+        reportHostEvent('rollback_staged', res.body.action_id + ':'
+          + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         showError('incidentOutput', error.message);
         showPanel('incident');
@@ -1265,7 +1292,7 @@
     }
 
     async function confirmRollback() {
-      var secret = requireSecret();
+      var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.staged) {
         showError('incidentOutput', 'Nothing is staged.');
         showPanel('incident');
@@ -1273,7 +1300,8 @@
       }
       showLoading('incidentOutput', 'Calling POST /mcp/tools/confirm_rollback ...');
       try {
-        var res = await post('/mcp/tools/confirm_rollback', {
+        var res = await post(state.dpadDemoApproval
+          ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback', {
           action_id: state.staged.action_id,
           governance_token: state.staged.governance_token
         }, 'incidentLatency', secret);
@@ -1294,6 +1322,7 @@
         setReason('btnConfirm', 'confirmReason', false,
           'That token has been spent. Confirming again is refused by name. Stage again for a new one.',
           'Disabled until a rollback has been staged and a governance token issued');
+        if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnHandoff')); }
 
         var box = document.createElement('div');
         box.appendChild(h('span', 'tag tag-ok', res.body.status));
@@ -1305,6 +1334,8 @@
         box.appendChild(h('p', 'row', res.body.output));
         render('incidentOutput', box);
         speak('Rollback governance result for ' + res.body.target_service + ': ' + res.body.status + '.');
+        reportHostEvent('rollback_confirmed', res.body.status + ':'
+          + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         showError('incidentOutput', error.message);
         showPanel('incident');
@@ -1328,9 +1359,9 @@
     }
 
     async function publishHandoff() {
-      var secret = requireSecret();
-      if (!secret || !state.lastCorrelation) {
-        showError('handoffOutput', 'A governance secret and a what-changed answer are required.');
+      var secret = state.dpadDemoApproval ? '' : requireSecret();
+      if ((!state.dpadDemoApproval && !secret) || !state.lastCorrelation) {
+        showError('handoffOutput', 'A what-changed answer and, outside the record-only demo, a governance secret are required.');
         return;
       }
       var data = state.lastCorrelation;
@@ -1347,28 +1378,44 @@
         : ((data.deployment_evidence && data.deployment_evidence.blocked_reason)
           || 'Keep investigating; Mercury has not produced an actionable target.');
       try {
-        var res = await post('/mcp/tools/update_handoff', {
+        var payload = state.dpadDemoApproval ? {
+          expected_revision: state.handoffRevision
+        } : {
           incident_id: handoffIncidentId(),
           responder: el('opResponder').value.trim() || 'Primary responder',
           current_action: data.recommended_action ? 'Reviewing verified rollback target' : 'Gathering evidence',
           confirmed_facts: facts,
           next_step: next,
           expected_revision: state.handoffRevision
-        }, 'handoffLatency', secret);
+        };
+        var res = await post(state.dpadDemoApproval
+          ? '/mcp/tools/demo_update_handoff' : '/mcp/tools/update_handoff',
+          payload, 'handoffLatency', secret);
         renderHandoff(res.body);
+        showPanel('incident');
+        if (window.mercuryNav) {
+          window.mercuryNav.setFocus(document.querySelector('[data-action="handoff-refresh"]'));
+        }
+        reportHostEvent('handoff_published', res.body.incident_id + ':revision-' + res.body.revision + ':'
+          + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         showError('handoffOutput', error.message);
       }
     }
 
     async function refreshHandoff() {
-      var secret = requireSecret();
-      if (!secret) { showError('handoffOutput', 'The governance secret is required.'); return; }
+      var secret = state.dpadDemoApproval ? '' : requireSecret();
+      if (!state.dpadDemoApproval && !secret) {
+        showError('handoffOutput', 'The governance secret is required.'); return;
+      }
       try {
-        var res = await call('/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()), {
-          method: 'GET', headers: { 'Authorization': 'Bearer ' + secret }
-        }, 'handoffLatency');
+        var headers = secret ? { 'Authorization': 'Bearer ' + secret } : {};
+        var path = state.dpadDemoApproval
+          ? '/mcp/demo-handoff' : '/mcp/handoffs/' + encodeURIComponent(handoffIncidentId());
+        var res = await call(path, { method: 'GET', headers: headers }, 'handoffLatency');
         renderHandoff(res.body);
+        reportHostEvent('handoff_refreshed', res.body.incident_id + ':revision-' + res.body.revision + ':'
+          + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         showError('handoffOutput', error.message);
       }
@@ -1552,6 +1599,7 @@
       el('btnWhatChanged').addEventListener('click', loadWhatChanged);
       el('btnStage').addEventListener('click', stageRollback);
       el('btnConfirm').addEventListener('click', confirmRollback);
+      el('btnHandoff').addEventListener('click', publishHandoff);
 
       // The navigator owns the only key handler on this page. It announces each
       // focus change, and the hint bar listens. A second key listener here would

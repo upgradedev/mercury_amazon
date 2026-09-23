@@ -6,8 +6,8 @@ returns the verdict unchanged. It never substitutes a result when a provider
 returns nothing.
 
 Commits come from the GitHub API when a token is present. When they do not, it
-falls back to the local git checkout rather than to invented commits, and the
-provenance says which of the two happened.
+falls back to the local git checkout and finally to the checked-in recording used
+by the published trial. The provenance distinguishes all three paths.
 
 When the metric series is simulated (no CloudWatch), the simulation is anchored
 to the newest known commit so the correlation is demonstrable end to end without
@@ -70,15 +70,17 @@ class DiagnoseIncidentUseCase:
         metric_provider: MetricSeriesProvider,
         commit_provider: CommitHistoryProvider,
         local_commit_provider: CommitHistoryProvider | None = None,
+        recorded_commit_provider: CommitHistoryProvider | None = None,
         correlator: IncidentCorrelator | None = None,
     ) -> None:
         self._metrics = metric_provider
         self._commits = commit_provider
         self._local_commits = local_commit_provider
+        self._recorded_commits = recorded_commit_provider
         self._correlator = correlator or IncidentCorrelator()
 
     def _gather_commits(self) -> tuple[list[CommitRef], Provenance]:
-        """Try GitHub, then the local checkout. Never fabricate a commit."""
+        """Try GitHub, local git, then an explicitly labelled recording."""
         raw = self._commits.list_recent_commits(limit=20)
         source = DataSource.GITHUB_API
         detail = "{count} recent default-branch commits read from the GitHub REST API."
@@ -90,6 +92,18 @@ class DiagnoseIncidentUseCase:
                 "{count} commits read from the local git checkout with git log, because no "
                 "GitHub token is configured. These are real commits from this repository, "
                 "not the service being monitored."
+            )
+
+        if not raw and self._recorded_commits is not None:
+            raw = self._recorded_commits.list_recent_commits(limit=20)
+            source = DataSource.OFFLINE_FIXTURE
+            detail = getattr(
+                self._recorded_commits,
+                "detail",
+                (
+                    "{count} commits read from a checked-in recording. They are real recorded "
+                    "repository commits, not live service deployments."
+                ),
             )
 
         commits: list[CommitRef] = []
@@ -110,8 +124,8 @@ class DiagnoseIncidentUseCase:
             return [], Provenance(
                 source=DataSource.OFFLINE_FIXTURE,
                 detail=(
-                    "No commits are available from GitHub or from a local checkout, and this "
-                    "use case does not invent commits. Attribution is reported as unavailable."
+                    "No commits are available from GitHub, local git or the checked-in recording, "
+                    "and this use case does not invent commits. Attribution is unavailable."
                 ),
                 observed_at_utc=_iso_now(),
             )

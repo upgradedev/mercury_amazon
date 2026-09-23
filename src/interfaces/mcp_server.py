@@ -38,6 +38,8 @@ from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
 from src.infrastructure.cloudwatch_github_ingest import DevOpsTelemetryIngestAdapter
+from src.infrastructure.demo_evidence import recorded_demo_handoff, seed_recorded_demo_evidence
+from src.infrastructure.dynamodb_state import DynamoStateStore
 from src.infrastructure.github_actions_dispatcher import (
     GitHubActionsRollbackDispatcher,
     RollbackDispatchError,
@@ -45,6 +47,7 @@ from src.infrastructure.github_actions_dispatcher import (
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
+from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
 from src.infrastructure.trial_summary import naming_accuracy
 
 logger = logging.getLogger("mercury.mcp")
@@ -123,7 +126,10 @@ dora_use_case = CalculateDORAUseCase(github_adapter)
 cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
 local_git_provider = LocalGitCommitProvider()
-incident_use_case = DiagnoseIncidentUseCase(cloudwatch_adapter, github_adapter, local_git_provider)
+recorded_commit_provider = RecordedCommitProvider()
+incident_use_case = DiagnoseIncidentUseCase(
+    cloudwatch_adapter, github_adapter, local_git_provider, recorded_commit_provider
+)
 
 # Selected by MERCURY_ROLLBACK_DISPATCH. None unless a deployment asks for it, in
 # which case the use case keeps its record-only default and nothing is contacted.
@@ -137,11 +143,15 @@ if rollback_dispatcher is not None:
         rollback_dispatcher.armed,
         rollback_dispatcher.disarm_reason,
     )
-rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET, rollback_dispatcher)
-deployment_evidence = DeploymentEvidenceLedger()
-incident_handoffs = IncidentHandoffStore()
+state_store = DynamoStateStore.from_env()
+rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET, rollback_dispatcher, state_store)
+deployment_evidence = DeploymentEvidenceLedger(storage=state_store)
+incident_handoffs = IncidentHandoffStore(storage=state_store)
 telemetry_detector = TelemetryAbsenceDetector()
 devops_events: list[dict[str, Any]] = []
+
+
+seed_recorded_demo_evidence(incident_use_case, deployment_evidence)
 
 
 # ---------------------------------------------------------------------- Auth
@@ -246,6 +256,10 @@ class HandoffUpdateRequest(BaseModel):
     expected_revision: int | None = Field(default=None, ge=0)
 
 
+class DemoHandoffRequest(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=0)
+
+
 # ------------------------------------------------------------- Observability
 
 @app.middleware("http")
@@ -284,6 +298,8 @@ async def health_check() -> dict[str, Any]:
         "rollback_secret_is_ephemeral": ROLLBACK_SECRET_IS_EPHEMERAL,
         "github_live": github_adapter.can_call_live,
         "rollback_dispatch": _dispatch_mode(),
+        "durable_state": bool(state_store),
+        "dpad_demo_approval": _dispatch_mode() == "record-only",
     }
 
 
@@ -446,9 +462,11 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             )
         else:
             offending, target = pair
+            recorded_demo = all(marker.source.startswith("offline-fixture") for marker in pair)
             payload["deployment_evidence"].update({
                 "offending_marker": offending.to_dict(),
                 "target_marker": target.to_dict(),
+                "mode": "OFFLINE_RECORDED_DEMO" if recorded_demo else "AUTHENTICATED_LIVE",
             })
             payload["recommended_action"] = {
                 "type": "GOVERNED_ROLLBACK",
@@ -461,6 +479,9 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
                 "lease_seconds": 300,
                 "status": "AWAITING_AUTHORIZED_STAGING",
                 "note": (
+                    "Target selected from internally consistent recorded demo markers. These are Mercury "
+                    "repository commits, not deployments of checkout-api; confirmation is record-only."
+                    if recorded_demo else
                     "Target selected from authenticated deployment evidence with a matching healthy "
                     "revision and artifact digest. Staging and confirmation still require authorization."
                 ),
@@ -523,6 +544,30 @@ async def get_handoff(incident_id: str) -> dict[str, Any]:
     if item is None:
         raise HTTPException(status_code=404, detail=f"No shared state for incident '{incident_id}'.")
     return item.to_dict()
+
+
+@app.post("/mcp/tools/demo_update_handoff")
+async def demo_update_handoff(req: DemoHandoffRequest) -> dict[str, Any]:
+    """Publish fixed fixture content; accept no responder-authored text."""
+    _validate_record_only_demo("tv-demo-handoff")
+    payload = recorded_demo_handoff(incident_use_case, deployment_evidence)
+    if payload is None:
+        raise HTTPException(status_code=409, detail="The labelled demo handoff is unavailable.")
+    try:
+        item = incident_handoffs.update(**payload, expected_revision=req.expected_revision)
+    except HandoffConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
+
+
+@app.get("/mcp/demo-handoff")
+async def get_demo_handoff() -> dict[str, Any]:
+    """Read the single fixed demo handoff without exposing operator state."""
+    _validate_record_only_demo("tv-demo-handoff")
+    item = incident_handoffs.get("checkout-api-active")
+    if item is None:
+        raise HTTPException(status_code=404, detail="No recorded demo handoff exists yet.")
+    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
 
 
 @app.post("/webhooks/github/workflow_run", dependencies=[Depends(require_operator)])
@@ -630,6 +675,70 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
         "target_deployment_marker_id": action.target_deployment_marker_id,
         "output": output,
     }
+
+
+def _validate_record_only_demo(action_id: str) -> None:
+    """Confine the no-secret TV path to the labelled, effect-free fixture."""
+    if _dispatch_mode() != "record-only" or not action_id.startswith("tv-demo-"):
+        raise HTTPException(
+            status_code=403,
+            detail="D-pad demo approval is available only for tv-demo actions in record-only mode.",
+        )
+
+
+@app.post("/mcp/tools/demo_stage_rollback")
+async def demo_stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
+    """Stage only the checked-in demo target, with no external side effect.
+
+    This route exists so a Fire TV remote can complete the public fixture journey
+    without typing an operator secret. It is fail-closed when any real dispatcher
+    is selected, and both markers must explicitly identify themselves as offline
+    fixtures. The normal stage route remains bearer-authenticated.
+    """
+    _validate_record_only_demo(req.action_id)
+    try:
+        offending, target = deployment_evidence.validate_pair(
+            service=req.target_service,
+            environment=req.environment,
+            offending_marker_id=req.offending_deployment_marker_id,
+            target_marker_id=req.target_deployment_marker_id,
+            target_revision=req.target_commit_sha,
+            target_artifact_sha256=req.target_artifact_sha256,
+        )
+    except DeploymentEvidenceError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not all(marker.source.startswith("offline-fixture") for marker in (offending, target)):
+        raise HTTPException(status_code=403, detail="The no-secret route refuses non-fixture evidence.")
+    response = await stage_rollback(req)
+    response["authorization_mode"] = "DPAD_RECORD_ONLY_DEMO"
+    response["external_effect"] = "NONE"
+    return response
+
+
+@app.post("/mcp/tools/demo_confirm_rollback")
+async def demo_confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
+    """Confirm a fixture-only action; still token-bound and single-use."""
+    _validate_record_only_demo(req.action_id)
+    action = rollback_use_case.get(req.action_id)
+    if action is None:
+        raise HTTPException(status_code=404, detail="The staged demo action is unavailable or expired.")
+    try:
+        offending, target = deployment_evidence.validate_pair(
+            service=action.target_service,
+            environment=action.environment,
+            offending_marker_id=action.offending_deployment_marker_id,
+            target_marker_id=action.target_deployment_marker_id,
+            target_revision=action.target_commit_sha,
+            target_artifact_sha256=action.target_artifact_sha256,
+        )
+    except DeploymentEvidenceError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not all(marker.source.startswith("offline-fixture") for marker in (offending, target)):
+        raise HTTPException(status_code=403, detail="The no-secret route refuses non-fixture evidence.")
+    response = await confirm_rollback(req)
+    response["authorization_mode"] = "DPAD_RECORD_ONLY_DEMO"
+    response["external_effect"] = "NONE"
+    return response
 
 
 @app.post("/mcp/tools/recommendation_liveness", dependencies=[Depends(require_operator)])

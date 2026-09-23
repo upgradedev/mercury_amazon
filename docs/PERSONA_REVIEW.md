@@ -14,7 +14,7 @@ receives".
 
 That was honest and it was useless. A judge who clones this repository alone does not
 get that file, so the four gates that passed here would have failed for them, and the
-published score of 44/53 would have read 40/53 in their hands. The evidence for a
+published score would have lost four gates in their hands. The evidence for a
 quarter of the failing surface was somewhere they could not look.
 
 This file is the restatement they can read. Nothing is copied from the coordination
@@ -58,9 +58,9 @@ being smoothed over.
 | UX designer | Mercury maintainer, interface row | Can a cold visitor use the thing without being told how? | PASS |
 | Recruiter | Mercury maintainer, engineering bar row | Would this code and this prose clear an engineering bar? | PASS |
 
-The sponsor product row fails. It is the row this entry most wants to pass, it is the
-one that decides the track it is entered in, and it is recorded as a failure because
-no Fire TV binary exists. Details in P01-1 below.
+The sponsor product row still fails until the candidate APK completes its normal-launch
+journey on the allowed Android TV Emulator and produces the checked runtime receipt.
+Details in P01-1 below.
 
 ## 3. Findings
 
@@ -69,7 +69,7 @@ A row that restates an older judgement says so and carries the older date.
 
 | ID | Lens | Finding | Verdict | Evidence |
 |---|---|---|---|---|
-| P01-1 | Sponsor product owner | The APK now builds in CI, but the sponsor product is not yet proved load-bearing because nothing has installed or run on a physical Fire TV. Gate J4 fails on the missing device receipt | FAIL | GitHub Actions run `35500282701`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
+| P01-1 | Sponsor product owner | The candidate has an automated Android TV install and D-pad journey, but J4 remains red until that workflow produces its content-addressed runtime receipt. The official FAQ permits this emulator route and does not require physical hardware | FAIL | `.github/workflows/android-tv-emulator.yml`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
 | P01-2 | Sponsor product owner | The review of 2026-09-04 recorded that "Fire TV spatial navigation and Alexa voice query are load-bearing" for this entry. The Alexa half was never true of this repository. It does not survive restatement, and a test now fails the build if any document claims it | FAIL | `tests/e2e/test_documentation_claims.py` |
 | P01-3 | Sponsor product owner | What is load-bearing and does exist: the D-pad and the arrow keys are one focus code path, driven by the same spec on both inputs | PASS | `tests/e2e/spatial_nav_spec.js`, `tests/e2e/test_html_structure.py` |
 | P06-1 | UX designer | The hero action is marked and the layout carries responsive breakpoints, so the primary action is visible without reading. Gate H1 passes | PASS | `python ci/readiness.py`, `tests/e2e/test_html_structure.py` |

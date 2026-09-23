@@ -164,6 +164,65 @@ def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(clie
             assert data["deployment_evidence"]["blocked_reason"]
 
 
+def test_recorded_demo_markers_create_an_honest_record_only_dpad_path(client):
+    from src.infrastructure.demo_evidence import seed_recorded_demo_evidence
+    from src.interfaces import mcp_server
+
+    seed_recorded_demo_evidence(mcp_server.incident_use_case, mcp_server.deployment_evidence)
+    changed = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    assert changed["recommended_action"] is not None
+    assert changed["deployment_evidence"]["mode"] == "OFFLINE_RECORDED_DEMO"
+    assert changed["commit_provenance"]["data_source"] in {"local-git", "offline-fixture"}
+    assert "not deployments of checkout-api" in changed["recommended_action"]["note"]
+
+    rec = changed["recommended_action"]
+    staged = client.post("/mcp/tools/demo_stage_rollback", json={
+        "action_id": "tv-demo-integration",
+        "target_service": rec["target_service"],
+        "target_commit_sha": rec["target_commit_sha"],
+        "environment": rec["environment"],
+        "target_artifact_sha256": rec["target_artifact_sha256"],
+        "target_deployment_marker_id": rec["target_deployment_marker_id"],
+        "offending_deployment_marker_id": rec["offending_deployment_marker_id"],
+        "reason": "Recorded fixture journey; no deployment system is contacted.",
+        "lease_sec": 300,
+    })
+    assert staged.status_code == 200
+    assert staged.json()["authorization_mode"] == "DPAD_RECORD_ONLY_DEMO"
+    confirmed = client.post("/mcp/tools/demo_confirm_rollback", json={
+        "action_id": staged.json()["action_id"],
+        "governance_token": staged.json()["governance_token"],
+    })
+    assert confirmed.status_code == 200
+    assert confirmed.json()["status"] == "RECORDED_ONLY"
+    assert confirmed.json()["external_effect"] == "NONE"
+
+    handoff = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": 0})
+    assert handoff.status_code == 200
+    assert handoff.json()["incident_id"] == "checkout-api-active"
+    assert handoff.json()["authorization_mode"] == "DPAD_RECORD_ONLY_DEMO"
+    assert handoff.json()["external_effect"] == "NONE"
+    assert "record-only" in handoff.json()["next_step"]
+    refreshed = client.get("/mcp/demo-handoff")
+    assert refreshed.status_code == 200
+    assert refreshed.json()["revision"] == handoff.json()["revision"]
+
+
+def test_demo_handoff_is_fixed_and_disabled_when_effectful_dispatch_is_selected(client, monkeypatch):
+    from src.interfaces import mcp_server
+
+    class ArmedDispatcher:
+        armed = True
+        repository = "example/repo"
+        workflow = "rollback.yml"
+        ref = "main"
+        disarm_reason = ""
+
+    monkeypatch.setattr(mcp_server, "rollback_dispatcher", ArmedDispatcher())
+    refused = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": 0})
+    assert refused.status_code == 403
+
+
 def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):
     """The demo that shows the refusal has to disclose its own staging too."""
     data = client.post("/mcp/tools/what_changed", json={"service_name": "release-train"}).json()

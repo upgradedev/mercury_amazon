@@ -211,8 +211,9 @@ def test_the_narration_and_the_cue_sheet_carry_the_same_words():
     assert narration["status"] == cue["status"]
 
 
-def test_the_video_plan_says_no_fire_tv_emulator_exists():
-    """The plan used to promise a beat on 'the official Fire TV emulator'. There is none."""
+def test_the_video_plan_uses_the_officially_allowed_android_tv_emulator_route():
+    """The event FAQ permits Android TV Emulator and makes hardware optional."""
     for name in ("narration.json", "cue_sheet.json"):
         status = json.loads((REPO_ROOT / "video" / name).read_text(encoding="utf-8"))["status"]
-        assert "no fire tv emulator exists" in status.lower(), f"video/{name} still implies an emulator"
+        assert "android tv emulator" in status.lower()
+        assert "does not require physical hardware" in status.lower()

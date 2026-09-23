@@ -10,12 +10,18 @@ import re
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from typing import Protocol
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class DeploymentEvidenceError(ValueError):
     """Raised when a marker is malformed or cannot prove a healthy deployment."""
+
+
+class DeploymentMarkerStore(Protocol):
+    def put_deployment_marker(self, payload: dict) -> None: ...
+    def list_deployment_markers(self, service: str, environment: str) -> list[dict]: ...
 
 
 @dataclass(frozen=True)
@@ -105,12 +111,13 @@ class DeploymentMarker:
 class DeploymentEvidenceLedger:
     """Thread-safe bounded ledger of verified deployment markers."""
 
-    def __init__(self, max_entries: int = 200) -> None:
+    def __init__(self, max_entries: int = 200, storage: DeploymentMarkerStore | None = None) -> None:
         if max_entries < 2:
             raise ValueError("max_entries must be at least 2")
         self.max_entries = max_entries
         self._markers: list[DeploymentMarker] = []
         self._lock = threading.RLock()
+        self._storage = storage
 
     def clear(self) -> None:
         with self._lock:
@@ -129,6 +136,8 @@ class DeploymentEvidenceLedger:
             self._markers.sort(key=lambda m: (m.deployed_at, m.marker_id))
             if len(self._markers) > self.max_entries:
                 del self._markers[: len(self._markers) - self.max_entries]
+            if self._storage is not None:
+                self._storage.put_deployment_marker(marker.to_dict())
             return marker
 
     def get(self, marker_id: str) -> DeploymentMarker | None:
@@ -137,10 +146,15 @@ class DeploymentEvidenceLedger:
 
     def timeline(self, service: str, environment: str) -> list[DeploymentMarker]:
         with self._lock:
-            return [
-                m for m in reversed(self._markers)
+            combined = {
+                m.marker_id: m for m in self._markers
                 if m.service == service and m.environment == environment
-            ]
+            }
+            if self._storage is not None:
+                for payload in self._storage.list_deployment_markers(service, environment):
+                    marker = DeploymentMarker.from_values(**payload)
+                    combined[marker.marker_id] = marker
+            return sorted(combined.values(), key=lambda m: (m.deployed_at, m.marker_id), reverse=True)
 
     def rollback_pair(
         self, service: str, environment: str, offending_revision: str

@@ -1,0 +1,39 @@
+name: Android TV runtime proof
+
+on:
+  workflow_dispatch:
+
+jobs:
+  emulator-golden-path:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Build the exact public-candidate APK
+        run: >-
+          ./gradlew :app:assembleDebug --stacktrace
+          -PmercuryCockpitUrl=https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/
+      - name: Install and drive the Android TV D-pad journey
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: android-tv
+          arch: x86
+          profile: tv_1080p
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/android_tv_smoke.sh
+      - name: Upload exact runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mercury-android-tv-runtime-${{ github.sha }}
+          path: build/android-tv-evidence/
+          if-no-files-found: error

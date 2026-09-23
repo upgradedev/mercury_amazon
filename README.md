@@ -36,14 +36,15 @@ every attribution carries its own measured precision.
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
-python -m pytest tests/ -q  # 544 passed
+python -m pytest tests/ -q  # 559 passed
 python -m src.interfaces.mcp_server
 ```
 
 Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
-secret to its log for you to paste into the cockpit. The current green-suite timing
+secret to its log for authenticated operator calls. The labelled record-only TV demo
+needs no typed secret and can contact no deployment pipeline. The current green-suite timing
 record spans 50.37 to 222.72 seconds across four runs of the 541-test tree on
 2026-09-23: the three quiet runs landed at 50.37, 55.55 and 162.76 seconds, and the
 run with 4 CPU-saturating background processes landed at 222.72 seconds. Every run
@@ -60,17 +61,17 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-544%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-559%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**An APK exists as a verified CI artifact; no Fire TV device run exists yet.**
-[`.github/workflows/android.yml`](.github/workflows/android.yml) ran the Kotlin tests,
-assembled the debug APK and uploaded it on 2026-09-20. Run `35500282701` produced a
-9,260,135-byte APK with SHA-256
-`6c05dc46cdee7b6ecb49354e5ace06cd7de6913b517882e208acde8f6c296331`.
-That proves a build, not installation, launch or D-pad behaviour on Fire TV hardware.
-Detail in [Fire TV](#fire-tv).
+**The candidate APK and runtime receipt are pending the dispatched emulator run.**
+Every Android build compiles the public HTTPS cockpit endpoint into the APK. A separate
+workflow installs that exact APK in Android TV Emulator, launches it normally with no
+ADB URL override, drives attribution, record-only approval and handoff by D-pad, then
+uploads the APK, logs, screenshot and content-addressed receipt. The event's
+[official FAQ](https://amazonappdev2026.devpost.com/details/faqs) permits this route
+and does not require physical hardware. Detail in [Fire TV](#fire-tv).
 
 The CI badge points at a repository that is currently **private**, so that badge
 will not resolve for anyone outside the organisation until it is made public. It is
@@ -566,10 +567,11 @@ means `DISPATCH_ACCEPTED`, not workflow success or healthy completion.
 The incident panel can publish and refresh one bounded shared state record. It
 shows the responder, current action, confirmed facts, next step, update time and
 revision. Updates use optimistic concurrency, so a responder working from an old
-revision receives 409 instead of overwriting newer evidence. The store retains at
-most 50 incidents and at most 10 confirmed facts per incident. This closes the
-software path for handoff; a two-responder comparison against the laptop dashboard
-has not been run and remains a separate user-evidence gate.
+revision receives 409 instead of overwriting newer evidence. The local store retains
+at most 50 incidents and at most 10 confirmed facts per incident; the deployed Lambda
+uses DynamoDB with conditional revisions. This closes the software path for handoff;
+a two-responder comparison against the laptop dashboard has not been run and remains
+a separate user-evidence gate.
 
 **It has never been fired.** No request has ever been sent to github.com from this
 repository: that needs a token with `actions:write` on a repository that has such
@@ -613,9 +615,9 @@ against that file, and the file records the test count they were measured over, 
 adding a test makes this paragraph fail the build until the suite is re-measured,
 unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
-timing record was **measured over 541 collected tests**. The three Lambda bridge
-checks were added afterward: **the suite now collects 544 tests and a re-measure on
-an idle machine is pending**.
+timing record was **measured over 541 collected tests**. Additional persistence,
+packaging, browser and Android TV checks were added afterward: **the suite now collects
+559 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -656,7 +658,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 544 passed
+# 559 passed
 ```
 
 ### 3. Start the server
@@ -683,10 +685,10 @@ cockpit. It changes on every restart.
 
 Open `http://127.0.0.1:8002/`. Press **Check connection** to send a real
 `GET /health` and watch the state pill change from *API not checked*. Then
-**Ask what changed**, paste the governance secret, **Stage governed rollback**,
-and **Confirm rollback**. After it executes, Confirm goes dark and says why: the
-token is spent. To watch the server refuse a replay itself, send the same confirm
-again from a shell; it answers `409 NOT_PENDING`.
+**Ask what changed**, **Stage governed rollback**, **Confirm rollback**, and
+**Publish handoff**. In record-only mode these controls accept only the fixed,
+labelled fixture and contact no deployment system. Authenticated operator routes use
+the secret and remain separate. A spent confirmation token cannot be replayed.
 
 Arrow keys move focus to the nearest control in that direction, which is the same
 code path the Fire TV remote drives.
@@ -699,11 +701,11 @@ adb connect <FIRE_TV_IP>:5555
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Device and troubleshooting instructions are in
-[`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md), which also says why there is no
-emulator step: no Fire TV emulator exists, so the device is the only place this
-runs. After the launch, `python scripts/write_firetv_receipt.py` writes the receipt
-gate J4 reads, and refuses to write it without an APK it can open.
+Build, emulator and evidence instructions are in
+[`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md). The official event FAQ permits
+Android TV Emulator or Fire TV/Vega simulator and makes a physical device optional.
+`.github/workflows/android-tv-emulator.yml` performs the normal-launch D-pad journey
+and writes the runtime receipt gate J4 reads.
 
 ---
 
@@ -816,32 +818,25 @@ controls so the remote cannot land in them. The API defaults to the origin the p
 was served from, and pressing **Stage governed rollback** with no secret opens the
 setup row by itself and says why. The first screen is the incident.
 
-The floor is a CSS pixel floor at a 1920x1080 CSS viewport. A Fire TV device that
-reports a smaller CSS viewport at the same physical resolution is not covered by
-this measurement, and nothing here has been measured on Fire TV hardware.
+The floor is a CSS pixel floor at a 1920x1080 CSS viewport. A target that reports a
+smaller CSS viewport at the same physical resolution is not covered by this browser
+measurement. The separate emulator workflow records the Android TV viewport.
 
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**The APK builds; the device journey has not run.**
-[`.github/workflows/android.yml`](.github/workflows/android.yml) executed successfully
-on 2026-09-20. Run `35500282701` ran the JVM unit tests, assembled the debug APK and
-uploaded artifact `10601069697`; the downloaded binary's SHA-256 matches the build
-log. The repository is private, so the Actions artifact is not visible to judges
-without repository access. It has not been built on the maintainer's machine, and it
-**has never been installed on a physical Fire TV Stick**. There is no emulator step
-to have skipped: Amazon's own Fire TV documentation says to test on an actual Fire
-TV device rather than an emulator, no Fire TV emulator exists, and the Vega Virtual
-Device runs Vega apps on macOS or Ubuntu rather than this APK on Windows, so device
-footage is the only evidence the track accepts; the citations are in
-`docs/FIRE_TV_BUILD.md`. The surface being described is a D-pad and a screen. Nothing
-on it listens for speech.
+**Runtime evidence pending.** The candidate adds a normal-launch Android TV workflow
+that builds with the intended public endpoint, installs the exact APK, drives the
+same D-pad bridge as a remote, and validates native journey events for attribution,
+single-use record-only confirmation and shared handoff. It uploads the APK, install
+and launch logs, logcat, screenshot and receipt as one artifact. This paragraph will
+be replaced with its run URL and digests only after that workflow succeeds.
 
-What *is* verified: the manifest declarations, the Gradle wiring and the key
-handling contract are checked by 30 structural tests, and the D-pad navigation
-logic the APK drives is tested by executing `docs/firetv_nav.js` in Node against
-a synthetic grid, 17 assertions in `tests/e2e/spatial_nav_spec.js`. The Kotlin
-itself has unit tests written but never compiled or run.
+The manifest declarations, Gradle wiring and key handling contract are checked by 30 structural tests
+plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
+17 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
+walks the browser form of the same golden path. None of those substitutes for the
+pending Android TV receipt.
 
 ---
 
@@ -873,8 +868,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 544 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1646 statements
+python -m pytest tests/ -q                                    # 559 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1920 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
@@ -885,10 +880,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 44/53 PASSED, 9/53 FAILED (0 of them blocking)
+# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
 ```
 
-**44/53 readiness gates**. J4 is
+**45/53 readiness gates**. J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -896,29 +891,24 @@ two text files, while the [Fire TV](#fire-tv) section two screens away said no A
 had ever been built. It was the one gate in the file that could not fail on the
 axis it exists to test.
 
-It now asks for `firetv_build_receipt.json`: a gradle command that exited 0, an APK
-that exists in the checkout, and a launch recorded on a Fire TV device.
-`python scripts/write_firetv_receipt.py` writes that file from a real build and a
-real launch, hashes the APK itself, runs the result through the gate's own predicate
-first, and refuses to write anything without an APK it can open, so the receipt
-cannot be typed into existence; `tests/unit/test_write_firetv_receipt.py` drives
-every refusal against a throwaway checkout. The file does not exist here, so **J4
-fails**, and the published score went down by one. `docs/FIRE_TV_BUILD.md` carries
-the receipt's shape, and `tests/unit/test_readiness_gates.py` drives every missing
-field through the predicate, including the case where it passes. The CI APK has now
-been downloaded into the ignored build-output path, but the passing branch remains
-unreachable until an actual Fire TV install and observed launch produce the receipt.
+It now accepts either `android_tv_runtime_receipt.json` from the dispatched Android
+TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
+emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
+Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
+The file does not exist yet, so **J4 fails**. `docs/FIRE_TV_BUILD.md` carries the
+receipt's shape, and `tests/unit/test_readiness_gates.py` drives both passing routes
+and every refusal through the predicate.
 
 **The same score in a clone.** Four of these gates, I1 to I4, used to read a
 coordination file that lives in the workspace above this repository. They passed
 here and would have failed for anyone who cloned the repository on its own, so the
-44 above was a number only this machine could reproduce and the audit said so in its
+45 above was a number only this machine could reproduce and the audit said so in its
 own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
 persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which four are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 44/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -982,18 +972,16 @@ given a substitute number.
   service name rather than from a constant, which makes the four verdicts
   reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **APK built; no device run.** Android CI run `35500282701` compiled the Kotlin,
-  passed the JVM tests and uploaded an APK whose downloaded SHA-256 matches the build
-  log. Nothing has been installed on Fire TV hardware, and there is no Fire TV
-  emulator for this Android APK. The TV surface is a D-pad and a screen; it takes no
-  voice input.
+* **Runtime evidence pending.** The Android TV workflow is wired to compile the
+  public endpoint, install the exact APK, launch without an ADB URL override and drive
+  the record-only path by D-pad. No receipt is claimed until that workflow succeeds.
 * **Public cockpit deployment.** The judge-facing Fire TV web cockpit is live at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` and `/health`
   publishes its build SHA. It runs in labelled offline-fixture mode until real telemetry
-  credentials are configured. The APK still requires the separate physical-device proof below.
+  credentials are configured. The APK still requires the separate allowed-target receipt below.
 * **No video.** Gates E2 and E4 fail for that reason.
-* **No browser-driver end-to-end test.** Gate C5 fails. The Node spatial navigation
-  spec is a DOM shim, not a browser, and is not counted as one.
+* **The browser path is not Android TV evidence.** Playwright now drives the whole
+  record-only journey, but J4 stays red until the APK itself completes it in the emulator.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.
@@ -1035,9 +1023,10 @@ given a substitute number.
   the browser's `speechSynthesis`. There is no Alexa skill and no Alexa integration
   in this repository, and nothing listens: the TV surface takes D-pad input and
   shows a screen, and that is the whole of it.
-* **In-memory state.** Staged rollbacks and spent nonces live in the server
-  process, so a restart forgets them. A multi-instance deployment needs shared
-  storage before the single-use guarantee holds across instances.
+* **Local quickstart state is in memory.** When `MERCURY_STATE_TABLE` is absent,
+  local runs reset markers, handoffs and staged actions on restart. The deployed
+  Lambda uses DynamoDB conditional writes and a global spent-nonce record so cold
+  starts and concurrent instances cannot replay a confirmation.
 
 ---
 

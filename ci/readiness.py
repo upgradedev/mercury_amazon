@@ -31,10 +31,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Gates that report FAIL honestly but do not fail the CI job, each with the
 # reason it is out of reach of an automated run. Printed in the output.
 CI_EXEMPT: dict[str, str] = {
-    "C5": "needs a real browser driver walking the recorded video path",
-    "J4": "a verified CI APK and portable ADB exist, but the gate still needs a physical "
-          "Fire TV install and observed launch; no Fire TV emulator exists to stand in for "
-          "the device",
+    "J4": "the official FAQ permits Android TV Emulator or Fire TV/Vega simulator evidence, "
+          "but a workflow-dispatched install, D-pad journey and runtime receipt must still run",
     "D2": "needs a verified deploy-and-teardown cycle for the recorded build",
     "E2": "needs a recorded video for narration and picture to be in sync with",
     "E4": "needs a public video of the running product",
@@ -96,6 +94,7 @@ def get_standards_gate_ids() -> list[str]:
 #: way deploy_teardown_receipt.json is written by its probe, and that script refuses to
 #: write it without an APK file it can open. Gate J4 fails while the receipt is absent.
 FIRETV_BUILD_RECEIPT = "firetv_build_receipt.json"
+ANDROID_TV_RUNTIME_RECEIPT = "android_tv_runtime_receipt.json"
 
 #: Every field J4 requires, and what each one is evidence of. A receipt missing any of
 #: them is not evidence, so the gate fails and says which field it wanted.
@@ -107,16 +106,37 @@ FIRETV_RECEIPT_FIELDS = {
     "device_run": "a recorded launch on a Fire TV device",
 }
 
-#: What a recorded launch has to say. A device that installed the APK but was never
-#: watched running it proves the package installs, not that the app works. The device
-#: is a physical one: no Fire TV emulator exists, and the Vega Virtual Device runs Vega
-#: apps rather than this APK, so the launch has to come from hardware.
+#: What the legacy physical-device receipt has to say. An installed APK that was
+#: never observed running proves packaging, not the user journey. The official event
+#: FAQ also accepts the Android TV Emulator path evaluated separately below.
 FIRETV_DEVICE_FIELDS = {
     "device_model": "which Fire TV device ran it",
     "fire_os_or_android_version": "what it was running",
     "adb_install_exit_code": "adb install's exit code, which must be 0",
     "launched_at_utc": "when it was launched",
     "observed": "what was seen on the screen, in words",
+}
+
+ANDROID_TV_RECEIPT_FIELDS = {
+    "build_sha": "the Git revision that built the APK",
+    "workflow_run_url": "the GitHub Actions run that retained the evidence bundle",
+    "artifact_name": "the downloadable Actions artifact containing APK, logs and screenshot",
+    "built_by_command": "the Gradle command and compiled endpoint",
+    "apk_sha256": "the exact APK digest",
+    "adb_install_exit_code": "the emulator install result, which must be 0",
+    "normal_launcher": "proof the normal Leanback launcher used no URL override",
+    "endpoint_loaded_without_intent_override": "the compiled HTTPS endpoint seen in logcat",
+    "runtime": "the emulator model and Android version",
+    "remote_journey": "the D-pad journey events and effect boundary",
+    "artifacts": "content-addressed APK, logcat and screenshot records",
+}
+
+ANDROID_TV_REQUIRED_EVENTS = {
+    "journey:page_loaded:",
+    "journey:what_changed:ANOMALY_ATTRIBUTED:",
+    "journey:rollback_staged:",
+    "journey:rollback_confirmed:RECORDED_ONLY:DPAD_RECORD_ONLY_DEMO",
+    "journey:handoff_published:checkout-api-active:",
 }
 
 
@@ -129,12 +149,10 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
     sponsor product was load-bearing was the one gate in this file that could not fail on
     the axis it exists to test, and it contributed a PASS to a published score.
 
-    A Fire TV entry is load-bearing when there is a Fire TV binary and somebody has
-    watched it run. So the manifest and the README stay as necessary conditions, and the
-    sufficient condition is a receipt recording a gradle build that exited 0, an APK that
-    exists in the checkout, and a launch on a Fire TV device. There is no such receipt
-    and this gate therefore fails, which is the truth and is why the published score
-    went down by one when this was written.
+    A Fire TV entry is load-bearing when there is a Fire TV binary and an allowed target
+    has run the real interaction. The event FAQ explicitly accepts Android TV Emulator
+    or the Fire TV/Vega simulator, so a content-addressed CI emulator receipt is valid;
+    the older physical-device receipt remains valid too.
 
     ``apk_exists`` is injected so a test can drive every branch without an APK.
     """
@@ -149,11 +167,60 @@ def evaluate_firetv_gate(readme_terms, manifest: str, receipt, apk_exists) -> tu
     if not isinstance(receipt, dict) or not receipt:
         return False, (
             f"A leanback manifest and the word 'Fire TV' are text, not a Fire TV app. This gate "
-            f"wants {FIRETV_BUILD_RECEIPT}, recording a gradle build that exited 0, the APK it "
-            f"produced, and a launch on a Fire TV device, written by "
-            f"python scripts/write_firetv_receipt.py. No such file exists. A verified CI APK "
-            f"exists, but nothing has installed or run on Fire TV hardware; "
-            f"docs/FIRE_TV_BUILD.md records the build and the remaining device procedure"
+            f"wants {ANDROID_TV_RUNTIME_RECEIPT} from the dispatched Android TV workflow or "
+            f"{FIRETV_BUILD_RECEIPT} from a physical device. Neither runtime receipt exists"
+        )
+
+    if receipt.get("schema") == "mercury.android_tv_runtime_receipt/1":
+        problems = []
+        for field, means in ANDROID_TV_RECEIPT_FIELDS.items():
+            if receipt.get(field) in (None, "", []):
+                problems.append(f"{field} missing ({means})")
+        if receipt.get("adb_install_exit_code") not in (None, 0):
+            problems.append("adb install did not exit 0")
+        if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("build_sha", ""))):
+            problems.append("build_sha is not a full Git SHA")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(receipt.get("apk_sha256", ""))):
+            problems.append("apk_sha256 is not a SHA-256 digest")
+        if not str(receipt.get("workflow_run_url", "")).startswith("https://github.com/"):
+            problems.append("workflow_run_url is not a GitHub HTTPS run URL")
+        if not str(receipt.get("endpoint_loaded_without_intent_override", "")).startswith("https://"):
+            problems.append("the compiled endpoint is not HTTPS")
+        if "no COCKPIT_URL intent extra" not in str(receipt.get("normal_launcher", "")):
+            problems.append("normal_launcher does not rule out an ADB URL override")
+        runtime = receipt.get("runtime")
+        if not isinstance(runtime, dict) or not runtime.get("device_model") or not runtime.get("os_version"):
+            problems.append("runtime must name the Android TV model and OS version")
+        journey = receipt.get("remote_journey")
+        if not isinstance(journey, dict):
+            problems.append("remote_journey is missing")
+        else:
+            events = set(journey.get("events", []))
+            missing_events = sorted(ANDROID_TV_REQUIRED_EVENTS - events)
+            if missing_events:
+                problems.append(f"remote_journey missing {missing_events}")
+            if "NONE" not in str(journey.get("external_effect", "")):
+                problems.append("record-only external effect is not explicit")
+        artifacts = receipt.get("artifacts")
+        if not isinstance(artifacts, dict):
+            problems.append("artifacts is missing")
+        else:
+            for name in ("apk", "logcat", "screenshot"):
+                item = artifacts.get(name)
+                if not isinstance(item, dict):
+                    problems.append(f"artifacts.{name} is missing")
+                    continue
+                if not re.fullmatch(r"[0-9a-f]{64}", str(item.get("sha256", ""))):
+                    problems.append(f"artifacts.{name}.sha256 is invalid")
+                if not isinstance(item.get("bytes"), int) or item["bytes"] <= 0:
+                    problems.append(f"artifacts.{name}.bytes is invalid")
+        if problems:
+            return False, f"{ANDROID_TV_RUNTIME_RECEIPT} is not evidence yet: " + "; ".join(problems)
+        return True, (
+            f"Android TV runtime {runtime['device_model']} ({runtime['os_version']}) installed APK "
+            f"{str(receipt['apk_sha256'])[:12]}..., loaded the compiled endpoint through the normal "
+            f"Leanback launcher, and logged attribution, record-only approval and handoff via D-pad; "
+            f"evidence: {receipt['workflow_run_url']}"
         )
 
     problems = []
@@ -461,7 +528,7 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
 
     j4_terms = [t for t in ["fire tv", "fire os", "leanback"] if t in readme_lower]
     manifest = read("app/src/main/AndroidManifest.xml")
-    firetv_receipt_text = read(FIRETV_BUILD_RECEIPT)
+    firetv_receipt_text = read(ANDROID_TV_RUNTIME_RECEIPT) or read(FIRETV_BUILD_RECEIPT)
     firetv_receipt = None
     if firetv_receipt_text:
         try:

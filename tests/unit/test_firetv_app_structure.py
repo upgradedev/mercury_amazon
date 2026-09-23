@@ -314,6 +314,6 @@ def test_an_android_ci_workflow_builds_and_uploads_the_apk():
 
 def test_the_build_document_states_what_has_not_been_run():
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "Not run" in doc
-    assert "JAVA_HOME is not set" in doc, "the real local build error must be recorded verbatim"
-    assert "No Fire TV hardware was available" in doc
+    assert "Pending the workflow-dispatch run" in doc
+    assert "Physical Fire TV" in doc
+    assert "Optional and not run" in doc
