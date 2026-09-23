@@ -64,6 +64,12 @@ def test_deployment_markers_survive_a_fresh_ledger():
     fresh = DeploymentEvidenceLedger(storage=durable)
     assert [item.marker_id for item in fresh.timeline("checkout-api", "production")] == ["new", "old"]
     assert fresh.rollback_pair("checkout-api", "production", "def")[1].revision == "abc"
+    offending, target = fresh.validate_pair(
+        service="checkout-api", environment="production",
+        offending_marker_id="new", target_marker_id="old",
+        target_revision="abc", target_artifact_sha256="a" * 64,
+    )
+    assert (offending.marker_id, target.marker_id) == ("new", "old")
 
 
 def test_handoff_uses_durable_optimistic_revision():

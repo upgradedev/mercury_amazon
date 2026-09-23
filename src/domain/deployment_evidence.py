@@ -179,8 +179,14 @@ class DeploymentEvidenceLedger:
         target_revision: str,
         target_artifact_sha256: str,
     ) -> tuple[DeploymentMarker, DeploymentMarker]:
-        offending = self.get(offending_marker_id)
-        target = self.get(target_marker_id)
+        # Rehydrate from durable storage before resolving IDs.  ``get`` only has
+        # an ID and cannot choose a service/environment partition, while this
+        # boundary has both.  This keeps authenticated evidence usable after a
+        # Lambda cold start instead of silently falling back to process memory.
+        markers = self.timeline(service, environment)
+        by_id = {marker.marker_id: marker for marker in markers}
+        offending = by_id.get(offending_marker_id)
+        target = by_id.get(target_marker_id)
         if offending is None or target is None:
             raise DeploymentEvidenceError("both deployment marker IDs must exist in the ledger")
         if any(m.service != service or m.environment != environment for m in (offending, target)):
