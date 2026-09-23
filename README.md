@@ -61,7 +61,7 @@ would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-544%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **An APK exists as a verified CI artifact; no Fire TV device run exists yet.**
@@ -874,7 +874,7 @@ because it shells out to `git log` for the commit fallback.
 
 ```bash
 python -m pytest tests/ -q                                    # 544 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1597 statements
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 1646 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra

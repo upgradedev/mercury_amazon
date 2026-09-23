@@ -76,7 +76,7 @@ place to report what happened, whether it worked or not.
 | Criterion | Status | Evidence |
 |---|---|---|
 | Automated suite green | Met | `python -m pytest tests/ -q`, 544 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1597 statements |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 93 percent of 1646 statements |
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | **Not met** | A verified APK exists, but gate J4 still fails because there is no `firetv_build_receipt.json` and no device observation |
