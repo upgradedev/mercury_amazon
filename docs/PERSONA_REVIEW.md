@@ -45,7 +45,7 @@ being smoothed over.
 
 | Step | What it asks | Outcome | Evidence |
 |---|---|---|---|
-| 1 | Does a deployed endpoint answer, and is it this commit? | PARTIAL | `python ci/readiness.py`: D1 passes, D2 and G2 fail. Two probes returned 200, the deployment reports no build SHA from `/health`, so it cannot be matched to HEAD |
+| 1 | Does a deployed endpoint answer, and identify its build? | PASS | Root and `/health` answer at the public Function URL, and `/health` publishes `build_sha`; `deploy_teardown_receipt.json` records the observation |
 | 2 | What is owner-gated and unmet, printed apart from the score rather than folded into it? | OPEN | `python ci/readiness.py`: O1, O2 and O3 fail as owner actions, E2 and E4 fail because no video exists. `video/README.md` says no video has been recorded |
 | 3 | Is the track and prize this entry is aimed at written down, with nothing else claimed? | PASS | Fire TV track in `README.md`, Open Source mini in `docs/DEVPOST_SUBMISSION.md`. `tests/e2e/test_documentation_claims.py` fails the build if any document claims an Alexa integration, which this repository does not have, or a device run or a built APK, neither of which has happened |
 | 4 | Do the presentation surfaces say what the code says? | PASS | `python -m pytest tests/e2e/test_documentation_claims.py -q`. Every number in the README is compared against the file the command that produced it wrote |
@@ -98,7 +98,7 @@ are listed because a review that reports only what it settled is not a review.
 |---|---|
 | Does the APK install and appear on a Fire TV home row? | A verified CI APK exists and portable ADB is prepared, but no Fire TV device has connected. `docs/FIRE_TV_BUILD.md` records the install and receipt procedure |
 | Is the cockpit legible from three metres on a television? | Measured in a 1920x1080 browser viewport, never on a television at distance |
-| Does a deployment of this commit answer? | No. The unrelated September 3 endpoint was removed on 2026-09-23. Gates D2 and G2 remain red until this commit is deployed. |
+| Has teardown been verified for a deployment of this commit? | No. The public cockpit is live and identifies its build, but the current release has not been destroyed and restored. |
 | Does an on-call engineer find a refusal to name a commit useful at three in the morning? | Nobody outside this project has used it. The README says this in its own words |
 
 ## 5. Where the gates read this

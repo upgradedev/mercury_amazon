@@ -45,10 +45,11 @@ terraform apply tfplan
 terraform destroy -auto-approve
 ```
 
-**No deployment has been executed for the current commit.** The unrelated September 3 API
-Gateway and Lambda were backed up and deleted on 2026-09-23. The endpoint recorded in
-`deploy_teardown_receipt.json` no longer resolves. Readiness gates D2 and G2 still fail because
-removing an old build is not a tested deployment of this commit.
+The public cockpit is deployed at
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`.
+`GET /health` publishes the immutable build SHA. The deployment currently uses labelled
+offline fixtures and record-only rollback dispatch; it does not claim live incident telemetry
+or a physical Fire TV run. `deploy_teardown_receipt.json` records a dated HTTP observation.
 
 Set `MERCURY_BUILD_SHA` at deploy time, or deploy from a git checkout, so that
 `GET /health` reports the commit it was built from. `scripts/probe_deployment.py`
