@@ -40,7 +40,8 @@ from typing import Any
 
 import httpx
 
-from src.domain.governed_rollback import GovernedRollbackAction
+from src.application.governed_rollback_use_case import DispatchResult
+from src.domain.governed_rollback import GovernedRollbackAction, RollbackState
 
 GITHUB_API_ROOT = "https://api.github.com"
 DISPATCH_MODE_ENV = "MERCURY_ROLLBACK_DISPATCH"
@@ -194,6 +195,10 @@ class GitHubActionsRollbackDispatcher:
                     "action_id": action.action_id,
                     "target_service": action.target_service,
                     "target_commit_sha": action.target_commit_sha,
+                "environment": action.environment,
+                "target_artifact_sha256": action.target_artifact_sha256,
+                "target_deployment_marker_id": action.target_deployment_marker_id,
+                "offending_deployment_marker_id": action.offending_deployment_marker_id,
                     "reason": action.reason,
                     "payload_hash": action.payload_hash,
                 },
@@ -202,17 +207,20 @@ class GitHubActionsRollbackDispatcher:
 
     # ------------------------------------------------------------------ Dispatch
 
-    def dispatch(self, action: GovernedRollbackAction) -> str:
+    def dispatch(self, action: GovernedRollbackAction) -> DispatchResult:
         """Send the workflow_dispatch request, or describe it and send nothing."""
         request = self.build_request(action)
 
         if not self.armed:
-            return (
-                f"Governance passed for '{action.target_service}' to commit "
-                f"{action.target_commit_sha[:8]}. DRY RUN: no request was sent. The request this "
-                f"deployment would have sent is {request.describe()} with headers "
-                f"{request.redacted_headers()}. {self.disarm_reason} Set {ARMED_ENV}=1 with "
-                f"{REPOSITORY_ENV} and {TOKEN_ENV} to arm it."
+            return DispatchResult(
+                state=RollbackState.RECORDED_ONLY,
+                output=(
+                    f"Governance passed for '{action.target_service}' to commit "
+                    f"{action.target_commit_sha[:8]}. DRY RUN: no request was sent. The request this "
+                    f"deployment would have sent is {request.describe()} with headers "
+                    f"{request.redacted_headers()}. {self.disarm_reason} Set {ARMED_ENV}=1 with "
+                    f"{REPOSITORY_ENV} and {TOKEN_ENV} to arm it."
+                ),
             )
 
         client = self._client or httpx.Client(timeout=self._timeout)
@@ -235,9 +243,12 @@ class GitHubActionsRollbackDispatcher:
                 status_code=response.status_code,
             )
 
-        return (
-            f"Governance passed for '{action.target_service}' to commit "
-            f"{action.target_commit_sha[:8]}. Dispatched to GitHub Actions: {request.describe()} "
-            f"returned HTTP {response.status_code}. GitHub accepted the request; whether the "
-            f"workflow itself succeeds is visible in that repository's Actions tab, not here."
+        return DispatchResult(
+            state=RollbackState.DISPATCH_ACCEPTED,
+            output=(
+                f"Governance passed for '{action.target_service}' to commit "
+                f"{action.target_commit_sha[:8]}. Dispatched to GitHub Actions: {request.describe()} "
+                f"returned HTTP {response.status_code}. GitHub accepted the request; this is not "
+                "completion. Workflow success and target health still require readback."
+            ),
         )

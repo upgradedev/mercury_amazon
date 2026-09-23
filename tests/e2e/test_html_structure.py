@@ -35,6 +35,8 @@ ENDPOINTS = [
     "/mcp/tools/audit_observability",
     "/mcp/tools/stage_rollback",
     "/mcp/tools/confirm_rollback",
+    "/mcp/tools/update_handoff",
+    "/mcp/handoffs/",
 ]
 
 
@@ -62,6 +64,14 @@ def test_every_backend_endpoint_is_referenced_by_the_page(html, endpoint):
 def test_the_page_measures_its_own_latency(html):
     assert "performance.now()" in html
     assert "elapsed" in html
+
+
+def test_incident_panel_shows_complete_shared_handoff_state(html):
+    for field in ("Responder", "Current action", "Confirmed facts", "Next step"):
+        assert field in html
+    assert "expected_revision" in html
+    assert "Publish handoff" in html
+    assert "Refresh handoff" in html
 
 
 def test_the_page_renders_loading_and_error_states(html):

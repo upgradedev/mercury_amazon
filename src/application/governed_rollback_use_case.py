@@ -7,6 +7,7 @@ decision needs and performs the dispatch once it passes.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Protocol
 
 from src.domain.governed_rollback import (
@@ -18,10 +19,18 @@ from src.domain.governed_rollback import (
 from src.domain.recommendation_invalidator import DynamicRecommendationEngine, EvidenceContract
 
 
+@dataclass(frozen=True)
+class DispatchResult:
+    """The strongest result the dispatcher actually proved."""
+
+    state: RollbackState
+    output: str
+
+
 class RollbackDispatcher(Protocol):
     """Whatever actually performs the rollback once governance has passed."""
 
-    def dispatch(self, action: GovernedRollbackAction) -> str:
+    def dispatch(self, action: GovernedRollbackAction) -> DispatchResult:
         ...
 
 
@@ -35,12 +44,15 @@ class RecordOnlyDispatcher:
     ``MERCURY_ROLLBACK_DISPATCH`` and is not reachable by accident.
     """
 
-    def dispatch(self, action: GovernedRollbackAction) -> str:
-        return (
-            f"Governance passed for '{action.target_service}' to commit {action.target_commit_sha[:8]}. "
-            "Recorded locally. No deployment pipeline was contacted: this deployment is running the "
-            "record-only dispatcher. Set MERCURY_ROLLBACK_DISPATCH=github_actions to reach one that "
-            "does, and MERCURY_ROLLBACK_DISPATCH_ARMED=1 for it to send anything."
+    def dispatch(self, action: GovernedRollbackAction) -> DispatchResult:
+        return DispatchResult(
+            state=RollbackState.RECORDED_ONLY,
+            output=(
+                f"Governance passed for '{action.target_service}' to commit {action.target_commit_sha[:8]}. "
+                "Recorded locally. No deployment pipeline was contacted: this deployment is running the "
+                "record-only dispatcher. Set MERCURY_ROLLBACK_DISPATCH=github_actions to reach one that "
+                "does, and MERCURY_ROLLBACK_DISPATCH_ARMED=1 for it to send anything."
+            ),
         )
 
 
@@ -64,10 +76,22 @@ class GovernedRollbackUseCase:
         target_commit_sha: str,
         reason: str,
         lease_sec: float = 300.0,
+        environment: str = "",
+        target_artifact_sha256: str = "",
+        target_deployment_marker_id: str = "",
+        offending_deployment_marker_id: str = "",
     ) -> tuple[GovernedRollbackAction, str]:
         """Stage an action and mint the single-use token that can confirm it."""
         action = GovernedRollbackAction.create(
-            action_id, target_service, target_commit_sha, reason, lease_sec
+            action_id,
+            target_service,
+            target_commit_sha,
+            reason,
+            lease_sec,
+            environment,
+            target_artifact_sha256,
+            target_deployment_marker_id,
+            offending_deployment_marker_id,
         )
         self._actions[action_id] = action
         token = mint_governance_token(self._secret, action_id, action.payload_hash)
@@ -120,7 +144,7 @@ class GovernedRollbackUseCase:
             )
         self._spent_nonces.add(nonce)
 
-        output = self._dispatcher.dispatch(action)
-        action.state = RollbackState.EXECUTED
-        action.execution_output = output
-        return action, output
+        result = self._dispatcher.dispatch(action)
+        action.state = result.state
+        action.execution_output = result.output
+        return action, result.output
