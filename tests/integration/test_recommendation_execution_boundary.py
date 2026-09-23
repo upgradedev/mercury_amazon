@@ -3,10 +3,18 @@ import time
 
 import pytest
 
-from src.application.governed_rollback_use_case import GovernedRollbackUseCase
-from src.domain.governed_rollback import GovernanceTokenError
+from src.application.governed_rollback_use_case import DispatchResult, GovernedRollbackUseCase
+from src.domain.governed_rollback import GovernanceTokenError, RollbackState
 from src.domain.recommendation_invalidator import DynamicRecommendationEngine, EvidenceContract
-from tests.integration.test_rollback_authorization import CONFIRM, STAGE, stage_payload
+from tests.integration.test_rollback_authorization import (
+    CONFIRM,
+    STAGE,
+    deployment_markers,
+    stage_payload,
+)
+
+_deployment_markers_fixture = deployment_markers
+pytestmark = pytest.mark.usefixtures("_deployment_markers_fixture")
 
 LIVENESS = "/mcp/tools/recommendation_liveness"
 
@@ -72,7 +80,7 @@ class CountingDispatcher:
 
     def dispatch(self, action):
         self.calls.append(action.action_id)
-        return "test-only dispatch recorded"
+        return DispatchResult(RollbackState.RECORDED_ONLY, "test-only dispatch recorded")
 
 
 @pytest.mark.parametrize("condition,reason", [

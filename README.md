@@ -36,7 +36,7 @@ every attribution carries its own measured precision.
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
-python -m pytest tests/ -q  # 529 passed
+python -m pytest tests/ -q  # 541 passed
 python -m src.interfaces.mcp_server
 ```
 
@@ -44,10 +44,10 @@ Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
 secret to its log for you to paste into the cockpit. The current green-suite timing
-record spans 41.46 to 119.83 seconds across four runs of the 529-test tree on
-2026-09-20: the three quiet runs landed at 70.55, 119.83 and 41.46 seconds, and the
-run with 4 CPU-saturating background processes landed at 67.1 seconds. Every run
-reported all 529 tests passing. It
+record spans 50.37 to 222.72 seconds across four runs of the 541-test tree on
+2026-09-23: the three quiet runs landed at 50.37, 55.55 and 162.76 seconds, and the
+run with 4 CPU-saturating background processes landed at 222.72 seconds. Every run
+reported all 541 tests passing. It
 moves with machine load and with whatever else the machine is doing: the session
 before it, on the same machine while other processes were saturating the CPU,
 measured 132.61–486.63 seconds over 440 tests. Both sessions come from
@@ -60,7 +60,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-529%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-541%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -489,7 +489,7 @@ sequenceDiagram
     TV->>API: POST /confirm_rollback + Bearer secret + token
     API->>Dom: verify signature, bound action, bound content, lease, nonce
     alt every condition holds
-        Dom-->>TV: EXECUTED, and the response says no pipeline was contacted
+        Dom-->>TV: RECORDED_ONLY, and the response says no pipeline was contacted
     else any condition fails
         Dom-->>TV: 401 / 403 / 409 / 410 with a named denial reason
     end
@@ -504,7 +504,7 @@ sequenceDiagram
    confirm. A token replayed against a re-staged action is refused with
    `TOKEN_ALREADY_USED`. A second confirm of an action that has already executed
    is refused one check earlier, with `NOT_PENDING`, and the cockpit does not even
-   send it: after `EXECUTED` the Confirm control goes dark and says the token is
+   send it: after `RECORDED_ONLY` or `DISPATCH_ACCEPTED` the Confirm control goes dark and says the token is
    spent.
 4. **Lease.** A staged action expires after `lease_sec` seconds, default 300, and
    then confirms with `LEASE_EXPIRED`.
@@ -520,16 +520,26 @@ sequenceDiagram
 
 This liveness reading is operator supplied and is labelled
 `OPERATOR_SUPPLIED_METRIC_NO_LIVE_REFRESH`. Mercury does not fetch fresh service
-telemetry at confirmation. These controls prevent dispatch from advice already
-known to be withdrawn, stale or unavailable; they do not establish a safe deployed
-rollback target or a real health check. Those integration proofs remain open.
+telemetry at confirmation. A separate deployment-evidence boundary now prevents
+the client from choosing a SHA. `POST /mcp/tools/record_deployment_evidence`
+accepts an authenticated marker only when its service, environment, revision and
+artifact SHA-256 match a later healthy readback. The correlator may offer a
+rollback only when that ledger contains both the incident revision and the
+immediately preceding healthy deployment. Staging revalidates both marker IDs and
+binds the environment and target digest into the governance hash. Missing,
+retargeted or stale evidence returns `UNVERIFIED_DEPLOYMENT_TARGET`.
+
+No real service has emitted those markers yet. A GitHub workflow acceptance is
+reported as `DISPATCH_ACCEPTED`, while record-only and dry-run paths report
+`RECORDED_ONLY`; neither is called executed. Workflow completion and a post-action
+health readback remain open integration proof.
 `tests/integration/test_recommendation_execution_boundary.py` exercises the HTTP
 and direct-use-case paths with record-only or counting test dispatchers.
 
 A refused confirmation moves the action to `REJECTED`, so it cannot be confirmed
 afterwards even with the correct token. That is fail-closed on purpose: a
 tampering attempt burns the action it was aimed at, and the operator stages
-again. `python scripts/security_audit.py` runs 28 checks over this path against
+again. `python scripts/security_audit.py` runs 30 checks over this path against
 the real HTTP surface and exits non-zero if any of them stops holding.
 
 ### What happens after governance passes
@@ -542,13 +552,24 @@ that is what a confirmed rollback would reach.
 One real dispatcher now exists behind that default.
 `src/infrastructure/github_actions_dispatcher.py` asks a GitHub Actions workflow
 to run through `POST /repos/{owner}/{repo}/actions/workflows/{file}/dispatches`,
-carrying the action id, the target service, the target commit, the reason and the
-payload hash as workflow inputs. It is selected only by
+carrying the action id, service, environment, verified target revision, artifact
+digest, both deployment marker IDs, reason and payload hash as workflow inputs. It is selected only by
 `MERCURY_ROLLBACK_DISPATCH=github_actions`, and being selected is not being armed:
 without `MERCURY_ROLLBACK_DISPATCH_ARMED=1`, a token and a repository, it builds
 the request, prints it with the token redacted, and opens no socket. A dispatch
 that is attempted and does not return HTTP 204 raises, the API answers 502, and
-the spent governance nonce means the action cannot be confirmed again.
+the spent governance nonce means the action cannot be confirmed again. HTTP 204
+means `DISPATCH_ACCEPTED`, not workflow success or healthy completion.
+
+### Shared responder handoff
+
+The incident panel can publish and refresh one bounded shared state record. It
+shows the responder, current action, confirmed facts, next step, update time and
+revision. Updates use optimistic concurrency, so a responder working from an old
+revision receives 409 instead of overwriting newer evidence. The store retains at
+most 50 incidents and at most 10 confirmed facts per incident. This closes the
+software path for handoff; a two-responder comparison against the laptop dashboard
+has not been run and remains a separate user-evidence gate.
 
 **It has never been fired.** No request has ever been sent to github.com from this
 repository: that needs a token with `actions:write` on a repository that has such
@@ -564,13 +585,13 @@ raises rather than reporting success. Firing it for real is an owner action.
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
 rather than guessed. The current green-suite record for `python -m pytest tests/ -q`
-spans **41.46 to 119.83 seconds** across four runs of the 529-test tree
-(recorded at 2026-09-20T08:18:00Z). The three quiet runs landed at 70.55, 119.83
-and 41.46 seconds. The run with **4 CPU-saturating background processes** started
-and killed by the measuring script landed at **67.1 seconds**. All four runs
-reported 529 passed and no skipped or failed tests. The immediately preceding
-bootstrap measured **89.03 to 358.91 seconds** over the same 529-test tree and is
-retained by the record as the failed-documentation baseline. An older 440-test session measured
+spans **50.37 to 222.72 seconds** across four runs of the 541-test tree
+(recorded at 2026-09-23T03:18:55Z). The three quiet runs landed at 50.37, 55.55
+and 162.76 seconds. The run with **4 CPU-saturating background processes** started
+and killed by the measuring script landed at **222.72 seconds**. All four runs
+reported 541 passed and no skipped or failed tests. The immediately preceding
+bootstrap record measured **54.97 to 113.33 seconds** over the same 541-test tree and is
+retained only as the previous red-suite baseline. An older 440-test session measured
 **132.61–486.63 seconds** and remains historical rather than a release claim.
 That earlier session ran while other processes on this machine were saturating the
 CPU: a processor-time counter sampled immediately after that older session
@@ -592,7 +613,7 @@ against that file, and the file records the test count they were measured over, 
 adding a test makes this paragraph fail the build until the suite is re-measured,
 unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The current
-green record and the suite both contain 529 collected tests.
+green record and the suite both contain 541 collected tests.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -602,8 +623,8 @@ sessions that day are no longer in the shipped record and are quoted here rather
 than claimed: the first measured `40.28–74.56 seconds`, with the loaded run
 slowest, and the next measured `33.37–37.44 seconds` across its quiet runs with
 the loaded run at `37.0 seconds`, both over 440 collected tests. The session the
-record now keeps as its previous one, 89.03 to 358.91 seconds over 529 tests, was
-the red-documentation bootstrap. The current session is the 41.46 to 119.83 second
+record now keeps as its previous one, 54.97 to 113.33 seconds over 541 tests, was
+the red-documentation bootstrap. The current session is the 50.37 to 222.72 second
 range above and includes the loaded condition. The spread between sessions of the same command on
 the same tree is larger than the spread inside any one of them, and the loaded run
 is not reliably the slowest: in one session it sat inside the quiet range and in
@@ -633,7 +654,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 529 passed
+# 541 passed
 ```
 
 ### 3. Start the server
@@ -850,8 +871,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 529 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1374 statements
+python -m pytest tests/ -q                                    # 541 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 1597 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra

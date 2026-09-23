@@ -381,7 +381,6 @@ class IncidentCorrelation:
                 "Investigate manually."
             )
         commit = self.offending_commit
-        target = self.rollback_target
         spoken = (
             f"{self.metric_name} on {self.service_name} is {self.anomaly_factor:.1f} times its baseline. "
             f"The closest preceding change is commit {commit.sha} by {commit.author}."
@@ -391,8 +390,10 @@ class IncidentCorrelation:
                 f" {self.commits_in_window} changes landed inside the attribution window, so this is "
                 "the closest of several and may not be the one that did it."
             )
-        if target is not None:
-            spoken += f" Rolling back to {target.sha} is staged and waiting for your confirmation."
+        spoken += (
+            " This is a temporal candidate, not proof of cause. A rollback target requires separate "
+            "deployment and health evidence."
+        )
         return spoken
 
 
@@ -571,10 +572,9 @@ class IncidentCorrelator:
                 "and this rule names the closest one. Every wrong attribution in "
                 "scripts/correlation_trial.py whose real cause was inside the window looked like this."
             )
-        if rollback_target is None:
-            explanation += " No earlier commit is known, so no rollback target can be offered."
-        else:
-            explanation += f" The preceding commit {rollback_target.sha} is the rollback target."
+        explanation += (
+            " Git order is not deployment evidence and does not by itself define a rollback target."
+        )
 
         return IncidentCorrelation(
             verdict=CorrelationVerdict.ANOMALY_ATTRIBUTED,

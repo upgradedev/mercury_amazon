@@ -5,6 +5,7 @@ existed, anyone who could reach the deployment could stage and confirm a
 production rollback with an arbitrary string as the token.
 """
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -12,6 +13,34 @@ from src.domain.governed_rollback import mint_governance_token
 
 STAGE = "/mcp/tools/stage_rollback"
 CONFIRM = "/mcp/tools/confirm_rollback"
+TARGET_DIGEST = "1" * 64
+OFFENDING_DIGEST = "2" * 64
+
+
+@pytest.fixture(autouse=True)
+def deployment_markers(_reset_shared_evidence_state):
+    from src.domain.deployment_evidence import DeploymentMarker
+    from src.interfaces.mcp_server import deployment_evidence
+
+    deployed = datetime(2026, 9, 23, 8, 0, tzinfo=timezone.utc)
+    deployment_evidence.clear()
+    deployment_evidence.record(DeploymentMarker.from_values(
+        marker_id="deploy-good", service="checkout-api", environment="production",
+        revision="3e9d10c", artifact_sha256=TARGET_DIGEST,
+        deployed_at=deployed, health_checked_at=deployed + timedelta(minutes=2),
+        health_status="HEALTHY", health_observed_revision="3e9d10c",
+        health_observed_artifact_sha256=TARGET_DIGEST,
+    ))
+    deployment_evidence.record(DeploymentMarker.from_values(
+        marker_id="deploy-bad", service="checkout-api", environment="production",
+        revision="badc0de", artifact_sha256=OFFENDING_DIGEST,
+        deployed_at=deployed + timedelta(hours=1),
+        health_checked_at=deployed + timedelta(hours=1, minutes=2),
+        health_status="HEALTHY", health_observed_revision="badc0de",
+        health_observed_artifact_sha256=OFFENDING_DIGEST,
+    ))
+    yield
+    deployment_evidence.clear()
 
 
 def stage_payload(action_id="itest-1", **overrides):
@@ -19,6 +48,10 @@ def stage_payload(action_id="itest-1", **overrides):
         "action_id": action_id,
         "target_service": "checkout-api",
         "target_commit_sha": "3e9d10c",
+        "environment": "production",
+        "target_artifact_sha256": TARGET_DIGEST,
+        "target_deployment_marker_id": "deploy-good",
+        "offending_deployment_marker_id": "deploy-bad",
         "reason": "Integration test staging",
         "lease_sec": 300.0,
     }
@@ -70,7 +103,7 @@ def test_authorized_staging_returns_a_bound_single_use_token(client, auth_header
         "action_id": "itest-happy", "governance_token": body["governance_token"],
     })
     assert confirmed.status_code == 200
-    assert confirmed.json()["status"] == "EXECUTED"
+    assert confirmed.json()["status"] == "RECORDED_ONLY"
 
 
 def test_a_replayed_token_is_refused_the_second_time(client, auth_headers):
@@ -176,12 +209,12 @@ def test_an_overlong_reason_is_rejected(client, auth_headers):
 
 
 def test_a_shell_metacharacter_service_name_is_stored_verbatim_not_executed(client, auth_headers):
-    """Nothing shells out, so the string is data. This records that it stays data."""
+    """A service outside authenticated deployment evidence is refused before dispatch."""
     hostile = "billing; rm -rf /; echo hacked"
     res = client.post(STAGE, headers=auth_headers,
                       json=stage_payload("itest-inject", target_service=hostile))
-    assert res.status_code == 200
-    assert res.json()["target_service"] == hostile
+    assert res.status_code == 409
+    assert res.json()["detail"]["denial_reason"] == "UNVERIFIED_DEPLOYMENT_TARGET"
 
 
 def test_a_refused_confirmation_burns_the_staged_action(client, auth_headers):

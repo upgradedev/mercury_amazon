@@ -43,6 +43,8 @@ TOKEN_VERSION = "v1"
 class RollbackState(str, Enum):
     PENDING_CONFIRMATION = "PENDING_CONFIRMATION"
     CONFIRMED = "CONFIRMED"
+    RECORDED_ONLY = "RECORDED_ONLY"
+    DISPATCH_ACCEPTED = "DISPATCH_ACCEPTED"
     EXECUTED = "EXECUTED"
     EXPIRED = "EXPIRED"
     REJECTED = "REJECTED"
@@ -73,7 +75,16 @@ class GovernanceTokenError(ValueError):
         self.reason = reason
 
 
-def compute_payload_hash(action_id: str, target_service: str, target_commit_sha: str, reason: str) -> str:
+def compute_payload_hash(
+    action_id: str,
+    target_service: str,
+    target_commit_sha: str,
+    reason: str,
+    environment: str = "",
+    target_artifact_sha256: str = "",
+    target_deployment_marker_id: str = "",
+    offending_deployment_marker_id: str = "",
+) -> str:
     """SHA-256 over the fields that define what the rollback will actually do.
 
     Each field is length-prefixed before hashing, so no combination of field
@@ -81,7 +92,16 @@ def compute_payload_hash(action_id: str, target_service: str, target_commit_sha:
     separator would let a value containing that separator forge a collision.
     """
     digest = hashlib.sha256()
-    for field_value in (action_id, target_service, target_commit_sha, reason):
+    for field_value in (
+        action_id,
+        target_service,
+        target_commit_sha,
+        reason,
+        environment,
+        target_artifact_sha256,
+        target_deployment_marker_id,
+        offending_deployment_marker_id,
+    ):
         encoded = field_value.encode("utf-8")
         digest.update(str(len(encoded)).encode("ascii"))
         digest.update(b":")
@@ -160,6 +180,10 @@ class GovernedRollbackAction:
     target_service: str
     target_commit_sha: str
     reason: str
+    environment: str = ""
+    target_artifact_sha256: str = ""
+    target_deployment_marker_id: str = ""
+    offending_deployment_marker_id: str = ""
     state: RollbackState = RollbackState.PENDING_CONFIRMATION
     created_at_epoch: float = field(default_factory=time.time)
     lease_sec: float = 300.0
@@ -176,20 +200,46 @@ class GovernedRollbackAction:
         target_commit_sha: str,
         reason: str,
         lease_sec: float = 300.0,
+        environment: str = "",
+        target_artifact_sha256: str = "",
+        target_deployment_marker_id: str = "",
+        offending_deployment_marker_id: str = "",
     ) -> "GovernedRollbackAction":
         return cls(
             action_id=action_id,
             target_service=target_service,
             target_commit_sha=target_commit_sha,
             reason=reason,
+            environment=environment,
+            target_artifact_sha256=target_artifact_sha256,
+            target_deployment_marker_id=target_deployment_marker_id,
+            offending_deployment_marker_id=offending_deployment_marker_id,
             lease_sec=lease_sec,
-            payload_hash=compute_payload_hash(action_id, target_service, target_commit_sha, reason),
+            payload_hash=compute_payload_hash(
+                action_id,
+                target_service,
+                target_commit_sha,
+                reason,
+                environment,
+                target_artifact_sha256,
+                target_deployment_marker_id,
+                offending_deployment_marker_id,
+            ),
             created_at_epoch=time.time(),
         )
 
     def current_payload_hash(self) -> str:
         """Recompute the hash from the live fields, so tampering is detectable."""
-        return compute_payload_hash(self.action_id, self.target_service, self.target_commit_sha, self.reason)
+        return compute_payload_hash(
+            self.action_id,
+            self.target_service,
+            self.target_commit_sha,
+            self.reason,
+            self.environment,
+            self.target_artifact_sha256,
+            self.target_deployment_marker_id,
+            self.offending_deployment_marker_id,
+        )
 
     def is_expired(self, current_time: float | None = None) -> bool:
         now = current_time if current_time is not None else time.time()

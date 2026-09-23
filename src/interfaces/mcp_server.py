@@ -27,7 +27,13 @@ from src.application.detect_cost_anomalies_use_case import DetectCostAnomaliesUs
 from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
 from src.application.governed_rollback_use_case import GovernedRollbackUseCase
 from src.application.inspect_pr_bottlenecks_use_case import InspectPRBottlenecksUseCase
+from src.domain.deployment_evidence import (
+    DeploymentEvidenceError,
+    DeploymentEvidenceLedger,
+    DeploymentMarker,
+)
 from src.domain.governed_rollback import GovernanceTokenError, RollbackDenialReason
+from src.domain.incident_handoff import HandoffConflict, IncidentHandoffStore
 from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
@@ -132,6 +138,8 @@ if rollback_dispatcher is not None:
         rollback_dispatcher.disarm_reason,
     )
 rollback_use_case = GovernedRollbackUseCase(ROLLBACK_SECRET, rollback_dispatcher)
+deployment_evidence = DeploymentEvidenceLedger()
+incident_handoffs = IncidentHandoffStore()
 telemetry_detector = TelemetryAbsenceDetector()
 devops_events: list[dict[str, Any]] = []
 
@@ -184,6 +192,10 @@ class StageRollbackRequest(BaseModel):
     action_id: str = Field(min_length=1, max_length=128)
     target_service: str = Field(min_length=1, max_length=128)
     target_commit_sha: str = Field(min_length=1, max_length=64)
+    environment: str = Field(min_length=1, max_length=64)
+    target_artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    target_deployment_marker_id: str = Field(min_length=1, max_length=128)
+    offending_deployment_marker_id: str = Field(min_length=1, max_length=128)
     reason: str = Field(min_length=1, max_length=500)
     lease_sec: float = Field(default=300.0, gt=0, le=3600)
 
@@ -195,6 +207,7 @@ class ConfirmRollbackRequest(BaseModel):
 
 class WhatChangedRequest(BaseModel):
     service_name: str = Field(default="checkout-api", min_length=1, max_length=128)
+    environment: str = Field(default="production", min_length=1, max_length=64)
     time_window_minutes: int = Field(default=60, ge=5, le=1440)
 
 
@@ -207,6 +220,30 @@ class WorkflowRunEvent(BaseModel):
     repository: str = Field(min_length=1, max_length=200)
     workflow_name: str = Field(min_length=1, max_length=200)
     conclusion: str = Field(min_length=1, max_length=40)
+
+
+class DeploymentMarkerRequest(BaseModel):
+    marker_id: str = Field(min_length=1, max_length=128)
+    service: str = Field(min_length=1, max_length=128)
+    environment: str = Field(min_length=1, max_length=64)
+    revision: str = Field(min_length=1, max_length=64)
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    deployed_at: str = Field(min_length=1, max_length=64)
+    health_checked_at: str = Field(min_length=1, max_length=64)
+    health_status: str = Field(min_length=1, max_length=32)
+    health_observed_revision: str = Field(min_length=1, max_length=64)
+    health_observed_artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source: str = Field(default="authenticated-deployment-marker", min_length=1, max_length=128)
+    health_url: str = Field(default="", max_length=500)
+
+
+class HandoffUpdateRequest(BaseModel):
+    incident_id: str = Field(min_length=1, max_length=128)
+    responder: str = Field(min_length=1, max_length=128)
+    current_action: str = Field(min_length=1, max_length=500)
+    confirmed_facts: list[str] = Field(min_length=1, max_length=10)
+    next_step: str = Field(min_length=1, max_length=500)
+    expected_revision: int | None = Field(default=None, ge=0)
 
 
 # ------------------------------------------------------------- Observability
@@ -341,6 +378,7 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
 
     payload: dict[str, Any] = {
         "service": correlation.service_name,
+        "environment": req.environment,
         "verdict": correlation.verdict.value,
         "incident_detected": correlation.incident_detected,
         "voice_summary": correlation.to_voice_summary(),
@@ -373,9 +411,19 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "onset_at": correlation.onset_at.isoformat() if correlation.onset_at else None,
             "baseline_points": correlation.baseline_points,
             "measured_accuracy": naming_accuracy(),
+            "claim_strength": "TEMPORAL_CANDIDATE_ONLY",
+            "causality_statement": (
+                "The named change is the sole change in the configured time window. "
+                "Temporal proximity does not prove it caused the anomaly."
+            ),
         },
         "offending_commit": None,
         "recommended_action": None,
+        "deployment_evidence": {
+            "required_for_rollback": True,
+            "markers_seen": len(deployment_evidence.timeline(correlation.service_name, req.environment)),
+            "blocked_reason": None,
+        },
     }
 
     if correlation.offending_commit is not None:
@@ -387,19 +435,36 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "committed_at": commit.committed_at.isoformat(),
         }
 
-    if correlation.rollback_is_available and correlation.rollback_target is not None:
-        target = correlation.rollback_target
-        payload["recommended_action"] = {
-            "type": "GOVERNED_ROLLBACK",
-            "target_commit_sha": target.sha,
-            "target_service": correlation.service_name,
-            "lease_seconds": 300,
-            "status": "AWAITING_AUTHORIZED_STAGING",
-            "note": (
-                "Staging this rollback requires the deployment's bearer secret. "
-                "Confirming it requires the single-use governance token that staging returns."
-            ),
-        }
+    if correlation.rollback_is_available and correlation.offending_commit is not None:
+        pair = deployment_evidence.rollback_pair(
+            correlation.service_name, req.environment, correlation.offending_commit.sha
+        )
+        if pair is None:
+            payload["deployment_evidence"]["blocked_reason"] = (
+                "No authenticated deployment marker plus matching health readback proves the "
+                "incident revision and its preceding healthy artifact. Git order alone is not a target."
+            )
+        else:
+            offending, target = pair
+            payload["deployment_evidence"].update({
+                "offending_marker": offending.to_dict(),
+                "target_marker": target.to_dict(),
+            })
+            payload["recommended_action"] = {
+                "type": "GOVERNED_ROLLBACK",
+                "target_commit_sha": target.revision,
+                "target_artifact_sha256": target.artifact_sha256,
+                "target_deployment_marker_id": target.marker_id,
+                "offending_deployment_marker_id": offending.marker_id,
+                "target_service": correlation.service_name,
+                "environment": req.environment,
+                "lease_seconds": 300,
+                "status": "AWAITING_AUTHORIZED_STAGING",
+                "note": (
+                    "Target selected from authenticated deployment evidence with a matching healthy "
+                    "revision and artifact digest. Staging and confirmation still require authorization."
+                ),
+            }
 
     return payload
 
@@ -422,6 +487,42 @@ async def audit_observability(req: ObservabilityAuditRequest) -> dict[str, Any]:
 async def list_devops_events() -> dict[str, Any]:
     """Return the CI events this server has received, newest first."""
     return {"events": list(reversed(devops_events))[:20], "total": len(devops_events)}
+
+
+@app.post("/mcp/tools/record_deployment_evidence", dependencies=[Depends(require_operator)])
+async def record_deployment_evidence(req: DeploymentMarkerRequest) -> dict[str, Any]:
+    """Record an authenticated deployment marker plus matching health readback."""
+    try:
+        marker = DeploymentMarker.from_values(**req.model_dump())
+        deployment_evidence.record(marker)
+    except (DeploymentEvidenceError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return marker.to_dict()
+
+
+@app.get("/mcp/deployments/{service}/{environment}")
+async def deployment_timeline(service: str, environment: str) -> dict[str, Any]:
+    """Return the bounded verified deployment timeline used for target selection."""
+    markers = deployment_evidence.timeline(service, environment)
+    return {"service": service, "environment": environment, "markers": [m.to_dict() for m in markers]}
+
+
+@app.post("/mcp/tools/update_handoff", dependencies=[Depends(require_operator)])
+async def update_handoff(req: HandoffUpdateRequest) -> dict[str, Any]:
+    """Publish the compact shared state a second responder needs to take over."""
+    try:
+        item = incident_handoffs.update(**req.model_dump())
+    except HandoffConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return item.to_dict()
+
+
+@app.get("/mcp/handoffs/{incident_id}", dependencies=[Depends(require_operator)])
+async def get_handoff(incident_id: str) -> dict[str, Any]:
+    item = incident_handoffs.get(incident_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"No shared state for incident '{incident_id}'.")
+    return item.to_dict()
 
 
 @app.post("/webhooks/github/workflow_run", dependencies=[Depends(require_operator)])
@@ -450,13 +551,40 @@ async def stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
     Requires the deployment bearer secret. The returned governance token is bound
     to this action id and to the SHA-256 hash of this exact payload.
     """
+    try:
+        deployment_evidence.validate_pair(
+            service=req.target_service,
+            environment=req.environment,
+            offending_marker_id=req.offending_deployment_marker_id,
+            target_marker_id=req.target_deployment_marker_id,
+            target_revision=req.target_commit_sha,
+            target_artifact_sha256=req.target_artifact_sha256,
+        )
+    except DeploymentEvidenceError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"denial_reason": "UNVERIFIED_DEPLOYMENT_TARGET", "message": str(exc)},
+        ) from exc
+
     action, token = rollback_use_case.stage_rollback(
-        req.action_id, req.target_service, req.target_commit_sha, req.reason, req.lease_sec
+        req.action_id,
+        req.target_service,
+        req.target_commit_sha,
+        req.reason,
+        req.lease_sec,
+        req.environment,
+        req.target_artifact_sha256,
+        req.target_deployment_marker_id,
+        req.offending_deployment_marker_id,
     )
     return {
         "action_id": action.action_id,
         "target_service": action.target_service,
         "target_commit_sha": action.target_commit_sha,
+        "environment": action.environment,
+        "target_artifact_sha256": action.target_artifact_sha256,
+        "target_deployment_marker_id": action.target_deployment_marker_id,
+        "offending_deployment_marker_id": action.offending_deployment_marker_id,
         "state": action.state.value,
         "payload_hash": action.payload_hash,
         "governance_token": token,
@@ -497,6 +625,9 @@ async def confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
         "action_id": action.action_id,
         "target_service": action.target_service,
         "target_commit_sha": action.target_commit_sha,
+        "environment": action.environment,
+        "target_artifact_sha256": action.target_artifact_sha256,
+        "target_deployment_marker_id": action.target_deployment_marker_id,
         "output": output,
     }
 

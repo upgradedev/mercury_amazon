@@ -42,7 +42,7 @@ def test_rollback_lifecycle_and_execution():
     assert len(action.payload_hash) == 64
 
     confirmed, output = use_case.confirm_and_execute("rb-101", token)
-    assert confirmed.state == RollbackState.EXECUTED
+    assert confirmed.state == RollbackState.RECORDED_ONLY
     assert "auth-service" in output
     assert "No deployment pipeline was contacted" in output
 

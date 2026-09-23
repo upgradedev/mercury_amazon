@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -31,12 +32,14 @@ os.environ.setdefault("MERCURY_OFFLINE", "1")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from src.domain.governed_rollback import mint_governance_token  # noqa: E402
-from src.interfaces.mcp_server import app  # noqa: E402
+from src.interfaces.mcp_server import app, deployment_evidence  # noqa: E402
 
 AUTH = {"Authorization": f"Bearer {SECRET}"}
 STATE_CHANGING = [
     "/mcp/tools/stage_rollback",
     "/mcp/tools/confirm_rollback",
+    "/mcp/tools/record_deployment_evidence",
+    "/mcp/tools/update_handoff",
     "/webhooks/github/workflow_run",
 ]
 HOSTILE_STRINGS = [
@@ -68,6 +71,42 @@ class Audit:
 def main() -> int:
     client = TestClient(app)
     audit = Audit()
+    deployment_evidence.clear()
+
+    deployed = datetime(2026, 9, 23, 8, tzinfo=timezone.utc)
+    target_digest = "1" * 64
+    incident_digest = "2" * 64
+    for marker_id, revision, digest, when in (
+        ("audit-good", "3e9d10c", target_digest, deployed),
+        ("audit-current", "badc0de", incident_digest, deployed + timedelta(hours=1)),
+    ):
+        recorded = client.post("/mcp/tools/record_deployment_evidence", headers=AUTH, json={
+            "marker_id": marker_id,
+            "service": "checkout-api",
+            "environment": "production",
+            "revision": revision,
+            "artifact_sha256": digest,
+            "deployed_at": when.isoformat(),
+            "health_checked_at": (when + timedelta(minutes=2)).isoformat(),
+            "health_status": "HEALTHY",
+            "health_observed_revision": revision,
+            "health_observed_artifact_sha256": digest,
+        })
+        if recorded.status_code != 200:
+            print(f"Could not seed deployment evidence: {recorded.text}")
+            return 1
+
+    def valid_stage(action_id: str, reason: str = "security audit") -> dict:
+        return {
+            "action_id": action_id,
+            "target_service": "checkout-api",
+            "target_commit_sha": "3e9d10c",
+            "environment": "production",
+            "target_artifact_sha256": target_digest,
+            "target_deployment_marker_id": "audit-good",
+            "offending_deployment_marker_id": "audit-current",
+            "reason": reason,
+        }
 
     print("=" * 70)
     print("  MERCURY SECURITY AUDIT")
@@ -85,15 +124,14 @@ def main() -> int:
     audit.check(wrong.status_code == 401, "a wrong bearer secret returns 401", f"got {wrong.status_code}")
     audit.check(SECRET not in wrong.text, "the 401 body does not contain the deployment secret")
 
-    print("\n[3] Hostile strings are stored as opaque data, never executed")
+    print("\n[3] Hostile reason strings are stored as opaque data, never executed")
     for index, (payload, label) in enumerate(HOSTILE_STRINGS):
         action_id = f"audit-{index:02d}"
-        staged = client.post("/mcp/tools/stage_rollback", headers=AUTH, json={
-            "action_id": action_id, "target_service": payload,
-            "target_commit_sha": "12443b59", "reason": "security audit",
-        })
-        ok = staged.status_code == 200 and staged.json()["target_service"] == payload
-        audit.check(ok, f"{label} is echoed back verbatim rather than interpreted",
+        staged = client.post(
+            "/mcp/tools/stage_rollback", headers=AUTH, json=valid_stage(action_id, payload)
+        )
+        ok = staged.status_code == 200
+        audit.check(ok, f"{label} is accepted only as a content-bound reason",
                     f"status {staged.status_code}")
 
     print("\n[4] The code path contains no shell invocation for these fields")
@@ -109,10 +147,9 @@ def main() -> int:
     def stage(action_id: str) -> dict:
         """Stage a fresh action. Each hostile attempt gets its own, because a
         refused confirmation deliberately burns the action it was aimed at."""
-        return client.post("/mcp/tools/stage_rollback", headers=AUTH, json={
-            "action_id": action_id, "target_service": "checkout-api",
-            "target_commit_sha": "3e9d10c", "reason": "security audit",
-        }).json()
+        return client.post(
+            "/mcp/tools/stage_rollback", headers=AUTH, json=valid_stage(action_id)
+        ).json()
 
     target = stage("audit-forge")
     forged = mint_governance_token("attacker-secret", "audit-forge", target["payload_hash"])

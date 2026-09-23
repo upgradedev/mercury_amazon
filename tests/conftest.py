@@ -34,3 +34,15 @@ def client() -> TestClient:
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {OPERATOR_SECRET}"}
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_evidence_state():
+    """Keep deployment and handoff evidence isolated between tests."""
+    from src.interfaces.mcp_server import deployment_evidence, incident_handoffs
+
+    deployment_evidence.clear()
+    incident_handoffs.clear()
+    yield
+    deployment_evidence.clear()
+    incident_handoffs.clear()

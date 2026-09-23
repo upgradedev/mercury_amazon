@@ -29,6 +29,8 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-09e | The crowding gate buys precision on corpora it was not chosen on | `tests/unit/test_correlation_trial.py` | At two held-out seeds the gate raises naming precision and lowers recall and the namings count |
 | A-09f | Every answer carries the measured worth of naming a commit | `tests/integration/test_mcp_endpoints.py`, `tests/unit/test_trial_summary.py` | `attribution.measured_accuracy` equals the recorded summary, and a checkout without that summary reports the accuracy as unknown rather than guessing |
 | A-10 | A zero baseline does not manufacture an incident | `tests/unit/test_incident_correlation.py` | Verdict is `NO_ANOMALY` with factor 0.0 |
+| A-10a | Git order cannot become a rollback target | `tests/unit/test_deployment_evidence.py`, `tests/integration/test_deployment_target_and_handoff.py` | An arbitrary SHA is refused; only the immediately preceding authenticated deployment marker with matching revision, digest and healthy readback can be staged |
+| A-10b | A second responder can read shared state without overwriting newer work | `tests/unit/test_incident_handoff.py`, `tests/integration/test_deployment_target_and_handoff.py` | Responder, current action, confirmed facts and next step round-trip; a stale expected revision returns 409 |
 | A-11 | Staging a rollback without the secret is refused | `tests/integration/test_rollback_authorization.py` | HTTP 401, and the response does not contain the secret |
 | A-12 | A governance token works exactly once | `tests/integration/test_rollback_authorization.py` | A token replayed against a re-staged action returns 409 with `TOKEN_ALREADY_USED`; a second confirm of an executed action returns 409 with `NOT_PENDING` |
 | A-13 | Editing the rollback target invalidates the token | `tests/integration/test_rollback_authorization.py` | HTTP 403 with `TOKEN_CONTENT_MISMATCH` |
@@ -62,6 +64,7 @@ They are listed so the gap is explicit rather than absent.
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
 | M-07 | The deployment answers at the submitted commit | No deploy of the current commit has been run | `terraform apply`, then `python scripts/probe_deployment.py` |
+| M-08 | Two responders resume from the TV state faster or with fewer omissions than the laptop dashboard | No comparative responder session has been run | Run the same incident once with the shared handoff panel and once with the existing dashboard; record recap time, omissions and preference |
 
 If you run any of these, `.github/ISSUE_TEMPLATE/firetv_device_report.yml` is the
 place to report what happened, whether it worked or not.
@@ -72,9 +75,9 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 529 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1338 statements |
-| Every rollback denial reason has a failing-input test | Met | 9 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 541 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 1597 statements |
+| Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 44/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | **Not met** | A verified APK exists, but gate J4 still fails because there is no `firetv_build_receipt.json` and no device observation |
 | Verified on a Fire TV device | **Not met** | No hardware run has taken place |

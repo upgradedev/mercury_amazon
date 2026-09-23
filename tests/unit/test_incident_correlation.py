@@ -98,7 +98,7 @@ def test_only_commit_available_offers_no_rollback_target():
     assert result.offending_commit.sha == "only11"
     assert result.rollback_target is None
     assert result.rollback_is_available is False
-    assert "No earlier commit is known" in result.explanation
+    assert "Git order is not deployment evidence" in result.explanation
 
 
 def test_commit_after_the_reading_is_never_blamed():

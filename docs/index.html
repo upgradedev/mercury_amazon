@@ -438,6 +438,10 @@
       <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
              title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
              placeholder="MERCURY_ROLLBACK_SECRET">
+      <label for="opResponder">Responder</label>
+      <input id="opResponder" type="text" spellcheck="false" autocomplete="off"
+             title="Name shown in the shared incident handoff state"
+             value="Primary responder" maxlength="128">
       <p class="note">The API defaults to the origin this page was served from, so it is
         usually already right. The secret is MERCURY_ROLLBACK_SECRET: the server prints an
         ephemeral one at startup when the variable is unset.</p>
@@ -588,6 +592,24 @@
               the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
           </div>
         </div>
+        <div class="actions-bar">
+          <button class="btn btn-primary" data-tv-focusable data-tv-label="Publish shared handoff"
+                  data-action="handoff-publish"
+                  title="Publish responder, current action, confirmed facts and next step">Publish handoff</button>
+          <button class="btn" data-tv-focusable data-tv-label="Refresh shared handoff"
+                  data-action="handoff-refresh"
+                  title="Read the latest shared state so another responder can resume">Refresh handoff</button>
+        </div>
+        <div class="console">
+          <div class="console-header">
+            <span>Shared responder handoff</span>
+            <span id="handoffLatency" class="latency"></span>
+          </div>
+          <div id="handoffOutput" aria-live="polite">
+            <div class="empty-state-card">No handoff loaded. Publish or refresh to show the responder,
+              current action, confirmed facts and next step.</div>
+          </div>
+        </div>
       </section>
 
       <section id="panel-velocity" class="panel" data-panel-body hidden aria-labelledby="velocityTitle">
@@ -665,6 +687,7 @@
       staged: null,
       lastCorrelation: null,
       connection: 'unknown',
+      handoffRevision: 0,
       speak: false,
       /* Which service the next correlation asks about. Changed only by the demo
          state buttons, so the screen always names the service it answered for. */
@@ -1116,8 +1139,10 @@
             'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
         } else {
           setReason('btnStage', 'stageReason', false,
-            'This correlation produced no rollback target, so there is nothing to stage.',
-            'Disabled until a correlation returns a rollback target');
+            (data.deployment_evidence && data.deployment_evidence.blocked_reason)
+              ? data.deployment_evidence.blocked_reason
+              : 'This correlation produced no rollback target, so there is nothing to stage.',
+            'Disabled until verified deployment evidence returns a rollback target');
         }
         speak(data.voice_summary);
       } catch (error) {
@@ -1140,6 +1165,10 @@
         ['Factor', data.metric.anomaly_factor + 'x over ' + data.metric.sample_size + ' points']
       ]));
       box.appendChild(h('p', 'row', data.explanation));
+      if (data.attribution && data.attribution.causality_statement) {
+        box.appendChild(h('div', 'empty-state-card', data.attribution.claim_strength + ': '
+          + data.attribution.causality_statement));
+      }
 
       if (data.offending_commit) {
         box.appendChild(kv([
@@ -1161,7 +1190,9 @@
         box.appendChild(rec);
       } else {
         box.appendChild(h('div', 'empty-state-card',
-          'No rollback is offered for this verdict. That is the correlator refusing, not a missing feature.'));
+          (data.deployment_evidence && data.deployment_evidence.blocked_reason)
+            ? data.deployment_evidence.blocked_reason
+            : 'No rollback is offered for this verdict. That is the correlator refusing, not a missing feature.'));
       }
       box.appendChild(provenanceBlock(data.metric_provenance));
       box.appendChild(provenanceBlock(data.commit_provenance));
@@ -1190,6 +1221,10 @@
           action_id: 'tv-' + Date.now(),
           target_service: rec.target_service,
           target_commit_sha: rec.target_commit_sha,
+          environment: rec.environment,
+          target_artifact_sha256: rec.target_artifact_sha256,
+          target_deployment_marker_id: rec.target_deployment_marker_id,
+          offending_deployment_marker_id: rec.offending_deployment_marker_id,
           reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
           lease_sec: 300
         }, 'incidentLatency', secret);
@@ -1214,7 +1249,9 @@
         box.appendChild(h('span', 'tag tag-warn', res.body.state));
         box.appendChild(kv([
           ['Action', res.body.action_id],
-          ['Target', res.body.target_service + ' at ' + res.body.target_commit_sha],
+          ['Target', res.body.target_service + '/' + res.body.environment + ' at ' + res.body.target_commit_sha],
+          ['Artifact', res.body.target_artifact_sha256.slice(0, 24) + '...'],
+          ['Evidence marker', res.body.target_deployment_marker_id],
           ['Payload hash', res.body.payload_hash.slice(0, 24) + '...'],
           ['Lease left', res.body.lease_seconds_remaining + ' s']
         ]));
@@ -1244,9 +1281,11 @@
         setHero({
           state: 'calm',
           eyebrow: 'Rollback ' + res.body.status.toLowerCase(),
-          figure: 'OK',
-          figureLabel: 'governance passed',
-          headline: res.body.target_service + ' rolled back to ' + res.body.target_commit_sha,
+          figure: res.body.status === 'DISPATCH_ACCEPTED' ? 'SENT' : 'DRY',
+          figureLabel: 'governance result',
+          headline: res.body.status === 'DISPATCH_ACCEPTED'
+            ? res.body.target_service + ' dispatch accepted for ' + res.body.target_commit_sha
+            : res.body.target_service + ' decision recorded for ' + res.body.target_commit_sha,
           cause: res.body.output,
           badges: []
         });
@@ -1265,10 +1304,73 @@
         ]));
         box.appendChild(h('p', 'row', res.body.output));
         render('incidentOutput', box);
-        speak('Rollback confirmed for ' + res.body.target_service + '.');
+        speak('Rollback governance result for ' + res.body.target_service + ': ' + res.body.status + '.');
       } catch (error) {
         showError('incidentOutput', error.message);
         showPanel('incident');
+      }
+    }
+
+    function handoffIncidentId() { return state.service + '-active'; }
+
+    function renderHandoff(data) {
+      state.handoffRevision = data.revision;
+      var box = document.createElement('div');
+      box.appendChild(h('span', 'tag tag-live', 'SHARED REVISION ' + data.revision));
+      box.appendChild(kv([
+        ['Responder', data.responder],
+        ['Current action', data.current_action],
+        ['Confirmed facts', data.confirmed_facts.join(' | ')],
+        ['Next step', data.next_step],
+        ['Updated', data.updated_at]
+      ]));
+      render('handoffOutput', box);
+    }
+
+    async function publishHandoff() {
+      var secret = requireSecret();
+      if (!secret || !state.lastCorrelation) {
+        showError('handoffOutput', 'A governance secret and a what-changed answer are required.');
+        return;
+      }
+      var data = state.lastCorrelation;
+      var facts = [
+        data.metric.name + ' is ' + data.metric.current + ' against baseline ' + data.metric.baseline,
+        data.verdict + ': ' + data.explanation
+      ];
+      if (data.deployment_evidence && data.deployment_evidence.target_marker) {
+        facts.push('Verified target marker ' + data.deployment_evidence.target_marker.marker_id
+          + ' points to ' + data.deployment_evidence.target_marker.revision);
+      }
+      var next = data.recommended_action
+        ? 'Stage the evidence-bound rollback and have a second responder confirm the exact digest.'
+        : ((data.deployment_evidence && data.deployment_evidence.blocked_reason)
+          || 'Keep investigating; Mercury has not produced an actionable target.');
+      try {
+        var res = await post('/mcp/tools/update_handoff', {
+          incident_id: handoffIncidentId(),
+          responder: el('opResponder').value.trim() || 'Primary responder',
+          current_action: data.recommended_action ? 'Reviewing verified rollback target' : 'Gathering evidence',
+          confirmed_facts: facts,
+          next_step: next,
+          expected_revision: state.handoffRevision
+        }, 'handoffLatency', secret);
+        renderHandoff(res.body);
+      } catch (error) {
+        showError('handoffOutput', error.message);
+      }
+    }
+
+    async function refreshHandoff() {
+      var secret = requireSecret();
+      if (!secret) { showError('handoffOutput', 'The governance secret is required.'); return; }
+      try {
+        var res = await call('/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()), {
+          method: 'GET', headers: { 'Authorization': 'Bearer ' + secret }
+        }, 'handoffLatency');
+        renderHandoff(res.body);
+      } catch (error) {
+        showError('handoffOutput', error.message);
       }
     }
 
@@ -1406,6 +1508,8 @@
       prs: loadPrs,
       cost: loadCost,
       observability: loadObservability
+      , 'handoff-publish': publishHandoff
+      , 'handoff-refresh': refreshHandoff
     };
 
     /* The demo state buttons change which service the next correlation asks
@@ -1413,6 +1517,7 @@
        give are refusals, and a refusal nobody can reach is not a control. */
     function selectService(name) {
       state.service = name;
+      state.handoffRevision = 0;
       Array.prototype.forEach.call(document.querySelectorAll('[data-service]'), function (button) {
         button.setAttribute('aria-pressed', button.getAttribute('data-service') === name ? 'true' : 'false');
       });
@@ -1498,6 +1603,7 @@
     return {
       loadDora: loadDora, loadPrs: loadPrs, loadCost: loadCost,
       loadObservability: loadObservability, loadWhatChanged: loadWhatChanged,
+      publishHandoff: publishHandoff, refreshHandoff: refreshHandoff,
       stageRollback: stageRollback, confirmRollback: confirmRollback,
       checkConnection: checkConnection, showPanel: showPanel, showWall: showWall
     };

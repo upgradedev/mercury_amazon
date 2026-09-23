@@ -157,8 +157,11 @@ def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(clie
             f"burst of commits can move this: fix the anchoring or the table, not this test."
         )
         assert data["attribution"]["refusal_reason"] == refusal, service
-        # Only the attributed row may offer a rollback. The refusals must not.
-        assert (data["recommended_action"] is not None) == (verdict == "ANOMALY_ATTRIBUTED"), service
+        # Correlation alone never creates a rollback target. Even an attributed
+        # row needs authenticated deployment evidence and a matching health readback.
+        assert data["recommended_action"] is None, service
+        if verdict == "ANOMALY_ATTRIBUTED":
+            assert data["deployment_evidence"]["blocked_reason"]
 
 
 def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):

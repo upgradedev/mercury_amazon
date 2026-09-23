@@ -67,6 +67,10 @@ def test_the_request_is_a_workflow_dispatch_carrying_every_rollback_field():
         "action_id": "tv-1730",
         "target_service": "checkout-api",
         "target_commit_sha": "3e9d10c4b2",
+        "environment": "",
+        "target_artifact_sha256": "",
+        "target_deployment_marker_id": "",
+        "offending_deployment_marker_id": "",
         "reason": "Staged from the Fire TV cockpit after a what-changed correlation.",
         "payload_hash": action.payload_hash,
     }
@@ -105,12 +109,13 @@ def test_an_unarmed_dispatch_sends_nothing_and_says_what_it_would_have_sent():
         REPO, token="ghp_test", armed=False, client=make_client(recorder=sent),
         disarm_reason=f"{ARMED_ENV} is not set, so this dispatch is a dry run.",
     )
-    output = dispatcher.dispatch(make_action())
+    result = dispatcher.dispatch(make_action())
 
     assert sent == [], "an unarmed dispatcher must not open a socket"
-    assert "DRY RUN: no request was sent" in output
-    assert EXPECTED_URL in output
-    assert "ghp_test" not in output, "the dry run must not print the token"
+    assert result.state.value == "RECORDED_ONLY"
+    assert "DRY RUN: no request was sent" in result.output
+    assert EXPECTED_URL in result.output
+    assert "ghp_test" not in result.output, "the dry run must not print the token"
 
 
 def test_an_armed_but_tokenless_configuration_refuses_to_arm(monkeypatch):
@@ -137,7 +142,7 @@ def test_an_armed_dispatch_sends_exactly_the_request_that_was_built():
         REPO, WORKFLOW, ref="release", token="ghp_test", armed=True,
         client=make_client(204, recorder=sent),
     )
-    output = dispatcher.dispatch(make_action())
+    result = dispatcher.dispatch(make_action())
 
     assert len(sent) == 1
     request = sent[0]
@@ -151,8 +156,9 @@ def test_an_armed_dispatch_sends_exactly_the_request_that_was_built():
     body = json.loads(request.content)
     assert body["ref"] == "release"
     assert body["inputs"]["target_commit_sha"] == "3e9d10c4b2"
-    assert "returned HTTP 204" in output
-    assert "whether the workflow itself succeeds is visible" in output
+    assert result.state.value == "DISPATCH_ACCEPTED"
+    assert "returned HTTP 204" in result.output
+    assert "this is not completion" in result.output
 
 
 def test_a_refused_dispatch_raises_with_the_status_and_the_body():
