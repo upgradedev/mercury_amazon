@@ -2,6 +2,10 @@
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
+![The Mercury incident board at 1920x1080: a departures-board answer row for checkout-api reading 12.9x over baseline with a hazard-striped OFFLINE FIXTURE stamp and a LIVE commits stamp beside the figure, the verdict Attributed naming one commit at 52.2% naming precision, a record-only rollback as the next action, the amber Ask what changed button, and five service rows below it reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data](docs/assets/incident-board-1920x1080.png)
+
+*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. Every row is its own `what_changed` response; the metric is an offline fixture and says so.*
+
 ```mermaid
 flowchart LR
     Q["Someone asks:<br/>what broke?"]
@@ -27,7 +31,7 @@ is why naming is the smaller half of this README. The numbers are in
 section in this file and the one to read first.
 
 Mercury answers on load. The badge saying whether a number was read live or served
-from a recording renders inside the incident card next to the number itself, and
+from a recording renders in the board's answer row next to the number itself, and
 every attribution carries its own measured precision.
 
 ### Run it
