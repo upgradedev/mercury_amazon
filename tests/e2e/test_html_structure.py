@@ -364,9 +364,28 @@ def test_reduced_motion_is_honoured(html):
     assert "@media (prefers-reduced-motion: reduce)" in html
 
 
-def test_light_and_dark_are_both_defined(html):
-    assert "@media (prefers-color-scheme: light)" in html
-    assert "color-scheme:" in html
+def test_the_board_commits_to_one_dark_theme_and_paints_it_explicitly(html):
+    """The departures board is dark on purpose, and says so rather than inheriting it.
+
+    This used to assert a light variant. The redesign commits to one dark board: the
+    page's first home is a television in a dim room, most TV browsers report no
+    colour-scheme preference, and a board that turned white on a phone would stop being
+    the same object. What must hold instead is that the choice is declared to the
+    browser and that nothing is left to a user-agent default: the page ground is
+    painted, and the colours come from named tokens.
+    """
+    style = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert "color-scheme: dark;" in style, "the dark commitment is not declared to the browser"
+    assert "@media (prefers-color-scheme: light)" not in style, (
+        "a light variant exists, so the one-theme rationale above is no longer true"
+    )
+    body = re.search(r"\n\s*body\s*\{(.+?)\}", style, re.DOTALL)
+    assert body and "background-color: var(--board)" in body.group(1), (
+        "the body does not paint its own background"
+    )
+    for token in ("--board:", "--flap:", "--ink:", "--amber:",
+                  "--v-attributed:", "--v-cannot:", "--v-nothing:", "--v-insufficient:"):
+        assert token in style, f"the palette token {token} is missing"
 
 
 def test_every_disabled_control_states_its_reason_in_visible_text(html):

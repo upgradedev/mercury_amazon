@@ -67,8 +67,8 @@ whatever is on screen. Do not say any other number from this document.
 ### 3. The refusal that carries the product. 0:31 to 0:47
 
 **Action:** press **release-train** in the demo row.
-**Expected on screen:** the hero reads `Cannot attribute this.` followed by the
-number of changes that landed before the spike started, and the eyebrow reads
+**Expected on screen:** the board's verdict line flips to `Cannot attribute this:`
+followed by the number of changes that landed before the spike started, and the eyebrow reads
 `Incident, too many changes to name one`. The cause line beneath is the server's
 own refusal statement: a refusal to guess, not a finding that none of them caused
 it, and rolling back on this answer would be a guess. Both rollback buttons stay
@@ -84,10 +84,10 @@ changes with it. Read what is on screen.
 ### 4. When it does name one, it prints its own odds. 0:47 to 1:08
 
 **Action:** press **checkout-api**.
-**Expected on screen:** the hero names the commit, quotes its message with the
-author, and the line beneath reads that when this correlator names a commit it is
-the one that caused the reading 52% of the time, over 113 namings in a corpus of
-1160 labelled cases, with the command that produced the figure.
+**Expected on screen:** the verdict line names the commit, the board quotes its
+message, and the line under the verdict gives the measured naming precision
+(52.2%). The Evidence section further down carries the full sentence: over 113
+namings in a corpus of 1160 labelled cases, with the command that produced it.
 **Point to make:** it names a change only when exactly one landed in the window,
 and it still shows the odds at the moment somebody would act. That line is read
 from `correlation_trial_summary.json` and shipped in the response as
@@ -95,20 +95,19 @@ from `correlation_trial_summary.json` and shipped in the response as
 
 ### 5. Where each half of that answer came from, without scrolling. 1:08 to 1:24
 
-**Action:** none. Hold on the two badges inside the hero card, beside the anomaly
-factor. Do not scroll.
+**Action:** none. Hold on the two badges in the board's answer row, beside the
+anomaly factor. Do not scroll.
 **Expected on screen:** two badges from the same response: `OFFLINE FIXTURE`
-against *metric series (offline-fixture)*, and `LIVE` against *commit history
-(local-git)*.
+against *metric*, and `LIVE` against *commits: local-git*.
 **Point to make:** the words, not the slug, and next to the number rather than
-below the fold. Measured at 1920x1080 the factor renders at y=274 and the stamp at
-y=453, both inside the first screenful, which matters because a wallboard is never
+below the fold. Measured at 1920x1080 the factor renders at y=189 and the stamp at
+y=337, both inside the first screenful, which matters because a wallboard is never
 scrolled. `python scripts/measure_legibility.py` exits 1 if that stops being true.
 
 ### 6. The D-pad moves in space, and BACK does not close the room. 1:24 to 1:41
 
-**Action:** press Right, Right, Down, Right, Left, then Enter on the Delivery
-velocity tile, then Escape.
+**Action:** press Right, Down, Down, Up, then Down until the ring reaches the
+Evidence tiles and Right to Delivery velocity, Enter, then Escape.
 **Expected on screen:** the amber focus ring jumps to the nearest control in the
 pressed direction and the label at the right of the key hint bar changes with it.
 On Enter the tiles are replaced by the Delivery velocity panel and the BACK legend

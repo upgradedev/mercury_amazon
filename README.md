@@ -740,11 +740,11 @@ as a separate artifact.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 207 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 233 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 207
+#   readings under the floor: 0 of 233
 #   smallest operational text (reasons, provenance, pills): 25.9px over 21 readings
-#   anomaly factor renders at y=274, provenance stamp at y=453, fold at y=1080
+#   anomaly factor renders at y=189, provenance stamp at y=337, fold at y=1080
 #   provenance stamps within the first viewport: 2 ['LIVE', 'OFFLINE FIXTURE']
 ```
 
@@ -785,7 +785,7 @@ section is the current one, and it is what the same command prints today.
 D-pad is about to do at exactly the same size as the decorative wordmark caption,
 because a floor says nothing about which text matters. The reason strings, the two
 provenance chips and the connection pill now sit a tier above the body copy at
-25.9px and 27.6px, and the measurement reports that tier separately so it cannot
+25.9px and 26.9px, and the measurement reports that tier separately so it cannot
 quietly sink back to the floor.
 
 **The provenance stamp was below the fold.** A floor and a reading order still say
@@ -797,7 +797,8 @@ rather than the words: not one of the strings above the fold contained "OFFLINE
 FIXTURE", "simulated" or "generated locally", so a viewer across a room read a
 locally generated 12.9x as a production number while this README claimed every
 number on the screen carried a badge saying otherwise. The badge now renders inside
-the hero card next to the figure, at y=453, and it prints `display_label`. The
+the board's answer row next to the figure, at y=337 with the figure at y=189, and it
+prints `display_label`. The
 measurement reports both positions and the script exits 1 when no stamp lands above
 the fold. Reproduce the failure on a clean checkout, which overwrites the page and
 then throws the copy away, so commit or stash anything uncommitted in it first:

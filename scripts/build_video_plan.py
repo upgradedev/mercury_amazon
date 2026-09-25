@@ -67,8 +67,9 @@ BEATS = [
         "control in the direction pressed, disabled controls are skipped rather than "
         "focused, and Back returns to the wall before it would ever close the "
         "application.",
-        "Press Right, Right, Down, Right, Left, then Enter on the Delivery velocity "
-        "tile and Escape. The Focused label and the BACK legend change with each press.",
+        "Press Right, Down, Down, Up, then Down to the Evidence tiles and Right to "
+        "Delivery velocity, Enter and Escape. The Focused label and the BACK legend "
+        "change with each press.",
     ),
     (
         "beat_07_two_sources", 101.0, 116.0,

@@ -47,7 +47,7 @@
       "timestamp_start": 84.0,
       "timestamp_end": 101.0,
       "narration_text": "The remote moves in space, not down a list. Focus jumps to the nearest control in the direction pressed, disabled controls are skipped rather than focused, and Back returns to the wall before it would ever close the application.",
-      "visual_action": "Press Right, Right, Down, Right, Left, then Enter on the Delivery velocity tile and Escape. The Focused label and the BACK legend change with each press."
+      "visual_action": "Press Right, Down, Down, Up, then Down to the Evidence tiles and Right to Delivery velocity, Enter and Escape. The Focused label and the BACK legend change with each press."
     },
     {
       "beat_id": "beat_07_two_sources",
