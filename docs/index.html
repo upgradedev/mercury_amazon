@@ -994,7 +994,7 @@
       if (state.connection === 'unreachable' || !apiBase()) {
         card.appendChild(h('span', 'error-detail',
           'This page is static unless a Mercury API is running. Start it with '
-          + 'python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.'));
+          + 'python -m src.interfaces.mcp_server, then press Setup in the Connection section below to point this page at it.'));
       }
       render(targetId, card);
     }
@@ -1272,7 +1272,9 @@
       ];
 
       var accuracy = accuracyLine(data);
-      var short = accuracyShort(data);
+      // The short precision sits under a named commit only. Under a refusal it would
+      // read as the refusal's own score; the full sentence stays in the evidence.
+      var short = verdictKind(data) === 'attributed' ? accuracyShort(data) : '';
       var common = {
         flap: true,
         service: data.service,
@@ -1382,7 +1384,7 @@
         figureLabel: 'Not measured',
         headline: 'No Mercury API answered',
         cause: message + ' This page is static unless a Mercury API is running. '
-          + 'Start it with python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.',
+          + 'Start it with python -m src.interfaces.mcp_server, then press Setup in the Connection section below to point this page at it.',
         badges: []
       });
     }
@@ -1567,7 +1569,7 @@
       if (!state.dpadDemoApproval && !secret) {
         showError('incidentOutput',
           'No governance secret entered. Staging a rollback needs the deployment secret, and the '
-          + 'Setup fields have been opened above for it. The server prints an ephemeral one at startup.');
+          + 'Setup fields have been opened in the Connection section for it. The server prints an ephemeral one at startup.');
         showPanel('incident');
         return;
       }

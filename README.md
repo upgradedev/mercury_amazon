@@ -818,7 +818,7 @@ git checkout -- docs/index.html                      # put the current page back
 **The setup form is off the first screen.** The API URL and the governance secret
 were two text inputs in the top bar, which is a form standing between a viewer and
 the incident and the worst thing in this product to operate with a D-pad. They are
-now behind a `Setup` toggle, hidden on load, and the D-pad ring skips hidden
+now behind a `Setup` toggle in the Connection section at the foot of the page, hidden on load, and the D-pad ring skips hidden
 controls so the remote cannot land in them. The API defaults to the origin the page
 was served from, and pressing **Stage governed rollback** with no secret opens the
 setup row by itself and says why. The first screen is the incident.
