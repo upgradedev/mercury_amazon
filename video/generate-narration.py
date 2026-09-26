@@ -16,7 +16,12 @@ tail. Nothing downstream invents a timestamp. What changed for this repository:
      the beat and the number of characters sent, so the billed total is counted,
      including re-rolls.
   4. Caption lines are wrapped at 84 characters, because the composition puts them
-     in a band under the picture instead of over it.
+     in a band under the picture instead of over it, and a sentence longer than two
+     lines is split after a colon or semicolon.
+  5. Cue boundaries start from the kit's character share of the measured length and
+     then move to the measured pause in the voice within 1.2 s, found with ffmpeg's
+     silencedetect. ``timing.json`` records each cue's start as
+     ``sentenceStartsSeconds``, which the capture uses to time key presses.
 
 Kept from the kit: per-beat caching keyed on the speech text and voice settings, so
 changing one beat costs one call; the 3 to 40 s per beat and 90 to 174 s total
@@ -103,7 +108,52 @@ def wrapped(text: str, width: int = CAPTION_WIDTH) -> str:
 
 
 def sentences(caption: str) -> list[str]:
-    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", caption) if part.strip()]
+    """Caption cues: one per sentence, and a sentence too long for two caption lines
+    is split once more after a colon or semicolon, so no cue needs a third line."""
+    cues: list[str] = []
+    for part in (p.strip() for p in re.split(r"(?<=[.!?])\s+", caption)):
+        if not part:
+            continue
+        if len(part) > 2 * CAPTION_WIDTH:
+            pieces = [piece.strip() for piece in re.split(r"(?<=[:;])\s+", part) if piece.strip()]
+            cues.extend(pieces)
+        else:
+            cues.append(part)
+    return cues
+
+
+def pauses(path: pathlib.Path) -> list[tuple[float, float]]:
+    """Measured pauses in one beat's audio: (start, end) of every stretch quieter than
+    -45 dB for at least 0.3 s. Used to put caption cue boundaries where the voice
+    actually pauses, instead of where a share of the characters says it should."""
+    result = subprocess.run(
+        [os.environ.get("FFMPEG", "ffmpeg"), "-hide_banner", "-nostats", "-i", str(path),
+         "-af", "silencedetect=noise=-45dB:d=0.3", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    starts = [float(v) for v in re.findall(r"silence_start:\s*([0-9.]+)", result.stderr)]
+    ends = [float(v) for v in re.findall(r"silence_end:\s*([0-9.]+)", result.stderr)]
+    return list(zip(starts, ends))
+
+
+def cue_bounds(parts: list[str], seconds: float, quiet: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Each cue's (start, end) inside the beat. The first estimate is the kit's: a
+    share of the measured length by characters. A boundary is then moved to the
+    measured pause within 1.2 s of it, if there is one."""
+    weight = sum(len(part) for part in parts) or 1
+    edges = [0.0]
+    for part in parts:
+        edges.append(edges[-1] + seconds * len(part) / weight)
+    bounds = [(edges[i], edges[i + 1]) for i in range(len(parts))]
+    for i in range(1, len(parts)):
+        estimate = edges[i]
+        near = [(abs((a + b) / 2 - estimate), a, b) for a, b in quiet if a < estimate + 1.2 and b > estimate - 1.2 and b < seconds - 0.05]
+        if near:
+            _, pause_start, pause_end = min(near)
+            if bounds[i - 1][0] < pause_start and pause_end < bounds[i][1]:
+                bounds[i - 1] = (bounds[i - 1][0], pause_start)
+                bounds[i] = (pause_end, bounds[i][1])
+    return bounds
 
 
 def elevenlabs_key() -> str:
@@ -248,14 +298,10 @@ def main() -> None:
             raise SystemExit(f"beat audio duration is unsafe: {identifier} {seconds:.3f}s")
         hold = seconds + TAIL_SECONDS
         parts = sentences(caption)
-        weight = sum(len(part) for part in parts) or 1
-        cursor = 0.0
         sentence_starts = []
-        for sentence in parts:
-            share = seconds * len(sentence) / weight
-            cues.append((offset + cursor, offset + cursor + share, wrapped(sentence)))
-            sentence_starts.append(round(cursor, 3))
-            cursor += share
+        for sentence, (begin, finish) in zip(parts, cue_bounds(parts, seconds, pauses(audio))):
+            cues.append((offset + begin, offset + finish, wrapped(sentence)))
+            sentence_starts.append(round(begin, 3))
         timing.append(
             {
                 "id": identifier,

@@ -39,7 +39,7 @@ TTS = {
 # (beat_id, seconds, narration_text, caption_text or None, visual_action)
 BEATS = [
     (
-        "beat_01_question", 13.0,
+        "beat_01_question", 15.139,
         "An incident starts, and someone asks what we just deployed. Half the time "
         "that is the wrong question. Mercury, an incident board for the team TV, asks "
         "a narrower one: can this spike be pinned on one change?",
@@ -47,7 +47,7 @@ BEATS = [
         "The loaded board at 1920x1080, focus on Ask what changed. No key pressed.",
     ),
     (
-        "beat_02_board_on_load", 17.0,
+        "beat_02_board_on_load", 18.297,
         "It answered as the page loaded, before any key was pressed. Most answers are "
         "refusals: on eleven hundred and sixty generated, labelled cases, it saw a real "
         "anomaly and named nobody eighty one percent of the time. A refusal never calls "
@@ -59,7 +59,7 @@ BEATS = [
         "attribute, Cannot attribute and Insufficient data, each from the server's answer.",
     ),
     (
-        "beat_03_crowded_refusal", 16.0,
+        "beat_03_crowded_refusal", 16.718,
         "Down walks the rows. Release train has a real spike, but several changes landed "
         "in the hour before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
@@ -71,7 +71,7 @@ BEATS = [
         "offered, and Stage rollback and Confirm are disabled.",
     ),
     (
-        "beat_04_named_with_odds", 16.0,
+        "beat_04_named_with_odds", 16.393,
         "On checkout A P I, exactly one change landed before the spike, so Mercury names "
         "it, and prints its own odds: on that corpus a named commit is the cause fifty "
         "two percent of the time, over one hundred and thirteen namings.",
@@ -82,7 +82,7 @@ BEATS = [
         "quotes its message, and reads 52.2% naming precision.",
     ),
     (
-        "beat_05_provenance", 16.0,
+        "beat_05_provenance", 14.071,
         "Each half says where it came from. The metric is an offline fixture, generated "
         "locally, and the striped stamp says so. The commit is one of Mercury's own, "
         "standing in for a deploy feed, and the dashed stamp says that too.",
@@ -91,7 +91,7 @@ BEATS = [
         "stamp against Mercury's commits. No key pressed.",
     ),
     (
-        "beat_06_stage", 13.0,
+        "beat_06_stage", 11.517,
         "Only a named change can be rolled back. Up, right, center: staging returns a "
         "single use token bound to a hash of this exact proposal, and the lease counts "
         "down on the board.",
@@ -103,7 +103,7 @@ BEATS = [
         "record-only.",
     ),
     (
-        "beat_07_confirm", 11.0,
+        "beat_07_confirm", 11.656,
         "Right, then center confirms. The server spends the token, and the recorded only "
         "card says it plainly: no deployment pipeline was contacted. Confirming again is "
         "refused.",
@@ -115,7 +115,7 @@ BEATS = [
         "pipeline was contacted, and 02 Confirm says the token has been spent.",
     ),
     (
-        "beat_08_handoff", 9.0,
+        "beat_08_handoff", 9.752,
         "Center publishes a fixed responder handoff. Its next step repeats the boundary: "
         "this fixture never contacts a deployment pipeline.",
         None,
@@ -123,7 +123,7 @@ BEATS = [
         "handoff's next step into view on the way to the evidence tiles.",
     ),
     (
-        "beat_09_dpad", 12.0,
+        "beat_09_dpad", 12.167,
         "The ring jumps to the nearest control in the direction pressed, and the label at "
         "the bottom right names it. Center opens delivery velocity, and Back now reads: "
         "back to the wall.",
@@ -134,7 +134,7 @@ BEATS = [
         "changes from Exit to the Fire TV launcher to Back to the wall.",
     ),
     (
-        "beat_10_fixtures", 15.0,
+        "beat_10_fixtures", 16.811,
         "Down brings the answer into view: a recording, because no GitHub token is set. "
         "Back returns to the wall, not out of the app. Cloud spend is a fixture too, "
         "marked synthetic, because this run has no AWS credentials.",
@@ -144,7 +144,7 @@ BEATS = [
         "the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC.",
     ),
     (
-        "beat_11_build_check", 19.0,
+        "beat_11_build_check", 19.458,
         "Last, the server reports its build: the commit on the opening card, in fixture "
         "mode. This take is a desktop browser at Fire TV resolution, driven through the "
         "D pad bridge the Leanback app calls. No device or emulator run is shown, and a "
@@ -160,8 +160,9 @@ BEATS = [
 
 STATUS = (
     "PLAN ONLY. No video has been recorded yet. The beats follow what the D-pad "
-    "brings on screen in the page, probed against a local server on 2026-09-26; "
-    "seconds are intended until video/generate-narration.py measures them. This is "
+    "brings on screen in the page, probed against a local server on 2026-09-26. "
+    "Each beat's seconds are its measured hold: the length of its synthesized audio "
+    "plus a 0.65 s tail, from video/generate-narration.py. This is "
     "not the Fire TV track runtime proof: the candidate Android TV Emulator receipt "
     "is still pending; the event FAQ permits that route and does not require "
     "physical hardware."
