@@ -1921,6 +1921,9 @@
           stopLease();
           state.staged = null;
           el('heroEyebrow').textContent = 'Lease expired';
+          setReason('btnStage', 'stageReason', true,
+            'Lease expired. Stage again for a new token.',
+            'Stage the rollback again for a new lease and token');
           setReason('btnConfirm', 'confirmReason', false,
             'Lease expired, stage again for a new token.',
             'Disabled: the lease on the staged rollback expired');

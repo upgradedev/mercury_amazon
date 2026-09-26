@@ -878,7 +878,7 @@ because it shells out to `git log` for the commit fallback.
 
 ```bash
 python -m pytest tests/ -q                                    # 606 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1922 statements
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1943 statements
 node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/measure_legibility.py                          # needs the ux extra
