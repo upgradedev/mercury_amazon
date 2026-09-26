@@ -367,6 +367,8 @@
     .how .verdicts .v-c { color: var(--v-cannot); }
     .how .verdicts .v-n { color: var(--v-nothing); }
     .how .verdicts .v-i { color: var(--v-insufficient); }
+    .who-for { margin: 1rem 0 0; }
+    .who-for strong { color: var(--ink); font-weight: 600; }
 
     .rollback-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; background-color: var(--seam); padding: 3px 0; list-style: none; }
     .rollback-steps li { background-color: var(--flap); padding: 0.9rem 1.1rem; position: relative; }
@@ -799,6 +801,9 @@
               whether anything left the building.</p>
           </li>
         </ol>
+        <p class="lede who-for"><strong>Who it is for:</strong> the team that owns an on-call rota and
+          a TV in the room where incidents are worked. <strong>Who would pay:</strong> whoever owns that
+          rota. Nobody has been asked yet, so that is a hypothesis, not a finding.</p>
       </section>
 
       <!-- ---------------------------------------------------- Governed rollback -->
