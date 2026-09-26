@@ -475,14 +475,12 @@
 
     [hidden] { display: none !important; }
     /* Under 1400px, and not on the TV host, the answer keeps the change and why it was
-       named; the commit message itself is one press away in the evidence panel. The
-       connection pill moves off those screens too: the Connection section reports it. */
+       named; the commit message itself is one press away in the evidence panel, which
+       keeps a laptop's first screen inside its word budget with the column heads shown.
+       The connection pill moves off those screens too: the Connection section reports it. */
     @media (max-width: 1399.98px) {
       html:not(.tv-host) .hero-cause[data-quote-only="true"] { display: none; }
       html:not(.tv-host) .topbar .conn-bar { display: none; }
-      /* The column heads are for the room: on a laptop or a phone the answer row and
-         the departures label themselves, and the thesis line takes their place. */
-      html:not(.tv-host) .board-heads { display: none; }
     }
     /* The board is the first screen, all of it; the explanation starts below it. */
     @media (min-width: 601px) {
@@ -879,14 +877,14 @@
 
         <button class="tile" data-tv-focusable data-panel="velocity" data-tv-label="Delivery velocity panel">
           <span class="tile-eyebrow">Delivery velocity</span>
-          <span class="tile-headline" id="tileVelocityHeadline" data-empty="true">Opens and loads</span>
+          <span class="tile-headline" id="tileVelocityHeadline" data-empty="true">Not loaded yet</span>
           <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
 
         <button class="tile" data-tv-focusable data-panel="spend" data-tv-label="Cloud spend panel">
           <span class="tile-eyebrow">Cloud spend</span>
-          <span class="tile-headline" id="tileSpendHeadline" data-empty="true">Opens and loads</span>
+          <span class="tile-headline" id="tileSpendHeadline" data-empty="true">Not loaded yet</span>
           <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
@@ -1220,7 +1218,7 @@
         // sentence stays the accessible description and the hover text.
         badge = h('span', 'src-badge');
         badge.appendChild(stampFor(provenance));
-        badge.appendChild(h('span', null, 'commits: this repo'));
+        badge.appendChild(h('span', null, 'Mercury’s commits'));
       } else {
         badge = sourceBadge(provenance, 'commits');
       }
@@ -1515,10 +1513,13 @@
     function heroFromCorrelation(data) {
       var metric = data.metric;
       var factor = metric.anomaly_factor;
-      var badges = [
-        sourceBadge(data.metric_provenance, ''),
-        commitBadge(data)
-      ];
+      // The commits stamp belongs to answers the commit history took part in: a named
+      // change or a refusal about the window. Under no anomaly or no data no commit is
+      // involved, so no commit stamp is shown.
+      var usedCommits = data.verdict === 'ANOMALY_ATTRIBUTED'
+        || data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION';
+      var badges = [sourceBadge(data.metric_provenance, '')];
+      if (usedCommits) { badges.push(commitBadge(data)); }
 
       var accuracy = accuracyLine(data);
       // The short precision sits under a named commit only. Under a refusal it would
@@ -1594,16 +1595,21 @@
             + 'no change caused it.')
         });
       } else if (data.verdict === 'NO_ANOMALY') {
-        /* The one verdict that may say nothing needs reverting: the reading is inside
-           its own baseline, so there is nothing wrong to revert. */
+        /* The one verdict that may say nothing needs reverting: the reading is under the
+           anomaly threshold. It can still sit above its baseline, and the board says so
+           rather than calling an elevated reading steady. The threshold is read from the
+           server's own explanation, never written here. */
+        var threshold = /below the ([\d.]+)x threshold/.exec(data.explanation || '');
+        var under = threshold ? 'under the ' + threshold[1] + '× threshold' : 'under the anomaly threshold';
         answer({
           state: 'calm',
-          eyebrow: 'Steady, inside its own baseline',
+          eyebrow: under.charAt(0).toUpperCase() + under.slice(1),
           figure: factor + '×',
           figureLabel: readingLabel(metric),
           headline: 'Nothing to revert',
-          cause: 'Nothing changed enough to report, so nothing needs reverting on this reading. '
-            + 'Mercury offers no rollback when it can see no anomaly.',
+          cause: 'The reading is ' + factor + '× its baseline, ' + under
+            + ', so Mercury reports no anomaly, names no change and offers no rollback. '
+            + 'If it keeps rising, ask again.',
           accuracy: '',
           accuracyShort: ''
         });
@@ -1750,13 +1756,14 @@
         heroFromCorrelation(data);
         fillRow(data.service, data);
         renderIncidentDetail(data);
-        tileHeadline('tileIncidentHeadline', data.verdict.split('_').join(' ').toLowerCase());
+        tileHeadline('tileIncidentHeadline', VERDICT_WORDS[verdictKind(data)]
+          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' to ' + data.offending_commit.sha : ''));
         el('tileIncidentSub').textContent =
           data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';
 
         if (data.recommended_action) {
           setReason('btnStage', 'stageReason', true,
-            'Roll back to ' + data.recommended_action.target_commit_sha
+            'Rollback to ' + data.recommended_action.target_commit_sha
             + (state.dpadDemoApproval ? ', record-only.' : '. Needs the governance secret.'),
             'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
         } else {

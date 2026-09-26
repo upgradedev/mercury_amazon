@@ -318,7 +318,7 @@ def test_the_quoted_commit_is_described_as_this_repositorys_history_standing_in_
         assert badge["description"] == expected
         assert badge["title"] == expected
         if provenance["data_source"] == "local-git":
-            assert badge["visible"] == "STAND-IN" + "commits: this repo"
+            assert badge["visible"] == "STAND-IN" + "Mercury’s commits"
         else:
             slug = provenance["data_source"]
             repeats = slug.replace("-", " ").lower() == provenance["display_label"].lower()
