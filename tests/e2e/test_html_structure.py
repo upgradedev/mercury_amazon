@@ -107,9 +107,13 @@ def test_the_provenance_badge_sits_inside_the_hero_card(html):
     assert "el('heroSource')" in html
     # The badge renders the words, not the machine slug: "offline-fixture" is a value,
     # "OFFLINE FIXTURE" is what somebody across a room reads.
+    # The words come from stampFor, which every badge and provenance block uses since
+    # this repository's own commits got a STAND-IN stamp of their own.
     badge = html.split("function sourceBadge(", 1)[1].split("\n    }", 1)[0]
-    assert "display_label" in badge
-    assert "OFFLINE FIXTURE" in badge
+    assert "stampFor(provenance)" in badge
+    stamp = html.split("function stampFor(", 1)[1].split("\n    }", 1)[0]
+    assert "display_label" in stamp
+    assert "OFFLINE FIXTURE" in stamp
 
 
 def test_the_page_renders_the_crowded_window_refusal(html):

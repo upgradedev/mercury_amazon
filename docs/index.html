@@ -157,6 +157,12 @@
       padding-left: 0.65rem; border-left: 1px solid var(--rule);
     }
     .conn-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    /* What the board is for, in one line beside its name. */
+    .thesis {
+      flex: 1 1 auto; min-width: 0;
+      font-family: var(--display); font-weight: 500; font-size: var(--fs-lead);
+      letter-spacing: 0.03em; color: var(--ink);
+    }
     .state-pill {
       display: inline-flex; align-items: center; gap: 0.45rem;
       font-family: var(--display); font-weight: 600; font-size: var(--fs-op);
@@ -249,6 +255,9 @@
     }
     .flap-cell.settled { background-color: transparent; color: inherit; }
     .hero-accuracy { display: block; font-size: var(--fs-op); color: var(--ink-2); margin-top: 0.45rem; }
+    /* Why this change: when it landed against the onset, from the same response. */
+    .hero-evidence { display: block; font-size: var(--fs-op); color: var(--ink); margin-top: 0.45rem; line-height: 1.3; }
+    .hero-evidence:empty { display: none; }
 
     .cell-next .reason { display: block; font-size: var(--fs-op); color: var(--ink); line-height: 1.35; }
 
@@ -259,6 +268,10 @@
       overflow-wrap: break-word;
     }
     .hero-cause .quote { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
+    .hero-cause .quote-label {
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2); margin-right: 0.6em;
+    }
 
     .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: stretch; margin: 0.9rem 0 0; }
 
@@ -275,6 +288,10 @@
     .tag-ok      { color: var(--ok);  border-color: var(--ok);  background-color: var(--board); }
     .tag-warn    { color: var(--critical); border-color: var(--critical); background-color: var(--board); }
     .tag-live    { color: var(--ok);  border-color: var(--ok);  background-color: var(--board); }
+    /* Real data standing in for something else: this repository's own commits where a
+       deploy feed would be. Not green, which would read as a live deploy feed, and not
+       the hazard plate, which means generated. A dashed rule: a stand-in. */
+    .tag-standin { color: var(--ink); border-color: var(--ink-2); border-style: dashed; background-color: var(--board); }
     /* The fixture stamp: hazard stripes round a solid plate, so the lettering sits
        on one flat colour and the stripes say "not production" before it is read. */
     .tag-fixture {
@@ -448,6 +465,20 @@
     html.tv-host body { padding-bottom: 4.5rem; }
 
     [hidden] { display: none !important; }
+    /* Under 1400px, and not on the TV host, the answer keeps the change and why it was
+       named; the commit message itself is one press away in the evidence panel. The
+       connection pill moves off those screens too: the Connection section reports it. */
+    @media (max-width: 1399.98px) {
+      html:not(.tv-host) .hero-cause[data-quote-only="true"] { display: none; }
+      html:not(.tv-host) .topbar .conn-bar { display: none; }
+      /* The column heads are for the room: on a laptop or a phone the answer row and
+         the departures label themselves, and the thesis line takes their place. */
+      html:not(.tv-host) .board-heads { display: none; }
+    }
+    /* The board is the first screen, all of it; the explanation starts below it. */
+    @media (min-width: 601px) {
+      .hero { min-height: calc(100vh - 5.5rem); }
+    }
     .sr-only {
       position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -461,27 +492,35 @@
       .wordmark strong { font-size: 1.25rem; line-height: 1; }
       .wordmark .wm-text { flex-direction: column; gap: 0.15rem; }
       .wordmark .wm-text > span { padding-left: 0; border-left: 0; font-size: 0.78rem; }
+      .topbar { flex-wrap: wrap; }
+      .thesis { flex-basis: 100%; font-size: 1.2rem; line-height: 1.25; }
       :root { --fs-label: 0.78rem; --fs-small: 0.84rem; }
       .state-pill { font-size: 0.8rem; white-space: nowrap; padding: 0.2rem 0.55rem; }
       .board-metric { font-size: 0.8rem; }
       .hero-figure-label { font-size: 1rem; }
-      .hero-actions .btn-danger { flex: 1 1 calc(50% - 0.4rem); font-size: 0.92rem; }
+      .hero-actions .btn-danger { flex: 1 1 calc(50% - 0.4rem); font-size: 0.92rem; min-height: 3.25rem; }
       .board-heads { display: none; }
       .answer { padding: 0.85rem 0.9rem; }
-      .answer.board-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 0.7rem; column-gap: 0.9rem; }
+      .answer.board-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 1rem; column-gap: 0.9rem; }
       .answer .cell-verdict, .answer .cell-next { grid-column: 1 / -1; }
       .answer .cell-label { display: block; margin-bottom: 0.15rem; }
       .answer .cell-service .cell-label, .answer .cell-reading .cell-label { display: none; }
-      .answer .cell-verdict .cell-label { display: none; }
+      .answer .cell-verdict .cell-label, .answer .cell-next .cell-label { display: none; }
+      /* A phone reads the answer at arm's length: fewer, larger things, and the metric
+         slug, unreadable at this size, stays in the evidence panel. */
+      .board-metric { display: none; }
+      .answer { padding: 1.3rem 0.9rem 1.3rem; }
+      .hero-actions .btn-primary { padding-top: 0.9rem; padding-bottom: 0.9rem; }
       .board-service { font-size: 1.55rem; }
-      .hero-figure-value { font-size: 3.1rem; }
-      .hero-headline { font-size: 2rem; }
-      .hero-actions { margin-top: 0.7rem; }
+      .hero-figure-value { font-size: 3.6rem; }
+      .hero-headline { font-size: 2.2rem; }
+      .hero-actions { margin-top: 1rem; }
       .hero-actions .btn-primary { flex: 1 1 100%; }
       .hero-actions .btn-primary { justify-content: center; }
       .hero-cause { font-size: var(--fs-body); }
       .departures-head { padding: 0 0.9rem; }
-      .btn-demo { padding: 0.55rem 0.9rem; font-size: 1.15rem; }
+      .departures { margin-top: 3rem; }
+      .btn-demo { padding: 0.7rem 0.9rem; font-size: 1.15rem; }
       .btn-demo.board-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr); }
       .btn-demo .row-verdict { grid-column: 1 / -1; font-size: 0.95rem; }
       .departures .note { margin: 0.6rem 0.9rem 0; }
@@ -605,8 +644,9 @@
           <path d="M8.5 24 V8.5 L16 17 L23.5 8.5 V24" fill="none" stroke="#FFB23F" stroke-width="3.2" stroke-linejoin="miter"/>
           <rect x="2" y="15.2" width="28" height="1.6" fill="#050506"/>
         </svg>
-        <span class="wm-text"><strong>MERCURY</strong><span>Incident board</span></span>
+        <span class="wm-text"><strong>MERCURY</strong><span>Fire TV incident board</span></span>
       </div>
+      <p class="thesis" id="thesis">Names one change, or why not.</p>
       <div class="conn-bar">
         <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
@@ -647,6 +687,7 @@
               <p class="cell-label">Verdict</p>
               <p class="hero-eyebrow" id="heroEyebrow">No answer yet</p>
               <h1 class="hero-headline" id="heroHeadline">What broke?</h1>
+              <span class="hero-evidence" id="heroEvidence"></span>
               <span class="hero-accuracy" id="heroAccuracy"></span>
             </div>
             <div class="cell cell-next">
@@ -671,12 +712,12 @@
           <button id="btnStage" class="btn btn-danger" data-tv-focusable data-tv-label="Stage governed rollback" disabled
                   aria-describedby="stageReason"
                   title="Disabled until a correlation returns a rollback target">
-            Stage governed rollback
+            Stage rollback
           </button>
           <button id="btnConfirm" class="btn btn-danger" data-tv-focusable data-tv-label="Confirm rollback" disabled
                   aria-describedby="confirmReason"
                   title="Disabled until a rollback has been staged and a governance token issued">
-            Confirm rollback
+            Confirm
           </button>
         </div>
 
@@ -1098,15 +1139,25 @@
       render(targetId, card);
     }
 
+    /* The stamp for a provenance. Commits read from this repository's own git history
+       are real, and the server calls them live, but on this board they stand in for a
+       deploy feed, and a green LIVE beside them read as one. They get their own stamp. */
+    function stampFor(provenance) {
+      if (provenance && provenance.data_source === 'local-git') {
+        return h('span', 'tag tag-standin', 'STAND-IN');
+      }
+      var live = provenance && provenance.is_live === true;
+      return h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
+        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE'));
+    }
+
     function provenanceBlock(provenance) {
       var box = h('div', 'provenance');
       if (!provenance) {
         box.appendChild(h('span', 'detail', 'This response carried no provenance stamp.'));
         return box;
       }
-      var live = provenance.is_live === true;
-      box.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
-        provenance.display_label || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      box.appendChild(stampFor(provenance));
       box.appendChild(h('span', 'src', provenance.data_source || 'unknown'));
       box.appendChild(h('span', 'detail', provenance.detail || ''));
       if (provenance.observed_at_utc) {
@@ -1128,26 +1179,36 @@
        viewport height again. */
     function sourceBadge(provenance, label) {
       var wrap = h('span', 'src-badge');
-      var live = provenance && provenance.is_live === true;
-      wrap.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
-        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      wrap.appendChild(stampFor(provenance));
       // The source slug is printed unless it only repeats the stamp beside it.
       var source = provenance && provenance.data_source;
       var stamp = (provenance && provenance.display_label) || '';
       var repeats = source && source.replace(/-/g, ' ').toLowerCase() === stamp.toLowerCase();
-      wrap.appendChild(h('span', null, label + (source && !repeats ? ': ' + source : '')));
+      var caption = label + (source && !repeats ? (label ? ': ' : '') + source : '');
+      // Under the figure the stamp alone says what it qualifies; no caption needed.
+      if (caption) { wrap.appendChild(h('span', null, caption)); }
       return wrap;
     }
 
     /* Without a GitHub token the commits are Mercury's own history (local git, or the
        checked-in recording of it), and the offline spike is placed after the newest
        lone commit in it, so the board quotes one of this repository's commits against
-       checkout-api. The badge says so to assistive technology and on hover, in the
-       server's own provenance sentence; nothing is added to the board's visible words. */
+       checkout-api. The badge says so on the board, with a STAND-IN stamp in place of
+       a green LIVE, and in full to assistive technology and on hover, in the server's
+       own provenance sentence. */
     function commitBadge(data) {
       var provenance = data.commit_provenance;
-      var badge = sourceBadge(provenance, 'commits');
       var source = provenance && provenance.data_source;
+      var badge;
+      if (source === 'local-git') {
+        // Visible: the stand-in stamp and whose commits these are. The server's full
+        // sentence stays the accessible description and the hover text.
+        badge = h('span', 'src-badge');
+        badge.appendChild(stampFor(provenance));
+        badge.appendChild(h('span', null, 'commits: this repo'));
+      } else {
+        badge = sourceBadge(provenance, 'commits');
+      }
       if (source === 'local-git' || source === 'offline-fixture') {
         var said = 'Standing in for deploys of ' + data.service + ': ' + (provenance.detail || '');
         badge.setAttribute('aria-description', said);
@@ -1323,13 +1384,18 @@
       el('heroMetric').textContent = config.metricName || '';
       flapText(el('heroHeadline'), config.headline, config.flap === true);
 
+      el('heroEvidence').textContent = config.evidence || '';
+
       var cause = el('heroCause');
       clear(cause);
       if (config.quote) {
+        // Labelled, so the message reads as data about the change, not an instruction.
+        cause.appendChild(h('span', 'quote-label', 'Commit message'));
         cause.appendChild(h('span', 'quote', '“' + config.quote + '”'));
         cause.appendChild(document.createTextNode(' '));
       }
       cause.appendChild(document.createTextNode(config.cause));
+      cause.setAttribute('data-quote-only', config.quote && !config.cause ? 'true' : 'false');
 
       /* Provenance renders inside the hero card, beside the figure, so it is on the
          same screenful as the number it qualifies. The hero footer it used to live in
@@ -1398,11 +1464,36 @@
       el(reasonId).textContent = reason;
     }
 
+    /* The reading against its baseline. "baseline 2.95 to 38.06" read as a baseline
+       range with the headline figure inside it. */
+    function readingLabel(metric) {
+      return metric.current + ' vs ' + metric.baseline + ' baseline';
+    }
+
+    /* Why this change was named: when it landed against the onset, and how many
+       changes the window held. Both from the response; the minutes are the difference
+       between the two timestamps it carries, never a number written here. */
+    function landedLine(data) {
+      var commit = data.offending_commit;
+      var attribution = data.attribution || {};
+      var landed = Date.parse(commit && commit.committed_at);
+      var onset = Date.parse(attribution.onset_at);
+      if (!(landed <= onset)) { return ''; }
+      var minutes = Math.round((onset - landed) / 60000);
+      // Board language, terse: which change, and when against the spike.
+      var when = minutes < 1 ? 'under 1 min before spike' : minutes + ' min before spike';
+      if (attribution.commits_in_window === 1) { return 'Only change, ' + when; }
+      if (attribution.commits_in_window > 1) {
+        return 'Closest of ' + attribution.commits_in_window + ' changes, ' + when;
+      }
+      return 'Landed ' + when;
+    }
+
     function heroFromCorrelation(data) {
       var metric = data.metric;
       var factor = metric.anomaly_factor;
       var badges = [
-        sourceBadge(data.metric_provenance, 'metric'),
+        sourceBadge(data.metric_provenance, ''),
         commitBadge(data)
       ];
 
@@ -1436,8 +1527,9 @@
           state: 'alarm',
           eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Attributed',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          figureLabel: readingLabel(metric),
           headline: 'Commit ' + data.offending_commit.sha,
+          evidence: landedLine(data),
           quote: data.offending_commit.message,
           // The author and the timestamp are in the evidence panel; the board keeps
           // the change itself.
@@ -1456,7 +1548,7 @@
           state: 'alarm',
           eyebrow: 'Incident, too many changes to name one',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          figureLabel: readingLabel(metric),
           headline: 'Cannot attribute this: ' + data.attribution.commits_in_window + ' changes landed',
           cause: refusalStatement(data,
             'Mercury names a change only when exactly one landed inside the attribution window. '
@@ -1471,7 +1563,7 @@
           state: 'alarm',
           eyebrow: 'Incident, cannot attribute: window empty',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          figureLabel: readingLabel(metric),
           headline: 'Cannot attribute this: no change in the window',
           cause: refusalStatement(data,
             'No change landed inside the attribution window before the onset, so Mercury cannot attribute '
@@ -1485,7 +1577,7 @@
           state: 'calm',
           eyebrow: 'Steady, inside its own baseline',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
+          figureLabel: readingLabel(metric),
           headline: 'Nothing to revert',
           cause: 'Nothing changed enough to report, so nothing needs reverting on this reading. '
             + 'Mercury offers no rollback when it can see no anomaly.',

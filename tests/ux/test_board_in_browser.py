@@ -292,9 +292,11 @@ def test_the_quoted_commit_is_described_as_this_repositorys_history_standing_in_
 
     The page has to say where that commit came from: the commits badge carries the
     server's own provenance sentence as its accessible description, prefixed with
-    what the commit stands in for, and the evidence note says it in one line. The
-    badge's visible text stays the stamp and the source slug, so the board's word
-    count does not move.
+    what the commit stands in for, and the evidence note says it in one line.
+
+    The visible text changed. It was a green LIVE stamp and the slug local-git, and on
+    a television, which has no hover, that read as a live deploy feed. Commits from
+    this repository's own history now show a STAND-IN stamp and say whose they are.
     """
     request = urllib.request.Request(
         base_url + "/mcp/tools/what_changed", data=b'{"service": "checkout-api"}',
@@ -315,7 +317,12 @@ def test_the_quoted_commit_is_described_as_this_repositorys_history_standing_in_
         expected = "Standing in for deploys of checkout-api: " + provenance["detail"]
         assert badge["description"] == expected
         assert badge["title"] == expected
-        assert badge["visible"] == provenance["display_label"] + "commits: " + provenance["data_source"]
+        if provenance["data_source"] == "local-git":
+            assert badge["visible"] == "STAND-IN" + "commits: this repo"
+        else:
+            slug = provenance["data_source"]
+            repeats = slug.replace("-", " ").lower() == provenance["display_label"].lower()
+            assert badge["visible"] == provenance["display_label"] + "commits" + ("" if repeats else ": " + slug)
         assert badge["note"] == ("Without a GitHub token, the commit named under a spike is the newest "
                                  "lone commit in Mercury's own git history, standing in for a deploy.")
         assert errors == [], errors

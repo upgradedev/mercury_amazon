@@ -744,12 +744,12 @@ as a separate artifact.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 234 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 237 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 234
+#   readings under the floor: 0 of 237
 #   smallest operational text (reasons, provenance, pills): 25.9px over 21 readings
 #   anomaly factor renders at y=189, provenance stamp at y=337, fold at y=1080
-#   provenance stamps within the first viewport: 2 ['LIVE', 'OFFLINE FIXTURE']
+#   provenance stamps within the first viewport: 2 ['OFFLINE FIXTURE', 'STAND-IN']
 ```
 
 That script starts the server, opens the page in Chromium at 1920x1080, drives it
