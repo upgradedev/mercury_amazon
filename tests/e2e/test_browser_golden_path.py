@@ -101,7 +101,7 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
             page.keyboard.press("ArrowRight")
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnConfirm"
             page.keyboard.press("Enter")
-            page.wait_for_function("document.querySelector('#heroEyebrow').textContent.includes('recorded_only')")
+            page.wait_for_function("document.querySelector('#heroEyebrow').textContent.includes('recorded, not sent')")
             assert "No deployment pipeline was contacted" in page.locator("#incidentOutput").inner_text()
 
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnHandoff"

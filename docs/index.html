@@ -199,7 +199,7 @@
     .hero[data-verdict="insufficient"] .answer { border-top-color: var(--v-insufficient); }
     .hero[data-verdict="staged"]       .answer,
     .hero[data-verdict="asking"]       .answer { border-top-color: var(--amber); }
-    .hero[data-verdict="recorded"]     .answer { border-top-color: var(--v-nothing); }
+    .hero[data-verdict="recorded"]     .answer { border-top-color: var(--amber); }
 
     .answer .cell { min-width: 0; }
     .answer .cell-label { display: none; }
@@ -216,6 +216,8 @@
       font-size: var(--fs-figure); color: var(--amber);
       font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
     }
+    /* A word in the figure slot (RECORDED, SENT) steps down so it fits its column. */
+    .hero-figure-value[data-long="true"] { font-size: calc(var(--fs-figure) * 0.58); line-height: 1; }
     .hero-figure-label {
       font-family: var(--display); font-weight: 500; font-size: var(--fs-lead);
       color: var(--ink-2); margin-top: 0.25rem; letter-spacing: 0.04em;
@@ -230,8 +232,8 @@
     }
     .hero[data-verdict="attributed"]   .hero-eyebrow { color: var(--v-attributed); }
     .hero[data-verdict="cannot"]       .hero-eyebrow { color: var(--v-cannot); }
-    .hero[data-verdict="nothing"]      .hero-eyebrow,
-    .hero[data-verdict="recorded"]     .hero-eyebrow { color: var(--v-nothing); }
+    .hero[data-verdict="nothing"]      .hero-eyebrow { color: var(--v-nothing); }
+    .hero[data-verdict="recorded"]     .hero-eyebrow { color: var(--amber); }
     .hero[data-verdict="insufficient"] .hero-eyebrow { color: var(--v-insufficient); }
     .hero[data-verdict="staged"]       .hero-eyebrow,
     .hero[data-verdict="asking"]       .hero-eyebrow { color: var(--amber); }
@@ -244,8 +246,8 @@
     }
     .hero[data-verdict="attributed"]   .hero-headline { color: var(--v-attributed); }
     .hero[data-verdict="cannot"]       .hero-headline { color: var(--v-cannot); }
-    .hero[data-verdict="nothing"]      .hero-headline,
-    .hero[data-verdict="recorded"]     .hero-headline { color: var(--v-nothing); }
+    .hero[data-verdict="nothing"]      .hero-headline { color: var(--v-nothing); }
+    .hero[data-verdict="recorded"]     .hero-headline { color: var(--ink); }
     .hero[data-verdict="insufficient"] .hero-headline { color: var(--v-insufficient); }
     .flap-word { white-space: nowrap; }
     .hero-headline[data-long="true"] { font-size: calc(var(--fs-head) * 0.74); }
@@ -1371,8 +1373,16 @@
       }, FLAP_TICK_MS);
     }
 
+    /* The staged lease, counted down on the board from the server's own figure. The
+       tick writes only the figure; nothing on the hero is a live region, so it is
+       never read out once a second. */
+    var leaseTimer = null;
+    function stopLease() { if (leaseTimer) { clearInterval(leaseTimer); leaseTimer = null; } }
+
     function setHero(config) {
       var hero = el('hero');
+      stopLease();
+      el('heroFigure').setAttribute('data-long', String(config.figure).length > 6 ? 'true' : 'false');
       // A long verdict line steps down a size so the board keeps its shape.
       el('heroHeadline').setAttribute('data-long', config.headline.length > 24 ? 'true' : 'false');
       hero.setAttribute('data-state', config.state);
@@ -1805,10 +1815,10 @@
         return;
       }
 
-      showLoading('incidentOutput', 'Calling POST /mcp/tools/stage_rollback ...');
+      var stagePath = state.dpadDemoApproval ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback';
+      showLoading('incidentOutput', 'Calling POST ' + stagePath + ' ...');
       try {
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback', {
+        var res = await post(stagePath, {
           action_id: (state.dpadDemoApproval ? 'tv-demo-' : 'tv-') + Date.now(),
           target_service: rec.target_service,
           target_commit_sha: rec.target_commit_sha,
@@ -1828,7 +1838,7 @@
           service: res.body.target_service,
           eyebrow: 'Rollback staged',
           figure: Math.round(res.body.lease_seconds_remaining) + 's',
-          figureLabel: 'lease remaining',
+          figureLabel: 'lease left to confirm',
           headline: 'Roll back to ' + res.body.target_commit_sha,
           cause: res.body.confirmation_prompt,
           badges: []
@@ -1838,7 +1848,11 @@
           + ', lease ' + Math.round(res.body.lease_seconds_remaining) + ' s.';
         el('rbStageStep').setAttribute('data-done', 'true');
         el('heroLatency').textContent =
-          'POST /mcp/tools/stage_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+          'POST ' + stagePath + ' answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+        startLease(res.body.lease_seconds_remaining);
+        setReason('btnStage', 'stageReason', true,
+          'Staged. Next: confirm' + (state.dpadDemoApproval ? ', record-only.' : '.'),
+          'Stage again to replace the staged rollback with a new lease');
         setReason('btnConfirm', 'confirmReason', true,
           'Token issued for action ' + res.body.action_id + '. It is valid once, for this exact change.',
           'Confirm rollback ' + res.body.action_id + ' with its single-use token');
@@ -1865,6 +1879,26 @@
       }
     }
 
+    /* Count the lease down from the seconds the server said were left, on this page's
+       monotonic clock. At zero Confirm goes off with the reason; the server would
+       refuse the token by then anyway. */
+    function startLease(secondsLeft) {
+      stopLease();
+      var endsAt = performance.now() + Number(secondsLeft) * 1000;
+      leaseTimer = setInterval(function () {
+        var left = Math.max(0, Math.ceil((endsAt - performance.now()) / 1000));
+        el('heroFigure').textContent = left + 's';
+        if (left === 0) {
+          stopLease();
+          state.staged = null;
+          el('heroEyebrow').textContent = 'Lease expired';
+          setReason('btnConfirm', 'confirmReason', false,
+            'Lease expired, stage again for a new token.',
+            'Disabled: the lease on the staged rollback expired');
+        }
+      }, 1000);
+    }
+
     async function confirmRollback() {
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.staged) {
@@ -1872,35 +1906,45 @@
         showPanel('incident');
         return;
       }
-      showLoading('incidentOutput', 'Calling POST /mcp/tools/confirm_rollback ...');
+      var confirmPath = state.dpadDemoApproval ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback';
+      showLoading('incidentOutput', 'Calling POST ' + confirmPath + ' ...');
       try {
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback', {
+        var res = await post(confirmPath, {
           action_id: state.staged.action_id,
           governance_token: state.staged.governance_token
         }, 'incidentLatency', secret);
 
+        var sent = res.body.status === 'DISPATCH_ACCEPTED';
         setHero({
           state: 'calm',
           verdict: 'recorded',
           flap: true,
           service: res.body.target_service,
-          eyebrow: 'Rollback ' + res.body.status.toLowerCase(),
-          figure: res.body.status === 'DISPATCH_ACCEPTED' ? 'SENT' : 'DRY',
-          figureLabel: 'governance result',
-          headline: res.body.status === 'DISPATCH_ACCEPTED'
+          eyebrow: sent ? 'Rollback sent' : 'Rollback recorded, not sent',
+          figure: sent ? 'SENT' : 'RECORDED',
+          // Read from the response: external_effect NONE is the server saying nothing
+          // outside it was contacted.
+          figureLabel: res.body.external_effect === 'NONE' ? 'no pipeline contacted' : 'handed to the pipeline',
+          headline: sent
             ? 'Dispatch accepted for ' + res.body.target_commit_sha
             : 'Decision recorded for ' + res.body.target_commit_sha,
-          cause: res.body.output,
+          // The server's own sentences, less the configuration instructions, which
+          // are for whoever runs the server and stay in the evidence panel.
+          cause: boardSentences(res.body.output),
           badges: []
         });
+        el('rbStageState').textContent = 'Staged, then confirmed: action ' + res.body.action_id + ', '
+          + res.body.target_service + ' to ' + res.body.target_commit_sha + '. The token is spent.';
+        setReason('btnStage', 'stageReason', false,
+          sent ? 'Sent. Next: publish the handoff.' : 'Recorded. Next: publish the handoff.',
+          'Disabled: this rollback is already confirmed. Ask what changed to start again');
         el('rbResultHead').textContent = res.body.status === 'DISPATCH_ACCEPTED'
           ? 'Dispatch accepted' : 'Recorded only';
-        el('rbResultState').textContent = res.body.status + ': ' + res.body.output;
+        el('rbResultState').textContent = boardSentences(res.body.output);
         el('rbResultStep').setAttribute('data-done', 'true');
         el('rbConfirmStep').setAttribute('data-done', 'true');
         el('heroLatency').textContent =
-          'POST /mcp/tools/confirm_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+          'POST ' + confirmPath + ' answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
         setReason('btnConfirm', 'confirmReason', false,
           'That token has been spent. Confirming again is refused by name. Stage again for a new one.',
           'Disabled until a rollback has been staged and a governance token issued');
@@ -1925,6 +1969,16 @@
         showError('incidentOutput', error.message);
         showPanel('incident');
       }
+    }
+
+    /* Sentences of a server message that are for the room, not for the operator who
+       configures the server: any sentence naming an environment variable is dropped
+       from the board. The whole message is in the incident panel. */
+    function boardSentences(text) {
+      return (String(text || '').match(/[^.]+(?:\.|$)/g) || [])
+        .map(function (sentence) { return sentence.trim(); })
+        .filter(function (sentence) { return sentence && !/MERCURY_[A-Z_]+/.test(sentence); })
+        .join(' ');
     }
 
     function handoffIncidentId() { return state.service + '-active'; }
