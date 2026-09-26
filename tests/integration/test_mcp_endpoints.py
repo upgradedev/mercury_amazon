@@ -46,6 +46,39 @@ def test_cockpit_script_route_refuses_path_traversal(client):
     assert res.status_code in (404, 400)
 
 
+def _committed_fonts():
+    from src.interfaces.mcp_server import WEB_DIR
+
+    return sorted(WEB_DIR.glob("*.woff2"))
+
+
+def test_the_board_fonts_are_served_from_this_origin_as_woff2(client):
+    """The page names its fonts relatively, so this server has to hand them out."""
+    fonts = _committed_fonts()
+    assert len(fonts) == 6
+    for font in fonts:
+        res = client.get(f"/{font.name}")
+        assert res.status_code == 200, font.name
+        assert res.headers["content-type"] == "font/woff2"
+        assert res.content == font.read_bytes()
+        assert res.content[:4] == b"wOF2"
+        # No explicit max-age: a TV revalidates against the validator instead.
+        assert res.headers.get("etag") and res.headers.get("last-modified")
+
+
+def test_the_font_route_refuses_anything_that_is_not_a_committed_font(client):
+    for probe in [
+        "/..%2f..%2fREADME.woff2",
+        "/%2e%2e%2fdocs%2fbarlow-latin-400.woff2",
+        "/..%5cREADME.woff2",
+        "/fonts/barlow-latin-400.woff2",
+        "/not-a-font.woff2",
+        "/OFL-Barlow.txt",
+        "/FIRE_TV_BUILD.md",
+    ]:
+        assert client.get(probe).status_code == 404, probe
+
+
 def test_dora_endpoint_returns_metrics_and_provenance(client):
     res = client.post("/mcp/tools/get_dora_velocity_report")
     assert res.status_code == 200

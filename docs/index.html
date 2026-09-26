@@ -7,11 +7,37 @@
   <meta name="description" content="An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0B0C0E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="preload" href="barlow-condensed-latin-700.woff2" as="font" type="font/woff2" crossorigin>
   <style>
+    /* ------------------------------------------------------------------ Fonts
+       Served from this page's own origin, never from a font CDN: a Fire TV on an
+       on-call room network may never reach one, and the board must read the same
+       there. Latin subset only, and only the faces this page renders (measured
+       with document.fonts after driving every row and panel). SIL Open Font
+       License 1.1; the licences sit beside the files as OFL-*.txt. JetBrains Mono
+       is one variable file, so its two weights share it. */
+    @font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url(barlow-latin-400.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(barlow-latin-600.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 500; font-display: swap;
+      src: url(barlow-condensed-latin-500.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(barlow-condensed-latin-600.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 700; font-display: swap;
+      src: url(barlow-condensed-latin-700.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url(jetbrains-mono-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(jetbrains-mono-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
     /* ------------------------------------------------------------------ Theme
        The incident departures board. One theme, dark, on purpose: this page's
        first home is a television on the wall of a room with the lights down, read

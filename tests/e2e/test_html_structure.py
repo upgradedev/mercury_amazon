@@ -399,13 +399,100 @@ def test_every_disabled_control_states_its_reason_in_visible_text(html):
     assert "Confirming is off until" in html
 
 
+SHIPPED_PAGE_FILES = ("index.html", "firetv_nav.js", "webmcp_bridge.js", "manifest.json")
+
+# Every way a page, a script or a manifest can make the browser load something:
+# attributes that fetch, CSS url() and @import, manifest members, and script calls.
+_LOADING_TARGETS = [
+    re.compile(r"""\b(?:href|src|srcset|poster|action|formaction|data)\s*=\s*["']?\s*([^"'\s>]+)""", re.I),
+    re.compile(r"""url\(\s*["']?([^"')\s]+)""", re.I),
+    re.compile(r"""@import\s+(?:url\()?\s*["']([^"']+)""", re.I),
+    re.compile(r"""["'](?:src|href|start_url|scope|action)["']\s*:\s*["']([^"']+)""", re.I),
+]
+_SCRIPT_REQUEST_TO_A_HOST = re.compile(
+    r"""\b(?:fetch|importScripts|EventSource|WebSocket|sendBeacon|open)\s*\([^)]*?["'`](?:[a-z]+:)?//""", re.I)
+_ANOTHER_ORIGIN = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)?//", re.I)
+
+
+def _external_references(text: str) -> list[str]:
+    found = [
+        match.group(0).strip()
+        for pattern in _LOADING_TARGETS
+        for match in pattern.finditer(text)
+        if _ANOTHER_ORIGIN.match(match.group(1))
+    ]
+    found.extend(match.group(0) for match in _SCRIPT_REQUEST_TO_A_HOST.finditer(text))
+    return found
+
+
+def test_the_page_loads_nothing_from_another_origin():
+    """Fire TV hardware may never reach a font CDN, or any other host.
+
+    This replaces a test that checked only the fallback stack, and only when the page
+    linked fonts.googleapis.com, so it passed whether or not the fonts could load. The
+    page, both scripts and the manifest ship together from one origin; none of them may
+    name another one anywhere the browser would fetch it. The API base the page calls is
+    its own origin, read at runtime, and the example in the Setup field is a placeholder
+    attribute, which is text, not a load.
+    """
+    for name in SHIPPED_PAGE_FILES:
+        text = (DOCS / name).read_text(encoding="utf-8")
+        assert _external_references(text) == [], (
+            f"{name} loads from another origin: {_external_references(text)}"
+        )
+        for host in ("fonts.googleapis.com", "fonts.gstatic.com", "cdn.", "unpkg.com", "cdnjs"):
+            assert host not in text, f"{name} names {host}"
+
+
+def test_the_matcher_above_catches_what_it_is_for():
+    """A forbid-list that matches nothing passes by not looking."""
+    caught = [
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow">',
+        '<link rel="preconnect" href="//fonts.gstatic.com" crossorigin>',
+        "<script src='https://cdn.example/x.js'></script>",
+        "@font-face { src: url(https://fonts.gstatic.com/s/a.woff2) format('woff2'); }",
+        '@import url("https://example.com/a.css");',
+        "fetch('https://api.example.com/x')",
+        '{"src": "https://example.com/icon.png"}',
+    ]
+    for sample in caught:
+        assert _external_references(sample), f"the matcher let through: {sample}"
+    allowed = [
+        '<input placeholder="http://127.0.0.1:8002">',
+        "src: url(barlow-latin-400.woff2) format('woff2');",
+        '<script src="firetv_nav.js"></script>',
+        "fetch(url, options || {})",
+    ]
+    for sample in allowed:
+        assert not _external_references(sample), f"the matcher refused a local reference: {sample}"
+
+
+def test_every_web_font_is_committed_beside_the_page_and_swaps_in(html):
+    """Each @font-face names a file that ships next to the page, with its licence."""
+    style = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    faces = re.findall(r"@font-face\s*\{(.+?)\}", style, re.DOTALL)
+    assert len(faces) >= 3, "the page no longer declares its own font faces"
+    families = set()
+    for face in faces:
+        assert "font-display: swap" in face, f"a face blocks text while it loads: {face[:80]}"
+        family = re.search(r"font-family:\s*'([^']+)'", face).group(1)
+        families.add(family)
+        for source in re.findall(r"url\(\s*([^)\s]+)\s*\)", face):
+            assert "/" not in source and source.endswith(".woff2"), f"{source} is not a sibling woff2"
+            assert (DOCS / source).is_file(), f"{source} is named by the page but not committed"
+    assert families == {"Barlow", "Barlow Condensed", "JetBrains Mono"}
+    for licence in ("OFL-Barlow.txt", "OFL-BarlowCondensed.txt", "OFL-JetBrainsMono.txt"):
+        text = (DOCS / licence).read_text(encoding="utf-8")
+        assert "SIL Open Font License, Version 1.1" in text, f"{licence} is not the OFL"
+
+
 def test_a_web_font_has_a_real_fallback_stack(html):
-    """Fire TV hardware may never reach fonts.googleapis.com."""
-    if "fonts.googleapis.com" not in html:
-        return
+    """The faces are local now, but a first paint with font-display: swap uses these."""
     families = re.search(r"--sans:\s*([^;]+);", html)
     assert families, "no --sans stack is declared"
-    assert families.group(1).count(",") >= 3, "the display font needs real fallbacks behind it"
+    assert families.group(1).count(",") >= 3, "the body font needs real fallbacks behind it"
+    display = re.search(r"--display:\s*([^;]+);", html)
+    assert display and display.group(1).count(",") >= 3, "the display font needs real fallbacks behind it"
     mono = re.search(r"--mono:\s*([^;]+);", html)
     assert mono and "monospace" in mono.group(1)
 

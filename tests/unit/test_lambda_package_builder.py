@@ -15,6 +15,11 @@ def test_lambda_package_manifest_includes_golden_path_evidence(tmp_path):
     assert "correlation_trial_summary.json" in required
     assert "src/infrastructure/fixtures/commit_stream_fixture.json" in required
     assert "docs/index.html" in required
+    # The page's self-hosted fonts and their licences ship with it: the Fire TV app
+    # loads the page from this Lambda and may never reach a font CDN.
+    for font in sorted((REPO_ROOT / "docs").glob("*.woff2")):
+        assert f"docs/{font.name}" in required, f"{font.name} would not ship in the Lambda zip"
+    assert {"docs/OFL-Barlow.txt", "docs/OFL-BarlowCondensed.txt", "docs/OFL-JetBrainsMono.txt"} <= required
     assert all((REPO_ROOT / path).is_file() for path in required)
     assert all("==" in requirement for requirement in RUNTIME_REQUIREMENTS)
 

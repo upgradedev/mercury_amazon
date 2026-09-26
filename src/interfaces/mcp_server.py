@@ -65,6 +65,7 @@ COCKPIT_ASSET_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
     ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
 }
 
 app = FastAPI(
@@ -774,9 +775,8 @@ async def serve_cockpit():
 async def serve_cockpit_asset(asset_name: str):
     """Serve the cockpit's sibling assets at the paths the page requests them from.
 
-    The page is written once and served from both GitHub Pages and this server, so
-    it links its script, manifest and service worker relatively. This route makes
-    those relative links resolve here too.
+    The page is written once and served from both GitHub Pages and this server, so it
+    links its scripts, manifest and self-hosted fonts relatively; this resolves them here.
 
     Only the extensions in :data:`COCKPIT_ASSET_TYPES` are served, and only files
     that resolve to a direct child of ``docs/``, so this cannot be walked out of

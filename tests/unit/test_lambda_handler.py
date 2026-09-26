@@ -48,3 +48,19 @@ def test_health_runs_through_lambda_bridge_and_exposes_revision(monkeypatch):
 def test_unknown_path_is_a_404_response():
     assert handler(event("GET", "/not-a-route"))["statusCode"] == 404
 
+
+
+def test_a_board_font_crosses_the_lambda_bridge_as_exact_binary():
+    """The Fire TV app loads the page from the Function URL, so its fonts come through here.
+
+    A woff2 is not text: the bridge must base64 it and flag it, or the Function URL
+    hands the WebView a mangled font and the board silently falls back.
+    """
+    import base64
+
+    font = ROOT / "docs" / "barlow-condensed-latin-700.woff2"
+    response = handler(event("GET", "/" + font.name))
+    assert response["statusCode"] == 200
+    assert response["headers"]["content-type"] == "font/woff2"
+    assert response["isBase64Encoded"] is True
+    assert base64.b64decode(response["body"]) == font.read_bytes()
