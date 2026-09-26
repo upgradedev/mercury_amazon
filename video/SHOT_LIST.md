@@ -1,8 +1,8 @@
 # Mercury demo video: shot list
 
 **Status: RENDERED LOCALLY, NOT UPLOADED.** One take of this plan was recorded on
-2026-09-26 from a local run of commit `924a58c`; `video/README.md` says how and where
-it lives. The beat order below was probed the same day by driving the page with the
+2026-09-26 from a local run of this repository; `video/README.md` names the commit and
+says how and where the render lives. The beat order below was probed the same day by driving the page with the
 D-pad bridge against a local server and reading what each press brings on screen. Beat lengths are set by the
 narration, not by this file: `video/generate-narration.py` measures each beat's
 synthesized audio and the capture holds every beat for exactly that length.

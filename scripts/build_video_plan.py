@@ -59,12 +59,12 @@ BEATS = [
         "attribute, Cannot attribute and Insufficient data, each from the server's answer.",
     ),
     (
-        "beat_03_crowded_refusal", 16.718,
-        "Down walks the rows. Release train has a real spike, but several changes landed "
-        "in the hour before it, and no metric says which one did it. Mercury cannot "
+        "beat_03_crowded_refusal", 18.019,
+        "Down walks the rows. Release train shows a spike well above its baseline, but "
+        "several changes landed in the hour before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
-        "Down walks the rows. release-train has a real spike, but several changes landed "
-        "in the hour before it, and no metric says which one did it. Mercury cannot "
+        "Down walks the rows. release-train shows a spike well above its baseline, but "
+        "several changes landed in the hour before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
         "D-pad Down four times to release-train, then Center. The verdict reads Cannot "
         "attribute this with the number of changes that landed, Next reads No rollback "
@@ -134,10 +134,10 @@ BEATS = [
         "changes from Exit to the Fire TV launcher to Back to the wall.",
     ),
     (
-        "beat_10_fixtures", 16.811,
+        "beat_10_fixtures", 16.95,
         "Down brings the answer into view: a recording, because no GitHub token is set. "
         "Back returns to the wall, not out of the app. Cloud spend is a fixture too, "
-        "marked synthetic, because this run has no AWS credentials.",
+        "marked synthetic, because this run is in offline mode.",
         None,
         "D-pad Down reveals the DORA answer with its OFFLINE FIXTURE stamp. Back returns "
         "to the wall and the legend changes back. Right to Cloud spend, Center, Down: "
@@ -160,7 +160,7 @@ BEATS = [
 
 STATUS = (
     "RENDERED LOCALLY, NOT UPLOADED. One take was recorded on 2026-09-26 from a local "
-    "run of commit 924a58c in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, "
+    "run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, "
     "driven through the D-pad bridge the Leanback app calls. Each beat's seconds are "
     "its measured hold: the length of its synthesized audio plus a 0.65 s tail, from "
     "video/generate-narration.py. The media lives outside the repository; "
