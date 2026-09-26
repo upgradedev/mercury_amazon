@@ -520,6 +520,68 @@
       .reason, .cell-next .reason { font-size: 1.12rem; }
       .setup-row input { min-width: 9rem; }
       body { padding-bottom: 4.2rem; }
+      /* The answer's why sits under the verdict it explains, beside the reading, not
+         in a full-width band under all four cells. As a band, a refusal's longer
+         sentence pushed the last departures behind the key bar; here every row stays
+         on the first screen in all four verdicts (tests/ux/test_board_in_browser.py). */
+      .board-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.3fr); }
+      .answer.board-grid { grid-template-rows: auto 1fr; }
+      .answer .cell-service   { grid-column: 1; grid-row: 1 / span 2; }
+      .answer .cell-reading   { grid-column: 2; grid-row: 1 / span 2; }
+      .answer .cell-verdict   { grid-column: 3; grid-row: 1; }
+      .answer .cell-next      { grid-column: 4; grid-row: 1; }
+      .hero-cause {
+        grid-column: 3 / -1; grid-row: 2; align-self: start;
+        font-size: var(--fs-op); line-height: 1.33;
+        margin-top: 0.55rem; padding: 0; border-top: 0;
+      }
+      .hero-cause .quote { font-size: 1em; }
+      .hero-actions { margin-top: 0.7rem; }
+      .departures { margin-top: 0.75rem; }
+      .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
+      .answer { padding-bottom: 0.8rem; }
+    }
+    /* The Fire TV app's WebView. A 1080p Fire TV reports a 960x540 CSS viewport
+       (two device pixels per CSS pixel), which the 1400px query above never sees,
+       so inside the host the same 10-foot board is drawn at 1.25vw to the rem: at
+       960 wide that is exactly the 1920 layout at half the CSS size, the same
+       physical size on the panel. Keep these rules in step with the block above;
+       tests/ux/test_board_in_browser.py measures both. */
+    @media (min-width: 900px) and (max-width: 1399.98px) {
+      html.tv-host {
+        font-size: 1.25vw;
+        --fs-label: 1rem;
+        --fs-small: 1rem;
+        --fs-op:    1.08rem;
+        --fs-body:  1.08rem;
+        --fs-lead:  1.15rem;
+        --fs-row:   1.3rem;
+        --fs-h2:    1.6rem;
+        --fs-head:  2.6rem;
+        --fs-figure:4.2rem;
+      }
+      .tv-host .shell { padding: 2.4vh 4.5vw 1.5rem; }
+      .tv-host .keybar { padding: 0.45rem 4.5vw; }
+      .tv-host .wordmark .wm-text > span { font-size: 1rem; }
+      .tv-host .board-service { font-size: 1.8rem; }
+      .tv-host .reason, .tv-host .cell-next .reason { font-size: 1.12rem; }
+      .tv-host .setup-row input { min-width: 9rem; }
+      .tv-host .board-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.3fr); }
+      .tv-host .answer.board-grid { grid-template-rows: auto 1fr; }
+      .tv-host .answer .cell-service   { grid-column: 1; grid-row: 1 / span 2; }
+      .tv-host .answer .cell-reading   { grid-column: 2; grid-row: 1 / span 2; }
+      .tv-host .answer .cell-verdict   { grid-column: 3; grid-row: 1; }
+      .tv-host .answer .cell-next      { grid-column: 4; grid-row: 1; }
+      .tv-host .hero-cause {
+        grid-column: 3 / -1; grid-row: 2; align-self: start;
+        font-size: var(--fs-op); line-height: 1.33;
+        margin-top: 0.55rem; padding: 0; border-top: 0;
+      }
+      .tv-host .hero-cause .quote { font-size: 1em; }
+      .tv-host .hero-actions { margin-top: 0.7rem; }
+      .tv-host .departures { margin-top: 0.75rem; }
+      .tv-host .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
+      .tv-host .answer { padding-bottom: 0.8rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {

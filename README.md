@@ -40,7 +40,7 @@ every attribution carries its own measured precision.
 git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
-python -m pytest tests/ -q  # 594 passed
+python -m pytest tests/ -q  # 596 passed
 python -m src.interfaces.mcp_server
 ```
 
@@ -65,7 +65,7 @@ rather than for a fast one. On PowerShell, set the secret with
 would rather choose it yourself. Full detail in [Quickstart](#quickstart).
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-594%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-596%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -621,7 +621,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-594 tests and a re-measure on an idle machine is pending**.
+596 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -662,7 +662,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 594 passed
+# 596 passed
 ```
 
 ### 3. Start the server
@@ -873,7 +873,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 594 passed
+python -m pytest tests/ -q                                    # 596 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1922 statements
 node tests/e2e/spatial_nav_spec.js                            # 17/17 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

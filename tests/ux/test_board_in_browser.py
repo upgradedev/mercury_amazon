@@ -10,6 +10,8 @@ claims they checked stay checked:
   and draws no letter cells at all under prefers-reduced-motion;
 * the D-pad cursor starts on the primary action and the remote reaches every
   visible control through window.navigateDpad, the entry point the app calls;
+* in every verdict, every board row stays above the remote's key bar, both at
+  1920x1080 and in the Fire TV WebView's 960x540 CSS viewport.
 
 It lives in ``tests/ux`` for the reason ``test_ten_foot_legibility.py`` gives:
 readiness gate C5 looks for a user-journey browser test under ``tests/e2e``, and
@@ -318,3 +320,100 @@ def test_focus_starts_on_the_primary_and_the_remote_reaches_every_visible_contro
     finally:
         context.close()
 
+
+# ------------------------------------------------------- Every verdict, every row
+
+EXPECTED_VERDICTS = {
+    "checkout-api": "attributed",
+    "payments-worker": "nothing",
+    "search-indexer": "cannot",
+    "release-train": "cannot",
+    "quiet-service": "insufficient",
+}
+
+BOARD_GEOMETRY = """() => {
+  const bar = document.querySelector('.keybar');
+  const shown = getComputedStyle(bar).display !== 'none';
+  const floor = shown ? bar.getBoundingClientRect().top : innerHeight;
+  const box = el => { const r = el.getBoundingClientRect();
+                      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+  let smallest = Infinity;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const text = walker.currentNode;
+    if (!text.textContent.trim()) continue;
+    const style = getComputedStyle(text.parentElement);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    const range = document.createRange(); range.selectNodeContents(text);
+    const r = range.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || r.top >= innerHeight || r.bottom <= 0) continue;
+    smallest = Math.min(smallest, parseFloat(style.fontSize));
+  }
+  return {
+    verdict: document.querySelector('#hero').dataset.verdict,
+    scrollY: window.scrollY, keybarShown: shown, keybarTop: floor,
+    rows: [...document.querySelectorAll('.btn-demo')].map(row => [row.dataset.service, box(row)]),
+    primary: box(document.querySelector('[data-testid="primary-hero-action"]')),
+    stamp: box(document.querySelector('#heroSource .tag-fixture')),
+    stampText: document.querySelector('#heroSource .tag-fixture').textContent,
+    overflow: document.documentElement.scrollWidth > innerWidth + 1,
+    smallestFont: smallest,
+  };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host, floor_px",
+    [
+        # The board at television resolution in a browser. 24px is the 10-foot floor
+        # scripts/measure_legibility.py holds the whole page to.
+        (1920, 1080, False, 24.0),
+        # The Fire TV app's WebView: a 1080p Fire TV reports 960x540 CSS pixels at
+        # two device pixels each (an assumption about the device class, not a
+        # measurement of one), so 12 CSS pixels is the same 24 on the panel.
+        (960, 540, True, 12.0),
+    ],
+    ids=["tv-browser-1920x1080", "firetv-webview-960x540"],
+)
+def test_every_board_row_stays_above_the_key_bar_in_every_verdict(
+        browser, base_url, width, height, host, floor_px):
+    """A refusal's longer answer used to push the last departures behind the key bar.
+
+    Each state is reached the way the remote reaches it: the cursor is put on the row
+    and SELECT is sent through window.navigateDpad, the entry point the Android app
+    calls. The navigator scrolls whenever the focused row is not wholly visible, so a
+    regression shows up as a scrolled page as well as a covered row.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=width, height=height, host=host)
+    try:
+        wait_for_board(page)
+        for service, verdict in EXPECTED_VERDICTS.items():
+            if service != "checkout-api":
+                page.evaluate(
+                    """s => { const row = document.querySelector('.btn-demo[data-service="' + s + '"]');
+                              window.mercuryNav.setFocus(row);
+                              return window.navigateDpad('SELECT'); }""",
+                    service,
+                )
+                wait_for_board(page, service)
+            geometry = page.evaluate(BOARD_GEOMETRY)
+            where = f"{service} at {width}x{height}"
+            assert geometry["verdict"] == verdict, f"{where}: reached {geometry['verdict']}"
+            assert geometry["keybarShown"], f"{where}: the remote's key bar is not shown"
+            assert geometry["scrollY"] == 0, f"{where}: the page scrolled to {geometry['scrollY']}"
+            bar = geometry["keybarTop"]
+            covered = [name for name, box in geometry["rows"] if box["top"] < 0 or box["bottom"] > bar]
+            assert covered == [], f"{where}: rows behind the key bar at y={bar}: {covered}"
+            for label in ("primary", "stamp"):
+                box = geometry[label]
+                assert box["top"] >= 0 and box["bottom"] <= bar and box["right"] <= width, (
+                    f"{where}: the {label} is not wholly on the first screen: {box}"
+                )
+            assert geometry["stampText"] == "OFFLINE FIXTURE"
+            assert geometry["overflow"] is False, f"{where}: the page scrolls sideways"
+            assert geometry["smallestFont"] >= floor_px, (
+                f"{where}: text renders at {geometry['smallestFont']}px, under {floor_px}px"
+            )
+        assert errors == [], errors
+    finally:
+        context.close()
