@@ -98,7 +98,8 @@ from `correlation_trial_summary.json` and shipped in the response as
 **Action:** none. Hold on the two badges in the board's answer row, beside the
 anomaly factor. Do not scroll.
 **Expected on screen:** two badges from the same response: `OFFLINE FIXTURE`
-against *metric*, and `LIVE` against *commits: local-git*.
+under the figure, and a dashed `STAND-IN` against *commits: this repo*, because the
+commits are this repository's own, standing in for a deploy feed.
 **Point to make:** the words, not the slug, and next to the number rather than
 below the fold. Measured at 1920x1080 the factor renders at y=189 and the stamp at
 y=337, both inside the first screenful, which matters because a wallboard is never
@@ -135,7 +136,7 @@ numbers.
 ### 8. Fixture boundary: the public control stays effect-free. 1:56 to 2:09
 
 **Action:** Escape to the wall, press **checkout-api** so a rollback target exists
-again, focus **Stage governed rollback**, and press Enter with the Secret field empty.
+again, focus **Stage rollback**, and press Enter with the Secret field empty.
 **Expected on screen:** `PENDING_CONFIRMATION`, `DPAD_RECORD_ONLY_DEMO` and the
 explicit `NONE` external effect. Confirm becomes enabled.
 **Point to make:** this route accepts only the labelled recorded fixture and is
@@ -154,8 +155,9 @@ this payload. Edit the target after staging and it stops applying.
 
 ### 10. Confirm, then publish the responder handoff. 2:20 to 2:34
 
-**Action:** press **Confirm rollback**, then **Publish handoff**.
-**Expected on screen:** status `RECORDED_ONLY` and the output verbatim:
+**Action:** press **Confirm**, then **Publish handoff**.
+**Expected on screen:** the board reads `RECORDED`, *no pipeline contacted*, and the
+evidence panel shows status `RECORDED_ONLY` and the output verbatim:
 `Governance passed for 'checkout-api' to commit <sha>. Recorded locally. No
 deployment pipeline was contacted`, followed by the line naming the record-only
 dispatcher. Confirm then goes dark, with its reason line underneath:

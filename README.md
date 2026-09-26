@@ -2,7 +2,7 @@
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
-![The Mercury incident board at 1920x1080: a departures-board answer row for checkout-api reading 12.9x over baseline with a hazard-striped OFFLINE FIXTURE stamp and a LIVE commits stamp beside the figure, the verdict Attributed naming one commit at 52.2% naming precision, a record-only rollback as the next action, the amber Ask what changed button, and five service rows below it reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data](docs/assets/incident-board-1920x1080.png)
+![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; a departures-board answer row for checkout-api reads 12.9x, 38.06 vs 2.95 baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for commits from this repo beside the figure; the verdict Attributed names one commit, only change, 4 min before spike, at 52.2% naming precision, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. Every row is its own `what_changed` response; the metric is an offline fixture and says so. The quoted commit is one of this repository's own, standing in for a deploy.*
 
@@ -748,9 +748,9 @@ as a separate artifact.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 237 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 244 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 237
+#   readings under the floor: 0 of 244
 #   smallest operational text (reasons, provenance, pills): 25.9px over 21 readings
 #   anomaly factor renders at y=189, provenance stamp at y=337, fold at y=1080
 #   provenance stamps within the first viewport: 2 ['OFFLINE FIXTURE', 'STAND-IN']
@@ -824,7 +824,7 @@ were two text inputs in the top bar, which is a form standing between a viewer a
 the incident and the worst thing in this product to operate with a D-pad. They are
 now behind a `Setup` toggle in the Connection section at the foot of the page, hidden on load, and the D-pad ring skips hidden
 controls so the remote cannot land in them. The API defaults to the origin the page
-was served from, and pressing **Stage governed rollback** with no secret opens the
+was served from, and pressing **Stage rollback** with no secret opens the
 setup row by itself and says why. The first screen is the incident.
 
 The floor is a CSS pixel floor at a 1920x1080 CSS viewport. A target that reports a

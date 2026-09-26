@@ -84,8 +84,8 @@ BEATS = [
         "This public path is constrained before it is convenient. It accepts only the "
         "labelled recorded fixture, selects no external dispatcher, and says on screen "
         "that approval will contact no deployment pipeline.",
-        "Go back to checkout-api. Leave the Secret field empty and press Stage governed "
-        "rollback with the D-pad. Show DPAD_RECORD_ONLY_DEMO and external effect NONE.",
+        "Go back to checkout-api. Leave the Secret field empty and press Stage rollback "
+        "with the D-pad. Show DPAD_RECORD_ONLY_DEMO and external effect NONE.",
     ),
     (
         "beat_09_staging", 129.0, 140.0,
@@ -99,8 +99,9 @@ BEATS = [
         "Governance passes, and the product says out loud what it did not do. No "
         "deployment pipeline was contacted. The token is spent, then the same remote "
         "publishes a fixed responder handoff with the facts and next step.",
-        "Press Confirm rollback and read the EXECUTED output verbatim, including the "
-        "sentence stating no pipeline was contacted. Press Publish handoff and hold "
+        "Press Confirm. Hold on RECORDED, no pipeline contacted, on the board, then read "
+        "the output verbatim in the evidence panel, including the sentence stating no "
+        "pipeline was contacted. Press Publish handoff and hold "
         "on the shared revision, facts and next step.",
     ),
     (

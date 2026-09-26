@@ -49,6 +49,7 @@ from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
 from src.infrastructure.trial_summary import naming_accuracy
+from src.interfaces.handoff_routes import register_handoff_routes
 
 logger = logging.getLogger("mercury.mcp")
 
@@ -254,10 +255,6 @@ class HandoffUpdateRequest(BaseModel):
     current_action: str = Field(min_length=1, max_length=500)
     confirmed_facts: list[str] = Field(min_length=1, max_length=10)
     next_step: str = Field(min_length=1, max_length=500)
-    expected_revision: int | None = Field(default=None, ge=0)
-
-
-class DemoHandoffRequest(BaseModel):
     expected_revision: int | None = Field(default=None, ge=0)
 
 
@@ -547,51 +544,6 @@ async def get_handoff(incident_id: str) -> dict[str, Any]:
     return item.to_dict()
 
 
-@app.get("/mcp/handoffs/{incident_id}/revision", dependencies=[Depends(require_operator)])
-async def get_handoff_revision(incident_id: str) -> dict[str, Any]:
-    """The revision a writer must send next; 0 when nothing has been published yet.
-
-    A shared handoff is written against the revision the writer last saw. A screen that
-    loaded before somebody else published would otherwise send a stale revision and be
-    refused, so a writer reads this first. It answers 200 either way, because nothing
-    having been published yet is a state, not an error.
-    """
-    item = incident_handoffs.get(incident_id)
-    return {"incident_id": incident_id, "revision": item.revision if item else 0}
-
-
-@app.get("/mcp/demo-handoff/revision")
-async def get_demo_handoff_revision() -> dict[str, Any]:
-    """The same revision read for the single fixed demo handoff, with no secret."""
-    _validate_record_only_demo("tv-demo-handoff")
-    item = incident_handoffs.get("checkout-api-active")
-    return {"incident_id": "checkout-api-active", "revision": item.revision if item else 0}
-
-
-@app.post("/mcp/tools/demo_update_handoff")
-async def demo_update_handoff(req: DemoHandoffRequest) -> dict[str, Any]:
-    """Publish fixed fixture content; accept no responder-authored text."""
-    _validate_record_only_demo("tv-demo-handoff")
-    payload = recorded_demo_handoff(incident_use_case, deployment_evidence)
-    if payload is None:
-        raise HTTPException(status_code=409, detail="The labelled demo handoff is unavailable.")
-    try:
-        item = incident_handoffs.update(**payload, expected_revision=req.expected_revision)
-    except HandoffConflict as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
-
-
-@app.get("/mcp/demo-handoff")
-async def get_demo_handoff() -> dict[str, Any]:
-    """Read the single fixed demo handoff without exposing operator state."""
-    _validate_record_only_demo("tv-demo-handoff")
-    item = incident_handoffs.get("checkout-api-active")
-    if item is None:
-        raise HTTPException(status_code=404, detail="No recorded demo handoff exists yet.")
-    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
-
-
 @app.post("/webhooks/github/workflow_run", dependencies=[Depends(require_operator)])
 async def ingest_workflow_run(event: WorkflowRunEvent) -> dict[str, Any]:
     """Ingest a GitHub Actions workflow_run event onto the war room timeline."""
@@ -706,6 +658,11 @@ def _validate_record_only_demo(action_id: str) -> None:
             status_code=403,
             detail="D-pad demo approval is available only for tv-demo actions in record-only mode.",
         )
+
+
+register_handoff_routes(
+    app, incident_handoffs, require_operator, _validate_record_only_demo,
+    lambda: recorded_demo_handoff(incident_use_case, deployment_evidence))
 
 
 @app.post("/mcp/tools/demo_stage_rollback")
