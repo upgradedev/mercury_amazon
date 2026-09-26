@@ -6,12 +6,12 @@ the video itself.
 
 | Item | Value |
 |---|---|
-| Recorded commit | `924a58c9ce409924f48a2bd3fa067c7ce8f917d7`, reported by the server's own `/health` during the take |
+| Recorded commit | `cf4ae181fa3cfda74791b8dfe64666641564f938`, reported by the server's own `/health` during the take |
 | File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260926/mercury_amazon/output/`, outside git |
-| Length | 169.0 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.5 LUFS integrated |
-| SHA-256 | `dbaaad31ca7f8623d252e4dbc7320f15e7257d470fb2f19d6dbcbafaac05375f` |
+| Length | 170.44 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.4 LUFS integrated |
+| SHA-256 | `b0c4728045b88266904d5604a25f36ec87f2a7100c6706934e206f4b3272022c` |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 2255, one call per beat, no re-rolls |
+| Characters synthesized | 2272 in the final narration; 2710 sent across all calls, because two beats were corrected and synthesized again |
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
 
 Next to the mp4 sit `video-receipt.json` (commit, duration, SHA-256, voice, characters),
@@ -21,7 +21,7 @@ receipt are in the sibling `narration/` and `capture/` folders.
 
 ## What the video shows, and what it does not
 
-* A 4 second title card: "Mercury. Recorded from a local run of commit 924a58c. Public
+* A 4 second title card: "Mercury. Recorded from a local run of commit cf4ae18. Public
   deployment pending." A 3 second closing card repeats the commit and says the public
   deployment and the Fire TV runtime receipt are pending.
 * Between them, one continuous take of the page served by
@@ -67,9 +67,11 @@ the voice cannot drift from the picture.
 The environment for steps 2 to 5: `MERCURY_VIDEO_ROOT` (the output folder),
 `MERCURY_RELEASE_SHA` (the recorded commit), `FFMPEG`, `FFPROBE`, and for step 2
 `ELEVENLABS_API_KEY`, which is read from the environment and never printed or stored.
-The compose step that made this file is the `video/build-video.py` committed after
-the recorded commit: its captions were first burned 4 s late, which the frame review
-caught, and the fix changed only which caption file the capture chain reads.
+A first take, from commit `924a58c`, was superseded and is kept beside the output as
+`superseded_924a58c/`. Reviewing it found two faults, both fixed before this take: the
+captions were burned 4 s late, because the subtitles filter runs before the title
+card is joined, and one beat gave the wrong reason for the spend fixture (the run is
+in offline mode; the machine does have AWS credentials).
 
 ## Re-rendering one beat
 
