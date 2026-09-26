@@ -1050,9 +1050,10 @@ engineering. The user is the responder answering the page at two in the morning,
 and the two are not the same person.
 
 **What is being sold, and what is being assumed.** What is being sold is a second
-opinion on the first question of an incident: is this a deploy at all. Mercury
-mostly answers no, with a reason, and when it does name a change it says on the
-screen how often naming is right. Both rates are in
+opinion on the first question of an incident: can this be pinned on one change.
+Mercury mostly answers that it cannot say, and why, which is never a finding that no
+deploy caused it; when it does name a change it says on the screen how often naming
+is right. Both rates are in
 [How often it is right](#how-often-it-is-right), and they are not restated here
 because this section is a hypothesis and the measured figures should be read where
 the commands that produced them are. What is being assumed is that a television is
