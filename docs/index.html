@@ -448,6 +448,10 @@
     html.tv-host body { padding-bottom: 4.5rem; }
 
     [hidden] { display: none !important; }
+    .sr-only {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
 
     /* ----------------------------------------------------------- Breakpoints */
     @media (max-width: 600px) {
@@ -619,7 +623,10 @@
           <p class="cell-label">Verdict</p>
           <p class="cell-label">Next</p>
         </div>
-        <div id="heroLive" aria-live="polite">
+        <!-- Not a live region. The whole answer used to be one, and a screen reader read
+             it out on load, then again in full when the flap settled. The one sentence
+             worth hearing goes to #boardStatus, and only after somebody asked. -->
+        <div id="heroLive">
           <div class="answer board-grid">
             <div class="cell cell-service">
               <p class="cell-label">Service</p>
@@ -651,6 +658,8 @@
             </p>
           </div>
         </div>
+
+        <p id="boardStatus" class="sr-only" role="status" aria-live="polite"></p>
 
         <div class="hero-actions">
           <button data-testid="primary-hero-action" id="btnWhatChanged" class="btn btn-primary"
@@ -778,7 +787,7 @@
               <span>Shared responder handoff</span>
               <span id="handoffLatency" class="latency"></span>
             </div>
-            <div id="handoffOutput" aria-live="polite">
+            <div id="handoffOutput">
               <div class="empty-state-card">No handoff loaded. Publish or refresh to show the responder,
                 current action, confirmed facts and next step.</div>
             </div>
@@ -1195,6 +1204,25 @@
       }, latencyTargetId);
     }
 
+    /* One short sentence for a screen reader, after an action somebody took. Never
+       called for the answer the board fetches by itself on load. */
+    function announce(text) {
+      var status = el('boardStatus');
+      status.textContent = '';
+      // A fresh text node, a tick later, so the same sentence twice is read twice.
+      setTimeout(function () { status.textContent = text; }, 50);
+    }
+
+    function answerSentence(data) {
+      var kind = verdictKind(data);
+      if (kind === 'attributed') {
+        var short = accuracyShort(data);
+        return data.service + ': attributed to commit ' + data.offending_commit.sha
+          + (short ? ', ' + short : '') + '.';
+      }
+      return data.service + ': ' + VERDICT_WORDS[kind].toLowerCase() + '.';
+    }
+
     function speak(text) {
       if (!state.speak || !text || !('speechSynthesis' in window)) { return; }
       window.speechSynthesis.cancel();
@@ -1554,7 +1582,9 @@
       }
     }
 
-    async function loadWhatChanged() {
+    /* userAsked is true when a person pressed something. The answer fetched on load
+       is painted, never announced. */
+    async function loadWhatChanged(userAsked) {
       setHero({
         state: 'busy',
         verdict: 'asking',
@@ -1609,9 +1639,11 @@
         el('btnHandoff').title = state.dpadDemoApproval
           ? 'Publish the fixed, record-only fixture handoff with the D-pad'
           : 'Publish the current incident facts using the operator secret';
+        if (userAsked === true) { announce(answerSentence(data)); }
         speak(data.voice_summary);
       } catch (error) {
         heroFromFailure(error.message);
+        if (userAsked === true) { announce('No Mercury API answered.'); }
         rowFailed(state.service);
         el('heroLatency').textContent = 'The call did not complete.';
         showError('incidentOutput', error.message);
@@ -1731,6 +1763,7 @@
         ]));
         box.appendChild(h('p', 'row', res.body.confirmation_prompt));
         render('incidentOutput', box);
+        announce('Rollback to ' + res.body.target_commit_sha + ' staged. Confirm is now available.');
         speak(res.body.confirmation_prompt);
         reportHostEvent('rollback_staged', res.body.action_id + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
@@ -1790,6 +1823,9 @@
         ]));
         box.appendChild(h('p', 'row', res.body.output));
         render('incidentOutput', box);
+        announce(res.body.status === 'DISPATCH_ACCEPTED'
+          ? 'Rollback to ' + res.body.target_commit_sha + ' sent.'
+          : 'Rollback to ' + res.body.target_commit_sha + ' recorded, not sent.');
         speak('Rollback governance result for ' + res.body.target_service + ': ' + res.body.status + '.');
         reportHostEvent('rollback_confirmed', res.body.status + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
@@ -1888,6 +1924,7 @@
           res = await post(path, payload(), 'handoffLatency', secret);
         }
         renderHandoff(res.body);
+        announce('Handoff published, shared revision ' + res.body.revision + '.');
         // The handoff lives on the second screen beside the rollback steps, so
         // publishing no longer opens a panel: the cursor moves to Refresh.
         if (window.mercuryNav) {
@@ -1913,6 +1950,7 @@
           ? '/mcp/demo-handoff' : '/mcp/handoffs/' + encodeURIComponent(handoffIncidentId());
         var res = await call(path, { method: 'GET', headers: headers }, 'handoffLatency');
         renderHandoff(res.body);
+        announce('Handoff refreshed, shared revision ' + res.body.revision + '.');
         reportHostEvent('handoff_refreshed', res.body.incident_id + ':revision-' + res.body.revision + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
@@ -2115,7 +2153,7 @@
       Array.prototype.forEach.call(document.querySelectorAll('[data-service]'), function (button) {
         button.setAttribute('aria-pressed', button.getAttribute('data-service') === name ? 'true' : 'false');
       });
-      loadWhatChanged();
+      loadWhatChanged(true);
     }
 
     function onClick(event) {
@@ -2143,7 +2181,7 @@
       el('btnCheck').addEventListener('click', checkConnection);
       el('btnSetup').addEventListener('click', toggleSetup);
       el('btnSpeak').addEventListener('click', toggleSpeech);
-      el('btnWhatChanged').addEventListener('click', loadWhatChanged);
+      el('btnWhatChanged').addEventListener('click', function () { loadWhatChanged(true); });
       el('btnStage').addEventListener('click', stageRollback);
       el('btnConfirm').addEventListener('click', confirmRollback);
       el('btnHandoff').addEventListener('click', publishHandoff);
@@ -2196,7 +2234,7 @@
       // load when there is an origin to ask, and show the honest failure when
       // there is not. Nothing is painted before the answer arrives.
       if (apiBase()) {
-        checkConnection().then(loadWhatChanged).then(refreshBoard);
+        checkConnection().then(function () { return loadWhatChanged(false); }).then(refreshBoard);
       } else {
         heroFromFailure('This page was opened from the file system, so it has no API origin.');
       }

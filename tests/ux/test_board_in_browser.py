@@ -414,6 +414,35 @@ def test_down_from_the_primary_enters_the_board_and_up_comes_back(browser, base_
         context.close()
 
 
+def test_nothing_is_announced_on_load_and_a_press_is_answered_in_one_sentence(browser, base_url):
+    """The board used to be read out by a screen reader the moment the page loaded.
+
+    No live region may change while nobody has pressed anything: the only live
+    region outside the closed panels is the status line, and it stays empty through
+    the load, the flap and the four row calls. Pressing a row then puts one short
+    sentence in it.
+    """
+    context, page, errors, _ = open_board(browser, base_url)
+    try:
+        wait_for_board(page)
+        page.wait_for_timeout(300)
+        live = page.evaluate(
+            """() => [...document.querySelectorAll('[aria-live], [role="status"], [role="alert"]')]
+                   .filter(el => !el.closest('[hidden]'))
+                   .map(el => ({ id: el.id, text: el.textContent.trim() }))""")
+        assert live == [{"id": "boardStatus", "text": ""}], live
+        page.evaluate(
+            """() => { window.mercuryNav.setFocus(document.querySelector('.btn-demo[data-service="search-indexer"]'));
+                      return window.navigateDpad('SELECT'); }""")
+        wait_for_board(page, "search-indexer")
+        page.wait_for_function("document.querySelector('#boardStatus').textContent.length > 0")
+        said = page.evaluate("document.querySelector('#boardStatus').textContent")
+        assert said == "search-indexer: cannot attribute.", said
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 # ------------------------------------------------------- Every verdict, every row
 
 EXPECTED_VERDICTS = {

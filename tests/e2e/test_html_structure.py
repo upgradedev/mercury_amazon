@@ -320,7 +320,9 @@ def test_the_hero_headline_and_figure_are_written_from_the_response(html):
 def test_the_page_asks_what_changed_on_load_rather_than_waiting_for_a_click(html):
     """A wallboard that says nothing until someone clicks cannot be read at all."""
     script = html.split("<script>")[-1]
-    assert "checkConnection().then(loadWhatChanged)" in script
+    # Still asked on load; the flag says nobody pressed anything, so it is painted
+    # and not announced to a screen reader.
+    assert "checkConnection().then(function () { return loadWhatChanged(false); })" in script
     assert "if (apiBase())" in script, "the load-time call must be conditional on there being an API"
 
 
@@ -354,10 +356,24 @@ def test_the_page_has_landmarks_a_skip_link_and_one_h1(html):
 
 
 def test_async_regions_announce_themselves_to_assistive_technology(html):
-    """Every region a fetch rewrites must be a live region."""
+    """Results are announced, briefly, and only after somebody asked for them.
+
+    This used to require the whole answer row (#heroLive) to be a live region. It was,
+    and a screen reader read the board out on page load, then read the full answer
+    again when the flap settled, refusal paragraphs included. The answer row is now
+    not live; one visually hidden status line carries a short sentence after a user
+    action. The panel consoles stay live: they are hidden until opened, and only a
+    press inside them rewrites them.
+    """
     assert html.count('aria-live="polite"') >= 4
-    for region in ["heroLive", "incidentOutput", "doraOutput", "costOutput"]:
+    for region in ["boardStatus", "incidentOutput", "doraOutput", "costOutput"]:
         assert region in html
+    hero_live = re.search(r'<div id="heroLive"[^>]*>', html).group(0)
+    assert "aria-live" not in hero_live, "the answer row must not announce itself on load"
+    status = re.search(r'<p id="boardStatus"[^>]*>', html).group(0)
+    assert 'role="status"' in status and "sr-only" in status
+    script = html.split("<script>")[-1]
+    assert "loadWhatChanged(false)" in script, "the answer fetched on load is not announced"
 
 
 def test_reduced_motion_is_honoured(html):
