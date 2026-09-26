@@ -995,10 +995,14 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
     # went stale as the suite tripled in size, and it is the one claim in this
     # repository that three readers failed to reproduce. It is recorded by
     # scripts/time_test_suite.py now, and G1 checks the README against the record.
-    # Figures inside backticks are quotations, not claims: the README quotes the two
-    # retired figures so the correction stays visible. Strip code before reading claims.
+    # Figures inside backticks are quotations, not claims: the evidence document quotes
+    # the two retired figures so the correction stays visible. Strip code before reading
+    # claims. The runtime and its history moved from the README into docs/EVIDENCE.md so
+    # the README reads in a minute; the badge above stays on the README, and the runtime
+    # is checked where it is now published.
+    evidence = read("docs/EVIDENCE.md")
     readme_prose = " ".join(re.sub(
-        r"`[^`]*`", " ", re.sub(r"```.*?```", " ", readme, flags=re.DOTALL)).split())
+        r"`[^`]*`", " ", re.sub(r"```.*?```", " ", evidence, flags=re.DOTALL)).split())
     runtime_claims = re.findall(r"(\d+(?:\.\d+)?) to (\d+(?:\.\d+)?) seconds", readme_prose)
     timing = {}
     if os.path.exists(os.path.join(REPO_ROOT, SUITE_TIMING_SUMMARY)):
@@ -1007,10 +1011,10 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
     if g1:
         stale_note = ""
         if not runtime_claims:
-            g1, g1_msg = False, "The README no longer says how long its own test suite takes"
+            g1, g1_msg = False, "docs/EVIDENCE.md no longer says how long the test suite takes"
         elif not timing:
             g1, g1_msg = False, (
-                f"The README publishes a suite runtime and {SUITE_TIMING_SUMMARY} is missing, "
+                f"docs/EVIDENCE.md publishes a suite runtime and {SUITE_TIMING_SUMMARY} is missing, "
                 f"so nothing measured it. Run python scripts/time_test_suite.py")
         elif timing.get("tests_collected") != collected:
             # The record predates the suite. That is allowed only when the README says
@@ -1023,12 +1027,12 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
                 g1, g1_msg = False, (
                     f"The recorded runtime was measured over {timing.get('tests_collected')} tests "
                     f"and this suite now has {collected}. Re-run python scripts/time_test_suite.py "
-                    f"on an idle machine, or disclose the gap in the README with the exact "
+                    f"on an idle machine, or disclose the gap in docs/EVIDENCE.md with the exact "
                     f"phrases {missing}")
             else:
                 stale_note = (
                     f"; the runtime record predates the suite ({timing.get('tests_collected')} of "
-                    f"{collected} tests), the README says so, and an idle re-measure is pending")
+                    f"{collected} tests), docs/EVIDENCE.md says so, and an idle re-measure is pending")
         if g1:
             # Two ranges may legitimately appear: this session's, and the session it
             # replaced. The second is there so a replaced figure leaves a trace.
@@ -1042,11 +1046,11 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
                          if (float(c[0]), float(c[1])) not in sessions]
             if unmatched:
                 g1, g1_msg = False, (
-                    f"The README publishes {unmatched} for the suite runtime; the recorded "
+                    f"docs/EVIDENCE.md publishes {unmatched} for the suite runtime; the recorded "
                     f"sessions measured {sorted(sessions)} s")
             elif f"{timing.get('loaded_max_seconds')} seconds" not in readme_prose:
                 g1, g1_msg = False, (
-                    f"The README publishes a runtime range with no loaded-machine figure "
+                    f"docs/EVIDENCE.md publishes a runtime range with no loaded-machine figure "
                     f"beside it, so it reads as a ceiling. The loaded run measured "
                     f"{timing.get('loaded_max_seconds')} s")
             else:

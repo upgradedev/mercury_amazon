@@ -48,6 +48,8 @@ from src.domain.incident_correlation import (  # noqa: E402
 
 SUMMARY_PATH = REPO_ROOT / "correlation_trial_summary.json"
 README = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+#: Where the trial's figures and their history are published in full.
+EVIDENCE = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -544,7 +546,7 @@ def test_the_readme_quotes_the_recorded_split_of_the_wrong_names():
     of it and still named the wrong thing, is published rather than rounded away.
     """
     block = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))["why_the_wrong_commit_was_named"]
-    section = README.split("## How often it is right")[1].split("\n## ")[0]
+    section = EVIDENCE.split("## How often it is right")[1].split("\n## ")[0]
 
     assert f"the {block['wrong_commit_attributions']} attributions that" in section
     assert f"**{block['cause_outside_the_attribution_window']}** had the real cause" in section
@@ -566,7 +568,7 @@ def test_the_readme_burstiness_figures_come_from_the_recorded_stream():
     """
     burst = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))["commit_stream"]["burstiness"]
     # Normalised, because any of these can be split across a line wrap.
-    section = " ".join(README.split("## How often it is right")[1].split("\n## ")[0].split())
+    section = " ".join(EVIDENCE.split("## How often it is right")[1].split("\n## ")[0].split())
 
     assert f"is {burst['median_gap_minutes']} minutes" in section
     assert f"{burst['gaps_under_the_attribution_window']} of its {burst['gaps']} gaps" in section
@@ -618,7 +620,7 @@ def test_the_readme_quotes_the_recorded_correlation_trial():
     head = summary["headline"]
 
     def quoted(label: str) -> float:
-        match = re.search(rf"\| {re.escape(label)} \| \*\*([\d.]+)%?\*\*", README)
+        match = re.search(rf"\| {re.escape(label)} \| \*\*([\d.]+)%?\*\*", EVIDENCE)
         assert match, f"the README no longer quotes {label!r} from the correlation trial"
         return float(match.group(1))
 
@@ -629,8 +631,9 @@ def test_the_readme_quotes_the_recorded_correlation_trial():
     assert quoted("Correct refusal, exogenous spikes") == round(
         head["correct_refusal_rate_on_exogenous_spikes"] * 100, 1)
 
-    cases = re.search(r"(\d+) labelled cases", README)
-    assert cases and int(cases.group(1)) == summary["cases"], (
-        f"the README quotes {cases.group(1) if cases else 'no'} cases, the recorded run scored "
-        f"{summary['cases']}"
-    )
+    for name, text in (("README.md", README), ("docs/EVIDENCE.md", EVIDENCE)):
+        cases = re.search(r"(\d+) labelled cases", text)
+        assert cases and int(cases.group(1)) == summary["cases"], (
+            f"{name} quotes {cases.group(1) if cases else 'no'} cases, the recorded run scored "
+            f"{summary['cases']}"
+        )

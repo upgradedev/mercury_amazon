@@ -98,7 +98,7 @@ from `correlation_trial_summary.json` and shipped in the response as
 **Action:** none. Hold on the two badges in the board's answer row, beside the
 anomaly factor. Do not scroll.
 **Expected on screen:** two badges from the same response: `OFFLINE FIXTURE`
-under the figure, and a dashed `STAND-IN` against *commits: this repo*, because the
+under the figure, and a dashed `STAND-IN` against *Mercury’s commits*, because the
 commits are this repository's own, standing in for a deploy feed.
 **Point to make:** the words, not the slug, and next to the number rather than
 below the fold. Measured at 1920x1080 the factor renders at y=189 and the stamp at

@@ -31,6 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 #: plan is included because the JSON it writes is regenerated from it.
 JUDGE_FACING = [
     "README.md",
+    "docs/EVIDENCE.md",
     "docs/DEVPOST_SUBMISSION.md",
     "docs/index.html",
     "docs/UAT_TESTBOOK.md",
@@ -47,6 +48,7 @@ JUDGE_FACING = [
 #: words the product uses for it.
 DESCRIBE_A_REFUSAL = [
     "README.md",
+    "docs/EVIDENCE.md",
     "docs/DEVPOST_SUBMISSION.md",
     "docs/index.html",
     "video/SHOT_LIST.md",
@@ -141,13 +143,17 @@ def test_the_readme_records_the_retired_phrasing_as_retired_and_never_as_live():
     stays inside backticks, which is what the scanner strips, so it cannot read as a
     live claim.
     """
+    # The correction moved with the audit history into docs/EVIDENCE.md; the README
+    # must still never state the retired phrasing as live.
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    assert "this is not a deploy" in readme, (
-        "the README no longer records the phrasing it retired; deleting the correction "
+    evidence = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
+    assert "this is not a deploy" in evidence, (
+        "docs/EVIDENCE.md no longer records the phrasing it retired; deleting the correction "
         "hides that the claim moved"
     )
+    assert "this is not a deploy" not in _live_text(evidence)
     assert "this is not a deploy" not in _live_text(readme)
-    assert "A refusal is not an acquittal" in readme
+    assert "A refusal is not an acquittal" in evidence
 
 
 # ----------------------------------------------------------- The diagram
@@ -158,6 +164,12 @@ def _mermaid_flowchart() -> str:
     flowcharts = [block for block in blocks if block.strip().startswith("flowchart")]
     assert flowcharts, "the README no longer opens with a flowchart"
     return flowcharts[0]
+
+
+#: The words on the one dotted edge that may lead to "nothing needs reverting": the
+#: reading is under the anomaly threshold. It used to say "inside baseline", which read
+#: as flat for a reading 1.6 times its baseline, so the label names the threshold now.
+NO_ANOMALY_EDGE = "under 3.0x"
 
 
 def _dotted_edge_targets(chart: str) -> dict[str, str]:
@@ -177,8 +189,8 @@ def test_the_diagram_gives_the_inside_baseline_verdict_a_node_of_its_own():
     """
     targets = _dotted_edge_targets(_mermaid_flowchart())
     assert len(targets) == 3, f"expected three dotted edges, found {sorted(targets)}"
-    baseline = [node for label, node in targets.items() if "inside baseline" in label]
-    refusals = [node for label, node in targets.items() if "inside baseline" not in label]
+    baseline = [node for label, node in targets.items() if NO_ANOMALY_EDGE in label]
+    refusals = [node for label, node in targets.items() if NO_ANOMALY_EDGE not in label]
     assert len(baseline) == 1 and len(refusals) == 2, sorted(targets)
     assert baseline[0] not in refusals, (
         "the inside-baseline verdict shares a node with a refusal, so the refusal "
@@ -190,7 +202,7 @@ def test_the_diagram_gives_the_inside_baseline_verdict_a_node_of_its_own():
 def test_the_diagram_refusal_node_says_cannot_attribute_and_names_no_innocent():
     chart = _mermaid_flowchart()
     targets = _dotted_edge_targets(chart)
-    refusal_node = next(node for label, node in targets.items() if "inside baseline" not in label)
+    refusal_node = next(node for label, node in targets.items() if NO_ANOMALY_EDGE not in label)
     definition = re.search(rf'\b{refusal_node}\["([^"]+)"\]', chart)
     assert definition, f"node {refusal_node} is never defined with a label"
     label = definition.group(1).replace("<br/>", " ").lower()

@@ -48,7 +48,7 @@ being smoothed over.
 | 1 | Does a deployed endpoint answer, and identify its build? | PASS | Root and `/health` answer at the public Function URL, and `/health` publishes `build_sha`; `deploy_teardown_receipt.json` records the observation |
 | 2 | What is owner-gated and unmet, printed apart from the score rather than folded into it? | OPEN | `python ci/readiness.py`: O1, O2 and O3 fail as owner actions, E2 and E4 fail because no video exists. `video/README.md` says no video has been recorded |
 | 3 | Is the track and prize this entry is aimed at written down, with nothing else claimed? | PASS | Fire TV track in `README.md`, Open Source mini in `docs/DEVPOST_SUBMISSION.md`. `tests/e2e/test_documentation_claims.py` fails the build if any document claims an Alexa integration, which this repository does not have, or a device run or a built APK, neither of which has happened |
-| 4 | Do the presentation surfaces say what the code says? | PASS | `python -m pytest tests/e2e/test_documentation_claims.py -q`. Every number in the README is compared against the file the command that produced it wrote |
+| 4 | Do the presentation surfaces say what the code says? | PASS | `python -m pytest tests/e2e/test_documentation_claims.py -q`. Every number in the README and in `docs/EVIDENCE.md` is compared against the file the command that produced it wrote |
 
 ## 2. The three lenses, and who owned each row
 

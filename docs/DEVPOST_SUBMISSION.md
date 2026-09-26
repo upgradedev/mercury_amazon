@@ -24,7 +24,7 @@ and the scoring changed what it claims. It turns out the answer worth having is
 usually a refusal: Mercury cannot attribute this to a change, and here is why. That
 refusal is never dressed up as proof that a deploy is innocent, because an empty or
 crowded window says nothing of the kind, and the only verdict that says nothing
-needs reverting is the one where the reading is inside its baseline. Mercury sees an
+needs reverting is the one where the reading is under the 3.0x anomaly threshold. Mercury sees an
 anomaly and names nobody 81.1% of the time, stays quiet on 199 of 200
 healthy series, and refuses outright on 60 of 60 telemetry gaps. When it does name
 a change, it is right 52.2% of the time over 113 namings, and it prints that on the
