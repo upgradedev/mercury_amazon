@@ -1,88 +1,108 @@
 {
   "schema": "mercury.video_narration/1",
-  "status": "PLAN ONLY. No video has been recorded. Durations are intended, not measured against a take. Every beat is an action that exists in the repository today and was performed in a desktop browser against a local server. The candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
+  "status": "PLAN ONLY. No video has been recorded yet. The beats follow what the D-pad brings on screen in the page, probed against a local server on 2026-09-26; seconds are intended until video/generate-narration.py measures them. This is not the Fire TV track runtime proof: the candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
   "project": "mercury_amazon",
-  "title": "Mercury: Fire TV Incident Commander",
-  "source_of_truth": "video/SHOT_LIST.md",
-  "target_duration_seconds": 168.0,
+  "title": "Mercury: Fire TV incident board",
+  "source_of_truth": "scripts/build_video_plan.py",
+  "tts": {
+    "provider": "elevenlabs",
+    "elevenLabs": {
+      "voiceId": "pNInz6obpgDQGcFmaJgB",
+      "voiceName": "Adam (ElevenLabs premade)",
+      "modelId": "eleven_multilingual_v2",
+      "outputFormat": "mp3_44100_128"
+    }
+  },
+  "target_duration_seconds": 157.0,
   "max_allowed_seconds": 180.0,
   "beats": [
     {
       "beat_id": "beat_01_question",
       "timestamp_start": 0.0,
       "timestamp_end": 13.0,
-      "narration_text": "An incident starts. Somebody asks what broke, and the first answer everyone reaches for is: what did we just deploy. Half the time that is the wrong question, and reverting on it costs an hour.",
-      "visual_action": "Cold open on the loaded cockpit at 1920x1080 in a desktop browser. No click yet."
+      "narration_text": "An incident starts, and someone asks what we just deployed. Half the time that is the wrong question. Mercury, an incident board for the team TV, asks a narrower one: can this spike be pinned on one change?",
+      "caption_text": "An incident starts, and someone asks what we just deployed. Half the time that is the wrong question. Mercury, an incident board for the team TV, asks a narrower one: can this spike be pinned on one change?",
+      "visual_action": "The loaded board at 1920x1080, focus on Ask what changed. No key pressed."
     },
     {
-      "beat_id": "beat_02_refusal_first",
+      "beat_id": "beat_02_board_on_load",
       "timestamp_start": 13.0,
-      "timestamp_end": 31.0,
-      "narration_text": "Mercury answers before anyone clicks, and its most common answer is a refusal. Against eleven hundred and sixty labelled incidents it sees a real anomaly and names nobody eighty one percent of the time. The refusal says what Mercury cannot attribute and why. It never calls the deploy innocent.",
-      "visual_action": "Reload the page. The hero renders the correlator's verdict and the anomaly factor as the large figure. Do not click anything yet."
+      "timestamp_end": 30.0,
+      "narration_text": "It answered as the page loaded, before any key was pressed. Most answers are refusals: on eleven hundred and sixty generated, labelled cases, it saw a real anomaly and named nobody eighty one percent of the time. A refusal never calls the deploy innocent.",
+      "caption_text": "It answered as the page loaded, before any key was pressed. Most answers are refusals: on 1160 generated, labelled cases, it saw a real anomaly and named nobody 81.1% of the time. A refusal never calls the deploy innocent.",
+      "visual_action": "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
     },
     {
       "beat_id": "beat_03_crowded_refusal",
-      "timestamp_start": 31.0,
-      "timestamp_end": 47.0,
-      "narration_text": "The refusal that matters. Several changes landed in the hour before this spike, and nothing in a metric series says which of them did it. Mercury cannot attribute this, names none of them, and the rollback stays disabled. Rolling back here would be a guess.",
-      "visual_action": "Press release-train. The hero reads Cannot attribute this, names the number of changes in the window, and both rollback buttons stay disabled with their reason lines visible."
+      "timestamp_start": 30.0,
+      "timestamp_end": 46.0,
+      "narration_text": "Down walks the rows. Release train has a real spike, but several changes landed in the hour before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
+      "caption_text": "Down walks the rows. release-train has a real spike, but several changes landed in the hour before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
+      "visual_action": "D-pad Down four times to release-train, then Center. The verdict reads Cannot attribute this with the number of changes that landed, Next reads No rollback offered, and Stage rollback and Confirm are disabled."
     },
     {
       "beat_id": "beat_04_named_with_odds",
-      "timestamp_start": 47.0,
-      "timestamp_end": 68.0,
-      "narration_text": "It names a change only when exactly one landed in the window. And when it does, it prints its own odds: against that same corpus the commit it names is the one that caused the reading fifty two percent of the time, over one hundred and thirteen namings. The screen says so beside the name.",
-      "visual_action": "Press checkout-api. The hero names the commit, quotes its message, and the line under it reads the measured precision and the number of namings it was measured over."
+      "timestamp_start": 46.0,
+      "timestamp_end": 62.0,
+      "narration_text": "On checkout A P I, exactly one change landed before the spike, so Mercury names it, and prints its own odds: on that corpus a named commit is the cause fifty two percent of the time, over one hundred and thirteen namings.",
+      "caption_text": "On checkout-api, exactly one change landed before the spike, so Mercury names it, and prints its own odds: on that corpus a named commit is the cause 52.2% of the time, over 113 namings.",
+      "visual_action": "D-pad Up three times to checkout-api, then Center. The verdict names the commit, quotes its message, and reads 52.2% naming precision."
     },
     {
       "beat_id": "beat_05_provenance",
-      "timestamp_start": 68.0,
-      "timestamp_end": 84.0,
-      "narration_text": "Both halves of that answer say where they came from, next to the number rather than under the fold. The metric series is generated locally and the badge in the card reads OFFLINE FIXTURE. The commits are real, read from the checkout.",
-      "visual_action": "Hold on the two source badges inside the hero card beside the anomaly factor, OFFLINE FIXTURE against metric series and LIVE against commit history. Do not scroll."
+      "timestamp_start": 62.0,
+      "timestamp_end": 78.0,
+      "narration_text": "Each half says where it came from. The metric is an offline fixture, generated locally, and the striped stamp says so. The commit is one of Mercury's own, standing in for a deploy feed, and the dashed stamp says that too.",
+      "caption_text": "Each half says where it came from. The metric is an offline fixture, generated locally, and the striped stamp says so. The commit is one of Mercury's own, standing in for a deploy feed, and the dashed stamp says that too.",
+      "visual_action": "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN stamp against Mercury's commits. No key pressed."
     },
     {
-      "beat_id": "beat_06_dpad",
-      "timestamp_start": 84.0,
-      "timestamp_end": 101.0,
-      "narration_text": "The remote moves in space, not down a list. Focus jumps to the nearest control in the direction pressed, disabled controls are skipped rather than focused, and Back returns to the wall before it would ever close the application.",
-      "visual_action": "Press Right, Down, Down, Up, then Down to the Evidence tiles and Right to Delivery velocity, Enter and Escape. The Focused label and the BACK legend change with each press."
+      "beat_id": "beat_06_stage",
+      "timestamp_start": 78.0,
+      "timestamp_end": 91.0,
+      "narration_text": "Only a named change can be rolled back. Up, right, center: staging returns a single use token bound to a hash of this exact proposal, and the lease counts down on the board.",
+      "caption_text": "Only a named change can be rolled back. Up, Right, Center: staging returns a single-use token bound to a hash of this exact proposal, and the lease counts down on the board.",
+      "visual_action": "D-pad Up, Right to Stage rollback, Center. The board reads Rollback staged, the lease in seconds as the large figure, and Next reads Staged. Next: confirm, record-only."
     },
     {
-      "beat_id": "beat_07_two_sources",
-      "timestamp_start": 101.0,
-      "timestamp_end": 116.0,
-      "narration_text": "One screen, two kinds of truth. The velocity panel is serving a recording because no GitHub token is set, and says so. The spend panel, on a machine with credentials, is a live Cost Explorer read, and says that too.",
-      "visual_action": "Load DORA velocity, then scan AWS spend. Compare the OFFLINE FIXTURE badge against the LIVE aws-cost-explorer badge. Do not read live spend figures aloud."
+      "beat_id": "beat_07_confirm",
+      "timestamp_start": 91.0,
+      "timestamp_end": 102.0,
+      "narration_text": "Right, then center confirms. The server spends the token, and the recorded only card says it plainly: no deployment pipeline was contacted. Confirming again is refused.",
+      "caption_text": "Right, then Center confirms. The server spends the token, and the Recorded only card says it plainly: no deployment pipeline was contacted. Confirming again is refused.",
+      "visual_action": "D-pad Right to Confirm, Center. Focus moves to Publish handoff and the page scrolls to the rollback steps: 03 Recorded only states that no deployment pipeline was contacted, and 02 Confirm says the token has been spent."
     },
     {
-      "beat_id": "beat_08_refusal",
-      "timestamp_start": 116.0,
-      "timestamp_end": 129.0,
-      "narration_text": "This public path is constrained before it is convenient. It accepts only the labelled recorded fixture, selects no external dispatcher, and says on screen that approval will contact no deployment pipeline.",
-      "visual_action": "Go back to checkout-api. Leave the Secret field empty and press Stage rollback with the D-pad. Show DPAD_RECORD_ONLY_DEMO and external effect NONE."
+      "beat_id": "beat_08_handoff",
+      "timestamp_start": 102.0,
+      "timestamp_end": 111.0,
+      "narration_text": "Center publishes a fixed responder handoff. Its next step repeats the boundary: this fixture never contacts a deployment pipeline.",
+      "caption_text": "Center publishes a fixed responder handoff. Its next step repeats the boundary: this fixture never contacts a deployment pipeline.",
+      "visual_action": "Center on Publish handoff; the server answers HTTP 200. D-pad Down brings the handoff's next step into view on the way to the evidence tiles."
     },
     {
-      "beat_id": "beat_09_staging",
-      "timestamp_start": 129.0,
-      "timestamp_end": 140.0,
-      "narration_text": "Staging still mints a single-use token bound to a hash of exactly this proposal. Change the target afterwards and the token stops applying.",
-      "visual_action": "Show PENDING_CONFIRMATION, the payload hash, the lease countdown as the hero figure, and Confirm becoming enabled."
+      "beat_id": "beat_09_dpad",
+      "timestamp_start": 111.0,
+      "timestamp_end": 123.0,
+      "narration_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens delivery velocity, and Back now reads: back to the wall.",
+      "caption_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens Delivery velocity, and BACK now reads: Back to the wall.",
+      "visual_action": "D-pad Right to Delivery velocity, Center. The panel opens and the BACK legend changes from Exit to the Fire TV launcher to Back to the wall."
     },
     {
-      "beat_id": "beat_10_confirm_and_replay",
-      "timestamp_start": 140.0,
-      "timestamp_end": 154.0,
-      "narration_text": "Governance passes, and the product says out loud what it did not do. No deployment pipeline was contacted. The token is spent, then the same remote publishes a fixed responder handoff with the facts and next step.",
-      "visual_action": "Press Confirm. Hold on RECORDED, no pipeline contacted, on the board, then read the output verbatim in the evidence panel, including the sentence stating no pipeline was contacted. Press Publish handoff and hold on the shared revision, facts and next step."
+      "beat_id": "beat_10_fixtures",
+      "timestamp_start": 123.0,
+      "timestamp_end": 138.0,
+      "narration_text": "Down brings the answer into view: a recording, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic, because this run has no AWS credentials.",
+      "caption_text": "Down brings the answer into view: a recording, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic, because this run has no AWS credentials.",
+      "visual_action": "D-pad Down reveals the DORA answer with its OFFLINE FIXTURE stamp. Back returns to the wall and the legend changes back. Right to Cloud spend, Center, Down: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC."
     },
     {
-      "beat_id": "beat_11_runtime_evidence",
-      "timestamp_start": 154.0,
-      "timestamp_end": 168.0,
-      "narration_text": "The source includes a normal-launch Android TV proof that installs this exact APK and replays the same D-pad journey. A receipt is claimed only after that workflow succeeds; physical hardware is optional under the event FAQ.",
-      "visual_action": "Cut to docs/FIRE_TV_BUILD.md and the Android TV runtime workflow. Do not show a receipt until the recorded run exists."
+      "beat_id": "beat_11_build_check",
+      "timestamp_start": 138.0,
+      "timestamp_end": 157.0,
+      "narration_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This take is a desktop browser at Fire TV resolution, driven through the D pad bridge the Leanback app calls. No device or emulator run is shown, and a public deployment is pending.",
+      "caption_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This take is a desktop browser at Fire TV resolution, driven through the D-pad bridge the Leanback app calls. No device or emulator run is shown, and a public deployment is pending.",
+      "visual_action": "Center on Check. The connection line reads GET /health returned 200, the build's short SHA, and GitHub live: no, fixture mode."
     }
   ]
 }
