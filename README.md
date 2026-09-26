@@ -4,7 +4,7 @@
 
 ![The Mercury incident board at 1920x1080: a departures-board answer row for checkout-api reading 12.9x over baseline with a hazard-striped OFFLINE FIXTURE stamp and a LIVE commits stamp beside the figure, the verdict Attributed naming one commit at 52.2% naming precision, a record-only rollback as the next action, the amber Ask what changed button, and five service rows below it reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data](docs/assets/incident-board-1920x1080.png)
 
-*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. Every row is its own `what_changed` response; the metric is an offline fixture and says so.*
+*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. Every row is its own `what_changed` response; the metric is an offline fixture and says so. The quoted commit is one of this repository's own, standing in for a deploy.*
 
 ```mermaid
 flowchart LR
@@ -744,9 +744,9 @@ as a separate artifact.
 ```bash
 pip install -e ".[ux]" && playwright install chromium
 python scripts/measure_legibility.py
-# Measured 233 visible text readings across 4 views at 1920x1080 (root font 24px)
+# Measured 234 visible text readings across 4 views at 1920x1080 (root font 24px)
 #   smallest rendered text anywhere: 24px (floor 24px)
-#   readings under the floor: 0 of 233
+#   readings under the floor: 0 of 234
 #   smallest operational text (reasons, provenance, pills): 25.9px over 21 readings
 #   anomaly factor renders at y=189, provenance stamp at y=337, fold at y=1080
 #   provenance stamps within the first viewport: 2 ['LIVE', 'OFFLINE FIXTURE']
