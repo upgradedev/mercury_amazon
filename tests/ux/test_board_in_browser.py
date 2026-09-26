@@ -372,6 +372,48 @@ def test_focus_starts_on_the_primary_and_the_remote_reaches_every_visible_contro
         context.close()
 
 
+DPAD_FROM_THE_PRIMARY = """() => {
+  const nav = window.mercuryNav;
+  const id = el => el && (el.id || el.getAttribute('data-service'));
+  const ask = document.querySelector('#btnWhatChanged');
+  nav.setFocus(ask);
+  window.navigateDpad('DOWN');
+  const down = id(nav.current);
+  window.navigateDpad('UP');
+  const up = id(nav.current);
+  const row = document.querySelector('.btn-demo[data-service="search-indexer"]');
+  nav.setFocus(row);
+  window.navigateDpad('RIGHT');
+  const right = id(nav.current);
+  nav.setFocus(ask);
+  window.scrollTo(0, 0);
+  return { down, up, right };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host",
+    [(1920, 1080, False), (1280, 720, False), (960, 540, True)],
+    ids=["tv-browser-1920x1080", "laptop-1280x720", "firetv-webview-960x540"],
+)
+def test_down_from_the_primary_enters_the_board_and_up_comes_back(browser, base_url, width, height, host):
+    """DOWN from the landing focus used to skip all five departures.
+
+    The navigator scored centre to centre, so the full-width rows 21px under the narrow
+    primary button counted as 680px off to the side, and DOWN jumped about 1400px to
+    Publish handoff. UP from the first row went to Stage, and RIGHT from any row jumped
+    down the page to a tile. Measured on the page at all three sizes the review used.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=width, height=height, host=host)
+    try:
+        wait_for_board(page)
+        moves = page.evaluate(DPAD_FROM_THE_PRIMARY)
+        assert moves == {"down": "checkout-api", "up": "btnWhatChanged", "right": "search-indexer"}, moves
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 # ------------------------------------------------------- Every verdict, every row
 
 EXPECTED_VERDICTS = {

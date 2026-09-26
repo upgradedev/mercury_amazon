@@ -21,6 +21,9 @@
   var FOCUS_CLASS = 'tv-focused';
   var FOCUS_EVENT = 'mercury:focuschange';
   var PERPENDICULAR_PENALTY = 2.5;
+  /* Sub-pixel rounding and 1px borders can put two boxes that sit edge to edge a
+     fraction of a pixel into each other. This much overlap still counts as beside. */
+  var EDGE_SLACK = 2;
   var DIRECTIONS = { UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT' };
 
   var KEY_TO_DIRECTION = {
@@ -45,27 +48,72 @@
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, rect: rect };
   }
 
+  /** Gap between two spans on one axis: 0 when they overlap. */
+  function spanGap(aStart, aEnd, bStart, bEnd) {
+    if (bStart >= aEnd) return bStart - aEnd;
+    if (aStart >= bEnd) return aStart - bEnd;
+    return 0;
+  }
+
   /**
-   * Score a candidate for a move. Returns null when the candidate is not in the
-   * pressed direction at all, otherwise a distance where lower wins.
+   * Score a candidate for a move, box to box. Returns null when the candidate does
+   * not lie wholly in the pressed direction, otherwise a distance where lower wins.
+   *
+   * Distances are measured edge to edge, and drift across the direction of travel
+   * costs nothing while the two boxes overlap on that axis. Centre to centre, a
+   * full-width row sitting 21px under a narrow button scored as if it were 680px off
+   * to the side, and DOWN from "Ask what changed" jumped 1400px past the whole
+   * departures board to the next narrow button on the page.
    *
    * Exported for testing: the geometry is pure and does not need a browser.
    */
-  function scoreCandidate(fromCentre, toCentre, direction) {
-    var dx = toCentre.x - fromCentre.x;
-    var dy = toCentre.y - fromCentre.y;
+  function scoreCandidate(fromBox, toBox, direction) {
+    var a = fromBox.rect;
+    var b = toBox.rect;
     var along;
     var across;
 
-    if (direction === DIRECTIONS.RIGHT) { along = dx; across = Math.abs(dy); }
-    else if (direction === DIRECTIONS.LEFT) { along = -dx; across = Math.abs(dy); }
-    else if (direction === DIRECTIONS.DOWN) { along = dy; across = Math.abs(dx); }
+    if (direction === DIRECTIONS.RIGHT) {
+      if (b.left < a.right - EDGE_SLACK) return null;
+      along = b.left - a.right; across = spanGap(a.top, a.bottom, b.top, b.bottom);
+    } else if (direction === DIRECTIONS.LEFT) {
+      if (b.right > a.left + EDGE_SLACK) return null;
+      along = a.left - b.right; across = spanGap(a.top, a.bottom, b.top, b.bottom);
+    } else if (direction === DIRECTIONS.DOWN) {
+      if (b.top < a.bottom - EDGE_SLACK) return null;
+      along = b.top - a.bottom; across = spanGap(a.left, a.right, b.left, b.right);
+    } else if (direction === DIRECTIONS.UP) {
+      if (b.bottom > a.top + EDGE_SLACK) return null;
+      along = a.top - b.bottom; across = spanGap(a.left, a.right, b.left, b.right);
+    } else return null;
+
+    return Math.max(0, along) + across * PERPENDICULAR_PENALTY;
+  }
+
+  /**
+   * The old centre-to-centre score, kept only as a fallback for UP and DOWN when no
+   * control lies wholly above or below, so a staggered layout never strands one.
+   * LEFT and RIGHT have no fallback: a full-width row has no neighbour to its right,
+   * and RIGHT from it holds instead of jumping down the page.
+   */
+  function centreScore(fromBox, toBox, direction) {
+    var dx = toBox.x - fromBox.x;
+    var dy = toBox.y - fromBox.y;
+    var along;
+    var across;
+    if (direction === DIRECTIONS.DOWN) { along = dy; across = Math.abs(dx); }
     else if (direction === DIRECTIONS.UP) { along = -dy; across = Math.abs(dx); }
     else return null;
-
-    // Must make real progress in the pressed direction.
     if (along <= 1) return null;
     return along + across * PERPENDICULAR_PENALTY;
+  }
+
+  /** Tie-break between equal scores: the box whose leading edge lines up with ours. */
+  function alignment(fromBox, toBox, direction) {
+    if (direction === DIRECTIONS.UP || direction === DIRECTIONS.DOWN) {
+      return Math.abs(toBox.rect.left - fromBox.rect.left);
+    }
+    return Math.abs(toBox.rect.top - fromBox.rect.top);
   }
 
   /** Best available human-readable name for a control, for the key hint bar. */
@@ -140,6 +188,26 @@
     this.setFocus(all[0]);
   };
 
+  /** The lowest score wins; a tie goes to the best-aligned leading edge, then DOM order. */
+  function pick(from, all, current, direction, scorer) {
+    var best = null;
+    var bestScore = Infinity;
+    var bestAlign = Infinity;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] === current) continue;
+      var box = centreOf(all[i]);
+      var score = scorer(from, box, direction);
+      if (score === null) continue;
+      var align = alignment(from, box, direction);
+      if (score < bestScore - 0.5 || (Math.abs(score - bestScore) <= 0.5 && align < bestAlign)) {
+        bestScore = score;
+        bestAlign = align;
+        best = all[i];
+      }
+    }
+    return best;
+  }
+
   /** Move focus one step in a direction. Returns the element focused, or null. */
   SpatialNavigator.prototype.move = function (direction) {
     if (!this.enabled) return null;
@@ -152,17 +220,8 @@
     }
 
     var from = centreOf(this.current);
-    var best = null;
-    var bestScore = Infinity;
-
-    for (var i = 0; i < all.length; i++) {
-      if (all[i] === this.current) continue;
-      var score = scoreCandidate(from, centreOf(all[i]), direction);
-      if (score !== null && score < bestScore) {
-        bestScore = score;
-        best = all[i];
-      }
-    }
+    var best = pick(from, all, this.current, direction, scoreCandidate);
+    if (!best) best = pick(from, all, this.current, direction, centreScore);
 
     // No candidate in that direction: hold focus rather than wrapping, which is
     // what a 10-foot UI should do. Wrapping loses the viewer's place.

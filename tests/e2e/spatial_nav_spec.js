@@ -256,6 +256,63 @@ test('only one element carries the focus class at a time', () => {
   assert.strictEqual(focused[0].id, 'r0c1');
 });
 
+/**
+ * The board at 1920x1080, from the positions measured in the page: the narrow
+ * primary button, Stage beside it, five full-width departure rows 21px below, and
+ * the next narrow button on the page 1400px further down. Centre to centre, DOWN
+ * from Ask scored the full-width row as 680px off to the side and jumped to the
+ * far button, skipping the whole board.
+ */
+function board() {
+  const ask = makeElement('ask', 80, 470, 400, 78);
+  const stage = makeElement('stage', 495, 470, 326, 78);
+  const rows = [0, 1, 2, 3, 4].map((i) => makeElement(`row${i}`, 86, 569 + i * 61, 1748, 58));
+  const handoff = makeElement('handoff', 86, 1891, 210, 50);
+  const spend = makeElement('spend', 1250, 2400, 580, 160);
+  return { ask, stage, rows, handoff, spend, all: [ask, stage, ...rows, handoff, spend] };
+}
+
+test('DOWN from a narrow button lands on the full-width row directly under it', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.ask);
+  assert.strictEqual(nav.move('DOWN').id, 'row0', 'the board is not skipped');
+  assert.strictEqual(nav.move('DOWN').id, 'row1');
+});
+
+test('UP from a full-width row returns to the button whose edge lines up with it', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[0]);
+  // Ask and Stage are the same distance above the row; Ask shares its left edge.
+  assert.strictEqual(nav.move('UP').id, 'ask');
+});
+
+test('RIGHT from a full-width row holds instead of jumping down the page', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[2]);
+  assert.strictEqual(nav.move('RIGHT').id, 'row2');
+  assert.strictEqual(nav.move('LEFT').id, 'row2');
+});
+
+test('the remote smoke path still reaches Stage from Ask, and DOWN from Stage enters the board', () => {
+  const b = board();
+  const { nav, bridge } = loadNavigator(b.all);
+  nav.setFocus(b.ask);
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'stage');
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'row0');
+});
+
+test('DOWN from the last row moves on to the next control below the board', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[4]);
+  assert.strictEqual(nav.move('DOWN').id, 'handoff');
+});
+
 // ---------------------------------------------------------------------- Runner
 
 let failures = 0;
