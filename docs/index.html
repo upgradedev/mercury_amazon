@@ -801,6 +801,8 @@
           <p class="note">Without AWS credentials each metric series is generated locally from the
             service name, so these answers differ. A name that is not on this list is refused rather
             than given an invented reading.</p>
+          <p class="note" id="standInNote">Without a GitHub token, the commit named under a spike is the
+            newest lone commit in Mercury's own git history, standing in for a deploy.</p>
         </div>
       </section>
 
@@ -1128,6 +1130,23 @@
       return wrap;
     }
 
+    /* Without a GitHub token the commits are Mercury's own history (local git, or the
+       checked-in recording of it), and the offline spike is placed after the newest
+       lone commit in it, so the board quotes one of this repository's commits against
+       checkout-api. The badge says so to assistive technology and on hover, in the
+       server's own provenance sentence; nothing is added to the board's visible words. */
+    function commitBadge(data) {
+      var provenance = data.commit_provenance;
+      var badge = sourceBadge(provenance, 'commits');
+      var source = provenance && provenance.data_source;
+      if (source === 'local-git' || source === 'offline-fixture') {
+        var said = 'Standing in for deploys of ' + data.service + ': ' + (provenance.detail || '');
+        badge.setAttribute('aria-description', said);
+        badge.title = said;
+      }
+      return badge;
+    }
+
     /**
      * One real HTTP call. The duration is measured around the fetch with
      * performance.now(), so the number on screen is the latency this page
@@ -1356,7 +1375,7 @@
       var factor = metric.anomaly_factor;
       var badges = [
         sourceBadge(data.metric_provenance, 'metric'),
-        sourceBadge(data.commit_provenance, 'commits')
+        commitBadge(data)
       ];
 
       var accuracy = accuracyLine(data);

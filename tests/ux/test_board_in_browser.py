@@ -24,6 +24,7 @@ Needs the optional browser extra, and skips where it is absent::
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import socket
 import subprocess
@@ -267,6 +268,56 @@ def test_the_verdict_line_is_instant_under_reduced_motion(browser, base_url):
         headline = page.evaluate(HEADLINE_STATE)
         sha = probe["bodies"]["checkout-api"]["offending_commit"]["sha"]
         assert headline == {"nodes": 1, "isText": True, "text": "Commit " + sha}
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+# ------------------------------------------------------------ The quoted commit
+
+COMMIT_BADGE = """() => {
+  const badges = [...document.querySelectorAll('#heroSource .src-badge')];
+  const commits = badges.find(b => b.textContent.includes('commits'));
+  const note = document.querySelector('#standInNote');
+  return { description: commits && commits.getAttribute('aria-description'),
+           title: commits && commits.title,
+           visible: commits && commits.textContent,
+           note: note && note.textContent.replace(/\\s+/g, ' ').trim() };
+}"""
+
+
+def test_the_quoted_commit_is_described_as_this_repositorys_history_standing_in_for_a_deploy(
+        browser, base_url):
+    """Offline, the board quotes one of Mercury's own commits against checkout-api.
+
+    The page has to say where that commit came from: the commits badge carries the
+    server's own provenance sentence as its accessible description, prefixed with
+    what the commit stands in for, and the evidence note says it in one line. The
+    badge's visible text stays the stamp and the source slug, so the board's word
+    count does not move.
+    """
+    request = urllib.request.Request(
+        base_url + "/mcp/tools/what_changed", data=b'{"service": "checkout-api"}',
+        headers={"content-type": "application/json"}, method="POST")
+    with urllib.request.urlopen(request, timeout=20) as response:
+        body = json.load(response)
+    provenance = body["commit_provenance"]
+    assert provenance["data_source"] in ("local-git", "offline-fixture"), provenance
+    sha = body["offending_commit"]["sha"]
+    # Real history, never an invented commit: the named sha is in this checkout.
+    if (REPO_ROOT / ".git").exists():
+        subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"], cwd=REPO_ROOT, check=True)
+
+    context, page, errors, _ = open_board(browser, base_url)
+    try:
+        wait_for_board(page)
+        badge = page.evaluate(COMMIT_BADGE)
+        expected = "Standing in for deploys of checkout-api: " + provenance["detail"]
+        assert badge["description"] == expected
+        assert badge["title"] == expected
+        assert badge["visible"] == provenance["display_label"] + "commits: " + provenance["data_source"]
+        assert badge["note"] == ("Without a GitHub token, the commit named under a spike is the newest "
+                                 "lone commit in Mercury's own git history, standing in for a deploy.")
         assert errors == [], errors
     finally:
         context.close()
