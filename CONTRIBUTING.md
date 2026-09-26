@@ -24,7 +24,7 @@ it works. Both are welcome; do not skip the first.
 ## Getting set up
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git
+git clone https://github.com/upgradedev/mercury_amazon.git   # fails while the repository is private
 cd mercury_amazon
 pip install -e ".[dev]"
 ```

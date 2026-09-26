@@ -1,10 +1,14 @@
 # Mercury: evidence, measurements and history
 
-This is the long form behind the [README](../README.md). Every claim in the README
-is here with the command that produced it, together with the audit history: what was
-measured, what was wrong, and what changed. Tests in `tests/` compare the figures on
-this page against the files their commands write, so a figure here cannot drift from
-its measurement without the build failing.
+This is the long form behind the [README](../README.md): the measurements with the
+commands that produced them, and the audit history of what was measured, what was
+wrong and what changed. Tests in `tests/` compare the headline figures on this page
+(the correlation trial, benchmarks, coverage, test counts, legibility, suite runtime
+and readiness score) against the files their commands write, so those cannot drift
+without the build failing. Some figures are not pinned that way: the ablation and
+sweep tables are what `python scripts/correlation_trial.py` prints, and a reader
+checks them by running it, and a few, such as how long one clean install took, are observations
+with no command behind them and are worded as such.
 
 ## Contents
 

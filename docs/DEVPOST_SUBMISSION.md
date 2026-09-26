@@ -227,9 +227,11 @@ Stated here rather than left for a judge to find:
   `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
-* The public cockpit is live at
+* The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It uses labelled offline fixtures and record-only rollback
+  publishes the deployed build SHA. It runs an older build than this repository: probed on
+  2026-09-26, `/health` reported `6dd76bd`, which predates the departures board design and
+  loads Google Fonts, where the current build serves its own fonts. It uses labelled offline fixtures and record-only rollback
   dispatch until real telemetry and pipeline credentials are configured.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
   like an anomaly. The baseline now stops at the onset rather than containing the
@@ -265,8 +267,11 @@ GitHub Actions.
 
 ## Try it
 
+The repository is private today, so the clone fails for anyone outside the
+organisation until it is made public. With the source in hand, start at `pip install`.
+
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git
+git clone https://github.com/upgradedev/mercury_amazon.git   # fails while private
 cd mercury_amazon
 pip install -e ".[dev]"
 python -m pytest tests/ -q

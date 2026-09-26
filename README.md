@@ -29,7 +29,7 @@ deployment of this build, and a public repository.
 |---|---|
 | [Live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/) | Build `6dd76bd`, probed 2026-09-26: older than this branch and the design above, and it loads Google Fonts. Its `/health` reports the build SHA |
 | [Run it locally](#run-it-locally) | The build in the picture, with no credentials |
-| [Evidence](docs/EVIDENCE.md) | Every figure with the command that produced it, and the audit history |
+| [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-610%20collected-brightgreen.svg)](tests/)
