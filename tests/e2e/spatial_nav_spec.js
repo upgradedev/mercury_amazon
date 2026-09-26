@@ -313,6 +313,17 @@ test('DOWN from the last row moves on to the next control below the board', () =
   assert.strictEqual(nav.move('DOWN').id, 'handoff');
 });
 
+test('setFocus can place the cursor without moving keyboard focus', () => {
+  const cells = grid();
+  const { nav } = loadNavigator(cells);
+  nav.setFocus(at(cells, 0, 0), { domFocus: false });
+  assert.strictEqual(nav.current.id, 'r0c0');
+  assert.ok(nav.current.hasClass('tv-focused'), 'the ring is drawn');
+  assert.strictEqual(at(cells, 0, 0).focused, 0, 'keyboard focus is left where it was');
+  nav.move('RIGHT');
+  assert.strictEqual(at(cells, 0, 1).focused, 1, 'a remote press moves keyboard focus with it');
+});
+
 // ---------------------------------------------------------------------- Runner
 
 let failures = 0;

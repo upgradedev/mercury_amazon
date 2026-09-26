@@ -73,7 +73,7 @@ distance along the axis of travel plus a weighted penalty for perpendicular drif
 and take the minimum. It holds focus at an edge rather than wrapping, because
 wrapping loses the viewer's place on a large screen. The geometry is tested by
 executing the real file in Node against a synthetic grid:
-`node tests/e2e/spatial_nav_spec.js`, 22 assertions.
+`node tests/e2e/spatial_nav_spec.js`, 23 assertions.
 
 **Suggestion.** Ship a small, supported spatial navigation JavaScript library for
 Fire TV web apps and WebView hosts, or enable the CSS specification in the Fire OS

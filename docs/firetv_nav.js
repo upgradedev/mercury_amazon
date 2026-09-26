@@ -160,13 +160,19 @@
     return rect.top >= 0 && rect.left >= 0 && rect.bottom <= height && rect.right <= width;
   }
 
-  SpatialNavigator.prototype.setFocus = function (element) {
+  /**
+   * Put the D-pad cursor on an element. Keyboard focus follows unless
+   * options.domFocus is false, which the page passes on load outside a television
+   * host so a desktop keyboard user's first Tab still reaches the skip link.
+   */
+  SpatialNavigator.prototype.setFocus = function (element, options) {
     if (!element) return;
     var previous = document.querySelector('.' + FOCUS_CLASS);
     if (previous && previous !== element) previous.classList.remove(FOCUS_CLASS);
     element.classList.add(FOCUS_CLASS);
     this.current = element;
-    if (typeof element.focus === 'function') element.focus({ preventScroll: true });
+    var domFocus = !options || options.domFocus !== false;
+    if (domFocus && typeof element.focus === 'function') element.focus({ preventScroll: true });
     // Scroll only when the target is not already wholly visible. Calling
     // scrollIntoView unconditionally made the page jump on load, which on a TV
     // reads as the wallboard glitching the moment it is switched on.
@@ -176,7 +182,7 @@
     announceFocus(element);
   };
 
-  SpatialNavigator.prototype.focusFirst = function () {
+  SpatialNavigator.prototype.focusFirst = function (options) {
     var all = this.candidates();
     if (!all.length) return;
     // Reading order: topmost, then leftmost.
@@ -185,7 +191,7 @@
       var rb = b.getBoundingClientRect();
       return (ra.top - rb.top) || (ra.left - rb.left);
     });
-    this.setFocus(all[0]);
+    this.setFocus(all[0], options);
   };
 
   /** The lowest score wins; a tie goes to the best-aligned leading edge, then DOM order. */
@@ -265,6 +271,10 @@
     }
     if (event.key === 'Enter' || event.key === 'Select') {
       if (target && target.tagName === 'INPUT') return;
+      // A link or button outside the ring (the skip link) activates itself.
+      if (target && typeof target.matches === 'function'
+          && target.matches('a[href], button, select, textarea')
+          && !target.matches(FOCUSABLE_SELECTOR)) return;
       event.preventDefault();
       navigator_.select();
       return;
@@ -275,8 +285,30 @@
   }
 
   document.addEventListener('keydown', onKeyDown);
+  function onTelevision() {
+    var root = document.documentElement;
+    return !!(root && root.classList && root.classList.contains('tv-host'));
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
-    navigator_.focusFirst();
+    if (navigator_.current) return;
+    if (onTelevision()) { navigator_.focusFirst(); return; }
+    // Outside a television host the cursor is placed, but keyboard focus is left
+    // where the browser puts it, at the top of the document.
+    navigator_.focusFirst({ domFocus: false });
+  });
+  // Tab and the arrow keys have to agree about where the viewer is. When keyboard
+  // focus lands on a control in the ring, the cursor follows it; when it lands on
+  // something outside the ring (the skip link, a text field), the ring steps aside
+  // until the next arrow press, so there is never a second focus indicator.
+  document.addEventListener('focusin', function (event) {
+    var target = event.target;
+    if (!target || typeof target.matches !== 'function') return;
+    if (target.matches(FOCUSABLE_SELECTOR)) {
+      if (target !== navigator_.current) navigator_.setFocus(target, { domFocus: false });
+    } else if (navigator_.current && navigator_.current.classList) {
+      navigator_.current.classList.remove(FOCUS_CLASS);
+    }
   });
   // A click with a mouse should move the D-pad cursor too, so the two agree.
   document.addEventListener('click', function (event) {

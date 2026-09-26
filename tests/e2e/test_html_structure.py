@@ -357,6 +357,10 @@ def test_the_page_has_landmarks_a_skip_link_and_one_h1(html):
         assert landmark in html, f"missing landmark {landmark}"
     assert html.count("<h1") == 1, "a 10-foot page has exactly one headline"
     assert 'aria-labelledby="heroHeadline"' in html
+    # The h1 names the product. It used to be the verdict line, so heading
+    # navigation read "Commit 432bcd2", or scrambled letters mid-flap, as the page.
+    assert '<h1 class="sr-only">Mercury Fire TV incident board</h1>' in html
+    assert '<h2 class="hero-headline" id="heroHeadline">' in html
 
 
 def test_async_regions_announce_themselves_to_assistive_technology(html):

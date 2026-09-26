@@ -393,6 +393,7 @@
       letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
     }
     .tile-headline { display: block; font-family: var(--display); font-size: 1.45rem; font-weight: 700; margin: 0.35rem 0 0.25rem; color: var(--amber); }
+    .tile-headline[data-empty="true"] { color: var(--ink-2); font-weight: 600; }
     .tile-sub { display: block; color: var(--ink-2); font-size: var(--fs-small); }
     .tile-open { display: block; margin-top: 0.7rem; font-family: var(--display); font-size: var(--fs-label); letter-spacing: 0.2em;
                  text-transform: uppercase; color: var(--amber); font-weight: 600; }
@@ -463,6 +464,10 @@
       padding: 0.05rem 0.45rem;
     }
     .keybar .focused-label { margin-left: auto; color: var(--amber); font-weight: 600; }
+    /* Inside the Fire TV app the remote is the only input, so the legend needs no
+       introduction; in a desktop browser it says whose keys these are. */
+    .keybar .remote-note { color: var(--ink); font-weight: 600; }
+    html.tv-host .keybar .remote-note { display: none; }
     html.tv-host .keybar { display: flex; }
     html.tv-host body { padding-bottom: 4.5rem; }
 
@@ -639,6 +644,7 @@
 
   <div class="shell">
     <header class="topbar">
+      <h1 class="sr-only">Mercury Fire TV incident board</h1>
       <div class="wordmark">
         <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
           <rect x="2" y="2" width="28" height="13.5" fill="#1D2025"/>
@@ -688,7 +694,7 @@
             <div class="cell cell-verdict">
               <p class="cell-label">Verdict</p>
               <p class="hero-eyebrow" id="heroEyebrow">No answer yet</p>
-              <h1 class="hero-headline" id="heroHeadline">What broke?</h1>
+              <h2 class="hero-headline" id="heroHeadline">What broke?</h2>
               <span class="hero-evidence" id="heroEvidence"></span>
               <span class="hero-accuracy" id="heroAccuracy"></span>
             </div>
@@ -861,22 +867,22 @@
       <section id="wall" class="wall" aria-label="War room panels">
         <button class="tile" data-tv-focusable data-panel="incident" data-tv-label="Incident evidence panel">
           <span class="tile-eyebrow">Incident evidence</span>
-          <span class="tile-headline" id="tileIncidentHeadline">Not loaded</span>
+          <span class="tile-headline" id="tileIncidentHeadline" data-empty="true">Not asked yet</span>
           <span class="tile-sub" id="tileIncidentSub">Metric series, baseline, attribution window and both provenance stamps.</span>
           <span class="tile-open">Center to open</span>
         </button>
 
         <button class="tile" data-tv-focusable data-panel="velocity" data-tv-label="Delivery velocity panel">
           <span class="tile-eyebrow">Delivery velocity</span>
-          <span class="tile-headline" id="tileVelocityHeadline">Not loaded</span>
-          <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog.</span>
+          <span class="tile-headline" id="tileVelocityHeadline" data-empty="true">Opens and loads</span>
+          <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
 
         <button class="tile" data-tv-focusable data-panel="spend" data-tv-label="Cloud spend panel">
           <span class="tile-eyebrow">Cloud spend</span>
-          <span class="tile-headline" id="tileSpendHeadline">Not loaded</span>
-          <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing.</span>
+          <span class="tile-headline" id="tileSpendHeadline" data-empty="true">Opens and loads</span>
+          <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
       </section>
@@ -997,6 +1003,7 @@
   </div>
 
   <footer class="keybar">
+    <span class="hint remote-note">Fire TV remote:</span>
     <span class="hint">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <circle cx="12" cy="12" r="10.5" fill="#16181C" stroke="#ABA597" stroke-width="1.5"/>
@@ -1035,6 +1042,7 @@
       connection: 'unknown',
       dpadDemoApproval: false,
       handoffRevision: 0,
+      panelLoaded: {},
       speak: false,
       /* Which service the next correlation asks about. Changed only by the demo
          state buttons, so the screen always names the service it answered for. */
@@ -1630,6 +1638,12 @@
 
     function panels() { return document.querySelectorAll('[data-panel-body]'); }
 
+    function tileHeadline(id, text) {
+      var node = el(id);
+      node.textContent = text;
+      node.removeAttribute('data-empty');
+    }
+
     function showWall() {
       state.view = 'wall';
       Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = true; });
@@ -1643,6 +1657,12 @@
       if (window.mercuryNav) { window.mercuryNav.setFocus(origin || document.querySelector('.tile')); }
     }
 
+    /* The call a panel makes when it is first opened: pressing the tile is the ask. */
+    var PANEL_PRIMARY = {
+      velocity: function () { return loadDora(); },
+      spend: function () { return loadCost(); }
+    };
+
     function showPanel(name) {
       var target = el('panel-' + name);
       if (!target) { return; }
@@ -1653,6 +1673,10 @@
       el('hintBack').textContent = 'Back to the wall';
       if (window.mercuryNav) {
         window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));
+      }
+      if (!state.panelLoaded[name] && PANEL_PRIMARY[name]) {
+        state.panelLoaded[name] = true;
+        PANEL_PRIMARY[name]();
       }
     }
 
@@ -1721,7 +1745,7 @@
         heroFromCorrelation(data);
         fillRow(data.service, data);
         renderIncidentDetail(data);
-        el('tileIncidentHeadline').textContent = data.verdict.split('_').join(' ').toLowerCase();
+        tileHeadline('tileIncidentHeadline', data.verdict.split('_').join(' ').toLowerCase());
         el('tileIncidentSub').textContent =
           data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';
 
@@ -1749,7 +1773,7 @@
         rowFailed(state.service);
         el('heroLatency').textContent = 'The call did not complete.';
         showError('incidentOutput', error.message);
-        el('tileIncidentHeadline').textContent = 'Call failed';
+        tileHeadline('tileIncidentHeadline', 'Call failed');
         el('tileIncidentSub').textContent = error.message;
       }
     }
@@ -2104,6 +2128,18 @@
       }
     }
 
+    /* A zero here is either no failures or no runs at all, and the two read the same
+       as a bare "0%". Which one it is follows from the deploy frequency beside it:
+       successful runs in the window mean completed runs exist, so 0% is none failed. */
+    function failureRateText(m) {
+      if (m.change_failure_rate_pct !== 0) { return m.change_failure_rate_pct + '%'; }
+      return m.deployment_frequency_per_day > 0 ? '0%, no failed runs in the window' : 'n/a, no completed runs';
+    }
+    function recoveryText(m) {
+      if (m.mttr_hours !== 0) { return m.mttr_hours + ' h'; }
+      return m.change_failure_rate_pct === 0 ? 'n/a, nothing failed to recover from' : 'no recovery recorded yet';
+    }
+
     async function loadDora() {
       el('doraEndpoint').textContent = 'POST /mcp/tools/get_dora_velocity_report';
       showLoading('doraOutput', 'Calling POST /mcp/tools/get_dora_velocity_report ...');
@@ -2116,19 +2152,19 @@
         box.appendChild(kv([
           ['Deploys per day', m.deployment_frequency_per_day],
           ['Lead time', m.lead_time_hours + ' h'],
-          ['Change failure rate', m.change_failure_rate_pct + '%'],
-          ['Recovery time', m.mttr_hours + ' h'],
+          ['Change failure rate', failureRateText(m)],
+          ['Recovery time', recoveryText(m)],
           ['Records used', data.sample_size + ' over ' + data.window_days + ' days']
         ]));
         box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        el('tileVelocityHeadline').textContent = m.deployment_frequency_per_day + ' deploys per day';
+        tileHeadline('tileVelocityHeadline', m.deployment_frequency_per_day + ' deploys per day');
         el('tileVelocitySub').textContent =
           data.tier + ', from ' + data.sample_size + ' records over ' + data.window_days + ' days.';
         speak(data.voice_summary);
       } catch (error) {
         showError('doraOutput', error.message);
-        el('tileVelocityHeadline').textContent = 'Call failed';
+        tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
       }
     }
@@ -2158,12 +2194,12 @@
         }
         box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        el('tileVelocityHeadline').textContent = data.stale_count + ' reviews past SLA';
+        tileHeadline('tileVelocityHeadline', data.stale_count + ' reviews past SLA');
         el('tileVelocitySub').textContent = data.total_open + ' pull requests open.';
         speak(data.voice_summary);
       } catch (error) {
         showError('doraOutput', error.message);
-        el('tileVelocityHeadline').textContent = 'Call failed';
+        tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
       }
     }
@@ -2194,12 +2230,12 @@
         }
         box.appendChild(provenanceBlock(data.provenance));
         render('costOutput', box);
-        el('tileSpendHeadline').textContent = '$' + data.month_to_date_usd + ' month to date';
+        tileHeadline('tileSpendHeadline', '$' + data.month_to_date_usd + ' month to date');
         el('tileSpendSub').textContent = data.anomalies.length + ' service anomalies over the day average.';
         speak(data.voice_summary);
       } catch (error) {
         showError('costOutput', error.message);
-        el('tileSpendHeadline').textContent = 'Call failed';
+        tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
       }
     }
@@ -2222,11 +2258,11 @@
           'The received signals in this call are the two the cockpit knows it sends. '
           + 'Mercury does not discover a service’s real signal set.'));
         render('costOutput', box);
-        el('tileSpendHeadline').textContent = data.missing_signals.length + ' signals missing';
+        tileHeadline('tileSpendHeadline', data.missing_signals.length + ' signals missing');
         el('tileSpendSub').textContent = 'Observability gap score ' + data.observability_gap_score + '.';
       } catch (error) {
         showError('costOutput', error.message);
-        el('tileSpendHeadline').textContent = 'Call failed';
+        tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
       }
     }
@@ -2373,8 +2409,13 @@
       }
 
       // The D-pad cursor starts on the one thing the room came here to press,
-      // not on whatever happens to be first in the DOM.
-      if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnWhatChanged')); }
+      // not on whatever happens to be first in the DOM. Keyboard focus moves there
+      // too only on a television host; in a desktop browser Tab still starts at the
+      // skip link, and the arrow keys start from the cursor.
+      if (window.mercuryNav) {
+        window.mercuryNav.setFocus(el('btnWhatChanged'),
+          { domFocus: document.documentElement.classList.contains('tv-host') });
+      }
 
       // A wallboard that waits for a click cannot be read in five seconds. Ask on
       // load when there is an origin to ask, and show the honest failure when

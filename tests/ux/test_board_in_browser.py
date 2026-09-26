@@ -450,6 +450,38 @@ def test_nothing_is_announced_on_load_and_a_press_is_answered_in_one_sentence(br
         context.close()
 
 
+@pytest.mark.parametrize("host", [False, True], ids=["desktop-browser", "firetv-host"])
+def test_keyboard_focus_moves_on_load_only_on_a_television(browser, base_url, host):
+    """On a laptop the first Tab reaches the skip link; on the TV the remote starts on Ask.
+
+    The page used to call focus() on the primary button at load everywhere, so the
+    skip link was never the first stop for a keyboard user. The D-pad cursor still
+    starts on Ask in both cases, which is what the Android smoke path relies on.
+    """
+    width, height = (960, 540) if host else (1280, 720)
+    context, page, errors, _ = open_board(browser, base_url, width=width, height=height, host=host)
+    try:
+        wait_for_board(page)
+        state = page.evaluate(
+            "() => ({ cursor: window.mercuryNav.current && window.mercuryNav.current.id,"
+            " active: document.activeElement && (document.activeElement.id || document.activeElement.className) })")
+        assert state["cursor"] == "btnWhatChanged"
+        if host:
+            assert state["active"] == "btnWhatChanged"
+        else:
+            assert state["active"] != "btnWhatChanged"
+            page.keyboard.press("Tab")
+            first = page.evaluate("document.activeElement.className")
+            assert first == "skip-link", first
+            assert page.evaluate("document.querySelectorAll('.tv-focused').length") == 0, (
+                "the D-pad ring steps aside while keyboard focus is outside it")
+            page.keyboard.press("ArrowRight")
+            assert page.evaluate("window.mercuryNav.current.id") == "btnStage"
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 # ------------------------------------------------------- Every verdict, every row
 
 EXPECTED_VERDICTS = {
