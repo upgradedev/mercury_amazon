@@ -1,10 +1,16 @@
-# Mercury: when a deploy cannot be named, and a governed rollback
+# Mercury: a Fire TV incident board that names a deploy only when it can
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
 ![The Mercury incident board at 1920x1080: a departures-board answer row for checkout-api reading 12.9x over baseline with a hazard-striped OFFLINE FIXTURE stamp and a LIVE commits stamp beside the figure, the verdict Attributed naming one commit at 52.2% naming precision, a record-only rollback as the next action, the amber Ask what changed button, and five service rows below it reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data](docs/assets/incident-board-1920x1080.png)
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. Every row is its own `what_changed` response; the metric is an offline fixture and says so. The quoted commit is one of this repository's own, standing in for a deploy.*
+
+**Who it is for:** the team that owns an on-call rota and a TV in the room where
+incidents are worked. **Who would pay:** whoever owns that rota, usually a head of
+platform or of engineering. That is a hypothesis nobody has tested yet;
+[Who would buy this](#who-would-buy-this-and-why) says what it rests on and what
+would falsify it.
 
 ```mermaid
 flowchart LR
@@ -48,21 +54,11 @@ Open `http://127.0.0.1:8002/`. No credentials and no AWS account are needed: the
 commits are read from the checkout you just cloned, the metric series is simulated
 and labelled as simulated on screen, and the server prints an ephemeral governance
 secret to its log for authenticated operator calls. The labelled record-only TV demo
-needs no typed secret and can contact no deployment pipeline. The current green-suite timing
-record spans 50.37 to 222.72 seconds across four runs of the 541-test tree on
-2026-09-23: the three quiet runs landed at 50.37, 55.55 and 162.76 seconds, and the
-run with 4 CPU-saturating background processes landed at 222.72 seconds. Every run
-reported all 541 tests passing. It
-moves with machine load and with whatever else the machine is doing: the session
-before it, on the same machine while other processes were saturating the CPU,
-measured 132.61–486.63 seconds over 440 tests. Both sessions come from
-`python scripts/time_test_suite.py`, and [Quickstart](#quickstart) names the
-machine, states the condition of every run, and says what the figure used to be.
-The `pip install` before it dominates the total and depends on your
-network; a clean-environment install here ran past ten minutes, so budget for that
-rather than for a fast one. On PowerShell, set the secret with
+needs no typed secret and can contact no deployment pipeline. `pip install` is the
+slow part; the measured suite timings, with the machine and the load of every run,
+are in [Quickstart](#quickstart). On PowerShell, set the secret with
 `$env:MERCURY_ROLLBACK_SECRET = "pick-any-string"` before the last line if you
-would rather choose it yourself. Full detail in [Quickstart](#quickstart).
+would rather choose it yourself.
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-604%20collected-brightgreen.svg)](tests/)
@@ -146,9 +142,14 @@ return DORA metrics computed from GitHub Actions runs and merged pull requests,
 open pull requests past a 36 hour review SLA, and month-to-date AWS spend per
 service from Cost Explorer.
 
-**Takes a governed rollback from the D-pad.** `POST /mcp/tools/stage_rollback`
-and `POST /mcp/tools/confirm_rollback` are the only state-changing endpoints, and
-both require the deployment's shared secret. See
+**Takes a governed rollback from the D-pad.** Outside the labelled record-only
+demo, `POST /mcp/tools/stage_rollback` and `POST /mcp/tools/confirm_rollback` are
+the state-changing rollback endpoints, and both require the deployment's shared
+secret, as do the operator handoff routes. The `demo_*` routes the TV's D-pad path
+calls take no secret, and they do change state: they stage and confirm a rollback
+to the checked-in fixture target only, and publish a fixed handoff with a revision
+number. They are refused whenever a dispatcher that can reach a pipeline is
+selected, and they contact nothing outside the server. See
 [The rollback is the point](#the-rollback-is-the-point).
 
 ---
@@ -186,11 +187,13 @@ can never make a fixture look live.
 
 With no credentials at all, the war room still works end to end: the commits are
 real ones read from your checkout, and the simulated metric series is anchored
-relative to the newest of them so the correlation is coherent. The response says
-exactly that, in the text the screen shows:
+after one of them so the correlation is coherent. The checkout-api response says
+exactly that, in the provenance text the evidence panel shows:
 
-> The final reading is placed 4 minutes after the newest known commit so the
-> correlation is demonstrable; the commits are real, this metric is not.
+> The final reading is placed 4 minutes after the newest commit that is alone in its
+> 60 minute attribution window, chosen from the real log so the attribution is
+> demonstrable and does not change with the last hour of somebody's commit history;
+> the commits are real, this metric is not.
 
 ### The refusals are the first thing you can press
 
@@ -590,7 +593,8 @@ raises rather than reporting success. Firing it for real is an owner action.
 ## Quickstart
 
 Time to first result on a machine with Python 3.11 and no credentials, measured
-rather than guessed. The current green-suite record for `python -m pytest tests/ -q`
+rather than guessed. The figure moves with machine load and with the size of the
+suite, so every run below names its condition. The current green-suite record for `python -m pytest tests/ -q`
 spans **50.37 to 222.72 seconds** across four runs of the 541-test tree
 (recorded at 2026-09-23T03:18:55Z). The three quiet runs landed at 50.37, 55.55
 and 162.76 seconds. The run with **4 CPU-saturating background processes** started
@@ -687,10 +691,10 @@ cockpit. It changes on every restart.
 
 ### 4. Open the cockpit and use it
 
-Open `http://127.0.0.1:8002/`. Press **Check connection** to send a real
-`GET /health` and watch the state pill change from *API not checked*. Then
-**Ask what changed**, **Stage governed rollback**, **Confirm rollback**, and
-**Publish handoff**. In record-only mode these controls accept only the fixed,
+Open `http://127.0.0.1:8002/`. The board asks on load. Press **Check** in the
+Connection section to send a real `GET /health` and read its status and latency
+there (on a TV-sized screen the state pill in the top bar shows it too). Then
+**Ask what changed**, **Stage rollback**, **Confirm**, and **Publish handoff**. In record-only mode these controls accept only the fixed,
 labelled fixture and contact no deployment system. Authenticated operator routes use
 the secret and remain separate. A spent confirmation token cannot be replayed.
 
