@@ -22,8 +22,9 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 read from real git history; the governed rollback and its refusals, each tested; the
 Leanback app source. Simulated: every metric series on the board is an offline
 fixture, and a confirmed rollback is recorded, never sent to a pipeline. Missing: a
-Fire TV or Android TV runtime receipt (runtime evidence pending), a video, a public
-deployment of this build, and a public repository.
+Fire TV or Android TV runtime receipt (runtime evidence pending), a published video (a
+render exists locally, pending upload), a public deployment of this build, and a public
+repository.
 
 | Link | What you get today |
 |---|---|

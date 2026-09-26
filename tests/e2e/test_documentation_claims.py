@@ -243,15 +243,21 @@ def test_every_committed_data_artifact_declares_its_origin(fixture_path):
     assert origin_fields & set(data), f"{fixture_path} does not say where it came from"
 
 
-def test_the_video_directory_does_not_attest_a_video():
-    video_readme = (REPO_ROOT / "video" / "README.md").read_text(encoding="utf-8")
-    assert "No video has been recorded" in video_readme
-    assert not (REPO_ROOT / "video" / "subtitles.srt").exists(), \
-        "a subtitle file asserts timing against a picture that does not exist"
-    assert not (REPO_ROOT / "video" / "subtitles.vtt").exists()
+def test_the_video_directory_does_not_attest_a_published_video():
+    """A render exists outside the repository and has not been uploaded.
+
+    The video files may say a local render exists, because one does, but none of
+    them may claim a published video, and no media or subtitle file is committed:
+    the render, its captions and its receipt live outside git until the owner
+    uploads it.
+    """
+    video_readme = (REPO_ROOT / "video" / "README.md").read_text(encoding="utf-8").lower()
+    assert "rendered locally" in video_readme and "not uploaded" in video_readme
+    for name in ["subtitles.srt", "subtitles.vtt", "captions.en.srt", "mercury-demo.mp4"]:
+        assert not (REPO_ROOT / "video" / name).exists(), f"video/{name} belongs with the render, outside git"
     for name in ["cue_sheet.json", "narration.json"]:
         data = json.loads((REPO_ROOT / "video" / name).read_text(encoding="utf-8"))
-        assert "PLAN ONLY" in data.get("status", ""), f"{name} does not declare itself a plan"
+        assert "NOT UPLOADED" in data.get("status", ""), f"{name} does not say the render is unpublished"
 
 
 def test_the_video_plan_claims_no_capability_the_repository_lacks():
@@ -272,7 +278,7 @@ def test_the_video_plan_claims_no_capability_the_repository_lacks():
 def test_the_video_plan_and_shot_list_agree_and_fit_the_time_limit():
     """A beat list that outruns the limit is a plan for a rejected submission."""
     shot_list = (REPO_ROOT / "video" / "SHOT_LIST.md").read_text(encoding="utf-8")
-    assert "PLAN ONLY" in shot_list, "the shot list does not declare itself a plan"
+    assert "NOT UPLOADED" in shot_list, "the shot list does not say the render is unpublished"
     assert "desktop rehearsal is not the final Fire TV track proof" in shot_list, \
         "the shot list must state that a browser rehearsal is not the APK runtime proof"
 

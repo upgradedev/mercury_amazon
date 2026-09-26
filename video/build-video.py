@@ -141,7 +141,7 @@ def main() -> None:
         ("Public deployment and Fire TV runtime receipt pending.", "segoeui.ttf", 40, INK_2),
     ])
 
-    # Captions move with the title card: every window is shifted by its length.
+    # In the finished file every caption starts after the title card: shift each window.
     source = srt_windows((NARRATION / "captions.en.srt").read_text(encoding="utf-8"))
     shifted = [(start + TITLE_SECONDS, end + TITLE_SECONDS, text) for start, end, text in source]
     captions_out = OUTPUT / "captions.en.srt"
@@ -169,7 +169,10 @@ def main() -> None:
             f"adelay={delay}:all=1[{label}]"
         )
         labels.append(f"[{label}]")
-    subtitle_path = str(captions_out).replace("\\", "/").replace(":", "\\:")
+    # The subtitles filter runs on the capture chain before the title card is
+    # concatenated in front of it, so it reads the capture's own clock: burn the
+    # unshifted captions there. The shifted copy is the sidecar for the finished file.
+    subtitle_path = str(NARRATION / "captions.en.srt").replace("\\", "/").replace(":", "\\:")
     style = (
         "FontName=Arial,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
         "BorderStyle=1,Outline=0,Shadow=0,MarginV=6,Alignment=2"

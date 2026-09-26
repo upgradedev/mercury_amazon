@@ -873,16 +873,17 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
     e1 = bool(narration) and "beats" in narration
     gate("E1", "Video narration script per beat in video/", e1,
          "video/narration.json holds a per-beat script" if e1 else "No per-beat narration script")
-    # E2 requires narration and picture to be in sync, which can only be true once
-    # a video exists. The cue sheet is a plan for one.
+    # E2 requires narration and picture to be in sync in the video judges see. A
+    # local render exists and passed scripts/verify_video_sync.py, but it lives
+    # outside the repository, so this gate cannot measure it and stays red.
     gate("E2", "Narration and picture in sync gate", False,
-         "No video exists, so nothing is in sync with anything. video/cue_sheet.json is a shot plan, "
-         "not a record of a recorded take")
+         "A local render passed scripts/verify_video_sync.py (see video/README.md), but no render is "
+         "in the repository or public, so this gate has nothing it can measure")
     e3 = bool(cue_sheet) and "beat_id" in cue_sheet
     gate("E3", "Single beat re-rendering supported", e3,
          "Beats carry stable ids, so one can be re-recorded alone" if e3 else "Beats are not individually addressable")
     gate("E4", "Public video under 180s with running product", False,
-         "No video has been recorded or uploaded")
+         "A render exists locally but has not been uploaded")
 
     # ------------------------------------------- F: The README and repo (F1-F9)
     # F1 is renamed to what it truly checks. It counts badges and reports that

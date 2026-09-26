@@ -1,6 +1,6 @@
 {
   "schema": "mercury.video_plan/1",
-  "status": "PLAN ONLY. No video has been recorded yet. The beats follow what the D-pad brings on screen in the page, probed against a local server on 2026-09-26. Each beat's seconds are its measured hold: the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. This is not the Fire TV track runtime proof: the candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
+  "status": "RENDERED LOCALLY, NOT UPLOADED. One take was recorded on 2026-09-26 from a local run of commit 924a58c in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. Each beat's seconds are its measured hold: the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. This is not the Fire TV track runtime proof: the candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
   "project": "mercury_amazon",
   "title": "Mercury: Fire TV incident board",
   "source_of_truth": "scripts/build_video_plan.py",
