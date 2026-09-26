@@ -547,6 +547,27 @@ async def get_handoff(incident_id: str) -> dict[str, Any]:
     return item.to_dict()
 
 
+@app.get("/mcp/handoffs/{incident_id}/revision", dependencies=[Depends(require_operator)])
+async def get_handoff_revision(incident_id: str) -> dict[str, Any]:
+    """The revision a writer must send next; 0 when nothing has been published yet.
+
+    A shared handoff is written against the revision the writer last saw. A screen that
+    loaded before somebody else published would otherwise send a stale revision and be
+    refused, so a writer reads this first. It answers 200 either way, because nothing
+    having been published yet is a state, not an error.
+    """
+    item = incident_handoffs.get(incident_id)
+    return {"incident_id": incident_id, "revision": item.revision if item else 0}
+
+
+@app.get("/mcp/demo-handoff/revision")
+async def get_demo_handoff_revision() -> dict[str, Any]:
+    """The same revision read for the single fixed demo handoff, with no secret."""
+    _validate_record_only_demo("tv-demo-handoff")
+    item = incident_handoffs.get("checkout-api-active")
+    return {"incident_id": "checkout-api-active", "revision": item.revision if item else 0}
+
+
 @app.post("/mcp/tools/demo_update_handoff")
 async def demo_update_handoff(req: DemoHandoffRequest) -> dict[str, Any]:
     """Publish fixed fixture content; accept no responder-authored text."""

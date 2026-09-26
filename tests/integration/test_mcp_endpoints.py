@@ -256,6 +256,44 @@ def test_demo_handoff_is_fixed_and_disabled_when_effectful_dispatch_is_selected(
     assert refused.status_code == 403
 
 
+def test_a_second_screen_can_read_the_demo_handoff_revision_before_it_writes(client):
+    """The shared handoff refuses a stale revision, so a writer has to be able to read it.
+
+    Before this route existed the page sent revision 0 on every load, so once anyone had
+    published, every later screen that pressed Publish was refused with a 409. Nothing
+    having been published is revision 0 and answers 200, not 404, so the read is not an
+    error in the browser console.
+    """
+    from src.infrastructure.demo_evidence import seed_recorded_demo_evidence
+    from src.interfaces import mcp_server
+
+    seed_recorded_demo_evidence(mcp_server.incident_use_case, mcp_server.deployment_evidence)
+    before = client.get("/mcp/demo-handoff/revision")
+    assert before.json()["revision"] == 0, "nothing published yet reads as revision 0"
+    assert before.status_code == 200
+    revision = before.json()["revision"]
+    assert revision >= 0
+
+    first = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": revision})
+    assert first.status_code == 200
+    after = client.get("/mcp/demo-handoff/revision").json()["revision"]
+    assert after == revision + 1
+
+    stale = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": revision})
+    assert stale.status_code == 409, "a stale revision is still refused; the read does not weaken it"
+    second = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": after})
+    assert second.status_code == 200
+    assert second.json()["revision"] == after + 1
+
+
+def test_the_operator_handoff_revision_read_needs_the_secret_and_starts_at_zero(client, auth_headers):
+    refused = client.get("/mcp/handoffs/never-published-incident/revision")
+    assert refused.status_code in (401, 403)
+    empty = client.get("/mcp/handoffs/never-published-incident/revision", headers=auth_headers)
+    assert empty.status_code == 200
+    assert empty.json()["revision"] == 0
+
+
 def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):
     """The demo that shows the refusal has to disclose its own staging too."""
     data = client.post("/mcp/tools/what_changed", json={"service_name": "release-train"}).json()

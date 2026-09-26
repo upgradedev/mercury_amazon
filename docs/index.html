@@ -1815,6 +1815,22 @@
       render('handoffOutput', box);
     }
 
+    /* The revision the server holds now, read before a write: 0 when nothing has been
+       published yet. The server answers 200 either way. */
+    async function readHandoffRevision(secret) {
+      var headers = secret ? { 'Authorization': 'Bearer ' + secret } : {};
+      var path = state.dpadDemoApproval
+        ? '/mcp/demo-handoff/revision'
+        : '/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()) + '/revision';
+      var res = await call(path, { method: 'GET', headers: headers }, null);
+      state.handoffRevision = res.body.revision;
+      return res.body.revision;
+    }
+
+    function renderHandoffNote(text) {
+      el('handoffOutput').appendChild(h('p', 'row', text));
+    }
+
     async function publishHandoff() {
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if ((!state.dpadDemoApproval && !secret) || !state.lastCorrelation) {
@@ -1834,8 +1850,9 @@
         ? 'Stage the evidence-bound rollback and have a second responder confirm the exact digest.'
         : ((data.deployment_evidence && data.deployment_evidence.blocked_reason)
           || 'Keep investigating; Mercury has not produced an actionable target.');
-      try {
-        var payload = state.dpadDemoApproval ? {
+      var path = state.dpadDemoApproval ? '/mcp/tools/demo_update_handoff' : '/mcp/tools/update_handoff';
+      function payload() {
+        return state.dpadDemoApproval ? {
           expected_revision: state.handoffRevision
         } : {
           incident_id: handoffIncidentId(),
@@ -1845,9 +1862,31 @@
           next_step: next,
           expected_revision: state.handoffRevision
         };
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_update_handoff' : '/mcp/tools/update_handoff',
-          payload, 'handoffLatency', secret);
+      }
+      try {
+        /* The handoff is shared: another screen may have published since this page
+           loaded, and the server refuses a write against a stale revision. Read the
+           revision it holds now, then write against that one. */
+        await readHandoffRevision(secret);
+        var res;
+        try {
+          res = await post(path, payload(), 'handoffLatency', secret);
+        } catch (first) {
+          if (first.status !== 409) { throw first; }
+          // Someone published between the read and the write. The demo content is
+          // fixed, so the demo write is retried once against the revision read now.
+          // An operator's own text is never written over someone else's revision.
+          if (!state.dpadDemoApproval) {
+            var theirs = await call('/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()),
+              { method: 'GET', headers: { 'Authorization': 'Bearer ' + secret } }, 'handoffLatency');
+            renderHandoff(theirs.body);
+            renderHandoffNote('Someone else updated this handoff first. Theirs is shown above; '
+              + 'publish again to replace it with yours.');
+            return;
+          }
+          await readHandoffRevision(secret);
+          res = await post(path, payload(), 'handoffLatency', secret);
+        }
         renderHandoff(res.body);
         // The handoff lives on the second screen beside the rollback steps, so
         // publishing no longer opens a panel: the cursor moves to Refresh.
@@ -1857,7 +1896,9 @@
         reportHostEvent('handoff_published', res.body.incident_id + ':revision-' + res.body.revision + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
-        showError('handoffOutput', error.message);
+        showError('handoffOutput', error.status === 409
+          ? 'Another screen published this handoff at the same moment, twice. Press Refresh handoff to see theirs.'
+          : error.message);
       }
     }
 
