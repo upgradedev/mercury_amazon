@@ -324,6 +324,9 @@
     .btn-danger:hover { background-color: #2A1614; }
     .btn[disabled] { color: var(--ink-2); border-color: var(--rule); border-style: dashed; cursor: not-allowed; }
     .btn[disabled]:hover { background-color: var(--flap); }
+    /* A call in flight from this control: it stays in the remote's ring, so focus is
+       not lost, but a second press is ignored until the server answers. */
+    .btn[aria-busy="true"] { cursor: progress; border-style: dashed; }
     .reason { color: var(--ink-2); font-size: var(--fs-op); }
 
     /* ------------------------------------------------------------ Departures */
@@ -1073,6 +1076,27 @@
 
     function el(id) { return document.getElementById(id); }
 
+    /* Every ask gets a number. A slower answer to an earlier ask (another row pressed
+       while the first call was in flight) still fills its own row, but never paints
+       the board, the evidence panel or the rollback target over the newer ask. */
+    var askSeq = 0;
+
+    /* Stage and Confirm are one call each. A second press while the first is in
+       flight (a remote's CENTER pressed twice) used to send a second request, and a
+       spent-token refusal then pulled the page away from the recorded result. */
+    function beginCall(buttonId) {
+      var button = el(buttonId);
+      if (button.getAttribute('aria-busy') === 'true') { return false; }
+      button.setAttribute('aria-busy', 'true');
+      button.setAttribute('aria-disabled', 'true');
+      return true;
+    }
+    function endCall(buttonId) {
+      var button = el(buttonId);
+      button.removeAttribute('aria-busy');
+      button.removeAttribute('aria-disabled');
+    }
+
     function reportHostEvent(eventName, detail) {
       try {
         if (window.MercuryHost && typeof window.MercuryHost.reportJourney === 'function') {
@@ -1753,6 +1777,8 @@
     /* userAsked is true when a person pressed something. The answer fetched on load
        is painted, never announced. */
     async function loadWhatChanged(userAsked) {
+      var ask = ++askSeq;
+      var service = state.service;
       setHero({
         state: 'busy',
         verdict: 'asking',
@@ -1776,8 +1802,9 @@
 
       try {
         var res = await post('/mcp/tools/what_changed',
-          { service_name: state.service, time_window_minutes: 60 }, 'incidentLatency');
+          { service_name: service, time_window_minutes: 60 }, 'incidentLatency');
         var data = res.body;
+        if (ask !== askSeq) { fillRow(data.service, data); return; }
         state.lastCorrelation = data;
         reportHostEvent('what_changed', data.verdict + ':'
           + (data.commit_provenance ? data.commit_provenance.data_source : 'unknown') + ':'
@@ -1812,9 +1839,10 @@
         if (userAsked === true) { announce(answerSentence(data)); }
         speak(data.voice_summary);
       } catch (error) {
+        if (ask !== askSeq) { rowFailed(service); return; }
         heroFromFailure(error.message);
         if (userAsked === true) { announce('No Mercury API answered.'); }
-        rowFailed(state.service);
+        rowFailed(service);
         el('heroLatency').textContent = 'The call did not complete.';
         showError('incidentOutput', error.message);
         tileHeadline('tileIncidentHeadline', 'Call failed');
@@ -1884,6 +1912,8 @@
       }
 
       var stagePath = state.dpadDemoApproval ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback';
+      if (!beginCall('btnStage')) { return; }
+      var ask = askSeq;
       showLoading('incidentOutput', 'Calling POST ' + stagePath + ' ...');
       try {
         var res = await post(stagePath, {
@@ -1897,6 +1927,9 @@
           reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
           lease_sec: 300
         }, 'incidentLatency', secret);
+        // Somebody asked again while this was in flight: that answer owns the board,
+        // and this token is left to expire unused.
+        if (ask !== askSeq) { return; }
         state.staged = res.body;
 
         setHero({
@@ -1942,8 +1975,11 @@
         reportHostEvent('rollback_staged', res.body.action_id + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
+        if (ask !== askSeq) { return; }
         showError('incidentOutput', error.message);
         showPanel('incident');
+      } finally {
+        endCall('btnStage');
       }
     }
 
@@ -1978,6 +2014,7 @@
         return;
       }
       var confirmPath = state.dpadDemoApproval ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback';
+      if (!beginCall('btnConfirm')) { return; }
       showLoading('incidentOutput', 'Calling POST ' + confirmPath + ' ...');
       try {
         var res = await post(confirmPath, {
@@ -2039,6 +2076,8 @@
       } catch (error) {
         showError('incidentOutput', error.message);
         showPanel('incident');
+      } finally {
+        endCall('btnConfirm');
       }
     }
 
