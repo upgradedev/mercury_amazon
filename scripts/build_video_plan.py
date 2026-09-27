@@ -39,49 +39,48 @@ TTS = {
 # (beat_id, seconds, narration_text, caption_text or None, visual_action)
 BEATS = [
     (
-        "beat_01_question", 15.139,
-        "An incident starts, and someone asks what we just deployed. Half the time "
-        "that is the wrong question. Mercury, an incident board for the team TV, asks "
-        "a narrower one: can this spike be pinned on one change?",
+        "beat_01_question", 16.022,
+        "An incident starts, and someone asks what we just deployed. Most of the time "
+        "nobody can honestly say. Mercury, an incident board for the team TV, asks "
+        "a narrower question: can this spike be pinned on one change?",
         None,
         "The loaded board at 1920x1080, focus on Ask what changed. No key pressed.",
     ),
     (
-        "beat_02_board_on_load", 18.297,
-        "It answered as the page loaded, before any key was pressed. Most answers are "
-        "refusals: on eleven hundred and sixty generated, labelled cases held out from "
-        "tuning, it saw a real anomaly and named nobody ninety three percent of the time. "
-        "A refusal never calls the deploy innocent.",
-        "It answered as the page loaded, before any key was pressed. Most answers are "
-        "refusals: on 1160 generated, labelled cases held out from tuning, it saw a real "
-        "anomaly and named nobody 93.1% of the time. A refusal never calls the deploy "
-        "innocent.",
+        "beat_02_board_on_load", 18.019,
+        "It answered on load, before any key was pressed. Most answers are refusals: on "
+        "generated cases held out from tuning, it saw a real anomaly and named nobody "
+        "ninety percent of the time. A refusal never calls the deploy innocent.",
+        "It answered on load, before any key was pressed. Most answers are refusals: on "
+        "generated cases held out from tuning, it saw a real anomaly and named nobody "
+        "90.0% of the time. A refusal never calls the deploy innocent.",
         "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot "
         "attribute, Cannot attribute and Insufficient data, each from the server's answer.",
     ),
     (
-        "beat_03_crowded_refusal", 18.019,
+        "beat_03_crowded_refusal", 17.554,
         "Down walks the rows. Release train shows a spike well above its baseline, but "
-        "several changes landed in the window before it, and no metric says which one did it. Mercury cannot "
+        "several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
         "Down walks the rows. release-train shows a spike well above its baseline, but "
-        "several changes landed in the window before it, and no metric says which one did it. Mercury cannot "
+        "several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
         "D-pad Down four times to release-train, then Center. The verdict reads Cannot "
         "attribute this with the number of changes that landed, Next reads No rollback "
         "offered, and Stage rollback and Confirm are disabled.",
     ),
     (
-        "beat_04_named_with_odds", 16.393,
-        "On checkout A P I, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on held-out generated cases a named commit is the "
-        "cause sixty two percent of the time, over forty namings, if a fault shows within "
-        "seventy five minutes.",
-        "On checkout-api, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on held-out generated cases a named commit is the "
-        "cause 62.5% of the time, over 40 namings, if a fault shows within 75 minutes.",
-        "D-pad Up three times to checkout-api, then Center. The verdict names the commit, "
-        "quotes its message, and reads 62.5% held-out precision (synthetic, 75 minute lag at most).",
+        "beat_04_named_with_odds", 19.783,
+        "On checkout A P I, exactly one runtime change landed before the spike, so Mercury "
+        "names it, and prints its own odds: on held-out generated cases a named commit is "
+        "the cause fifty percent of the time, over fifty eight namings, if a fault shows "
+        "within seventy five minutes.",
+        "On checkout-api, exactly one runtime change landed before the spike, so Mercury "
+        "names it, and prints its own odds: on held-out generated cases a named commit is "
+        "the cause 50.0% of the time, over 58 namings, if a fault shows within 75 minutes.",
+        "D-pad Up three times to checkout-api, then Center. The verdict names the commit as the "
+        "only runtime change, quotes its message, and reads 50.0% held-out precision "
+        "(synthetic, ≤75m lag).",
     ),
     (
         "beat_05_provenance", 14.071,
@@ -161,7 +160,7 @@ BEATS = [
 ]
 
 STATUS = (
-    "RENDERED LOCALLY, NOT UPLOADED. One take was recorded on 2026-09-26 from a local "
+    "RENDERED LOCALLY, NOT UPLOADED. The current take was recorded on 2026-09-27 from a local "
     "run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, "
     "driven through the D-pad bridge the Leanback app calls. Each beat's seconds are "
     "its measured hold: the length of its synthesized audio plus a 0.65 s tail, from "

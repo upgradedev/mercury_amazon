@@ -1,7 +1,7 @@
 # Mercury demo video: shot list
 
-**Status: RENDERED LOCALLY, NOT UPLOADED.** One take of this plan was recorded on
-2026-09-26 from a local run of this repository; `video/README.md` names the commit and
+**Status: RENDERED LOCALLY, NOT UPLOADED.** The current take of this plan was recorded on
+2026-09-27 from a local run of this repository; `video/README.md` names the commit and
 says how and where the render lives. The beat order below was probed the same day by driving the page with the
 D-pad bridge against a local server and reading what each press brings on screen. Beat lengths are set by the
 narration, not by this file: `video/generate-narration.py` measures each beat's
@@ -21,7 +21,7 @@ on screen or in `correlation_trial_summary.json`.
 ## Platform shown, and what that costs
 
 **Every beat is desktop Chromium at 1920x1080 against a local server** started with
-`MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8803`, driven
+`MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8843`, driven
 by calling `window.navigateDpad` with `UP`, `DOWN`, `LEFT`, `RIGHT`, `SELECT` and
 `BACK`, which is the bridge the Leanback `MainActivity` calls for each remote key.
 No mouse is used.
@@ -52,8 +52,8 @@ is still pending, and the video says so in its closing beat.
 |---|---|---|---|
 | 1 | `beat_01_question` | none | The loaded board, focus on Ask what changed |
 | 2 | `beat_02_board_on_load` | none | Five rows answered on load: Attributed, Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data |
-| 3 | `beat_03_crowded_refusal` | Down x4, Center | release-train: Cannot attribute this, N changes landed; Next: No rollback offered; Stage and Confirm disabled |
-| 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named, its message quoted, 62.5% held-out precision (synthetic, at most 75 minutes of lag) |
+| 3 | `beat_03_crowded_refusal` | Down x4, Center | release-train: Cannot attribute this, N runtime changes landed; Next: No rollback offered; Stage and Confirm disabled |
+| 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named as the only runtime change, its message quoted, 50.0% held-out precision (synthetic, at most 75 minutes of lag) |
 | 5 | `beat_05_provenance` | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
 | 6 | `beat_06_stage` | Up, Right, Center | Rollback staged, the lease counting down as the large figure, Next: confirm, record-only |
 | 7 | `beat_07_confirm` | Right, Center | The rollback steps: 02 says the token is spent, 03 Recorded only says no deployment pipeline was contacted |
@@ -73,16 +73,14 @@ number of changes in the release-train window, the lease, the latency and the SH
 The spend figures are synthetic and are not read aloud.
 
 Two figures are spoken from the script because they describe the labelled corpus,
-not this run: 93.1% named nobody on a real anomaly (beat 2), and 62.5% precision over
-40 namings (beat 4), both on the held-out split of the synthetic corpus. Beat 4 also
-says the precision holds only if a fault shows within 75 minutes, the generator's
-delay ceiling, which the window equals. Both are
-written by `python scripts/attribution_split.py` into
-`attribution_holdout_summary.json`. Until 2026-09-27 these beats quoted the in-sample
-81.1% and 52.2% over 113 namings. If a re-run moves them, change the beat in
-`scripts/build_video_plan.py` and re-render that beat. Beats 2 to 4 were rewritten on
-2026-09-27 and their hold times still come from the earlier audio, so they need a
-fresh narration render before the next cut. Beat 4 was lengthened again the same day to
-carry the delay assumption, so against its old hold time it reads at 175.7 words per
-minute; a fresh render will set the hold from the new audio. Any existing local render
-still says fifty two percent and must not be used.
+not this run: 90.0% named nobody on a real anomaly (beat 2), and 50.0% precision over
+58 namings (beat 4), both on the held-out split of the synthetic corpus with the runtime
+filter shipped on 2026-09-27. Beat 4 also says the precision holds only if a fault
+shows within 75 minutes, the generator's delay ceiling, which the window equals. Both
+are written by `python scripts/attribution_split.py` into
+`attribution_holdout_summary.json`, and the README quotes the same two. Earlier takes
+quoted the in-sample 81.1% and 52.2% over 113 namings, and then the pre-filter held-out
+93.1% and 62.5% over 40; neither is current, and the takes that spoke them are
+superseded. If a re-run moves them, change the beat in `scripts/build_video_plan.py`,
+rerun it, and re-render that beat: `video/generate-narration.py` synthesizes only the
+beats whose words changed, and the measured holds are copied back into the plan.
