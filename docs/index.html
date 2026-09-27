@@ -1293,9 +1293,7 @@
         throw networkError;
       }
       var elapsed = performance.now() - started;
-      if (latencyTargetId) {
-        el(latencyTargetId).textContent = 'HTTP ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms';
-      }
+      if (latencyTargetId) { writeLatency(latencyTargetId, response.status, elapsed); }
       var body = null;
       try { body = await response.json(); } catch (parseError) { body = null; }
       if (!response.ok) {
@@ -1306,11 +1304,23 @@
         }
         var failure = new Error('HTTP ' + response.status + '. ' + detail);
         failure.status = response.status;
+        failure.elapsedMs = elapsed;
         throw failure;
       }
       setConnection('reachable',
         'Last call: ' + path + ' returned ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms.');
       return { body: body, elapsedMs: elapsed, status: response.status, url: url };
+    }
+
+    function writeLatency(targetId, status, elapsedMs) {
+      el(targetId).textContent = 'HTTP ' + status + ' in ' + elapsedMs.toFixed(0) + ' ms';
+    }
+    /* For a call whose answer may be dropped as stale: the label is written only once
+       the answer is known to be the one on screen. */
+    function latencyOf(targetId, failure) {
+      if (failure && failure.status !== undefined && failure.elapsedMs !== undefined) {
+        writeLatency(targetId, failure.status, failure.elapsedMs);
+      }
     }
 
     function post(path, payload, latencyTargetId, secret) {
@@ -1804,9 +1814,10 @@
 
       try {
         var res = await post('/mcp/tools/what_changed',
-          { service_name: service, time_window_minutes: 60 }, 'incidentLatency');
+          { service_name: service, time_window_minutes: 60 }, null);
         var data = res.body;
         if (ask !== askSeq) { fillRow(data.service, data); return; }
+        writeLatency('incidentLatency', res.status, res.elapsedMs);
         state.lastCorrelation = data;
         reportHostEvent('what_changed', data.verdict + ':'
           + (data.commit_provenance ? data.commit_provenance.data_source : 'unknown') + ':'
@@ -1842,6 +1853,7 @@
         speak(data.voice_summary);
       } catch (error) {
         if (ask !== askSeq) { rowFailed(service); return; }
+        latencyOf('incidentLatency', error);
         heroFromFailure(error.message);
         if (userAsked === true) { announce('No Mercury API answered.'); }
         rowFailed(service);
@@ -1928,10 +1940,11 @@
           offending_deployment_marker_id: rec.offending_deployment_marker_id,
           reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
           lease_sec: 300
-        }, 'incidentLatency', secret);
+        }, null, secret);
         // Somebody asked again while this was in flight: that answer owns the board,
         // and this token is left to expire unused.
         if (ask !== askSeq) { return; }
+        writeLatency('incidentLatency', res.status, res.elapsedMs);
         state.staged = res.body;
 
         setHero({
@@ -1978,6 +1991,7 @@
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         if (ask !== askSeq) { return; }
+        latencyOf('incidentLatency', error);
         showError('incidentOutput', error.message);
         showPanel('incident');
       } finally {
