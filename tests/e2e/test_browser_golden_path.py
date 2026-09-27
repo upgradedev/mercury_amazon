@@ -112,10 +112,13 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
                 " return { top: r.top, bottom: r.bottom, text: document.querySelector('#heroFigure').textContent,"
                 " label: document.querySelector('#heroFigureLabel').textContent,"
                 " rings: document.querySelectorAll('.tv-focused').length,"
-                " evidence: document.querySelector('#heroProvenance').textContent }; })()")
+                " evidence: document.querySelector('#heroProvenance').textContent,"
+                " active: document.activeElement && document.activeElement.id }; })()")
             assert hero["text"] == "RECORDED" and hero["label"] == "no pipeline contacted", hero
             assert 0 <= hero["top"] and hero["bottom"] <= 1080, f"the RECORDED hero left the screen: {hero}"
             assert hero["rings"] == 0, hero
+            # Keyboard focus agrees: it waits on the board, not on the off-screen control.
+            assert hero["active"] == "hero", hero
             # The evidence keeps the held-out measurement of the answer that was acted on.
             assert "held-out split" in hero["evidence"], hero
             page.keyboard.press("Enter")

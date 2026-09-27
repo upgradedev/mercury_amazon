@@ -117,6 +117,9 @@
       padding: 0.6rem 1rem; font-weight: 700; text-decoration: none;
     }
     .skip-link:focus { top: 0.5rem; }
+    /* The board takes keyboard focus only as a parking place after Confirm; the
+       D-pad legend says where the next press goes, so it draws no outline. */
+    #hero[tabindex="-1"]:focus { outline: none; }
 
     /* Keyboard focus for anyone not using the D-pad ring. */
     a:focus-visible, button:focus-visible, input:focus-visible {
@@ -2126,7 +2129,12 @@
         // Publish handoff is the next stop, but the screen moves to it only on the
         // next D-pad press; CENTER still publishes, as the remote's smoke path expects.
         if (window.mercuryNav) {
-          if (typeof window.mercuryNav.defer === 'function') { window.mercuryNav.defer(el('btnHandoff')); }
+          if (typeof window.mercuryNav.defer === 'function') {
+            // Keyboard focus parks on the board it is reading, not on the control
+            // below the fold; the confirmed Confirm button no longer takes it.
+            el('hero').setAttribute('tabindex', '-1');
+            window.mercuryNav.defer(el('btnHandoff'), { park: el('hero') });
+          }
           else { window.mercuryNav.setFocus(el('btnHandoff')); }
         }
 

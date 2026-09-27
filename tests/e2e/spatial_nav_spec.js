@@ -253,9 +253,12 @@ test('a deferred cursor draws no ring until the next press, which only reveals i
   document.addEventListener('mercury:focuschange', (event) => {
     announced.push([event.detail.element.id, event.detail.pending]);
   });
+  const board = makeElement('board', 0, 0, 10, 10);
   nav.setFocus(at(cells, 0, 0));
-  nav.defer(at(cells, 2, 2));
+  nav.defer(at(cells, 2, 2), { park: board });
   assert.strictEqual(nav.current.id, 'r2c2');
+  assert.strictEqual(at(cells, 2, 2).focused, 0, 'keyboard focus does not go to the deferred control');
+  assert.strictEqual(board.focused, 1, 'keyboard focus parks where the page asked');
   assert.strictEqual(cells.filter((c) => c.hasClass('tv-focused')).length, 0, 'no ring while deferred');
   // The first press, in any direction, lands on the deferred control, not beyond it.
   assert.strictEqual(nav.move('UP').id, 'r2c2');

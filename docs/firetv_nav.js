@@ -188,18 +188,21 @@
    * Make an element the next stop without moving the screen to it. The page uses
    * this after a result it wants left in view: the cursor belongs to the element,
    * so CENTER acts on it, but no ring is drawn and nothing scrolls until the next
-   * D-pad press, which first brings it into view. Keyboard focus moves there
-   * without scrolling, so Enter and Tab agree with the remote.
+   * D-pad press, which first brings it into view. Keyboard focus does not go to
+   * the off-screen control either: it parks on options.park, something already on
+   * screen (the page passes the board), so the ring, the readout and the browser's
+   * focus all agree that nothing has moved yet. Enter there acts on the cursor.
    */
-  SpatialNavigator.prototype.defer = function (element) {
+  SpatialNavigator.prototype.defer = function (element, options) {
     if (!element) return;
     var previous = document.querySelector('.' + FOCUS_CLASS);
     if (previous) previous.classList.remove(FOCUS_CLASS);
-    // current before focus(): the focusin listener below then sees the cursor
-    // already there and does not call setFocus, which would scroll.
     this.current = element;
     this.pending = true;
-    if (typeof element.focus === 'function') element.focus({ preventScroll: true });
+    var park = options && options.park;
+    if (park && typeof park.focus === 'function') park.focus({ preventScroll: true });
+    // After focus(): the page's focusin listener names whatever took focus, and
+    // this is the line the legend should end on.
     announceFocus(element, true);
   };
 
