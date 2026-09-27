@@ -1571,9 +1571,13 @@
       var minutes = Math.round((onset - landed) / 60000);
       // Board language, terse: which change, and when against the spike.
       var when = minutes < 1 ? 'under 1m pre-spike' : minutes + 'm pre-spike';
-      if (attribution.commits_in_window === 1) { return 'Only change, ' + when; }
+      // With the runtime filter on, the count is of commits that changed a file the
+      // server is built from, and the board says "runtime" so nobody reads it as every
+      // commit in the window.
+      var kind = attribution.candidate_filter ? 'runtime change' : 'change';
+      if (attribution.commits_in_window === 1) { return 'Only ' + kind + ', ' + when; }
       if (attribution.commits_in_window > 1) {
-        return 'Closest of ' + attribution.commits_in_window + ' changes, ' + when;
+        return 'Closest of ' + attribution.commits_in_window + ' ' + kind + 's, ' + when;
       }
       return 'Landed ' + when;
     }
@@ -1641,7 +1645,8 @@
           eyebrow: 'Incident, too many changes to name one',
           figure: factor + '×',
           figureLabel: readingLabel(metric),
-          headline: 'Cannot attribute this: ' + data.attribution.commits_in_window + ' changes landed',
+          headline: 'Cannot attribute this: ' + data.attribution.commits_in_window
+            + (data.attribution.candidate_filter ? ' runtime changes landed' : ' changes landed'),
           cause: refusalStatement(data,
             'Mercury names a change only when exactly one landed inside the attribution window. '
             + data.attribution.commits_in_window + ' did, so it cannot attribute this to any one of them, '
@@ -1905,8 +1910,13 @@
             + ((data.attribution && data.attribution.is_ambiguous)
               ? ' changes landed inside the window. This names the closest of them, which is the '
                 + 'case every wrong attribution in the trial with a reachable cause fell into.'
-              : ' change landed inside the window, so there was nothing else it could be.')]
-        ]));
+              : ' candidate landed inside the window, so there was nothing else it could be.')]
+        ].concat(data.offending_commit.runtime_files
+          ? [['Runtime files it changed', data.offending_commit.runtime_files.join(', ')]]
+          : []).concat(data.attribution && data.attribution.candidate_filter
+          ? [['Set aside, no runtime file', data.attribution.commits_set_aside
+              + ' in the window. ' + data.attribution.candidate_filter.rule]]
+          : [])));
       }
       if (data.recommended_action) {
         var rec = h('div', 'row');

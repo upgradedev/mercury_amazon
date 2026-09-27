@@ -26,12 +26,13 @@ refusal is never dressed up as proof that a deploy is innocent, because an empty
 crowded window says nothing of the kind, and the only verdict that says nothing
 needs reverting is the one where the reading is under the 3.0x anomaly threshold. On the
 held-out half of a synthetic labelled corpus, which no setting was tuned on, Mercury
-sees an anomaly and names nobody 93.1% of the time, stays quiet on 200 of 200
-healthy series, and refuses outright on every telemetry gap. When it does name a
-change, it is right 62.5% of the time over 40 namings, and it prints that on the
+sees an anomaly and names nobody 90.0% of the time, stays quiet on 200 of 200
+healthy series, and refuses outright on every telemetry gap. It counts as a deploy
+only a commit that changed a file the server is built from. When it does name a
+change, it is right 50.0% of the time over 58 namings, and it prints that on the
 screen beside the name, with the assumption it rests on: the corpus has every
-regression show within 75 minutes, the same as the window. At a 90 minute ceiling the
-same engine reads 50.0%, at 180 minutes 25.0%. Then it renders where the people are. A Fire TV in the room
+regression show within 75 minutes, the same as the window. With a longer delay
+ceiling the same engine reads 41.5% at 90 minutes and 27.3% at 180. Then it renders where the people are. A Fire TV in the room
 is one of those places and the one this entry is built for: a screen everyone can
 see, driven by a remote, with the evidence readable from a sofa. The screen is the
 delivery; the engine is the thing.
@@ -154,6 +155,14 @@ that fit. We now publish held-out precision at other ceilings beside the headlin
 new engine beats the old at every ceiling, but its level falls from 62.5% to 25.0% if
 regressions can take three hours to show.
 
+Then a reviewer saw the board blame a commit that only edited the README for a 5XX
+spike. A change that touches no runtime file deploys no code, so the engine now counts
+only commits that changed a file the server is built from. Our generator's labels
+disagree (they let any commit cause a regression), so on held-out the figure fell from
+62.5% over 40 namings to 50.0% over 58; 14 of the 16 wrong namings on regressions are
+cases labelled as caused by a commit that touched no runtime file. We ship the filter
+and print the lower number.
+
 **We changed the headline to match the numbers.** The old one said Mercury tells you
 which change broke production. Its own harness said that is right about half the
 times it fires, so the headline is now the refusal, which is what the numbers
@@ -194,7 +203,7 @@ Stated plainly, because the cockpit shows it anyway.
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
-| Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 62.5% over 40 namings (95% interval 47.0% to 75.8%) under the corpus's assumption that a regression shows within 75 minutes (50.0% at 90, 25.0% at 180), recall 4.2% over 600 regressions, refusal on 93.1% of detected anomalies, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
+| Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 50.0% over 58 namings (95% interval 37.5% to 62.5%) under the corpus's assumption that a regression shows within 75 minutes (41.5% at 90, 27.3% at 180), recall 4.8% over 600 regressions, refusal on 90.0% of detected anomalies, with only commits that changed a runtime file counted as deploys, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
 | Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. That emulator run is the target proof. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
 
 ---
@@ -212,9 +221,10 @@ without touching the governance code.
 anchor are fixed; the remaining half of what the corpus pointed at is not. When
 several changes land together Mercury says how many and names none of them, where a
 better tool would rank them on what they touched against what the metric measures.
-That is the change most likely to move held-out recall off 4.2% without giving back
-the precision the crowding gate bought. A file-list scope is built and measured; it
-is off by default because this corpus's labels cannot say whether it helps.
+That is the change most likely to move held-out recall off 4.8% without giving back
+the precision the crowding gate bought. A runtime file-list filter is on since
+2026-09-27; this corpus's labels cannot say whether it helps, because they let any
+commit cause a regression.
 
 **Lengthen the series.** 65 of the 300 late-look cases are undetectable by any rule
 here, because a six point series polled every ten minutes has no readings left
@@ -256,20 +266,20 @@ Stated here rather than left for a judge to find:
   spike, but the detector still needs at least two readings before that onset, so 65
   of the 300 late-look cases in the corpus are undetectable whatever it does. That
   ceiling is published as `detectability_ceiling`.
-* Naming a change is right 62.5% of the time over 40 held-out namings, and it
-  fires on about one regression in twenty-four there. That level assumes every
+* Naming a change is right 50.0% of the time over 58 held-out namings, and it
+  fires on about one regression in twenty-one there. That level assumes every
   regression shows within 75 minutes, as the generator draws them. That is why the headline is the refusal. The
   figure ships with every answer, so nobody has to take the README's word for it at
   the moment they are deciding whether to revert.
 * When several changes land in the window Mercury says how many and names none of
   them. It does not rank them. Ranking is the next thing worth building and it is
   not built.
-* The held-out side is small: 17 commits and 40 namings, so the 95% interval on
-  precision runs from 47.0% to 75.8%. The 75 minute window won on train partly
+* The held-out side is small: 17 commits and 58 namings, so the 95% interval on
+  precision runs from 37.5% to 62.5%. The 75 minute window won on train partly
   because the corpus's own delay assumption reaches 75 minutes, and the held-out side
   shares that assumption, so it cannot test it. `python scripts/attribution_split.py`
-  publishes the held-out precision at delay ceilings of 60 to 180 minutes: 69.6%,
-  62.5%, 50.0%, 38.8% and 25.0%.
+  publishes the held-out precision at delay ceilings of 60 to 180 minutes: 54.0%,
+  50.0%, 41.5%, 38.6% and 27.3%.
 * That an on-call engineer is in a room with a television during an incident is an
   assumption. It has never been tested with a responder. The same page and the same
   HTTP surface render on a laptop, so what that assumption risks is the surface,

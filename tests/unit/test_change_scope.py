@@ -149,3 +149,94 @@ def test_a_scope_is_a_plain_value_another_service_can_declare():
     web = ServiceScope(name="web", patterns=("web/*",))
     assert web.touches(("web/index.ts",)) is True
     assert web.touches(("src/app.py",)) is False
+
+
+# ------------------------------------------- The server counts only runtime commits
+
+
+class _Entries:
+    def __init__(self, entries):
+        self.entries = entries
+
+    def list_recent_commits(self, limit=20):
+        return self.entries[:limit]
+
+
+class _Empty:
+    def list_recent_commits(self, limit=20):
+        return []
+
+
+def test_a_readme_only_commit_is_never_named_for_the_demo_spike():
+    """The 2026-09-27 review saw the board blame a README edit for a 5XX spike.
+
+    The newest commit edits only prose. The use case must place the simulated reading
+    after the runtime commit, and the correlator must name that one and report the prose
+    commit as set aside, never as the deploy.
+    """
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+    from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
+
+    entries = [
+        {"sha": "docs001", "message": "Frame the README", "author": "D",
+         "committed_at": (NOW - timedelta(minutes=5)).isoformat(),
+         "paths": ["README.md", "docs/DEVPOST_SUBMISSION.md", "docs/EVIDENCE.md"]},
+        {"sha": "code001", "message": "Change the server", "author": "D",
+         "committed_at": (NOW - timedelta(minutes=40)).isoformat(),
+         "paths": ["src/interfaces/mcp_server.py"]},
+        {"sha": "base001", "message": "Older change", "author": "D",
+         "committed_at": (NOW - timedelta(hours=6)).isoformat(),
+         "paths": ["src/domain/change_scope.py"]},
+    ]
+    use_case = DiagnoseIncidentUseCase(
+        CloudWatchMetricAdapter(), _Empty(), _Entries(entries),
+        correlator=IncidentCorrelator(service_scope=MERCURY_SERVICE_SCOPE),
+    )
+    answer = use_case.execute("checkout-api")
+    assert answer.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert answer.offending_commit.sha == "code001"
+    assert answer.offending_commit.paths == ("src/interfaces/mcp_server.py",)
+
+
+def test_the_server_names_no_prose_only_commit_and_says_how_many_it_set_aside(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from src.interfaces import mcp_server
+
+    entries = [
+        {"sha": "docs002", "message": "Edit the README", "author": "D",
+         "committed_at": (NOW - timedelta(minutes=70)).isoformat(), "paths": ["README.md"]},
+        {"sha": "code002", "message": "Change the board", "author": "D",
+         "committed_at": (NOW - timedelta(minutes=72)).isoformat(), "paths": ["docs/index.html"]},
+        {"sha": "base002", "message": "Older", "author": "D",
+         "committed_at": (NOW - timedelta(hours=9)).isoformat(), "paths": ["src/a.py"]},
+    ]
+    monkeypatch.setattr(mcp_server.incident_use_case, "_commits", _Empty())
+    monkeypatch.setattr(mcp_server.incident_use_case, "_local_commits", _Entries(entries))
+    payload = TestClient(mcp_server.app).post(
+        "/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
+    assert payload["verdict"] == "ANOMALY_ATTRIBUTED"
+    assert payload["offending_commit"]["sha"] == "code002"
+    assert payload["offending_commit"]["runtime_files"] == ["docs/index.html"]
+    assert payload["attribution"]["commits_set_aside"] == 1
+    assert payload["attribution"]["commits_in_window"] == 1
+    rule = payload["attribution"]["candidate_filter"]
+    assert rule["defined_in"] == "src/domain/change_scope.py"
+    assert rule["runtime_paths"] == list(MERCURY_SERVICE_SCOPE.patterns)
+
+
+def test_local_git_and_the_recording_carry_file_lists():
+    from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+    from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
+
+    recorded = RecordedCommitProvider().list_recent_commits(limit=100)
+    fixture = json.loads(PATHS_FIXTURE.read_text(encoding="utf-8"))["paths_by_sha"]
+    assert recorded and all(entry["paths"] == (fixture.get(entry["sha"]) or None) for entry in recorded)
+
+    local = LocalGitCommitProvider()
+    if not local.is_available:
+        pytest.skip("not a git checkout")
+    commits = local.list_recent_commits(limit=5)
+    assert commits
+    for entry in commits:
+        assert entry["paths"] is None or all(isinstance(p, str) and p for p in entry["paths"])

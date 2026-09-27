@@ -12,26 +12,31 @@ from two inputs, a metric series and a list of commits, using explicit rules:
    before the reading, because a change that landed after a spike started cannot
    have caused it.
 4. Name one only when exactly ``max_commits_in_window`` or fewer landed there.
-   Otherwise say how many landed and name none of them.
+   Otherwise say how many landed and name none of them. When a ``service_scope`` is
+   given (the shipped server gives the runtime paths in ``change_scope.py``), a commit
+   whose file list touches none of those paths is not counted: it deployed no code.
 5. Recommend rolling back to the commit immediately preceding the named one.
 
 Every step reports what it did, and the answer it gives most often is a refusal.
 On the held-out split scored by ``scripts/attribution_split.py`` (a synthetic,
-self-authored corpus, tuned on a separate train split), this class sees an anomaly
-and names nobody 93.1% of the time: 207 times because nothing landed in the window
-and 335 times because too much did. Those two are counted apart, in the trial and on
+self-authored corpus, tuned on a separate train split), this class as the server
+wires it, with the runtime filter, sees an anomaly and names nobody 90.0% of the
+time: 278 times because no candidate landed in the window and 246 times because too
+many did. Those two are counted apart, in the trial and on
 the wire, because a refusal for want of a candidate is the data being empty while a
 refusal for a crowded window is a decision.
 
 Rule 4 is what naming precision rests on and it was chosen from a published sweep.
 Naming the closest of several changes is where the wrong names came from. On that
-held-out split, when this class names a commit it is the one that caused the reading
-62.5% of the time over 40 namings (95% interval 47.0% to 75.8%); 14 of its 15 wrong
-namings blamed a commit for an exogenous spike no commit caused. That level assumes, as
-the generator does, that a regression shows within 75 minutes, which is also this
-class's default window; the held-out split shares the assumption and cannot test it,
-and at longer delay ceilings the same figure falls (50.0% at 90 minutes, 25.0% at 180). That is far enough
-from certain that the figure travels with the answer: see
+held-out split, when the server's correlator names a commit it is the one that caused
+the reading 50.0% of the time over 58 namings (95% interval 37.5% to 62.5%). Without
+the runtime filter the same split reads 62.5% over 40, because the generator's labels
+let a commit that changed no runtime file cause a regression: 14 of the filtered
+engine's 16 wrong namings on regressions are such labels. That level assumes, as the
+generator does, that a regression shows within 75 minutes, which is also this class's
+default window; the held-out split shares the assumption and cannot test it, and at
+longer delay ceilings the same figure falls (41.5% at 90 minutes, 27.3% at 180). That
+is far enough from certain that the figure travels with the answer: see
 ``src/infrastructure/trial_summary.py``. The 60 minute window shipped until
 2026-09-27 read 40.8% over 71 namings on the same split, and 52.2% over 113 on the
 corpus its gate was chosen on.
@@ -349,8 +354,8 @@ class IncidentCorrelation:
                 "not a finding that none of them caused it; rolling back on this answer would "
                 "be a guess."
             )
-            if self.commits_set_aside:
-                statement += " " + self._set_aside_clause()
+            # The set-aside count is in the explanation and on the wire
+            # (``commits_set_aside``); the statement stays short enough for the board.
             return statement
         return None
 
@@ -609,7 +614,10 @@ class IncidentCorrelator:
                 f"{self.max_commits_in_window} this correlator will name from, so it names none of "
                 "them. Nothing here says which of those changes did it, and rolling back the closest "
                 "one is as likely to revert an innocent change as the guilty one. This is a refusal "
-                "to attribute, not a finding that none of them did it.",
+                "to attribute, not a finding that none of them did it."
+                + (f" {set_aside} other commit(s) in the window changed no file {service_name} is "
+                   "built from and were not counted; that is a reading of their file lists, not a "
+                   "finding that they are harmless." if set_aside else ""),
             )
 
         offending = candidates[-1]

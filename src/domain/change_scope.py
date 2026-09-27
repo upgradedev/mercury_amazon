@@ -9,8 +9,9 @@ touch a file this service is built from?
 Three answers, and the third matters:
 
 * ``True``: at least one changed file is one the service is built from.
-* ``False``: every changed file is outside that set. The correlator does not count such a
-  commit as a candidate. That is a reading of its file list, not a finding that the
+* ``False``: every changed file is outside that set. The correlator the server wires
+  (``src/interfaces/mcp_server.py``) does not count such a commit as a candidate: a
+  change that touches no runtime file deployed no code. That is a reading of its file list, not a finding that the
   change is harmless, and every surface that mentions it says so.
 * ``None``: the file list is unknown (the GitHub commits API does not return one, and a
   recording may lack it). An unknown commit stays a candidate, exactly as before this
@@ -69,6 +70,27 @@ class ServiceScope:
         if not paths:
             return None
         return any(self.covers(path) for path in paths)
+
+    def runtime_files(self, paths: tuple[str, ...] | None) -> list[str] | None:
+        """The listed files this scope covers, or None when the file list is unknown."""
+        if not paths:
+            return None
+        return [path for path in paths if self.covers(path)]
+
+    def describe(self) -> dict[str, object]:
+        """What counts as a deploy candidate, as the server states it beside an answer."""
+        return {
+            "name": self.name,
+            "runtime_paths": list(self.patterns),
+            "rule": (
+                "A commit counts as a deploy candidate only when it changed at least one of "
+                "these paths, the files the server is built from. A commit that changed none of "
+                "them deploys no code and is set aside; that is a reading of its file list, not "
+                "a finding that it is harmless. A commit whose file list is unknown (the GitHub "
+                "commits API does not return one) stays a candidate."
+            ),
+            "defined_in": "src/domain/change_scope.py",
+        }
 
 
 MERCURY_SERVICE_SCOPE = ServiceScope(name="mercury-server", patterns=MERCURY_SERVICE_PATTERNS)

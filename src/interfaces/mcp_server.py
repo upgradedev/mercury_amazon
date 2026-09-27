@@ -32,7 +32,9 @@ from src.domain.deployment_evidence import (
     DeploymentEvidenceLedger,
     DeploymentMarker,
 )
+from src.domain.change_scope import MERCURY_SERVICE_SCOPE
 from src.domain.governed_rollback import GovernanceTokenError, RollbackDenialReason
+from src.domain.incident_correlation import IncidentCorrelator
 from src.domain.incident_handoff import HandoffConflict, IncidentHandoffStore
 from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
@@ -129,9 +131,16 @@ cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
 local_git_provider = LocalGitCommitProvider()
 recorded_commit_provider = RecordedCommitProvider()
+# The shipped engine: the domain defaults plus the runtime filter, so a commit that
+# changed no file the server is built from (src/domain/change_scope.py) is never named
+# as the deploy behind a spike. Scored as v3_2026_09_27_runtime by
+# python scripts/attribution_split.py.
+incident_correlator = IncidentCorrelator(service_scope=MERCURY_SERVICE_SCOPE)
 incident_use_case = DiagnoseIncidentUseCase(
-    cloudwatch_adapter, github_adapter, local_git_provider, recorded_commit_provider
+    cloudwatch_adapter, github_adapter, local_git_provider, recorded_commit_provider,
+    correlator=incident_correlator,
 )
+
 
 # Selected by MERCURY_ROLLBACK_DISPATCH. None unless a deployment asks for it, in
 # which case the use case keeps its record-only default and nothing is contacted.
@@ -412,6 +421,10 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
         # whether to revert, not the moment they read the README.
         "attribution": {
             "commits_in_window": correlation.commits_in_window,
+            # Commits inside the window that changed no runtime file and so were not
+            # counted. Reported so the answer never hides a change it saw.
+            "commits_set_aside": correlation.commits_set_aside,
+            "candidate_filter": MERCURY_SERVICE_SCOPE.describe() if incident_correlator.service_scope else None,
             "is_ambiguous": correlation.attribution_is_ambiguous,
             "can_attribute": correlation.can_attribute,
             # True only when the reading is inside its baseline. A refusal to
@@ -427,7 +440,7 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "measured_accuracy": naming_accuracy(),
             "claim_strength": "TEMPORAL_CANDIDATE_ONLY",
             "causality_statement": (
-                "The named change is the sole change in the configured time window. "
+                "The named change is the sole deploy candidate in the configured time window. "
                 "Temporal proximity does not prove it caused the anomaly."
             ),
         },
@@ -447,6 +460,8 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "author": commit.author,
             "message": commit.message,
             "committed_at": commit.committed_at.isoformat(),
+            # The runtime files it changed; None when its file list is unknown.
+            "runtime_files": MERCURY_SERVICE_SCOPE.runtime_files(commit.paths),
         }
 
     if correlation.rollback_is_available and correlation.offending_commit is not None:

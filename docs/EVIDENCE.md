@@ -37,18 +37,21 @@ corpus rather than demonstrated once.
 Scoring it changed what this product claims. The engine's reliable answer is the
 refusal. On a held-out split of a synthetic, self-authored corpus that no setting was
 tuned on, it stays quiet on 200 of 200 healthy series, and on a real anomaly it
-declines to name a change 93.1% of the time, because the window before the spike
-usually holds either no change or several; it refuses outright on every telemetry
+declines to name a change 90.0% of the time, because the window before the spike
+usually holds either no deploy candidate or several; it refuses outright on every telemetry
 gap. Each refusal says which of those it was, and says in the same sentence what it
 is not: Mercury has no way to rule a deploy out, so a refusal is never rendered as a
 deploy having been cleared, and rolling back on a refusal would be a guess. Naming
-one change is the smaller capability: on that held-out split it is right 62.5% of
-the 40 times it fires (95% interval 47.0% to 75.8%), and Mercury prints that figure
-on the screen at the moment somebody would act on it. That figure holds only under the
-corpus's assumption that a regression shows within 75 minutes of its commit, which is
-also the shipped window and which both splits share; if regressions can take up to 90
-minutes the same engine reads 50.0%, and at 180 minutes 25.0%
-([table](#the-figure-depends-on-an-assumed-delay)).
+one change is the smaller capability: on that held-out split it is right 50.0% of
+the 58 times it fires (95% interval 37.5% to 62.5%), and Mercury prints that figure
+on the screen at the moment somebody would act on it. Since 2026-09-27 only a commit
+that changed a file the server is built from counts as a deploy candidate, so a
+documentation-only commit is never named for a 5XX spike; on this corpus's labels that
+filter lowered the figure from 62.5%, for reasons [counted below](#the-runtime-filter-v3).
+That figure holds only under the corpus's assumption that a regression shows within 75
+minutes of its commit, which is also the shipped window and which both splits share; if
+regressions can take up to 90 minutes the same engine reads 41.5%, and at 180 minutes
+27.3% ([table](#the-figure-depends-on-an-assumed-delay)).
 
 The screen is a delivery choice, not the product. Mercury renders on a Fire TV in
 a room, and on a laptop browser, from the same HTTP surface and the same page: the
@@ -248,7 +251,7 @@ later runs changed no engine and no earlier figure: one added the breakdown fiel
 (6a101e7). That is five held-out scoring runs in all, two of which produced the
 comparison.
 
-| Held-out, synthetic corpus | v1: 60 minute window (2026-09-08) | v2: 75 minute window (shipped) |
+| Held-out, synthetic corpus | v1: 60 minute window (2026-09-08) | v2: 75 minute window (shipped until the runtime filter) |
 |---|---|---|
 | Held-out naming precision | 40.8% (29 of 71, 95% CI 30.2% to 52.5%) | **62.5%** (25 of 40, 95% CI 47.0% to 75.8%) |
 | Held-out naming recall | 4.8% (29 of 600) | **4.2%** (25 of 600) |
@@ -278,28 +281,93 @@ it, because both splits come from the same generator with the same ceiling. On a
 service the window should come from that service's measured rollout delay, not from
 this corpus.
 
+#### The runtime filter (v3)
+
+A commit that changes no file the server is built from deploys no code, so it cannot be
+the deploy behind a 5XX spike. v2 could still name one, and on 2026-09-27 the board did:
+it named a commit that edited only `README.md` and two documents. The shipped engine, v3
+(`v3_2026_09_27_runtime`), is v2 with one constraint: a commit counts as a deploy
+candidate only when its file list touches a runtime path. The runtime paths are defined
+in `src/domain/change_scope.py` from what ships: the files the `Dockerfile` copies into
+the image and `scripts/build_lambda_package.py` packs into the Lambda zip, plus the files
+that define how that artefact is built and deployed.
+
+| Runtime paths (fnmatch, `*` crosses `/`) | Why |
+|---|---|
+| `src/*` | The server code |
+| `docs/index.html`, `docs/firetv_nav.js`, `docs/webmcp_bridge.js`, `docs/manifest.json`, `docs/*.woff2`, `docs/OFL-*.txt` | The board the server serves |
+| `correlation_trial_summary.json`, `attribution_holdout_summary.json` | Read by the server at run time |
+| `pyproject.toml`, `Dockerfile`, `docker-compose.yml`, `scripts/build_lambda_package.py`, `scripts/terraform_cycle.py`, `infra/*`, `.github/workflows/terraform-cycle.yml` | How the artefact is built and deployed |
+
+Everything else is not a runtime path for this server: the README and the other
+documents, tests, CI, the video plan and the Fire TV client in `app/`. A commit whose
+file list is unknown stays a candidate, so missing data never makes Mercury more willing
+to name a change. Local git and the checked-in recording supply file lists; the GitHub
+commits API Mercury reads with a `GITHUB_TOKEN` does not, so with a token set every
+commit stays a candidate and the filter has nothing to act on. A commit set aside is
+counted on the wire (`attribution.commits_set_aside`) and in the refusal wording, which
+says it is a reading of file lists, not a finding that those changes are harmless.
+`tests/unit/test_change_scope.py` parses the Dockerfile and the packager and fails if
+either ships a path the set does not cover.
+
+The train sweep did not choose the filter: its rule picked no filter, for the reason
+below. So the filter is imposed as a constraint of what a deploy is, the window and gate
+stay as chosen on train, and nothing was re-tuned. Held-out, same split, same seeds, same
+unchanged generator and labels, `python scripts/attribution_split.py`:
+
+| Held-out, synthetic corpus | v2: 75 minute window | v3: v2 plus the runtime filter (shipped) |
+|---|---|---|
+| Held-out naming precision | 62.5% (25 of 40, 95% CI 47.0% to 75.8%) | **50.0%** (29 of 58, 95% CI 37.5% to 62.5%) |
+| Held-out naming recall | 4.2% (25 of 600) | **4.8%** (29 of 600) |
+| Held-out refusal to name, on anomalies it saw | 93.1% (542 of 582) | **90.0%** (524 of 582) |
+| Held-out false attribution on exogenous spikes | 4.7% (14 of 300) | **4.3%** (13 of 300) |
+| Held-out quiet on healthy series | 100% (200 of 200) | **100%** (200 of 200) |
+| Wrong commit named for a regression | 1 | **16** |
+
+**The filter costs precision on these labels, and the cost is counted, not argued.**
+The generator draws a regression's cause from every commit, so its labels say a README
+edit can raise the server's 5XX rate; the filter refuses to believe that and is scored
+wrong each time. The summary's `runtime_filter_cost_on_published_labels` block counts
+it: of v3's 16 wrong namings on regressions, 14 are cases the generator labels as caused
+by a commit that touched no runtime file, and all 6 correct namings v2 made and v3 does
+not are such labels. The labels were not changed. Over the 20 other held-out seeds
+below, v3 averages 62.0% (sd 6.4 points) against v2's 81.7% and is more precise on 1 of
+20, so the cost is not one seed's draw.
+
+**An assumption variant, not a measured gain.** The summary's
+`runtime_cause_assumption_variant` rebuilds only the held-out regression cases with the
+cause drawn from the 9 of 17 held-out commits that touch a runtime path, and keeps every
+uncaused case. There v2 reads 66.7% (28 of 42) and v3 75.8% (47 of 62), recall 4.7% to
+7.8%. That encodes the filter's own premise, so it cannot test the filter; it is not on
+the board and nothing was chosen from it.
+
+The board prints 50.0%. The trade is deliberate: a 5XX spike blamed on a documentation
+commit is a wrong answer on its face, and a figure earned by allowing it is not one to
+show beside a name.
+
 #### The figure depends on an assumed delay
 
-`python scripts/attribution_split.py` also re-scores both frozen engines on held-out
+`python scripts/attribution_split.py` also re-scores every frozen engine on held-out
 corpora that differ from the published one only in the delay ceiling (same seed, same
 commits, same floor of 1 minute), and `--check` holds the rows to the record. Nothing
-was chosen from this table and v2 was not changed after it was run. Synthetic,
+was chosen from this table and no engine was changed after it was run. Synthetic,
 self-authored corpus:
 
-| Delay ceiling (minutes) | v1 held-out precision | v2 held-out precision | v2 wrong commit on a regression |
-|---|---|---|---|
-| 60 | 56.9% (37 of 65) | 69.6% (32 of 46) | 0 |
-| **75 (published)** | **40.8% (29 of 71)** | **62.5% (25 of 40)** | **1** |
-| 90 | 27.5% (22 of 80) | 50.0% (20 of 40) | 6 |
-| 120 | 26.3% (15 of 57) | 38.8% (19 of 49) | 16 |
-| 180 | 17.1% (6 of 35) | 25.0% (8 of 32) | 10 |
+| Delay ceiling (minutes) | v1 held-out precision | v2 held-out precision | v3 held-out precision (shipped) | v3 wrong commit on a regression |
+|---|---|---|---|---|
+| 60 | 56.9% (37 of 65) | 69.6% (32 of 46) | 54.0% (27 of 50) | 10 |
+| **75 (published)** | **40.8% (29 of 71)** | **62.5% (25 of 40)** | **50.0% (29 of 58)** | **16** |
+| 90 | 27.5% (22 of 80) | 50.0% (20 of 40) | 41.5% (22 of 53) | 18 |
+| 120 | 26.3% (15 of 57) | 38.8% (19 of 49) | 38.6% (17 of 44) | 14 |
+| 180 | 17.1% (6 of 35) | 25.0% (8 of 32) | 27.3% (9 of 33) | 11 |
 
-The ranking holds at every ceiling tried: v2 is more precise than v1 in all five rows.
-The level does not: v2's 62.5% is the figure for a world where no regression takes
-longer than the window to show, and it falls to 25.0% if some take three hours. The
-single wrong commit v2 names for a regression at the published ceiling (against 33 for
-v1) is the same effect: when no delay exceeds the window, the cause is almost always
-inside it.
+v2 is more precise than v1 in all five rows. v3 is below v2 at every ceiling up to 120
+minutes, for the labelling reason in the section above, and above it at 180; it is below
+v1 at 60. The level falls for all three as the ceiling rises: v3's 50.0% is the figure
+for a world where no regression takes longer than the window to show, and it falls to
+27.3% if some take three hours. The single wrong commit v2 names for a regression at the
+published ceiling (against 33 for v1) is the same effect: when no delay exceeds the
+window, the cause is almost always inside it.
 
 The same command also scores both engines on 20 other held-out seeds (20261001 to
 20261020, first run by the audit of this change, none tuned on), recorded as
@@ -308,10 +376,12 @@ points, range 66.7% to 92.6%) against 44.4% (sd 7.0 points). Correct namings are
 on average (30.95 against 30.6) and false attributions on exogenous spikes rise (6.45
 against 5.7 of 300), so the gain is fewer namings, not more right ones. The published
 seed gives v2 a lower precision than any of the 20, so 62.5% is the conservative draw.
+The shipped v3 on the same 20 seeds is averaging 62.0% (sd 6.4 points, range 47.1% to
+71.0%); the published seed's 50.0% is again near the bottom of that range.
 That seed spread is not in the 95% interval above, which covers the namings of one
 seed only, and every row still assumes the 75 minute ceiling.
 
-**What was tried and not shipped: a file-list scope.** `src/domain/change_scope.py`
+**How the train sweep scored the file list, and why it did not pick it.** `src/domain/change_scope.py`
 reads the files each commit changed (recorded from `git show` into
 `src/infrastructure/fixtures/commit_paths_fixture.json` by
 `python scripts/record_commit_paths.py`) against the files the server is built from,
@@ -337,9 +407,11 @@ authors' assumption and is published as that, never as a gain:
 | False attribution on exogenous spikes, every row | 12.2% | 16.4% |
 
 So the scope raises recall by about two thirds if changes outside the service
-rarely break it, it costs precision once a quarter of causes are outside it, and it
-always blames more innocent commits for spikes nothing caused. It stays in the code,
-off by default, until a real deploy feed says which of those worlds a service is in.
+rarely break it, it costs precision once a quarter of causes are outside it, and on
+train it blames more innocent commits for spikes nothing caused (on held-out, 13 of 300
+against 14). The sweep's rule therefore left it off. Since 2026-09-27 it is on anyway,
+as a constraint rather than a tuned choice, with its held-out cost published in
+[the runtime filter (v3)](#the-runtime-filter-v3) above.
 
 **What the fixture does not carry.** The corpus is one service, and the stream has no
 deploy markers: every commit is treated as its own deploy. Per-service ownership and
@@ -388,17 +460,19 @@ values are generated here and were never read from a monitored service.
 | Hit rate, late look | **9.0%** | 300 regressions seen one to four polls later | 8.3% |
 
 The right-hand column is the history, reproduced by
-`python scripts/correlation_trial.py --attribution-window 60 --no-write`. The 72.5%
-is higher than the held-out 62.5% for the reason the held-out split exists: the
-window was chosen on train corpora that share most of these commits.
+`python scripts/correlation_trial.py --attribution-window 60 --no-write`. This trial
+scores the engine without the runtime filter (v2's settings). The 72.5% is higher than
+v2's held-out 62.5% for the reason the held-out split exists: the window was chosen on
+train corpora that share most of these commits.
 
 Read the table in that order, because that is the order of what this thing is good
 at. The four refusal rows are the product. The naming rows are a bounded secondary
 capability: when it names a change it is right more often than not, and it names one
-for about one regression in ten on this corpus and one in twenty-four on held-out.
+for about one regression in ten on this corpus and one in twenty-one on held-out with
+the runtime filter.
 
-**Naming a commit is still far from certain, and the screen says so.** 62.5% over 40
-held-out namings, with an interval reaching down to 47.0% and a level that assumes
+**Naming a commit is still far from certain, and the screen says so.** 50.0% over 58
+held-out namings, with an interval reaching down to 37.5% and a level that assumes
 every regression shows within the 75 minute window, is not a number to revert
 production on unaided, so the answer carries it, with that assumption in its note. Every `what_changed` response ships
 `attribution.measured_accuracy`, read from `attribution_holdout_summary.json` rather
@@ -739,7 +813,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-645 tests and a re-measure on an idle machine is pending**.
+650 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -783,7 +857,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 645 passed
+# 650 passed
 ```
 
 #### Step 3: Start the server
@@ -997,7 +1071,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 645 passed
+python -m pytest tests/ -q                                    # 650 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2000 statements
 node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
@@ -1132,17 +1206,17 @@ given a substitute number.
   the readings before the step, with a fixed factor. It has no seasonality and no
   trend, and a service whose error rate is legitimately ten times higher at nine in
   the morning than at four will be called an anomaly every day.
-* **Naming a change is right a little more than half the time.** **62.5%**
-  precision over 40 namings on the held-out split (95% interval 47.0% to 75.8%), on a
-  synthetic, self-authored corpus. That is published, it travels with every answer in
-  `attribution.measured_accuracy`, and it is why the README's headline is the
-  refusal rather than the name. It is not good enough to revert on unaided. Until
-  2026-09-27 the figure shown was an in-sample 52.2% over 113 namings; the same
-  engine read 40.8% on held-out.
-* **Naming a change fires rarely.** **4.2%** recall over 600 genuine regressions on
-  held-out (11.0% on the whole-stream corpus). The rest get a refusal or a miss.
-  Widening the window on 2026-09-27 bought precision, not recall: held-out recall
-  fell from 4.8%. Recall was 20.3% before the crowding gate, at 32.6% precision; the
+* **Naming a change is right half the time.** **50.0%**
+  precision over 58 namings on the held-out split (95% interval 37.5% to 62.5%), on a
+  synthetic, self-authored corpus whose labels let a documentation-only commit cause a
+  server regression, which the shipped runtime filter refuses to name. That is
+  published, it travels with every answer in `attribution.measured_accuracy`, and it
+  is why the README's headline is the refusal rather than the name. It is not good
+  enough to revert on unaided. Until 2026-09-27 the figure shown was an in-sample
+  52.2% over 113 namings; the same engine read 40.8% on held-out.
+* **Naming a change fires rarely.** **4.8%** recall over 600 genuine regressions on
+  held-out (11.0% on the whole-stream corpus, without the filter). The rest get a
+  refusal or a miss. Recall was 20.3% before the crowding gate, at 32.6% precision; the
   gate traded the first for the second on purpose and the whole sweep is published.
 * **The window was fitted to the corpus's delay assumption.** 75 minutes won on train
   because the generator's propagation delay reaches 75 minutes. A real service's
@@ -1161,11 +1235,11 @@ given a substitute number.
 * **The crowding gate was chosen on the whole-stream corpus.** N=1 came from a
   sweep over seed 20260908 on 2026-09-08. Since 2026-09-27 the published figure is
   measured on a held-out split instead, but the held-out side is small: 17 commits
-  and 40 namings, so its interval is wide.
+  and 58 namings, so its interval is wide.
 * **A crowded window is refused, not ranked.** Mercury says how many changes landed
-  and names none of them. It does not rank or diff them. It can read which files they
-  touched (`src/domain/change_scope.py`), but that scope is off by default because
-  on this corpus's labels it cost precision; see the held-out section above.
+  and names none of them. It does not rank or diff them. It does read which files they
+  touched (`src/domain/change_scope.py`) and counts only commits that touched a
+  runtime path; with a `GITHUB_TOKEN` the file lists are unknown and every commit counts.
 * **The delivery-channel premise is an assumption, not a finding.** That an on-call
   engineer is in a room with a television during an incident has never been tested
   with a responder. Nobody has been asked. If they are all remote, the ten-foot
@@ -1258,8 +1332,8 @@ If responders say the attribution is not worth reading, that is fatal, and the
 measured hit rate in [How often it is right](#how-often-it-is-right) is the reason
 to take that seriously: on the evidence there, the engine is not a product yet.
 What would make it one is a ranked candidate set in place of a refusal on a
-crowded window, which the corpus points straight at; a file-list scope was built and
-measured on 2026-09-27 and is off by default because this corpus cannot say whether
-it helps. The other fix it pointed at, a
+crowded window, which the corpus points straight at; a runtime file-list filter
+shipped on 2026-09-27 as a constraint, and this corpus cannot say whether it helps,
+because its labels let any commit cause a regression. The other fix it pointed at, a
 baseline drawn from before the onset, shipped on 2026-09-08 and is measured above. No commercial claim here rests on a figure that has not been
 measured, and none of the figures above is a commercial figure.

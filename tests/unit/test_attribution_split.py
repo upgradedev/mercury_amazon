@@ -143,59 +143,125 @@ def _engines() -> dict:
     return {row["engine"]: row for row in summary["engines"]}, summary["shipped_engine"]
 
 
+def _precision_row(before: dict, after: dict) -> str:
+    return (f"| Held-out naming precision | {_pct(before['naming_precision'])} "
+            f"({before['correct_namings']} of {before['times_a_commit_was_named']}, 95% CI "
+            f"{_pct(before['naming_precision_95ci'][0])} to {_pct(before['naming_precision_95ci'][1])}) | "
+            f"**{_pct(after['naming_precision'])}** ({after['correct_namings']} of "
+            f"{after['times_a_commit_was_named']}, 95% CI {_pct(after['naming_precision_95ci'][0])} to "
+            f"{_pct(after['naming_precision_95ci'][1])}) |")
+
+
+def _false_exo_row(before: dict, after: dict) -> str:
+    return (f"| Held-out false attribution on exogenous spikes | "
+            f"{_pct(before['false_attribution_rate_on_exogenous_spikes'])} "
+            f"({before['false_attributions_on_exogenous_spikes']} of 300) | "
+            f"**{_pct(after['false_attribution_rate_on_exogenous_spikes'])}** "
+            f"({after['false_attributions_on_exogenous_spikes']} of 300) |")
+
+
 def test_the_documents_quote_the_recorded_held_out_figures():
-    """Every held-out figure the README, EVIDENCE and Devpost text quote, pinned to the file."""
+    """Every held-out figure the README, EVIDENCE and Devpost text quote, pinned to the file.
+
+    Two comparisons are published: the runtime filter (previous engine to shipped engine),
+    which is the current before-and-after, and the window change before it (v1 to v2),
+    which EVIDENCE keeps as history. Both are held to the record.
+    """
     engines, shipped = _engines()
     after = engines[shipped]["held_out"]
-    before = engines["v1_2026_09_08"]["held_out"]
+    before = engines[split.PREVIOUS_ENGINE]["held_out"]
+    v1 = engines["v1_2026_09_08"]["held_out"]
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     evidence = " ".join((REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8").split())
     devpost = " ".join((REPO_ROOT / "docs" / "DEVPOST_SUBMISSION.md").read_text(encoding="utf-8").split())
     readme_flat = " ".join(readme.split())
 
     assert f"{_pct(after['naming_precision'])} (n={after['times_a_commit_was_named']} namings" in readme_flat
-    for text in (readme_flat, evidence):
-        assert f"from {_pct(before['naming_precision'])} to {_pct(after['naming_precision'])}" in text \
-            or f"{_pct(before['naming_precision'])} (29 of 71" in text
-        assert _pct(after["naming_recall_on_regressions"]) in text
-        assert _pct(before["naming_recall_on_regressions"]) in text
-        assert _pct(after["refused_to_name_rate_on_all_anomalies"]) in text
-        assert _pct(before["refused_to_name_rate_on_all_anomalies"]) in text
-        assert f"from {before['wrong_namings']} to {after['wrong_namings']}" in text \
-            or f"{before['wrong_namings']} under v1, {after['wrong_namings']} under v2" in text
+    assert f"from {_pct(before['naming_precision'])} to {_pct(after['naming_precision'])}" in readme_flat
+    assert (f"from {_pct(before['naming_recall_on_regressions'])} to "
+            f"{_pct(after['naming_recall_on_regressions'])}") in readme_flat
+    assert (f"from {_pct(before['refused_to_name_rate_on_all_anomalies'])} to "
+            f"{_pct(after['refused_to_name_rate_on_all_anomalies'])}") in readme_flat
+    assert f"from {before['wrong_namings']} to {after['wrong_namings']}" in readme_flat
 
-    row = (f"| Held-out naming precision | {_pct(before['naming_precision'])} "
-           f"({before['correct_namings']} of {before['times_a_commit_was_named']}, 95% CI "
-           f"{_pct(before['naming_precision_95ci'][0])} to {_pct(before['naming_precision_95ci'][1])}) | "
-           f"**{_pct(after['naming_precision'])}** ({after['correct_namings']} of "
-           f"{after['times_a_commit_was_named']}, 95% CI {_pct(after['naming_precision_95ci'][0])} to "
-           f"{_pct(after['naming_precision_95ci'][1])}) |")
-    assert row in evidence, "the EVIDENCE held-out precision row no longer matches the record"
-    assert (f"| Held-out false attribution on exogenous spikes | "
-            f"{_pct(before['false_attribution_rate_on_exogenous_spikes'])} "
-            f"({before['false_attributions_on_exogenous_spikes']} of 300) | "
-            f"**{_pct(after['false_attribution_rate_on_exogenous_spikes'])}** "
-            f"({after['false_attributions_on_exogenous_spikes']} of 300) |") in evidence
+    assert _precision_row(before, after) in evidence, "the EVIDENCE runtime-filter precision row drifted"
+    assert _false_exo_row(before, after) in evidence
+    assert (f"| Held-out naming recall | {_pct(before['naming_recall_on_regressions'])} "
+            f"({before['correct_namings']} of 600) | **{_pct(after['naming_recall_on_regressions'])}** "
+            f"({after['correct_namings']} of 600) |") in evidence
+    assert (f"| Wrong commit named for a regression | {before['regressions_named_wrong_commit']} | "
+            f"**{after['regressions_named_wrong_commit']}** |") in evidence
+    # The history the filter came after: v1 to v2, the window change.
+    assert _precision_row(v1, before) in evidence, "the EVIDENCE v1 to v2 precision row drifted"
+    assert _false_exo_row(v1, before) in evidence
+    assert f"{v1['wrong_namings']} under v1, {before['wrong_namings']} under v2" in evidence
 
-    assert f"right {_pct(after['naming_precision'])} of the time over " \
-           f"{after['times_a_commit_was_named']} namings" in devpost
-    assert f"read {_pct(before['naming_precision'])} over {before['times_a_commit_was_named']} namings" in devpost
+    assert (f"right {_pct(after['naming_precision'])} of the time over "
+            f"{after['times_a_commit_was_named']} namings") in devpost
+    assert f"read {_pct(v1['naming_precision'])} over {v1['times_a_commit_was_named']} namings" in devpost
+    assert (f"from {_pct(before['naming_precision'])} over {before['times_a_commit_was_named']} namings "
+            f"to {_pct(after['naming_precision'])} over {after['times_a_commit_was_named']}") in devpost
 
 
-def test_the_shipped_engine_is_the_one_the_train_sweep_chose():
-    """The tuning record, the frozen engine and the correlator's default must agree."""
+def test_the_documents_quote_the_filter_cost_breakdown():
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    cost = summary["runtime_filter_cost_on_published_labels"]
+    variant = {r["engine"]: r for r in summary["runtime_cause_assumption_variant"]["rows"]}
+    evidence = " ".join((REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8").split())
+    readme = " ".join((REPO_ROOT / "README.md").read_text(encoding="utf-8").split())
+    wrong = cost["regressions_named_wrong_commit"]
+    labelled = cost["wrong_namings_whose_labelled_cause_touched_no_runtime_file"]
+    assert f"of v3's {wrong} wrong namings on regressions, {labelled} are cases" in evidence
+    assert f"{labelled} of its {wrong} wrong namings on regressions" in readme
+    lost = cost["hits_lost_against_previous"]
+    if lost == cost["lost_hits_whose_labelled_cause_touched_no_runtime_file"]:
+        assert f"all {lost} correct namings v2 made and v3 does not" in evidence
+    for name in (split.PREVIOUS_ENGINE, split.SHIPPED_ENGINE):
+        row = variant[name]
+        assert (f"{_pct(row['naming_precision'])} ({row['correct_namings']} of "
+                f"{row['times_a_commit_was_named']})") in evidence
+
+
+def test_the_shipped_engine_keeps_the_train_choice_and_imposes_the_runtime_filter():
+    """Window and gate are the train sweep's choice; the runtime filter is imposed on top.
+
+    The sweep's rule picked no filter (under the generator's labels a prose-only commit can
+    cause a server regression), so the shipped engine departs from it on that one axis and
+    this test says so rather than pretending the sweep chose it. The server wires the same
+    engine, and the summary publishes the filter's cost on the unchanged labels.
+    """
+    from src.domain.change_scope import MERCURY_SERVICE_SCOPE
     from src.domain.incident_correlation import (
         DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
         DEFAULT_MAX_COMMITS_IN_WINDOW,
     )
+    from src.interfaces import mcp_server
 
     tuning = json.loads((REPO_ROOT / "attribution_tuning_summary.json").read_text(encoding="utf-8"))
     chosen = tuning["chosen"]
     engine = split.ENGINES[split.SHIPPED_ENGINE]["build"]()
-    assert (engine.attribution_window_minutes, engine.max_commits_in_window,
-            engine.service_scope is not None) == (chosen["window"], chosen["gate"], chosen["scope"])
+    assert (engine.attribution_window_minutes, engine.max_commits_in_window) == (chosen["window"], chosen["gate"])
+    assert chosen["scope"] is False, "the sweep now picks the filter itself; retire this departure"
+    assert engine.service_scope is MERCURY_SERVICE_SCOPE
     assert (DEFAULT_ATTRIBUTION_WINDOW_MINUTES, DEFAULT_MAX_COMMITS_IN_WINDOW) == (chosen["window"], chosen["gate"])
     assert tuning["split"].startswith("train only")
+    served = mcp_server.incident_correlator
+    assert (served.attribution_window_minutes, served.max_commits_in_window, served.service_scope) == (
+        engine.attribution_window_minutes, engine.max_commits_in_window, engine.service_scope)
+    previous = split.ENGINES[split.PREVIOUS_ENGINE]["build"]()
+    assert (previous.attribution_window_minutes, previous.max_commits_in_window, previous.service_scope) == (
+        engine.attribution_window_minutes, engine.max_commits_in_window, None)
+
+
+def test_the_filter_cost_on_the_published_labels_is_published_and_explained():
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    cost = summary["runtime_filter_cost_on_published_labels"]
+    engines, shipped = _engines()
+    assert cost["engine"] == shipped
+    assert cost["regressions_named_wrong_commit"] == engines[shipped]["held_out"]["regressions_named_wrong_commit"]
+    variant = summary["runtime_cause_assumption_variant"]
+    assert variant["note"].startswith("ASSUMPTION VARIANT, NOT A MEASURED GAIN")
+    assert [r["engine"] for r in variant["rows"]] == [split.PREVIOUS_ENGINE, shipped]
 
 
 # ------------------------------------------- The figure is conditional on a delay ceiling
@@ -225,8 +291,11 @@ def test_the_ranking_but_not_the_level_survives_other_delay_ceilings():
     assert ceilings == list(split.DELAY_CEILINGS_MINUTES)
     shipped = summary["shipped_engine"]
     precision = {(r["delay_ceiling_minutes"], r["engine"]): r["naming_precision"] for r in rows}
+    # The window change (v1 to v2) held its ranking at every ceiling. The runtime filter
+    # does not claim one: on these labels v3 sits below v2 up to 120 minutes, which
+    # EVIDENCE says in words.
     for ceiling in ceilings:
-        assert precision[(ceiling, shipped)] > precision[(ceiling, "v1_2026_09_08")]
+        assert precision[(ceiling, "v2_2026_09_27")] > precision[(ceiling, "v1_2026_09_08")]
     # The level falls as the ceiling rises past the window: the headline is conditional.
     assert precision[(ceilings[-1], shipped)] < precision[(75, shipped)]
 
@@ -256,13 +325,15 @@ def test_the_documents_quote_the_recorded_delay_ceiling_rows():
     for text in (readme, devpost):
         assert f"{at_90} at 90" in text and at_180 in text
     for ceiling in split.DELAY_CEILINGS_MINUTES:
-        v1, v2 = rows[(ceiling, "v1_2026_09_08")], rows[(ceiling, shipped)]
+        v1, v2 = rows[(ceiling, "v1_2026_09_08")], rows[(ceiling, split.PREVIOUS_ENGINE)]
+        v3 = rows[(ceiling, shipped)]
         label = f"**{ceiling} (published)**" if ceiling == 75 else str(ceiling)
         if ceiling == 75:
-            line = (f"| {label} | **{_cell(v1)}** | **{_cell(v2)}** | "
-                    f"**{v2['regressions_named_wrong_commit']}** |")
+            line = (f"| {label} | **{_cell(v1)}** | **{_cell(v2)}** | **{_cell(v3)}** | "
+                    f"**{v3['regressions_named_wrong_commit']}** |")
         else:
-            line = f"| {label} | {_cell(v1)} | {_cell(v2)} | {v2['regressions_named_wrong_commit']} |"
+            line = (f"| {label} | {_cell(v1)} | {_cell(v2)} | {_cell(v3)} | "
+                    f"{v3['regressions_named_wrong_commit']} |")
         assert line in evidence, f"the EVIDENCE delay-ceiling row for {ceiling} no longer matches the record"
     spread = summary["held_out_seed_spread"]["engines"][shipped]
     assert f"averaging {_pct(spread['mean_naming_precision'])}" in evidence

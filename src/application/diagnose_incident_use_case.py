@@ -13,6 +13,12 @@ When the metric series is simulated (no CloudWatch), the simulation is anchored
 to the newest known commit so the correlation is demonstrable end to end without
 an AWS account. That anchoring is stated in the provenance the cockpit renders:
 the commits are real, the metric is not, and the screen says so.
+
+Each commit carries its file list when the source has one (local git and the recording
+do; the GitHub commits API used here does not). With a runtime filter on the correlator,
+a commit whose files are all outside what the server is built from is not a deploy
+candidate, and the simulated reading is placed after a candidate, never after a commit
+the filter sets aside.
 """
 from __future__ import annotations
 
@@ -111,12 +117,15 @@ class DiagnoseIncidentUseCase:
             stamp = _parse_commit_time(entry.get("committed_at", ""))
             if stamp is None:
                 continue
+            listed = entry.get("paths")
+            paths = tuple(str(p) for p in listed) if isinstance(listed, (list, tuple)) and listed else None
             commits.append(
                 CommitRef(
                     sha=entry.get("sha", ""),
                     message=entry.get("message", ""),
                     author=entry.get("author", "unknown"),
                     committed_at=stamp,
+                    paths=paths,
                 )
             )
 
@@ -145,12 +154,18 @@ class DiagnoseIncidentUseCase:
         # crowded that commit's attribution window is, and only the fixture knows which
         # shape it is building. Only ever applied to a simulated series; a live
         # CloudWatch reading keeps its own timestamps.
+        #
+        # Only candidates are handed over as commit times: with the runtime filter on, a
+        # reading placed after a README edit would ask the correlator about a commit it
+        # does not count, and the attributing row would turn into a refusal.
         anchor = max((c.committed_at for c in commits), default=None)
+        scope = getattr(self._correlator, "service_scope", None)
+        candidates = [c for c in commits if scope is None or scope.touches(c.paths) is not False]
         series = self._metrics.get_error_series(
             service_name,
             window_minutes=window_minutes,
             anchor_at=anchor,
-            commit_times=[c.committed_at for c in commits],
+            commit_times=[c.committed_at for c in candidates],
         )
 
         return self._correlator.correlate(service_name, series, commits, commit_provenance)
