@@ -38,7 +38,9 @@ receipt are in the sibling `narration/` and `capture/` folders.
   scrolling to the rollback steps (frame at 103 s). Later builds keep the board and its
   RECORDED, no pipeline contacted figure on screen, and move to Publish handoff only on
   the next press; CENTER still publishes, so the journey below is unchanged. A new take
-  would show that instead.
+  would show that instead. The take also shows How it answers and Who it is for as
+  prose under the board and three tiles in the evidence wall; later builds open that
+  prose from a fourth tile, How it answers, on its own row under the three.
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture is shown at 87.5% so the captions sit in a band under it and never
   cover the board. The page itself was captured at full 1920x1080.

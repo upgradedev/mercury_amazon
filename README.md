@@ -210,8 +210,10 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   through the D-pad bridge the Leanback app calls, with burned-in captions. It shows
   the figures this page prints: commit `7bd8b41` named at 50.0% held-out precision over
   58 namings, and 90.0% refusals. No device or emulator appears in it, and it says so.
-  One difference: in the take, Confirm scrolls the board to the rollback steps (frame
-  at 103 s); this build keeps the RECORDED board on screen until the next press.
+  Two differences from this build: in the take, Confirm scrolls the board to the
+  rollback steps (frame at 103 s), where this build keeps the RECORDED board on screen
+  until the next press; and the take shows How it answers and Who it is for as prose
+  under the board, where this build opens them from a How it answers tile.
   Details in [video/README.md](video/README.md).
 - **A public deployment of this build.** The
   [live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
