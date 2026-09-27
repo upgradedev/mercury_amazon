@@ -74,13 +74,14 @@ BEATS = [
     (
         "beat_04_named_with_odds", 16.393,
         "On checkout A P I, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on held-out cases a named commit is the cause sixty "
-        "two percent of the time, over forty namings.",
+        "it, and prints its own odds: on held-out generated cases a named commit is the "
+        "cause sixty two percent of the time, over forty namings, if a fault shows within "
+        "seventy five minutes.",
         "On checkout-api, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on held-out cases a named commit is the cause 62.5% "
-        "of the time, over 40 namings.",
+        "it, and prints its own odds: on held-out generated cases a named commit is the "
+        "cause 62.5% of the time, over 40 namings, if a fault shows within 75 minutes.",
         "D-pad Up three times to checkout-api, then Center. The verdict names the commit, "
-        "quotes its message, and reads 62.5% held-out precision.",
+        "quotes its message, and reads 62.5% held-out precision (synthetic, 75 minute lag at most).",
     ),
     (
         "beat_05_provenance", 14.071,
