@@ -14,7 +14,9 @@ is the same journey logic in Python against a local server:
     server, and each beat is held for its measured length from ``timing.json``;
   * every press checks which control took focus, and every answer is awaited from
     the server, so a journey that drifts from the narration aborts instead of being
-    filmed. Nothing on screen is staged or edited; waiting is real waiting.
+    filmed. Nothing on screen is staged or edited; waiting is real waiting. The one
+    addition is a 1x1 px repaint marker (see ``REPAINT``), which only makes sure
+    the recorder is sent the frame the page is already showing.
 
 Run from the repository root, with the server already running:
 
@@ -64,6 +66,21 @@ ROWS_ANSWERED = """() => { const rows = document.querySelectorAll('[data-row-ver
   return rows.length === 5 && Array.from(rows).every(r => ['attributed','cannot','nothing','insufficient']
     .includes(r.getAttribute('data-verdict'))); }"""
 
+# Chromium's screencast drops a frame that is painted while the previous one is still
+# unacknowledged, and sends nothing more until the page paints again. A fast answer
+# (the /health check returns in a few milliseconds, straight after its "Sending"
+# line) can therefore be missing from the recording although the page shows it: the
+# first 2026-09-28 take held "Sending GET .../health" through the whole last beat.
+# After every settled press the page is asked to paint three more times, by flipping
+# the colour of one 1x1 px marker in the bottom-right corner, so the recorder receives
+# the frame the page is actually showing. The marker has no text, takes no focus and
+# is not a D-pad stop.
+REPAINT = """() => { let m = document.getElementById('captureRepaint');
+  if (!m) { m = document.createElement('div'); m.id = 'captureRepaint'; m.setAttribute('aria-hidden', 'true');
+    m.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;pointer-events:none;z-index:2147483647';
+    document.body.appendChild(m); }
+  const tint = getComputedStyle(document.body).backgroundColor;
+  [120, 400, 900].forEach((delay, i) => setTimeout(() => { m.style.background = i % 2 ? 'transparent' : tint; }, delay)); }"""
 
 BOARD_RECORDED = """() => document.getElementById('heroFigure').textContent.trim() === 'RECORDED'
   && /recorded, not sent/i.test(document.getElementById('heroEyebrow').textContent)
@@ -124,7 +141,8 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
         (("sentence", 2, 2.0), "DOWN", "Check connection", None),
     ],
     "beat_11_build_check": [
-        (0.4, "SELECT", "Check connection", r"() => /GET \/health returned 200[^\n]*Build/.test(document.body.innerText)"),
+        (0.4, "SELECT", "Check connection",
+         r"() => /^GET \/health returned 200[^\n]*Build/.test(document.getElementById('connDetail').textContent)"),
     ],
 }
 
@@ -178,6 +196,7 @@ def main() -> None:
             if condition:
                 page.wait_for_function(condition, timeout=8_000)
             page.wait_for_timeout(150)
+            page.evaluate(REPAINT)
             focused = page.evaluate(FOCUSED)
             if expected is not None and focused != expected:
                 raise SystemExit(f"after {key} focus is {focused!r}, expected {expected!r}")
