@@ -43,6 +43,9 @@ is still pending, and the video says so in its closing beat.
   predates this and shows the page scrolling to the rollback steps instead, so its
   confirm beat reads the **03 Recorded only** card. A new take should reword that
   sentence to the board's RECORDED figure before synthesis.
+* How it answers and Who it is for open from a fourth tile on its own row under the
+  three evidence tiles, so Down from Refresh handoff still lands on Incident evidence
+  and Right from there on Delivery velocity, as the capture journey expects.
 * A panel's answer renders below its buttons. Pressing Down to the next control
   (Check, in the Connection section) is what brings it into view.
 * `DPAD_RECORD_ONLY_DEMO` and the `NONE` external effect are in the server's response

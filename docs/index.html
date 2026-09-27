@@ -570,7 +570,10 @@
       body { padding-bottom: 1.5rem; }
     }
     @media (min-width: 1000px) {
-      .wall { grid-template-columns: repeat(4, 1fr); }
+      .wall { grid-template-columns: repeat(3, 1fr); }
+      /* How it answers is not evidence: it runs along the row under the three
+         evidence tiles, so the remote's moves between those three are unchanged. */
+      .wall .tile-how { grid-column: 1 / -1; }
     }
     /* 10-foot mode. Root type goes to 24px, the floor for reading at three metres,
        and every token that was a fraction of a rem is raised to at least 1rem, in
@@ -660,7 +663,8 @@
       .tv-host .hero-cause .quote { font-size: 1em; }
       .tv-host .hero-actions { margin-top: 0.7rem; }
       .tv-host .departures { margin-top: 0.75rem; }
-      .tv-host .wall { grid-template-columns: repeat(4, 1fr); }
+      .tv-host .wall { grid-template-columns: repeat(3, 1fr); }
+      .tv-host .wall .tile-how { grid-column: 1 / -1; }
       .tv-host .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
       .tv-host .answer { padding-bottom: 0.8rem; }
     }
@@ -894,7 +898,7 @@
           <span class="tile-open">Center to open</span>
         </button>
 
-        <button class="tile" data-tv-focusable data-panel="how" data-tv-label="How it answers panel">
+        <button class="tile tile-how" data-tv-focusable data-panel="how" data-tv-label="How it answers panel">
           <span class="tile-eyebrow">How it answers</span>
           <span class="tile-headline">One change named, or none</span>
           <span class="tile-sub">The three steps behind every answer, the four verdicts, and who it is for. Opening it makes no call.</span>
