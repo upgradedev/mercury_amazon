@@ -111,10 +111,13 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
                 "(() => { const r = document.querySelector('#heroFigure').getBoundingClientRect();"
                 " return { top: r.top, bottom: r.bottom, text: document.querySelector('#heroFigure').textContent,"
                 " label: document.querySelector('#heroFigureLabel').textContent,"
-                " rings: document.querySelectorAll('.tv-focused').length }; })()")
+                " rings: document.querySelectorAll('.tv-focused').length,"
+                " evidence: document.querySelector('#heroProvenance').textContent }; })()")
             assert hero["text"] == "RECORDED" and hero["label"] == "no pipeline contacted", hero
             assert 0 <= hero["top"] and hero["bottom"] <= 1080, f"the RECORDED hero left the screen: {hero}"
             assert hero["rings"] == 0, hero
+            # The evidence keeps the held-out measurement of the answer that was acted on.
+            assert "held-out split" in hero["evidence"], hero
             page.keyboard.press("Enter")
             page.locator("#handoffOutput .tag-live").wait_for(timeout=10_000)
             assert "D-pad demo responder" in page.locator("#handoffOutput").inner_text()

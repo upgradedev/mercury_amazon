@@ -1491,9 +1491,14 @@
          board beside the verdict at the moment somebody is deciding whether to revert,
          and in full, with the command that reproduces it, in the evidence below. */
       el('heroAccuracy').textContent = config.accuracyShort || '';
-      var prov = el('heroProvenance');
-      clear(prov);
-      if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+      /* The full sentence in the evidence changes only with a new answer. A staged or
+         recorded rollback says nothing about how often a naming is right, so it
+         leaves the measurement of the answer it acted on in place. */
+      if (config.accuracy !== undefined) {
+        var prov = el('heroProvenance');
+        clear(prov);
+        if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+      }
     }
 
     /* One sentence about how often this correlator names the right commit, taken from
@@ -1720,6 +1725,7 @@
         headline: 'No Mercury API answered',
         cause: message + ' This page is static unless a Mercury API is running. '
           + 'Start it with python -m src.interfaces.mcp_server, then press Setup in the Connection section below to point this page at it.',
+        accuracy: '',
         badges: []
       });
     }
