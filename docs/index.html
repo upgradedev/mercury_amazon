@@ -394,6 +394,8 @@
       display: block; font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
       letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
     }
+    .tile-stamp { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+    .tile-stamp:empty { display: none; }
     .tile-headline { display: block; font-family: var(--display); font-size: 1.45rem; font-weight: 700; margin: 0.35rem 0 0.25rem; color: var(--amber); }
     .tile-headline[data-empty="true"] { color: var(--ink-2); font-weight: 600; }
     .tile-sub { display: block; color: var(--ink-2); font-size: var(--fs-small); }
@@ -424,6 +426,9 @@
                   color: var(--ink-2); font-size: var(--fs-op); }
     .provenance .src { font-family: var(--mono); color: var(--ink); font-size: var(--fs-op); }
     .provenance .detail { flex: 1 1 20ch; min-width: 0; }
+    /* In a result the stamp comes first, above the figures it qualifies, so a figure
+       is never on screen while the word that says it is a fixture is below the fold. */
+    .provenance.lead { margin: 0 0 0.9rem; padding: 0 0 0.7rem; border-top: 0; border-bottom: 1px dashed var(--rule); }
 
     dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1.1rem; margin-top: 0.7rem; }
     dl.kv dt { color: var(--ink-2); font-size: var(--fs-small); }
@@ -870,6 +875,7 @@
       <section id="wall" class="wall" aria-label="War room panels">
         <button class="tile" data-tv-focusable data-panel="incident" data-tv-label="Incident evidence panel">
           <span class="tile-eyebrow">Incident evidence</span>
+          <span class="tile-stamp" id="tileIncidentStamp"></span>
           <span class="tile-headline" id="tileIncidentHeadline" data-empty="true">Not asked yet</span>
           <span class="tile-sub" id="tileIncidentSub">Metric series, baseline, attribution window and both provenance stamps.</span>
           <span class="tile-open">Center to open</span>
@@ -877,6 +883,7 @@
 
         <button class="tile" data-tv-focusable data-panel="velocity" data-tv-label="Delivery velocity panel">
           <span class="tile-eyebrow">Delivery velocity</span>
+          <span class="tile-stamp" id="tileVelocityStamp"></span>
           <span class="tile-headline" id="tileVelocityHeadline" data-empty="true">Not loaded yet</span>
           <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
@@ -884,6 +891,7 @@
 
         <button class="tile" data-tv-focusable data-panel="spend" data-tv-label="Cloud spend panel">
           <span class="tile-eyebrow">Cloud spend</span>
+          <span class="tile-stamp" id="tileSpendStamp"></span>
           <span class="tile-headline" id="tileSpendHeadline" data-empty="true">Not loaded yet</span>
           <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
@@ -1164,8 +1172,8 @@
         (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE'));
     }
 
-    function provenanceBlock(provenance) {
-      var box = h('div', 'provenance');
+    function provenanceBlock(provenance, lead) {
+      var box = h('div', lead ? 'provenance lead' : 'provenance');
       if (!provenance) {
         box.appendChild(h('span', 'detail', 'This response carried no provenance stamp.'));
         return box;
@@ -1649,10 +1657,19 @@
 
     function panels() { return document.querySelectorAll('[data-panel-body]'); }
 
-    function tileHeadline(id, text) {
+    /* A tile headline is a figure too. Its stamps sit above it, in the tile's
+       stamp slot, and are cleared when the headline is not a figure (a failure). */
+    function tileHeadline(id, text, provenances) {
       var node = el(id);
       node.textContent = text;
       node.removeAttribute('data-empty');
+      var slot = el(id.replace('Headline', 'Stamp'));
+      if (slot) {
+        clear(slot);
+        (provenances || []).forEach(function (provenance) {
+          if (provenance) { slot.appendChild(stampFor(provenance)); }
+        });
+      }
     }
 
     function showWall() {
@@ -1685,6 +1702,9 @@
       if (window.mercuryNav) {
         window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));
       }
+      // Bring the whole panel up, not just its first button: the result, and the
+      // stamp that now leads it, sit under the buttons and were left below the fold.
+      if (typeof target.scrollIntoView === 'function') { target.scrollIntoView({ block: 'start' }); }
       if (!state.panelLoaded[name] && PANEL_PRIMARY[name]) {
         state.panelLoaded[name] = true;
         PANEL_PRIMARY[name]();
@@ -1757,7 +1777,8 @@
         fillRow(data.service, data);
         renderIncidentDetail(data);
         tileHeadline('tileIncidentHeadline', VERDICT_WORDS[verdictKind(data)]
-          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' to ' + data.offending_commit.sha : ''));
+          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' to ' + data.offending_commit.sha : ''),
+          [data.metric_provenance, data.commit_provenance]);
         el('tileIncidentSub').textContent =
           data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';
 
@@ -1792,6 +1813,8 @@
 
     function renderIncidentDetail(data) {
       var box = document.createElement('div');
+      box.appendChild(provenanceBlock(data.metric_provenance, true));
+      box.appendChild(provenanceBlock(data.commit_provenance, true));
       box.appendChild(h('span', 'tag ' + (data.incident_detected ? 'tag-warn' : 'tag-ok'), data.verdict));
       box.appendChild(kv([
         ['Service', data.service],
@@ -1830,8 +1853,6 @@
             ? data.deployment_evidence.blocked_reason
             : 'No rollback is offered for this verdict. That is the correlator refusing, not a missing feature.'));
       }
-      box.appendChild(provenanceBlock(data.metric_provenance));
-      box.appendChild(provenanceBlock(data.commit_provenance));
       render('incidentOutput', box);
     }
 
@@ -2163,6 +2184,7 @@
         var data = res.body;
         var m = data.metrics;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(h('span', 'tag tag-ok', data.tier));
         box.appendChild(kv([
           ['Deploys per day', m.deployment_frequency_per_day],
@@ -2171,9 +2193,8 @@
           ['Recovery time', recoveryText(m)],
           ['Records used', data.sample_size + ' over ' + data.window_days + ' days']
         ]));
-        box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        tileHeadline('tileVelocityHeadline', m.deployment_frequency_per_day + ' deploys per day');
+        tileHeadline('tileVelocityHeadline', m.deployment_frequency_per_day + ' deploys per day', [data.provenance]);
         el('tileVelocitySub').textContent =
           data.tier + ', from ' + data.sample_size + ' records over ' + data.window_days + ' days.';
         speak(data.voice_summary);
@@ -2191,6 +2212,7 @@
         var res = await post('/mcp/tools/get_pr_bottlenecks', {}, 'doraLatency');
         var data = res.body;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(kv([['Open', data.total_open], ['Past the 36 hour SLA', data.stale_count]]));
         if (!data.stale_prs.length) {
           box.appendChild(h('div', 'empty-state-card', 'No pull request is past the 36 hour review SLA.'));
@@ -2207,9 +2229,8 @@
               'Showing ' + data.stale_prs.length + ' of ' + data.stale_count + ' stale pull requests.'));
           }
         }
-        box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        tileHeadline('tileVelocityHeadline', data.stale_count + ' reviews past SLA');
+        tileHeadline('tileVelocityHeadline', data.stale_count + ' reviews past SLA', [data.provenance]);
         el('tileVelocitySub').textContent = data.total_open + ' pull requests open.';
         speak(data.voice_summary);
       } catch (error) {
@@ -2226,6 +2247,7 @@
         var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, 'costLatency');
         var data = res.body;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(kv([
           ['Month to date', '$' + data.month_to_date_usd],
           ['Projected month end', '$' + data.projected_usd]
@@ -2243,9 +2265,8 @@
             box.appendChild(row);
           });
         }
-        box.appendChild(provenanceBlock(data.provenance));
         render('costOutput', box);
-        tileHeadline('tileSpendHeadline', '$' + data.month_to_date_usd + ' month to date');
+        tileHeadline('tileSpendHeadline', '$' + data.month_to_date_usd + ' month to date', [data.provenance]);
         el('tileSpendSub').textContent = data.anomalies.length + ' service anomalies over the day average.';
         speak(data.voice_summary);
       } catch (error) {
