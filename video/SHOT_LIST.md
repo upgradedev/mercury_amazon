@@ -37,9 +37,12 @@ is still pending, and the video says so in its closing beat.
   above **Ask what changed**, so once the page has scrolled down the board's top row
   does not come back into view. The staging beat therefore comes before any beat
   that scrolls down.
-* Confirm moves focus to **Publish handoff**, which scrolls the page to the rollback
-  steps. The board's RECORDED figure is off screen from then on, so the confirm beat
-  reads the **03 Recorded only** card instead.
+* Confirm leaves the board where it is: the large figure reads **RECORDED, no
+  pipeline contacted**, and **Publish handoff** is the next stop without a ring. The
+  next press brings it into view; Center publishes it. The take recorded at `ad12202`
+  predates this and shows the page scrolling to the rollback steps instead, so its
+  confirm beat reads the **03 Recorded only** card. A new take should reword that
+  sentence to the board's RECORDED figure before synthesis.
 * A panel's answer renders below its buttons. Pressing Down to the next control
   (Check, in the Connection section) is what brings it into view.
 * `DPAD_RECORD_ONLY_DEMO` and the `NONE` external effect are in the server's response
@@ -56,7 +59,7 @@ is still pending, and the video says so in its closing beat.
 | 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named as the only runtime change, its message quoted, 50.0% held-out precision (synthetic, at most 75 minutes of lag) |
 | 5 | `beat_05_provenance` | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
 | 6 | `beat_06_stage` | Up, Right, Center | Rollback staged, the lease counting down as the large figure, Next: confirm, record-only |
-| 7 | `beat_07_confirm` | Right, Center | The rollback steps: 02 says the token is spent, 03 Recorded only says no deployment pipeline was contacted |
+| 7 | `beat_07_confirm` | Right, Center | The board: RECORDED, no pipeline contacted, and the legend's Next press: Publish responder handoff (the `ad12202` take shows the rollback steps instead) |
 | 8 | `beat_08_handoff` | Center, Down | Publish handoff answers HTTP 200; Down brings its next step into view |
 | 9 | `beat_09_dpad` | Right, Center | Delivery velocity opens; the BACK legend changes to Back to the wall |
 | 10 | `beat_10_fixtures` | Down, Back, Right, Center, Down | DORA answer with OFFLINE FIXTURE; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures |

@@ -84,7 +84,7 @@
       "words_count": 26,
       "words_per_minute": 133.8,
       "narration_text": "Right, then center confirms. The server spends the token, and the recorded only card says it plainly: no deployment pipeline was contacted. Confirming again is refused.",
-      "visual_action": "D-pad Right to Confirm, Center. Focus moves to Publish handoff and the page scrolls to the rollback steps: 03 Recorded only states that no deployment pipeline was contacted, and 02 Confirm says the token has been spent."
+      "visual_action": "D-pad Right to Confirm, Center. The board stays in view: the large figure reads RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next press: Publish responder handoff."
     },
     {
       "beat_index": 8,

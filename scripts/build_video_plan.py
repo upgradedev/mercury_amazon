@@ -111,9 +111,9 @@ BEATS = [
         "Right, then Center confirms. The server spends the token, and the Recorded only "
         "card says it plainly: no deployment pipeline was contacted. Confirming again is "
         "refused.",
-        "D-pad Right to Confirm, Center. Focus moves to Publish handoff and the page "
-        "scrolls to the rollback steps: 03 Recorded only states that no deployment "
-        "pipeline was contacted, and 02 Confirm says the token has been spent.",
+        "D-pad Right to Confirm, Center. The board stays in view: the large figure reads "
+        "RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the key "
+        "legend reads Next press: Publish responder handoff.",
     ),
     (
         "beat_08_handoff", 9.752,
