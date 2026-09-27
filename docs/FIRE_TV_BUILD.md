@@ -37,7 +37,7 @@ candidate without this Gradle property and without `COCKPIT_URL`:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell monkey -p com.amazon.mercury.wallboard \
+adb shell monkey -p io.github.upgradedev.mercury.wallboard \
   -c android.intent.category.LEANBACK_LAUNCHER 1
 ```
 

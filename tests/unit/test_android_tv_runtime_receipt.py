@@ -25,7 +25,7 @@ def test_receipt_requires_every_runtime_event_and_records_apk_digest(tmp_path):
     install.write_text("Success\n", encoding="utf-8")
     launch = tmp_path / "launch.txt"
     launch.write_text(
-        "Status: ok\nActivity: com.amazon.mercury.wallboard/.MainActivity\n",
+        "Status: ok\nActivity: io.github.upgradedev.mercury.wallboard/.MainActivity\n",
         encoding="utf-8",
     )
     health = tmp_path / "endpoint-health.json"
@@ -50,7 +50,7 @@ def test_receipt_refuses_an_endpoint_from_a_different_release(tmp_path):
     install.write_text("Success\n", encoding="utf-8")
     launch = tmp_path / "launch.txt"
     launch.write_text(
-        "Status: ok\nActivity: com.amazon.mercury.wallboard/.MainActivity\n",
+        "Status: ok\nActivity: io.github.upgradedev.mercury.wallboard/.MainActivity\n",
         encoding="utf-8",
     )
     health = tmp_path / "endpoint-health.json"

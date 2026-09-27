@@ -18,8 +18,8 @@ APP = REPO_ROOT / "app"
 MANIFEST = APP / "src" / "main" / "AndroidManifest.xml"
 DEBUG_MANIFEST = APP / "src" / "debug" / "AndroidManifest.xml"
 TOOLS_NS = "http://schemas.android.com/tools"
-KOTLIN = APP / "src" / "main" / "kotlin" / "com" / "amazon" / "mercury" / "wallboard"
-KOTLIN_TESTS = APP / "src" / "test" / "kotlin" / "com" / "amazon" / "mercury" / "wallboard"
+KOTLIN = APP / "src" / "main" / "kotlin" / "io" / "github" / "upgradedev" / "mercury" / "wallboard"
+KOTLIN_TESTS = APP / "src" / "test" / "kotlin" / "io" / "github" / "upgradedev" / "mercury" / "wallboard"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
 
@@ -159,8 +159,11 @@ def test_gradle_project_files_exist():
 
 
 def test_namespace_matches_the_kotlin_package(app_gradle, activity_source):
-    assert 'namespace = "com.amazon.mercury.wallboard"' in app_gradle
-    assert "package com.amazon.mercury.wallboard" in activity_source
+    assert 'namespace = "io.github.upgradedev.mercury.wallboard"' in app_gradle
+    assert 'applicationId = "io.github.upgradedev.mercury.wallboard"' in app_gradle
+    assert "package io.github.upgradedev.mercury.wallboard" in activity_source
+    # A third-party app does not ship inside Amazon's own package namespace.
+    assert "com.amazon" not in app_gradle
 
 
 def test_min_sdk_covers_fire_os_7(app_gradle):

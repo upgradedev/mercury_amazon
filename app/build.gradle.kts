@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.amazon.mercury.wallboard"
+    namespace = "io.github.upgradedev.mercury.wallboard"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.amazon.mercury.wallboard"
+        applicationId = "io.github.upgradedev.mercury.wallboard"
         // Fire OS 7 is based on Android 9 (API 28). Fire OS 8 is Android 11 (API 30).
         minSdk = 28
         targetSdk = 34

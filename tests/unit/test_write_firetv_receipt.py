@@ -111,7 +111,7 @@ def test_a_dry_run_prints_the_receipt_and_writes_nothing(checkout, capsys):
 
 def test_the_adb_launch_output_is_attached_verbatim_when_given(checkout, tmp_path):
     log = tmp_path / "launch.log"
-    log.write_text("Starting: Intent { cmp=com.amazon.mercury.wallboard/.MainActivity }\n", encoding="utf-8")
+    log.write_text("Starting: Intent { cmp=io.github.upgradedev.mercury.wallboard/.MainActivity }\n", encoding="utf-8")
     assert receipt_script.main(_argv(checkout) + ["--adb-launch-output", str(log)]) == 0
     written = json.loads(_receipt_path(checkout).read_text(encoding="utf-8"))
     assert "MainActivity" in written["device_run"]["adb_launch_output"]
