@@ -103,3 +103,70 @@ def test_the_tuning_script_cannot_reach_the_held_out_side():
     for forbidden in ("held_out_corpus", "HELD_OUT_SEED", "split_stream", "held_out ="):
         assert forbidden not in source, f"the tuning script references {forbidden}"
     assert "from attribution_split import SYNTHETIC_LABEL, train_corpus" in source
+
+
+# ------------------------------------------------ The documents quote the record
+
+
+def _pct(value: float) -> str:
+    return f"{value * 100:.1f}%"
+
+
+def _engines() -> dict:
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    return {row["engine"]: row for row in summary["engines"]}, summary["shipped_engine"]
+
+
+def test_the_documents_quote_the_recorded_held_out_figures():
+    """Every held-out figure the README, EVIDENCE and Devpost text quote, pinned to the file."""
+    engines, shipped = _engines()
+    after = engines[shipped]["held_out"]
+    before = engines["v1_2026_09_08"]["held_out"]
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    evidence = " ".join((REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8").split())
+    devpost = " ".join((REPO_ROOT / "docs" / "DEVPOST_SUBMISSION.md").read_text(encoding="utf-8").split())
+    readme_flat = " ".join(readme.split())
+
+    assert f"{_pct(after['naming_precision'])} (n={after['times_a_commit_was_named']} namings" in readme_flat
+    for text in (readme_flat, evidence):
+        assert f"from {_pct(before['naming_precision'])} to {_pct(after['naming_precision'])}" in text \
+            or f"{_pct(before['naming_precision'])} (29 of 71" in text
+        assert _pct(after["naming_recall_on_regressions"]) in text
+        assert _pct(before["naming_recall_on_regressions"]) in text
+        assert _pct(after["refused_to_name_rate_on_all_anomalies"]) in text
+        assert _pct(before["refused_to_name_rate_on_all_anomalies"]) in text
+        assert f"from {before['wrong_namings']} to {after['wrong_namings']}" in text \
+            or f"{before['wrong_namings']} under v1, {after['wrong_namings']} under v2" in text
+
+    row = (f"| Held-out naming precision | {_pct(before['naming_precision'])} "
+           f"({before['correct_namings']} of {before['times_a_commit_was_named']}, 95% CI "
+           f"{_pct(before['naming_precision_95ci'][0])} to {_pct(before['naming_precision_95ci'][1])}) | "
+           f"**{_pct(after['naming_precision'])}** ({after['correct_namings']} of "
+           f"{after['times_a_commit_was_named']}, 95% CI {_pct(after['naming_precision_95ci'][0])} to "
+           f"{_pct(after['naming_precision_95ci'][1])}) |")
+    assert row in evidence, "the EVIDENCE held-out precision row no longer matches the record"
+    assert (f"| Held-out false attribution on exogenous spikes | "
+            f"{_pct(before['false_attribution_rate_on_exogenous_spikes'])} "
+            f"({before['false_attributions_on_exogenous_spikes']} of 300) | "
+            f"**{_pct(after['false_attribution_rate_on_exogenous_spikes'])}** "
+            f"({after['false_attributions_on_exogenous_spikes']} of 300) |") in evidence
+
+    assert f"right {_pct(after['naming_precision'])} of the time over " \
+           f"{after['times_a_commit_was_named']} namings" in devpost
+    assert f"read {_pct(before['naming_precision'])} over {before['times_a_commit_was_named']} namings" in devpost
+
+
+def test_the_shipped_engine_is_the_one_the_train_sweep_chose():
+    """The tuning record, the frozen engine and the correlator's default must agree."""
+    from src.domain.incident_correlation import (
+        DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+        DEFAULT_MAX_COMMITS_IN_WINDOW,
+    )
+
+    tuning = json.loads((REPO_ROOT / "attribution_tuning_summary.json").read_text(encoding="utf-8"))
+    chosen = tuning["chosen"]
+    engine = split.ENGINES[split.SHIPPED_ENGINE]["build"]()
+    assert (engine.attribution_window_minutes, engine.max_commits_in_window,
+            engine.service_scope is not None) == (chosen["window"], chosen["gate"], chosen["scope"])
+    assert (DEFAULT_ATTRIBUTION_WINDOW_MINUTES, DEFAULT_MAX_COMMITS_IN_WINDOW) == (chosen["window"], chosen["gate"])
+    assert tuning["split"].startswith("train only")

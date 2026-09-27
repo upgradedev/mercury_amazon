@@ -2,7 +2,7 @@
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
-![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 62.5% held-out precision, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
+![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 62.5% held-out precision on a synthetic corpus, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own, standing in for a deploy.*
 
@@ -34,7 +34,7 @@ repository.
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-636%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-638%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -148,7 +148,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 636 passed
+# 638 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -207,8 +207,9 @@ corpus the authors wrote. Settings are now tuned on a train split and reported o
 held-out split (a time cut of the commit stream with fixed seeds, scored by
 `python scripts/attribution_split.py`). On held-out, naming recall is 4.2%: it names the cause
 of about one regression in twenty-four. Widening the window from 60 to 75 minutes on
-2026-09-27 raised held-out precision from 40.8% to 62.5% and cut wrong namings from
-42 to 15, but it did not raise recall (4.8% before), it refuses more often (93.1%
+2026-09-27 cut wrong namings on the held-out cases from 42 to 15 and raised held-out
+precision from 40.8% to 62.5% (the 95% intervals overlap, so the size of that gain is
+not settled by this sample), but it did not raise recall (4.8% before), it refuses more often (93.1%
 against 87.8%), and it blames a commit for more spikes no commit caused (14 of 300
 against 9). The 52.2% this page printed before was in-sample. A crowded window is
 refused, not ranked. The full list is in

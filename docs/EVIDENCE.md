@@ -56,8 +56,8 @@ Three things it does:
 
 **Answers "is this a deploy, and which one?"** `POST /mcp/tools/what_changed` reads
 an error metric series and a commit history, decides whether the metric has stepped
-up against a baseline taken from before the step, and looks for changes in the hour
-before that step started. It names one only when exactly one landed there. When
+up against a baseline taken from before the step, and looks for changes in the 75
+minutes before that step started (60 until 2026-09-27). It names one only when exactly one landed there. When
 none landed it says so; when several landed it says how many and names none of
 them, because nothing in a metric series says which of two changes did it. Both
 refusals are the product rather than a fallback, they have their own tests, and
@@ -240,8 +240,11 @@ engine was frozen and then scored on held-out once, beside the engine it replace
 | Held-out quiet on healthy series | 100% (200 of 200) | **100%** (200 of 200) |
 | Wrong namings in all | 42 | **15** |
 
-**Read both sides of that trade.** Precision rose by 21.7 points and the wrong names
-fell from 42 to 15. Recall did not rise: it fell by four correct namings, the refusal
+**Read both sides of that trade.** The sturdiest result is the count of wrong names on
+the same held-out cases: 42 under v1, 15 under v2. Precision rose by 21.7 points, but
+the two 95% intervals overlap between 47.0% and 52.5%, so this sample alone does not
+fix the size of that gain, and the recall change (29 to 25 correct namings, intervals
+3.4% to 6.9% and 2.8% to 6.1%) is inside the noise. Recall did not rise: it fell by four correct namings, the refusal
 rate rose by 5.3 points, and false attribution on exogenous spikes rose from 9 to 14 of
 300, because a wider window finds a lone commit in front of some spikes that no commit
 caused. Of the 15 wrong namings, 14 are those; 1 blamed the wrong commit for a
@@ -673,7 +676,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-636 tests and a re-measure on an idle machine is pending**.
+638 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -717,7 +720,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 636 passed
+# 638 passed
 ```
 
 #### Step 3: Start the server
@@ -928,7 +931,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 636 passed
+python -m pytest tests/ -q                                    # 638 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1992 statements
 node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

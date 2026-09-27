@@ -297,7 +297,7 @@ def commit_density_per_hour(commits: list[CommitRef]) -> float:
     return round(len(commits) / span_hours, 3) if span_hours > 0 else 0.0
 
 
-def burstiness(commits: list[CommitRef]) -> dict:
+def burstiness(commits: list[CommitRef], window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES) -> dict:
     """Describe the clustering of the stream, because the rates depend on it.
 
     A rate per hour hides a stream that sits idle for a day and then lands eight commits
@@ -313,7 +313,7 @@ def burstiness(commits: list[CommitRef]) -> dict:
         (b.committed_at - a.committed_at).total_seconds() / 60.0
         for a, b in zip(ordered, ordered[1:])
     ]
-    window = timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+    window = timedelta(minutes=window_minutes)
     in_window = [
         sum(1 for other in ordered if 0 <= (c.committed_at - other.committed_at).total_seconds() <= window.total_seconds())
         for c in ordered
@@ -321,7 +321,7 @@ def burstiness(commits: list[CommitRef]) -> dict:
     return {
         "median_gap_minutes": round(statistics.median(gaps), 2),
         "gaps": len(gaps),
-        "gaps_under_the_attribution_window": sum(1 for gap in gaps if gap < DEFAULT_ATTRIBUTION_WINDOW_MINUTES),
+        "gaps_under_the_attribution_window": sum(1 for gap in gaps if gap < window_minutes),
         "mean_commits_in_a_window_ending_at_a_commit": round(statistics.mean(in_window), 2),
         "max_commits_in_a_window_ending_at_a_commit": max(in_window),
     }
@@ -436,6 +436,7 @@ def _regression_cases(
     stratum: str,
     noise_sigma: float,
     start_index: int,
+    window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
 ) -> list[TrialCase]:
     """Cases where one recorded commit really did cause the reading.
 
@@ -461,12 +462,14 @@ def _regression_cases(
         times = _point_times(observed_at)
         elevated_from = next((i for i, at in enumerate(times) if at >= onset), None)
 
-        window_start = observed_at - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+        # Diagnostics only: which window the cause fell in. The truth label is the
+        # causing sha, and no draw above depends on the window.
+        window_start = observed_at - timedelta(minutes=window_minutes)
         # The first poll at or after the onset is the earliest reading that can show the
         # spike, so it is the onset any detector could find. Derived from the generator's
         # own onset, not from where the correlator thought the onset was.
         onset_poll = times[elevated_from] if elevated_from is not None else observed_at
-        onset_window_start = onset_poll - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+        onset_window_start = onset_poll - timedelta(minutes=window_minutes)
         between = sum(
             1 for c in commits if cause.committed_at < c.committed_at <= observed_at
         )
@@ -553,6 +556,7 @@ def build_corpus(
     exogenous: int = DEFAULT_EXOGENOUS,
     healthy: int = DEFAULT_HEALTHY,
     sparse: int = DEFAULT_SPARSE,
+    window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
 ) -> list[TrialCase]:
     """Build the whole labelled corpus from one seed, so a run reproduces exactly."""
     if len(commits) < 2:
@@ -560,8 +564,10 @@ def build_corpus(
     span = (commits[0].committed_at, commits[-1].committed_at)
 
     cases: list[TrialCase] = []
-    cases += _regression_cases(regression_fresh, commits, seed, STRATUM_FRESH, noise_sigma, len(cases))
-    cases += _regression_cases(regression_late, commits, seed, STRATUM_LATE, noise_sigma, len(cases))
+    cases += _regression_cases(regression_fresh, commits, seed, STRATUM_FRESH, noise_sigma, len(cases),
+                               window_minutes)
+    cases += _regression_cases(regression_late, commits, seed, STRATUM_LATE, noise_sigma, len(cases),
+                               window_minutes)
     cases += _uncaused_cases(exogenous, span, seed, STRATUM_EXOGENOUS, noise_sigma, len(cases))
     cases += _uncaused_cases(healthy, span, seed, STRATUM_HEALTHY, noise_sigma, len(cases))
     cases += _uncaused_cases(sparse, span, seed, STRATUM_SPARSE, noise_sigma, len(cases))
@@ -978,6 +984,7 @@ def build_summary(args) -> dict:
         stream, seed=args.seed, noise_sigma=args.noise_sigma,
         regression_fresh=args.regression_fresh, regression_late=args.regression_late,
         exogenous=args.exogenous, healthy=args.healthy, sparse=args.sparse,
+        window_minutes=args.attribution_window,
     )
     correlator = correlator_from(args)
     verdicts = run_corpus(cases, stream, correlator)
@@ -1011,7 +1018,7 @@ def build_summary(args) -> dict:
             "commits_per_hour": commit_density_per_hour(stream),
             "span_start_utc": stream[0].committed_at.isoformat(),
             "span_end_utc": stream[-1].committed_at.isoformat(),
-            "burstiness": burstiness(stream),
+            "burstiness": burstiness(stream, args.attribution_window),
             "source": recording.get("source"),
         },
         "scope": (

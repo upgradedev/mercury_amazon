@@ -1508,7 +1508,8 @@
     function accuracyShort(data) {
       var measured = data.attribution && data.attribution.measured_accuracy;
       if (!measured || !measured.measured) { return ''; }
-      return percent(measured.precision_when_it_names_a_commit) + ' held-out precision';
+      // Held-out, and on a corpus the authors generated: both words travel with the figure.
+      return percent(measured.precision_when_it_names_a_commit) + ' held-out precision (synthetic)';
     }
 
     /* Which of the four answers a response is, for colour and for the board rows.
@@ -1558,7 +1559,7 @@
       if (!(landed <= onset)) { return ''; }
       var minutes = Math.round((onset - landed) / 60000);
       // Board language, terse: which change, and when against the spike.
-      var when = minutes < 1 ? 'under 1 min before spike' : minutes + ' min before spike';
+      var when = minutes < 1 ? 'under 1 min pre-spike' : minutes + ' min pre-spike';
       if (attribution.commits_in_window === 1) { return 'Only change, ' + when; }
       if (attribution.commits_in_window > 1) {
         return 'Closest of ' + attribution.commits_in_window + ' changes, ' + when;
