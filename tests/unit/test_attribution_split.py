@@ -97,12 +97,38 @@ def test_the_wilson_interval_brackets_the_rate():
     assert split.wilson_interval(0, 0) is None
 
 
-def test_the_tuning_script_cannot_reach_the_held_out_side():
-    """Parameters are chosen by scripts/tune_attribution.py, on train corpora only."""
+def test_the_tuning_script_does_not_load_the_held_out_side():
+    """Parameters are chosen by scripts/tune_attribution.py, on train corpora only.
+
+    An import-level check in a fresh interpreter: after importing the tuning script, no
+    loaded module may be ``attribution_split`` or define the held-out builder or seed.
+    It stops an import, not a determined edit, and is described that way.
+    """
+    probe = "\n".join((
+        "import sys; sys.path[:0] = ['scripts', '.']",
+        "import tune_attribution",
+        "bad = sorted(name for name, mod in list(sys.modules.items())",
+        "             if name == 'attribution_split'",
+        "             or hasattr(mod, 'held_out_corpus') or hasattr(mod, 'HELD_OUT_SEED'))",
+        "print(','.join(bad))",
+        "sys.exit(1 if bad else 0)",
+    ))
+    result = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True,
+                            cwd=str(REPO_ROOT), timeout=120)
+    assert result.returncode == 0, f"the tuning script loads the held-out side: {result.stdout}{result.stderr}"
     source = (REPO_ROOT / "scripts" / "tune_attribution.py").read_text(encoding="utf-8")
-    for forbidden in ("held_out_corpus", "HELD_OUT_SEED", "split_stream", "held_out ="):
-        assert forbidden not in source, f"the tuning script references {forbidden}"
-    assert "from attribution_split import SYNTHETIC_LABEL, train_corpus" in source
+    assert "from attribution_train import SYNTHETIC_LABEL, train_corpus" in source
+    train_source = (REPO_ROOT / "scripts" / "attribution_train.py").read_text(encoding="utf-8")
+    for forbidden in ("held_out_corpus", "HELD_OUT_SEED", "import attribution_split", "from attribution_split"):
+        assert forbidden not in train_source, f"attribution_train.py references {forbidden}"
+
+
+def test_the_recorded_tuning_summary_matches_a_fresh_sweep():
+    result = subprocess.run(
+        [sys.executable, "scripts/tune_attribution.py", "--check"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=600,
+    )
+    assert result.returncode == 0, result.stdout[-1500:]
 
 
 # ------------------------------------------------ The documents quote the record
@@ -170,3 +196,45 @@ def test_the_shipped_engine_is_the_one_the_train_sweep_chose():
             engine.service_scope is not None) == (chosen["window"], chosen["gate"], chosen["scope"])
     assert (DEFAULT_ATTRIBUTION_WINDOW_MINUTES, DEFAULT_MAX_COMMITS_IN_WINDOW) == (chosen["window"], chosen["gate"])
     assert tuning["split"].startswith("train only")
+
+
+# ------------------------------------------- The figure is conditional on a delay ceiling
+
+
+def test_the_delay_ceiling_rows_hold_the_published_figure_at_the_published_ceiling():
+    """The 75 minute row is the headline, so the table and the headline cannot drift apart."""
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    sensitivity = summary["delay_ceiling_sensitivity"]
+    assert sensitivity["published_delay_minutes"] == list(trial.PROPAGATION_DELAY_MINUTES)
+    assert summary["split"]["propagation_delay_minutes"] == list(trial.PROPAGATION_DELAY_MINUTES)
+    engines, shipped = _engines()
+    published = [r for r in sensitivity["rows"]
+                 if r["delay_ceiling_minutes"] == trial.PROPAGATION_DELAY_MINUTES[1]]
+    by_engine = {r["engine"]: r for r in published}
+    for name, row in engines.items():
+        assert by_engine[name]["naming_precision"] == row["held_out"]["naming_precision"]
+        assert by_engine[name]["times_a_commit_was_named"] == row["held_out"]["times_a_commit_was_named"]
+    # The shipped window equals the published ceiling; that coincidence is what the table discloses.
+    assert split.ENGINES[shipped]["build"]().attribution_window_minutes == trial.PROPAGATION_DELAY_MINUTES[1]
+
+
+def test_the_ranking_but_not_the_level_survives_other_delay_ceilings():
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    rows = summary["delay_ceiling_sensitivity"]["rows"]
+    ceilings = sorted({r["delay_ceiling_minutes"] for r in rows})
+    assert ceilings == list(split.DELAY_CEILINGS_MINUTES)
+    shipped = summary["shipped_engine"]
+    precision = {(r["delay_ceiling_minutes"], r["engine"]): r["naming_precision"] for r in rows}
+    for ceiling in ceilings:
+        assert precision[(ceiling, shipped)] > precision[(ceiling, "v1_2026_09_08")]
+    # The level falls as the ceiling rises past the window: the headline is conditional.
+    assert precision[(ceilings[-1], shipped)] < precision[(75, shipped)]
+
+
+def test_the_check_compares_every_field_but_the_run_metadata():
+    recorded = {"measured_at_utc": "a", "measured_on": "x", "python_version": "3.11",
+                "split": {"cut_utc": "c", "train_burstiness": {"mean": 2.57}}, "engines": []}
+    fresh = {"measured_at_utc": "b", "measured_on": "y", "python_version": "3.12",
+             "split": {"cut_utc": "c", "train_burstiness": {"mean": 2.86}}, "engines": []}
+    assert split.drifted_keys(recorded, fresh) == ["split.train_burstiness.mean"]
+    assert split.drifted_keys(recorded, recorded) == []

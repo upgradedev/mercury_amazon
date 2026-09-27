@@ -3,7 +3,8 @@
 
 WHAT THIS IS. A labelled corpus of incidents, scored against the committed
 :class:`~src.domain.incident_correlation.IncidentCorrelator` with its shipped defaults
-(3.0x anomaly threshold, 60 minute attribution window, 6 point series). Each case carries
+(3.0x anomaly threshold, 75 minute attribution window since 2026-09-27, 60 before it,
+6 point series). Each case carries
 the truth its generator recorded when it built the case: which commit, if any, caused the
 reading. The correlator never sees that truth, and the truth is never derived from what
 the correlator said. Two figures come out of it and both are published whatever they are:
@@ -29,10 +30,15 @@ independence by regenerating those strata against a commit log whose times have 
 shuffled and asserting the reading times do not move.
 
 For a regression the reading time necessarily follows its cause, because that is what
-causing something means. What is not chosen to flatter the correlator is the delay: the
-propagation delay is drawn from a distribution that reaches past the 60 minute attribution
-window, and the operator's look at the screen is drawn from a distribution that reaches
-several polls past the onset. Both draws are made without looking at where the neighbouring
+causing something means. The delay was set at 1 to 75 minutes on 2026-09-08, when it
+reached past the correlator's 60 minute window on purpose. On 2026-09-27 the window was
+widened to 75 minutes on the train split of ``scripts/attribution_split.py``, which uses
+this same ceiling, so the shipped window now equals the delay ceiling: the window was
+fitted to this authored assumption, not the other way round, and a held-out split drawn
+from the same generator cannot show that. ``attribution_split.py`` publishes held-out
+precision at ceilings from 60 to 180 minutes so the reader can see what the assumption is
+worth. The operator's look at the screen is drawn from a distribution that reaches several
+polls past the onset. Both draws are made without looking at where the neighbouring
 commits are.
 
 Two more figures come out of it and they are the ones this product is now built around:
@@ -57,7 +63,7 @@ WHAT THE NUMBERS ARE WORTH, WHICH IS NOT THE SAME THING.
 * Both hit rates are bounded by ``detectability_ceiling``: the pre-onset baseline needs
   readings before the onset, and a look four polls late does not have them. That is a
   property of a six point series, not of the rule.
-* The **false-attribution rate** is a joint property of the correlator's 60 minute window,
+* The **false-attribution rate** is a joint property of the correlator's attribution window,
   its crowding gate and the density of the commit stream it is given, and it is close to
   meaningless without the rest of that sentence. ``--commit-stride`` thins the recorded log
   to every k-th commit, and the report prints the sweep, so a reader can see how much of
@@ -281,7 +287,7 @@ def thin(commits: list[CommitRef], stride: int) -> list[CommitRef]:
     """Keep every ``stride``-th commit, so commit density can be varied on purpose.
 
     Density is the other half of any false-attribution figure: an anomaly with no cause is
-    attributed exactly when some commit happens to fall in the 60 minute window before the
+    attributed exactly when some commit happens to fall in the attribution window before the
     reading, and how often that happens is a property of the stream, not of the correlator.
     """
     if stride < 1:
@@ -437,11 +443,14 @@ def _regression_cases(
     noise_sigma: float,
     start_index: int,
     window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+    propagation_delay_minutes: tuple[float, float] = PROPAGATION_DELAY_MINUTES,
 ) -> list[TrialCase]:
     """Cases where one recorded commit really did cause the reading.
 
-    The cause is drawn uniformly from the stream. The propagation delay reaches past the
-    correlator's own 60 minute window on purpose, and on the late-look stratum the operator
+    The cause is drawn uniformly from the stream. The propagation delay's ceiling (75
+    minutes by default) reached past the correlator's 60 minute window when it was set; the
+    shipped window has since been widened to equal it, on a train split that shares it, so
+    precision measured here is conditional on it. On the late-look stratum the operator
     arrives one to four polls after the onset, which is what a person walking into a room
     does. Neither draw looks at where the neighbouring commits are.
     """
@@ -453,7 +462,7 @@ def _regression_cases(
         cause = rng.choice(commits)
         multiplier = _log_uniform(rng, *SPIKE_MULTIPLIER_RANGE)
         baseline_rate = _log_uniform(rng, *BASELINE_RATE_RANGE)
-        propagation = rng.uniform(*PROPAGATION_DELAY_MINUTES)
+        propagation = rng.uniform(*propagation_delay_minutes)
         polls_late = rng.randint(*LATE_LOOK_POLLS) if late else 0
 
         onset = cause.committed_at + timedelta(minutes=propagation)
@@ -557,17 +566,23 @@ def build_corpus(
     healthy: int = DEFAULT_HEALTHY,
     sparse: int = DEFAULT_SPARSE,
     window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+    propagation_delay_minutes: tuple[float, float] = PROPAGATION_DELAY_MINUTES,
 ) -> list[TrialCase]:
-    """Build the whole labelled corpus from one seed, so a run reproduces exactly."""
+    """Build the whole labelled corpus from one seed, so a run reproduces exactly.
+
+    ``propagation_delay_minutes`` exists only so ``scripts/attribution_split.py`` can
+    publish how the figures move when the authored delay ceiling moves. Every published
+    corpus uses the default.
+    """
     if len(commits) < 2:
         raise ValueError("a corpus needs at least two commits in the stream")
     span = (commits[0].committed_at, commits[-1].committed_at)
 
     cases: list[TrialCase] = []
     cases += _regression_cases(regression_fresh, commits, seed, STRATUM_FRESH, noise_sigma, len(cases),
-                               window_minutes)
+                               window_minutes, propagation_delay_minutes)
     cases += _regression_cases(regression_late, commits, seed, STRATUM_LATE, noise_sigma, len(cases),
-                               window_minutes)
+                               window_minutes, propagation_delay_minutes)
     cases += _uncaused_cases(exogenous, span, seed, STRATUM_EXOGENOUS, noise_sigma, len(cases))
     cases += _uncaused_cases(healthy, span, seed, STRATUM_HEALTHY, noise_sigma, len(cases))
     cases += _uncaused_cases(sparse, span, seed, STRATUM_SPARSE, noise_sigma, len(cases))

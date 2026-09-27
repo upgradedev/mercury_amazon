@@ -3,10 +3,17 @@
 
 Every setting below is scored on train corpora built from the 42 commits before the cut in
 ``scripts/attribution_split.py``. This script never builds, loads or scores the held-out
-corpus: it imports ``train_corpus`` and nothing that reaches the held-out side, and
-``tests/unit/test_attribution_split.py`` fails if that ever changes.
+corpus. It imports ``scripts/attribution_train.py``, which defines the train side and not
+the held-out builder or seed, and never imports ``attribution_split``;
+``tests/unit/test_attribution_split.py`` imports this script in a fresh interpreter and
+fails if ``attribution_split`` or anything defining the held-out builder is loaded. That
+is an import-level boundary inside one repository, not a sandbox: nothing stops a future
+edit from adding the import, except that test.
 
-THE RULE, FIXED BEFORE THE SWEEP WAS RUN. Among the settings whose pooled train naming
+THE RULE, STATED IN THIS SCRIPT, WHICH PRODUCED THE CHOICE. The rule, the sweep and its
+summary were committed together (5987fbe), so history cannot show the rule came first.
+The chosen setting (75 minutes, gate 1, no scope) also has the highest pooled train
+precision of all 36 settings, so a precision-first rule would have picked it too. Among the settings whose pooled train naming
 precision is at least the shipped engine's and whose pooled train false-attribution rate on
 exogenous spikes is no higher than the shipped engine's, pick the one with the highest pooled
 train naming recall. Ties go to the narrower window, then the smaller gate, then no scope.
@@ -24,6 +31,10 @@ What is not tuned, and why. The 3.0x anomaly threshold is left alone: it trades 
 against quiet on healthy series, which is a different question from attribution. Closeness
 to the onset is not used as a ranking signal: the generator draws the propagation delay
 uniformly from 1 to 75 minutes, so any gain from it would be fitted to that assumption.
+The window is exposed to the same fit and was not protected from it: the chosen 75 minutes
+equals that ceiling, and both sides of the split share the generator. The held-out figure
+is therefore conditional on regressions showing within 75 minutes;
+``scripts/attribution_split.py`` publishes how it moves at other ceilings.
 
 The train figures come from three train seeds pooled, so one lucky draw cannot pick the
 setting. The corpus is synthetic and self-authored; see ``scripts/correlation_trial.py``.
@@ -42,10 +53,16 @@ part in the choice above.
 
 Run::
 
-    python scripts/tune_attribution.py
+    python scripts/tune_attribution.py              # sweep, print, write the summary
+    python scripts/tune_attribution.py --no-write   # sweep and print only
+    python scripts/tune_attribution.py --check      # re-run and compare, what CI runs
+
+``--check`` compares every field of ``attribution_tuning_summary.json`` except
+``measured_at_utc``, so the record a test pins the shipped engine to is re-derived in CI.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import datetime, timezone
@@ -57,7 +74,7 @@ for entry in (REPO_ROOT, REPO_ROOT / "scripts"):
         sys.path.insert(0, str(entry))
 
 import correlation_trial as trial  # noqa: E402
-from attribution_split import SYNTHETIC_LABEL, train_corpus  # noqa: E402
+from attribution_train import SYNTHETIC_LABEL, train_corpus  # noqa: E402
 
 from src.domain.change_scope import MERCURY_SERVICE_SCOPE  # noqa: E402
 from src.domain.incident_correlation import IncidentCorrelator  # noqa: E402
@@ -139,6 +156,11 @@ def leak_sweep(chosen: dict, commits: list, corpora_seeds) -> list[dict]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true",
+                        help="re-run the sweep and compare against the recorded summary without writing it")
+    parser.add_argument("--no-write", action="store_true", help="print the sweep without writing the summary")
+    args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     commits, _ = trial.load_commit_stream()
     corpora = [train_corpus(commits, seed=seed) for seed in TRAIN_SEEDS]
@@ -161,7 +183,7 @@ def main() -> int:
         print(f"  leak {r['leak']:<4} scope {str(r['scope']):<5} precision {r['precision']} "
               f"recall {r['recall']} refusal {r['refusal_rate']} false_exo "
               f"{r['false_attribution_exogenous']} namings {r['namings']}")
-    SUMMARY_PATH.write_text(json.dumps({
+    summary = {
         "measured_by_command": "python scripts/tune_attribution.py",
         "measured_at_utc": datetime.now(timezone.utc).isoformat(),
         "label": SYNTHETIC_LABEL,
@@ -183,7 +205,24 @@ def main() -> int:
             ),
             "rows": sweep_rows,
         },
-    }, indent=2) + "\n", encoding="utf-8")
+    }
+    if args.check:
+        if not SUMMARY_PATH.exists():
+            print(f"{SUMMARY_PATH.name} does not exist; run python scripts/tune_attribution.py first")
+            return 1
+        recorded = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+        # A JSON round trip so tuples and lists compare the way the file stores them.
+        fresh = json.loads(json.dumps(summary))
+        drifted = sorted(key for key in set(recorded) | set(fresh)
+                         if key != "measured_at_utc" and recorded.get(key) != fresh.get(key))
+        if drifted:
+            print("the recorded tuning summary no longer matches a fresh sweep: " + ", ".join(drifted))
+            return 1
+        print(f"{SUMMARY_PATH.name} matches a fresh sweep in every field but measured_at_utc "
+              f"({len(rows)} settings, chosen {chosen['window']}/{chosen['gate']}/{chosen['scope']})")
+        return 0
+    if not args.no_write:
+        SUMMARY_PATH.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
