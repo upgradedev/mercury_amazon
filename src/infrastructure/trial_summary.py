@@ -9,7 +9,10 @@ Since 2026-09-27 the number is the **held-out** one. It comes from
 ``attribution_holdout_summary.json``, which ``python scripts/attribution_split.py``
 writes and ``python scripts/attribution_split.py --check`` proves is still what the
 committed code produces: the shipped engine's figures on a split of the corpus that no
-parameter was tuned on. The in-sample figure the page carried before (52.2% over 113
+parameter was tuned on. One assumption is shared by both splits and so cannot be tested
+by holding one out: the generator's ceiling on how long a regression takes to show,
+which equals the shipped 75 minute window. The note says so, and reads the ceiling from
+the summary. The in-sample figure the page carried before (52.2% over 113
 namings) was measured on the corpus its crowding gate was chosen on, so it is kept in
 ``docs/EVIDENCE.md`` as history rather than shown beside a live answer. Nothing here
 recomputes a figure: a value invented at request time would be a different number
@@ -63,6 +66,15 @@ def _held_out_figures(summary: dict) -> dict:
     return {}
 
 
+def _delay_ceiling_minutes(summary: dict) -> float | None:
+    """The generator's delay ceiling the held-out figure is conditional on, if recorded."""
+    split = summary.get("split")
+    delay = split.get("propagation_delay_minutes") if isinstance(split, dict) else None
+    if isinstance(delay, list) and len(delay) == 2 and isinstance(delay[1], (int, float)):
+        return delay[1]
+    return None
+
+
 def naming_accuracy(path: Path = SUMMARY_PATH) -> dict[str, object]:
     """What the held-out split measured about naming a commit, or an honest blank.
 
@@ -82,12 +94,23 @@ def naming_accuracy(path: Path = SUMMARY_PATH) -> dict[str, object]:
             "namings_measured": None,
             "recall_on_regressions": None,
             "corpus_cases": None,
+            "assumed_delay_ceiling_minutes": None,
             "measured_by_command": MEASURED_BY_COMMAND,
             "note": (
                 "No held-out attribution summary is present in this checkout, so this answer "
                 f"carries no measured accuracy. Produce one with: {MEASURED_BY_COMMAND}"
             ),
         }
+    ceiling = _delay_ceiling_minutes(summary)
+    condition = (
+        f" The figure assumes, as the generator does, that a regression shows within "
+        f"{ceiling:g} minutes of its commit. The window was widened to match on the train "
+        f"split, which shares that assumption, so holding data out cannot test it; "
+        f"{SUMMARY_PATH.name} records the figure at longer delays."
+        if ceiling is not None else
+        " The summary does not record the delay the generator assumed, so the figure's "
+        "condition is unknown."
+    )
     return {
         "measured": True,
         "split": "held-out",
@@ -98,6 +121,7 @@ def naming_accuracy(path: Path = SUMMARY_PATH) -> dict[str, object]:
         "recall_on_regressions": held.get("naming_recall_on_regressions"),
         "refused_to_name_rate_on_anomalies": held.get("refused_to_name_rate_on_all_anomalies"),
         "corpus_cases": held.get("cases"),
+        "assumed_delay_ceiling_minutes": ceiling,
         "measured_by_command": MEASURED_BY_COMMAND,
         "note": (
             f"On a held-out split of {held.get('cases')} synthetic, self-authored labelled cases "
@@ -106,6 +130,6 @@ def naming_accuracy(path: Path = SUMMARY_PATH) -> dict[str, object]:
             f"that caused the reading {precision} of those times (95% interval "
             f"{held.get('naming_precision_95ci')}). It named the cause of "
             f"{held.get('naming_recall_on_regressions')} of the genuine regressions, refusing "
-            "on the rest."
+            "on the rest." + condition
         ),
     }

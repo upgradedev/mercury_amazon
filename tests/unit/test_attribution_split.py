@@ -238,3 +238,31 @@ def test_the_check_compares_every_field_but_the_run_metadata():
              "split": {"cut_utc": "c", "train_burstiness": {"mean": 2.86}}, "engines": []}
     assert split.drifted_keys(recorded, fresh) == ["split.train_burstiness.mean"]
     assert split.drifted_keys(recorded, recorded) == []
+
+
+def _cell(row: dict) -> str:
+    return f"{_pct(row['naming_precision'])} ({row['correct_namings']} of {row['times_a_commit_was_named']})"
+
+
+def test_the_documents_quote_the_recorded_delay_ceiling_rows():
+    """The conditional figures the README, EVIDENCE and Devpost text quote, pinned to the file."""
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    shipped = summary["shipped_engine"]
+    rows = {(r["delay_ceiling_minutes"], r["engine"]): r for r in summary["delay_ceiling_sensitivity"]["rows"]}
+    readme = " ".join((REPO_ROOT / "README.md").read_text(encoding="utf-8").split())
+    evidence = " ".join((REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8").split())
+    devpost = " ".join((REPO_ROOT / "docs" / "DEVPOST_SUBMISSION.md").read_text(encoding="utf-8").split())
+    at_90, at_180 = _pct(rows[(90, shipped)]["naming_precision"]), _pct(rows[(180, shipped)]["naming_precision"])
+    for text in (readme, devpost):
+        assert f"{at_90} at 90" in text and at_180 in text
+    for ceiling in split.DELAY_CEILINGS_MINUTES:
+        v1, v2 = rows[(ceiling, "v1_2026_09_08")], rows[(ceiling, shipped)]
+        label = f"**{ceiling} (published)**" if ceiling == 75 else str(ceiling)
+        if ceiling == 75:
+            line = (f"| {label} | **{_cell(v1)}** | **{_cell(v2)}** | "
+                    f"**{v2['regressions_named_wrong_commit']}** |")
+        else:
+            line = f"| {label} | {_cell(v1)} | {_cell(v2)} | {v2['regressions_named_wrong_commit']} |"
+        assert line in evidence, f"the EVIDENCE delay-ceiling row for {ceiling} no longer matches the record"
+    spread = summary["held_out_seed_spread"]["engines"][shipped]
+    assert f"averaging {_pct(spread['mean_naming_precision'])}" in evidence

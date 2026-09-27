@@ -1495,11 +1495,17 @@
       var measured = data.attribution && data.attribution.measured_accuracy;
       if (!measured) { return ''; }
       if (!measured.measured) { return measured.note; }
+      var ceiling = measured.assumed_delay_ceiling_minutes;
       return 'Measured on a held-out split no setting was tuned on: when this correlator names a '
         + 'commit it is the one that caused the reading '
         + percent(measured.precision_when_it_names_a_commit) + ' of the time, over '
         + measured.namings_measured + ' namings in ' + measured.corpus_cases
-        + ' synthetic labelled cases. Reproduce with ' + measured.measured_by_command + '.';
+        + ' synthetic labelled cases. '
+        + (ceiling
+          ? 'That assumes, as the generator does, a regression shows within ' + ceiling
+            + ' minutes of its commit, the same as the window; at longer delays it is lower. '
+          : 'The delay the corpus assumed is not recorded. ')
+        + 'Reproduce with ' + measured.measured_by_command + '.';
     }
 
     function percent(fraction) { return (fraction * 100).toFixed(1) + '%'; }
@@ -1508,8 +1514,12 @@
     function accuracyShort(data) {
       var measured = data.attribution && data.attribution.measured_accuracy;
       if (!measured || !measured.measured) { return ''; }
-      // Held-out, and on a corpus the authors generated: both words travel with the figure.
-      return percent(measured.precision_when_it_names_a_commit) + ' held-out precision (synthetic)';
+      // Held-out, on a corpus the authors generated, and only if a regression shows within
+      // the generator's delay ceiling (which the window equals): all three travel with it.
+      // Non-breaking spaces keep the parenthetical on one line when it wraps.
+      var ceiling = measured.assumed_delay_ceiling_minutes;
+      return percent(measured.precision_when_it_names_a_commit) + ' held-out precision (synthetic'
+        + (ceiling ? ',\u00a0\u2264' + ceiling + 'm\u00a0lag' : '') + ')';
     }
 
     /* Which of the four answers a response is, for colour and for the board rows.
@@ -1559,7 +1569,7 @@
       if (!(landed <= onset)) { return ''; }
       var minutes = Math.round((onset - landed) / 60000);
       // Board language, terse: which change, and when against the spike.
-      var when = minutes < 1 ? 'under 1 min pre-spike' : minutes + ' min pre-spike';
+      var when = minutes < 1 ? 'under 1m pre-spike' : minutes + 'm pre-spike';
       if (attribution.commits_in_window === 1) { return 'Only change, ' + when; }
       if (attribution.commits_in_window > 1) {
         return 'Closest of ' + attribution.commits_in_window + ' changes, ' + when;
@@ -1837,8 +1847,9 @@
 
         if (data.recommended_action) {
           setReason('btnStage', 'stageReason', true,
-            'Rollback to ' + data.recommended_action.target_commit_sha
-            + (state.dpadDemoApproval ? ', record-only.' : '. Needs the governance secret.'),
+            state.dpadDemoApproval
+              ? 'Record-only rollback: ' + data.recommended_action.target_commit_sha
+              : 'Rollback to ' + data.recommended_action.target_commit_sha + '. Needs the governance secret.',
             'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
         } else {
           setReason('btnStage', 'stageReason', false,

@@ -46,6 +46,7 @@ import argparse
 import json
 import math
 import platform
+import statistics
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,6 +82,10 @@ HELD_OUT_SEED = 20260927
 #: is also 75 minutes. Both sides of the split share that authored ceiling, so the
 #: held-out side cannot reveal a fit to it; this table is how a reader sees what it is worth.
 DELAY_CEILINGS_MINUTES = (60, 75, 90, 120, 180)
+
+#: Other held-out seeds, to show how much of the published figure is the one seed's draw.
+#: First run by the 2026-09-27 audit of this split; no parameter was tuned on any of them.
+SPREAD_SEEDS = tuple(range(20261001, 20261021))
 
 
 # -------------------------------------------------- The held-out side of the split
@@ -234,6 +239,53 @@ def delay_ceiling_sensitivity(commits: list[CommitRef]) -> dict:
     }
 
 
+def held_out_seed_spread(commits: list[CommitRef]) -> dict:
+    """Both frozen engines on held-out corpora built from other seeds, same commits.
+
+    The Wilson interval on the headline covers the namings of one seed only. This block
+    shows the generator-seed variance it leaves out. Nothing is chosen from it.
+    """
+    per_engine: dict[str, list[dict]] = {name: [] for name in ENGINES}
+    for seed in SPREAD_SEEDS:
+        cases, held_out = held_out_corpus(commits, seed=seed)
+        for name, spec in ENGINES.items():
+            f = figures(cases, held_out, spec["build"]())
+            per_engine[name].append({
+                "seed": seed,
+                "naming_precision": f["naming_precision"],
+                "times_a_commit_was_named": f["times_a_commit_was_named"],
+                "correct_namings": f["correct_namings"],
+                "false_attributions_on_exogenous_spikes": f["false_attributions_on_exogenous_spikes"],
+            })
+    engines = {}
+    for name, rows in per_engine.items():
+        precisions = [r["naming_precision"] for r in rows if r["naming_precision"] is not None]
+        engines[name] = {
+            "mean_naming_precision": round(statistics.mean(precisions), 4),
+            "sd_naming_precision": round(statistics.stdev(precisions), 4),
+            "min_naming_precision": min(precisions),
+            "max_naming_precision": max(precisions),
+            "mean_correct_namings": round(statistics.mean(r["correct_namings"] for r in rows), 2),
+            "mean_false_attributions_on_exogenous_spikes": round(
+                statistics.mean(r["false_attributions_on_exogenous_spikes"] for r in rows), 2),
+            "rows": rows,
+        }
+    names = list(ENGINES)
+    wins = sum(
+        1 for a, b in zip(per_engine[names[0]], per_engine[names[-1]])
+        if (b["naming_precision"] or 0) > (a["naming_precision"] or 0)
+    )
+    return {
+        "seeds": [SPREAD_SEEDS[0], SPREAD_SEEDS[-1]],
+        "note": (
+            "Held-out commits, other seeds, the published delay ceiling. Not tuned on. "
+            "Shows the seed-to-seed variance the single-seed Wilson interval leaves out."
+        ),
+        "shipped_more_precise_than_previous_on_seeds": wins,
+        "engines": engines,
+    }
+
+
 def build_summary() -> dict:
     commits, recording = trial.load_commit_stream()
     train_cases, train = train_corpus(commits)
@@ -279,6 +331,7 @@ def build_summary() -> dict:
         "shipped_engine": SHIPPED_ENGINE,
         "engines": engines,
         "delay_ceiling_sensitivity": delay_ceiling_sensitivity(commits),
+        "held_out_seed_spread": held_out_seed_spread(commits),
     }
 
 
@@ -309,6 +362,15 @@ def print_report(summary: dict) -> None:
               f"{r['naming_precision']} ({r['correct_namings']}/{r['times_a_commit_was_named']}, "
               f"95% CI {r['naming_precision_95ci']})  recall {r['naming_recall_on_regressions']}  "
               f"wrong commit on a regression {r['regressions_named_wrong_commit']}")
+    spread = summary["held_out_seed_spread"]
+    print(f"  held-out precision over seeds {spread['seeds'][0]} to {spread['seeds'][1]} "
+          f"(shipped engine more precise on {spread['shipped_more_precise_than_previous_on_seeds']} "
+          f"of {len(SPREAD_SEEDS)}):")
+    for name, e in spread["engines"].items():
+        print(f"    {name}  mean {e['mean_naming_precision']} (sd {e['sd_naming_precision']}, "
+              f"range {e['min_naming_precision']} to {e['max_naming_precision']})  "
+              f"mean correct namings {e['mean_correct_namings']}  mean false attributions on "
+              f"exogenous {e['mean_false_attributions_on_exogenous_spikes']}")
 
 
 #: Fields that describe the run rather than the result. They differ between a Windows
@@ -351,7 +413,7 @@ def main() -> int:
             return 1
         print(f"{SUMMARY_PATH.name} matches a fresh run in every field but the run metadata "
               f"({len(summary['engines'])} engine(s), {len(summary['delay_ceiling_sensitivity']['rows'])} "
-              "delay-ceiling rows)")
+              f"delay-ceiling rows, {len(SPREAD_SEEDS)} spread seeds)")
         return 0
 
     if not args.no_write:

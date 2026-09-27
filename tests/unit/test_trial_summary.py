@@ -98,3 +98,22 @@ def test_the_note_carries_the_denominator_not_only_the_rate():
     assert str(held["times_a_commit_was_named"]) in note
     assert str(held["cases"]) in note
     assert "held-out" in note and "synthetic" in note
+
+
+def test_the_note_states_the_delay_assumption_the_figure_rests_on():
+    """The shipped window equals the generator's delay ceiling, and both splits share it."""
+    accuracy = trial_summary.naming_accuracy()
+    recorded = json.loads((REPO_ROOT / "attribution_holdout_summary.json").read_text(encoding="utf-8"))
+    ceiling = recorded["split"]["propagation_delay_minutes"][1]
+    assert accuracy["assumed_delay_ceiling_minutes"] == ceiling
+    assert f"within {ceiling:g} minutes" in accuracy["note"]
+    assert "cannot test it" in accuracy["note"]
+
+
+def test_a_summary_without_the_delay_ceiling_says_the_condition_is_unknown(tmp_path):
+    path = tmp_path / "no-ceiling.json"
+    path.write_text(json.dumps(_summary(0.5)), encoding="utf-8")
+    trial_summary._load.cache_clear()
+    accuracy = trial_summary.naming_accuracy(path)
+    assert accuracy["assumed_delay_ceiling_minutes"] is None
+    assert "condition is unknown" in accuracy["note"]

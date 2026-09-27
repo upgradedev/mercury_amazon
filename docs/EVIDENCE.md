@@ -44,7 +44,11 @@ is not: Mercury has no way to rule a deploy out, so a refusal is never rendered 
 deploy having been cleared, and rolling back on a refusal would be a guess. Naming
 one change is the smaller capability: on that held-out split it is right 62.5% of
 the 40 times it fires (95% interval 47.0% to 75.8%), and Mercury prints that figure
-on the screen at the moment somebody would act on it.
+on the screen at the moment somebody would act on it. That figure holds only under the
+corpus's assumption that a regression shows within 75 minutes of its commit, which is
+also the shipped window and which both splits share; if regressions can take up to 90
+minutes the same engine reads 50.0%, and at 180 minutes 25.0%
+([table](#the-figure-depends-on-an-assumed-delay)).
 
 The screen is a delivery choice, not the product. Mercury renders on a Fire TV in
 a room, and on a laptop browser, from the same HTTP surface and the same page: the
@@ -219,17 +223,28 @@ relabelled, deleted or regenerated. The held-out side is the newer and burstier 
 the log (median gap between commits 5.66 minutes, against 28.95 on train), so its
 figures differ from train, and both sides are published in
 `attribution_holdout_summary.json`. `tests/unit/test_attribution_split.py` checks the
-cut, that no window can cross it, that each side draws only its own commits, and that
-the tuning script cannot build the held-out corpus.
+cut, that no window can cross it, and that each side draws only its own commits. It also
+imports the tuning script in a fresh interpreter and fails if any loaded module is
+`attribution_split` or defines the held-out builder or seed: the train side lives in
+`scripts/attribution_train.py`, which has neither. That is an import-level guard inside
+one repository, not a sandbox.
 
 **How the setting was chosen.** `scripts/tune_attribution.py` scores every window of
 45, 60, 75, 90, 120 and 150 minutes, every gate of 1, 2 and 3, with and without the
 file-list scope described below, on three pooled train seeds (20260908, 20260909,
-20260910). The rule was written into the script before it ran: highest train recall
-among the settings whose train precision is at least the shipped engine's and whose
-false attribution on exogenous spikes is no higher. It picked a **75 minute window,
-gate 1, no scope** (pooled train precision 52.4% to 64.1%, recall 12.1% to 12.5%). That
-engine was frozen and then scored on held-out once, beside the engine it replaced:
+20260910). The rule is stated in the script that produced the choice: highest train
+recall among the settings whose train precision is at least the shipped engine's and
+whose false attribution on exogenous spikes is no higher. The rule, the sweep and its
+summary were committed together (5987fbe), so the history cannot show that the rule came
+first. The chosen setting also has the highest pooled train precision of all 36, so a
+precision-first rule would have made the same choice. It picked a **75 minute window,
+gate 1, no scope** (pooled train precision 52.4% to 64.1%, recall 12.1% to 12.5%).
+`python scripts/tune_attribution.py --check` re-runs the sweep in CI and compares every
+field of `attribution_tuning_summary.json` except its timestamp. That engine was frozen
+and then scored on held-out beside the engine it replaced. Held-out was scored in steps,
+all recorded in git: v1 alone (dc01f11), then v1 and the frozen v2 (9b9ac1a). Two later
+runs changed no engine and no earlier figure: one added the breakdown fields (93960ed),
+the other the delay-ceiling rows below (2026-09-27, after the audit).
 
 | Held-out, synthetic corpus | v1: 60 minute window (2026-09-08) | v2: 75 minute window (shipped) |
 |---|---|---|
@@ -256,8 +271,43 @@ reads 40.8% on data it was not chosen on.
 propagation delay from 1 to 75 minutes and the metric is polled every 10, so a cause
 can sit up to 85 minutes before the first elevated reading. A 75 minute window catches
 most of those, which is why it won on train. That is a fit to the authors' delay
-assumption as much as a property of the engine. On a real service the window should
-come from that service's measured rollout delay, not from this corpus.
+assumption as much as a property of the engine, and the held-out split cannot detect
+it, because both splits come from the same generator with the same ceiling. On a real
+service the window should come from that service's measured rollout delay, not from
+this corpus.
+
+#### The figure depends on an assumed delay
+
+`python scripts/attribution_split.py` also re-scores both frozen engines on held-out
+corpora that differ from the published one only in the delay ceiling (same seed, same
+commits, same floor of 1 minute), and `--check` holds the rows to the record. Nothing
+was chosen from this table and v2 was not changed after it was run. Synthetic,
+self-authored corpus:
+
+| Delay ceiling (minutes) | v1 held-out precision | v2 held-out precision | v2 wrong commit on a regression |
+|---|---|---|---|
+| 60 | 56.9% (37 of 65) | 69.6% (32 of 46) | 0 |
+| **75 (published)** | **40.8% (29 of 71)** | **62.5% (25 of 40)** | **1** |
+| 90 | 27.5% (22 of 80) | 50.0% (20 of 40) | 6 |
+| 120 | 26.3% (15 of 57) | 38.8% (19 of 49) | 16 |
+| 180 | 17.1% (6 of 35) | 25.0% (8 of 32) | 10 |
+
+The ranking holds at every ceiling tried: v2 is more precise than v1 in all five rows.
+The level does not: v2's 62.5% is the figure for a world where no regression takes
+longer than the window to show, and it falls to 25.0% if some take three hours. The
+single wrong commit v2 names for a regression at the published ceiling (against 33 for
+v1) is the same effect: when no delay exceeds the window, the cause is almost always
+inside it.
+
+The same command also scores both engines on 20 other held-out seeds (20261001 to
+20261020, first run by the audit of this change, none tuned on), recorded as
+`held_out_seed_spread`. v2 is more precise than v1 on all 20, averaging 81.7% (sd 6.5
+points, range 66.7% to 92.6%) against 44.4% (sd 7.0 points). Correct namings are flat
+on average (30.95 against 30.6) and false attributions on exogenous spikes rise (6.45
+against 5.7 of 300), so the gain is fewer namings, not more right ones. The published
+seed gives v2 a lower precision than any of the 20, so 62.5% is the conservative draw.
+That seed spread is not in the 95% interval above, which covers the namings of one
+seed only, and every row still assumes the 75 minute ceiling.
 
 **What was tried and not shipped: a file-list scope.** `src/domain/change_scope.py`
 reads the files each commit changed (recorded from `git show` into
@@ -346,8 +396,9 @@ capability: when it names a change it is right more often than not, and it names
 for about one regression in ten on this corpus and one in twenty-four on held-out.
 
 **Naming a commit is still far from certain, and the screen says so.** 62.5% over 40
-held-out namings, with an interval reaching down to 47.0%, is not a number to revert
-production on unaided, so the answer carries it. Every `what_changed` response ships
+held-out namings, with an interval reaching down to 47.0% and a level that assumes
+every regression shows within the 75 minute window, is not a number to revert
+production on unaided, so the answer carries it, with that assumption in its note. Every `what_changed` response ships
 `attribution.measured_accuracy`, read from `attribution_holdout_summary.json` rather
 than recomputed, and the cockpit prints it under the headline the moment a commit is
 named. Until 2026-09-27 the page printed the in-sample 52.2% from
@@ -393,28 +444,38 @@ change that did. Anchoring the window at the onset took the late look from 9.3% 
 **Then it was told to refuse a crowded window, which cost recall to buy precision.**
 Naming the closest of several changes was where the wrong names came from. The
 correlator now names a commit only when exactly one landed inside the window. The
-threshold was chosen from this sweep, printed by the same command, and the sweep is
-published so the choice can be argued with:
+threshold was chosen on 2026-09-08 from this sweep, at the 60 minute window of the time,
+and the sweep is published so the choice can be argued with. It is history: the default
+command now runs at 75 minutes, so this table is reproduced by
+`python scripts/correlation_trial.py --attribution-window 60 --no-write`:
 
-| Names when at most N landed | Naming precision | Naming recall | Namings | False attribution |
+| Names when at most N landed (60 minutes, 2026-09-08) | Naming precision | Naming recall | Namings | False attribution |
 |---|---|---|---|---|
-| N = 1 (shipped) | **52.2%** | 9.8% | 113 | 3.6% |
+| N = 1 (chosen) | **52.2%** | 9.8% | 113 | 3.6% |
 | N = 2 | 47.9% | 16.8% | 211 | 5.4% |
 | N = 3 | 40.6% | 19.0% | 281 | 7.2% |
 | N = 5 | 38.9% | 19.7% | 303 | 7.4% |
 | no gate | 32.6% | 20.3% | 374 | 8.0% |
 
+At the shipped 75 minute window, `python scripts/correlation_trial.py --no-write` prints
+the same sweep as: N = 1 72.5% over 91 namings (recall 11.0%), N = 2 56.0% over 191,
+N = 3 46.6% over 275, N = 5 42.7% over 307, no gate 34.6% over 407. The ordering is the
+same. This whole-stream corpus shares 42 commits with the train split the window was
+chosen on, so none of those rows is held out.
+
 Choosing a threshold on the corpus you then report it on is fitting, and a figure
 chosen that way is worth less than it looks. So the direction was checked on two
-seeds that took no part in the choice: naming precision at N=1 is **53.3%** over 92
-namings at seed 19850717 and **55.7%** over 115 namings at seed 20261231, against
-32.6% ungated on the reported corpus.
+seeds that took no part in the choice: with the 2026-09-08 engine (60 minute window),
+naming precision at N=1 is **53.3%** over 92 namings at seed 19850717 and **55.7%** over
+115 namings at seed 20261231, against 32.6% ungated on the reported corpus. With the
+shipped 75 minute window the same seeds read 71.6% over 67 and 65.5% over 84 (drop the
+flag from the commands below).
 `tests/unit/test_correlation_trial.py::test_the_crowding_gate_holds_up_on_corpora_it_was_not_chosen_on`
 runs both and fails if the gate stops buying precision.
 
 ```bash
-python scripts/correlation_trial.py --no-write --seed 19850717
-python scripts/correlation_trial.py --no-write --seed 20261231
+python scripts/correlation_trial.py --no-write --seed 19850717 --attribution-window 60
+python scripts/correlation_trial.py --no-write --seed 20261231 --attribution-window 60
 ```
 
 **What it cost.** Recall fell from 20.3% to 9.8%: Mercury now names the cause of
@@ -676,7 +737,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-642 tests and a re-measure on an idle machine is pending**.
+645 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -720,7 +781,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 642 passed
+# 645 passed
 ```
 
 #### Step 3: Start the server
@@ -931,7 +992,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 642 passed
+python -m pytest tests/ -q                                    # 645 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1992 statements
 node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

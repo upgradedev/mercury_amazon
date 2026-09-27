@@ -29,7 +29,9 @@ held-out half of a synthetic labelled corpus, which no setting was tuned on, Mer
 sees an anomaly and names nobody 93.1% of the time, stays quiet on 200 of 200
 healthy series, and refuses outright on every telemetry gap. When it does name a
 change, it is right 62.5% of the time over 40 namings, and it prints that on the
-screen beside the name. Then it renders where the people are. A Fire TV in the room
+screen beside the name, with the assumption it rests on: the corpus has every
+regression show within 75 minutes, the same as the window. At a 90 minute ceiling the
+same engine reads 50.0%, at 180 minutes 25.0%. Then it renders where the people are. A Fire TV in the room
 is one of those places and the one this entry is built for: a screen everyone can
 see, driven by a remote, with the evidence readable from a sofa. The screen is the
 delivery; the engine is the thing.
@@ -142,11 +144,15 @@ full, with the sweep it was chosen from.
 
 Then we noticed the 52.2% was measured on the corpus the gate was chosen on. We split
 the commit log in time into train and held-out sides. On held-out the same engine
-read 40.8% over 71 namings. A 75 minute window, chosen on train by a rule written
-before the sweep ran, reads 62.5% over 40 namings on held-out, and it cost something:
+read 40.8% over 71 namings. A 75 minute window, chosen on train by a rule stated in
+the script that made the choice, reads 62.5% over 40 namings on held-out, and it cost something:
 recall 4.8% to 4.2%, refusals 87.8% to 93.1%, and false attribution on spikes no
 commit caused from 9 to 14 of 300. Both engines, both sides and the sweep are
-published.
+published. An audit then pointed out that 75 minutes is also the ceiling of the delay
+our generator draws, on both sides of the split, so holding data out could not test
+that fit. We now publish held-out precision at other ceilings beside the headline: the
+new engine beats the old at every ceiling, but its level falls from 62.5% to 25.0% if
+regressions can take three hours to show.
 
 **We changed the headline to match the numbers.** The old one said Mercury tells you
 which change broke production. Its own harness said that is right about half the
@@ -188,7 +194,7 @@ Stated plainly, because the cockpit shows it anyway.
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
-| Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 62.5% over 40 namings (95% interval 47.0% to 75.8%), recall 4.2% over 600 regressions, refusal on 93.1% of detected anomalies, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
+| Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 62.5% over 40 namings (95% interval 47.0% to 75.8%) under the corpus's assumption that a regression shows within 75 minutes (50.0% at 90, 25.0% at 180), recall 4.2% over 600 regressions, refusal on 93.1% of detected anomalies, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
 | Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. The official event FAQ permits this target; no physical device is required |
 
 ---
@@ -251,7 +257,8 @@ Stated here rather than left for a judge to find:
   of the 300 late-look cases in the corpus are undetectable whatever it does. That
   ceiling is published as `detectability_ceiling`.
 * Naming a change is right 62.5% of the time over 40 held-out namings, and it
-  fires on about one regression in twenty-four there. That is why the headline is the refusal. The
+  fires on about one regression in twenty-four there. That level assumes every
+  regression shows within 75 minutes, as the generator draws them. That is why the headline is the refusal. The
   figure ships with every answer, so nobody has to take the README's word for it at
   the moment they are deciding whether to revert.
 * When several changes land in the window Mercury says how many and names none of
@@ -259,7 +266,10 @@ Stated here rather than left for a judge to find:
   not built.
 * The held-out side is small: 17 commits and 40 namings, so the 95% interval on
   precision runs from 47.0% to 75.8%. The 75 minute window won on train partly
-  because the corpus's own delay assumption reaches 75 minutes.
+  because the corpus's own delay assumption reaches 75 minutes, and the held-out side
+  shares that assumption, so it cannot test it. `python scripts/attribution_split.py`
+  publishes the held-out precision at delay ceilings of 60 to 180 minutes: 69.6%,
+  62.5%, 50.0%, 38.8% and 25.0%.
 * That an on-call engineer is in a room with a television during an incident is an
   assumption. It has never been tested with a responder. The same page and the same
   HTTP surface render on a laptop, so what that assumption risks is the surface,

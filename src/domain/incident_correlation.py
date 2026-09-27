@@ -27,7 +27,10 @@ Rule 4 is what naming precision rests on and it was chosen from a published swee
 Naming the closest of several changes is where the wrong names came from. On that
 held-out split, when this class names a commit it is the one that caused the reading
 62.5% of the time over 40 namings (95% interval 47.0% to 75.8%); 14 of its 15 wrong
-namings blamed a commit for an exogenous spike no commit caused. That is far enough
+namings blamed a commit for an exogenous spike no commit caused. That level assumes, as
+the generator does, that a regression shows within 75 minutes, which is also this
+class's default window; the held-out split shares the assumption and cannot test it,
+and at longer delay ceilings the same figure falls (50.0% at 90 minutes, 25.0% at 180). That is far enough
 from certain that the figure travels with the answer: see
 ``src/infrastructure/trial_summary.py``. The 60 minute window shipped until
 2026-09-27 read 40.8% over 71 namings on the same split, and 52.2% over 113 on the

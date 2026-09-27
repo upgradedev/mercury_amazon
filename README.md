@@ -2,7 +2,7 @@
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
-![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 62.5% held-out precision on a synthetic corpus, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
+![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 62.5% held-out precision on a synthetic corpus assuming at most 75 minutes of lag, with its labelled commit message; the next action reads Record-only rollback to the preceding commit; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own, standing in for a deploy.*
 
@@ -10,7 +10,9 @@
 room's TV: can this be pinned on one change? It names a change only when exactly one
 landed in the 75 minutes before the spike started, and prints beside the name how often
 that is right on a held-out split it was not tuned on: 62.5% (n=40 namings, synthetic
-corpus). Otherwise it says it cannot attribute, and why. A
+corpus), under the corpus's assumption that a regression shows within 75 minutes. At
+longer delays it is lower: 50.0% at 90 minutes, 25.0% at 180
+([table](docs/EVIDENCE.md#the-figure-depends-on-an-assumed-delay)). Otherwise it says it cannot attribute, and why. A
 named change can be rolled back from the remote, behind five checks and a single-use
 token.
 
@@ -34,7 +36,7 @@ repository.
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-642%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-645%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -76,7 +78,8 @@ an anomaly and names nobody 93.1% of the time, because that window usually holds
 change or several. A refusal says which, and never claims a deploy is innocent: an
 empty window says nothing about a change outside it. When it does name a change it is
 right 62.5% of the time on that held-out split (25 of 40, 95% interval 47% to 76%),
-and the board prints that figure next to the name.
+and the board prints that figure next to the name with its condition: `≤75m lag`,
+because the corpus assumes no regression takes longer than the window to show.
 
 The board shows five services, one per answer. Each row is its own live response from
 the server; the readings come from the offline fixture.
@@ -148,7 +151,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 642 passed
+# 645 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -211,7 +214,7 @@ of about one regression in twenty-four. Widening the window from 60 to 75 minute
 precision from 40.8% to 62.5% (the 95% intervals overlap, so the size of that gain is
 not settled by this sample), but it did not raise recall (4.8% before), it refuses more often (93.1%
 against 87.8%), and it blames a commit for more spikes no commit caused (14 of 300
-against 9). The 52.2% this page printed before was in-sample. A crowded window is
+against 9). Both splits share the generator's 75 minute delay ceiling, which the new window equals, so the held-out figure cannot test that fit: at a 180 minute ceiling v2 reads 25.0% and v1 17.1%. The 52.2% this page printed before was in-sample. A crowded window is
 refused, not ranked. The full list is in
 [Known limitations](docs/EVIDENCE.md#known-limitations).
 
