@@ -294,6 +294,12 @@
        deploy feed would be. Not green, which would read as a live deploy feed, and not
        the hazard plate, which means generated. A dashed rule: a stand-in. */
     .tag-standin { color: var(--ink); border-color: var(--ink-2); border-style: dashed; background-color: var(--board); }
+    /* The evidence panel's verdict tag uses the board's verdict tokens, so a verdict is one
+       colour everywhere: INSUFFICIENT_DATA is grey here as on the board, never green. */
+    .tag[data-verdict="attributed"]   { color: var(--v-attributed);   border-color: var(--v-attributed); }
+    .tag[data-verdict="cannot"]       { color: var(--v-cannot);       border-color: var(--v-cannot); }
+    .tag[data-verdict="nothing"]      { color: var(--v-nothing);      border-color: var(--v-nothing); }
+    .tag[data-verdict="insufficient"] { color: var(--v-insufficient); border-color: var(--v-insufficient); }
     /* The fixture stamp: hazard stripes round a solid plate, so the lettering sits
        on one flat colour and the stripes say "not production" before it is read. */
     .tag-fixture {
@@ -673,7 +679,7 @@
         </svg>
         <span class="wm-text"><strong>MERCURY</strong><span>Fire TV incident board</span></span>
       </div>
-      <p class="thesis" id="thesis">Names one change, or why not.</p>
+      <p class="thesis" id="thesis">One deploy, or why not.</p>
       <div class="conn-bar">
         <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
@@ -1887,7 +1893,9 @@
       var box = document.createElement('div');
       box.appendChild(provenanceBlock(data.metric_provenance, true));
       box.appendChild(provenanceBlock(data.commit_provenance, true));
-      box.appendChild(h('span', 'tag ' + (data.incident_detected ? 'tag-warn' : 'tag-ok'), data.verdict));
+      var verdictTag = h('span', 'tag', data.verdict);
+      verdictTag.setAttribute('data-verdict', verdictKind(data));
+      box.appendChild(verdictTag);
       box.appendChild(kv([
         ['Service', data.service],
         ['Metric', data.metric.name],
