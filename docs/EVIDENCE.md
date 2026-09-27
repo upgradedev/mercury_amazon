@@ -248,8 +248,13 @@ and then scored on held-out beside the engine it replaced. Held-out was scored i
 all recorded in git: v1 alone (dc01f11), then v1 and the frozen v2 (9b9ac1a). Three
 later runs changed no engine and no earlier figure: one added the breakdown fields
 (93960ed), one the delay-ceiling rows below (8dffcb8), and one the 20 seed spread
-(6a101e7). That is five held-out scoring runs in all, two of which produced the
-comparison.
+(6a101e7). A sixth recorded run (7bd8b41) added the runtime filter as engine v3, with
+its cost breakdown and the assumption variant, and changed no earlier figure. Before
+that commit the filter was also scored on held-out in scratch runs that were not
+recorded, under the published labels and under runtime-only causes. Including the
+filter was set as a constraint of what a deploy is, not chosen from those figures, and
+the headline shipped is the lower of the figures seen. That is six recorded held-out
+scoring runs in all, plus those scratch runs.
 
 | Held-out, synthetic corpus | v1: 60 minute window (2026-09-08) | v2: 75 minute window (shipped until the runtime filter) |
 |---|---|---|
