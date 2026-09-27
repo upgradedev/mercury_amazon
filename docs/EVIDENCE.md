@@ -774,7 +774,7 @@ long form, with the PowerShell variant and the operator secret, follows.
 #### Step 1: Install
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # fails while the repository is private
+git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while the repository is private
 cd mercury_amazon
 pip install -e ".[dev]"
 ```
@@ -822,13 +822,16 @@ code path the Fire TV remote drives.
 
 ```bash
 ./gradlew :app:assembleDebug     # needs JDK 17 and the Android SDK
-adb connect <FIRE_TV_IP>:5555
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk   # into a running Android TV emulator
+# optional, a physical Fire TV instead: adb connect <FIRE_TV_IP>:5555 first
 ```
 
 Build, emulator and evidence instructions are in
-[`docs/FIRE_TV_BUILD.md`](FIRE_TV_BUILD.md). The official event FAQ permits
-Android TV Emulator or Fire TV/Vega simulator and makes a physical device optional.
+[`docs/FIRE_TV_BUILD.md`](FIRE_TV_BUILD.md). The target proof is an Android TV
+emulator run, not a physical Fire TV. For Fire TV the event's
+[official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says that "an
+emulator (Android TV Emulator or the Fire TV/Vega simulator) is fine - a physical
+device isn't required at any stage of submission or judging".
 `.github/workflows/android-tv-emulator.yml` performs the normal-launch D-pad journey
 and writes the runtime receipt gate J4 reads.
 
@@ -1106,6 +1109,8 @@ given a substitute number.
 * **Runtime evidence pending.** The Android TV workflow is wired to compile the
   public endpoint, install the exact APK, launch without an ADB URL override and drive
   the record-only path by D-pad. No receipt is claimed until that workflow succeeds.
+  The target proof is that emulator run; the event FAQ does not require a physical
+  Fire TV.
 * **The public deployment runs an older build.** The cockpit at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reported
   `build_sha` `6dd76bde74542b9c6c5edc93f6d8ed36dd7b494b` from `/health` when probed on

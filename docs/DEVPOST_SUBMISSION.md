@@ -195,7 +195,7 @@ Stated plainly, because the cockpit shows it anyway.
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 62.5% over 40 namings (95% interval 47.0% to 75.8%) under the corpus's assumption that a regression shows within 75 minutes (50.0% at 90, 25.0% at 180), recall 4.2% over 600 regressions, refusal on 93.1% of detected anomalies, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
-| Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. The official event FAQ permits this target; no physical device is required |
+| Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. That emulator run is the target proof. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
 
 ---
 
@@ -290,11 +290,14 @@ GitHub Actions.
 
 ## Try it
 
-The repository is private today, so the clone fails for anyone outside the
-organisation until it is made public. With the source in hand, start at `pip install`.
+The repository is private today. The event's [FAQ](https://amazonappdev2026.devpost.com/details/faqs) sets the rule for that
+case: "Add the Amazon and Devpost reviewers as collaborators before the submission
+deadline". That is an owner step and it has not been done yet; until it is, the clone
+works only for collaborators. The MIT `LICENSE` file stays in the repository either
+way. With the source in hand, start at `pip install`.
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # fails while private
+git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while private
 cd mercury_amazon
 pip install -e ".[dev]"
 python -m pytest tests/ -q

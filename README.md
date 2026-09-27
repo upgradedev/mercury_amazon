@@ -134,15 +134,18 @@ only and contacts nothing outside the server.
 
 ## Run it locally
 
-The repository is private, so `git clone` fails for anyone outside the organisation
-until it is made public. If you hold the source, start at `pip install`. The install
-depends on your network; one clean install here ran past ten minutes. No credentials
-and no AWS account are needed.
+The repository is private today. The event's [FAQ](https://amazonappdev2026.devpost.com/details/faqs) sets the rule for that
+case: "Add the Amazon and Devpost reviewers as collaborators before the submission
+deadline". That is an owner step and it has not been done yet; until it is, `git clone`
+works only for collaborators. The MIT [LICENSE](LICENSE) file stays in the repository
+either way. If you hold the source, start at `pip install`. The install depends on your
+network; one clean install here ran past ten minutes. No credentials and no AWS account
+are needed.
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # fails while private
+git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while private
 cd mercury_amazon
 pip install -e ".[dev]"
 ```
@@ -179,14 +182,14 @@ a spent confirmation token cannot be replayed.
 
 ```bash
 ./gradlew :app:assembleDebug     # needs JDK 17 and the Android SDK
-adb connect <FIRE_TV_IP>:5555
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk   # into a running Android TV emulator
+# optional, a physical Fire TV instead: adb connect <FIRE_TV_IP>:5555 first
 ```
 
 [`docs/FIRE_TV_BUILD.md`](docs/FIRE_TV_BUILD.md) covers the build and the Android TV
-Emulator workflow, which the event's
-[official FAQ](https://amazonappdev2026.devpost.com/details/faqs) accepts in place of
-hardware.
+Emulator workflow. The target proof is an Android TV emulator run, not a physical Fire
+TV. The event's [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't
+required at any stage of submission or judging".
 
 ---
 
@@ -199,7 +202,7 @@ hardware.
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source and a CI build workflow | **Runtime evidence pending**: no emulator or device receipt yet |
+| Fire TV | App source and a CI build workflow | **Runtime evidence pending**: no Android TV emulator receipt yet. The target proof is an emulator run; the event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on
