@@ -116,13 +116,15 @@ record at that commit; the title card and the Check line both name it.
 ## Known weaknesses of this take
 
 * It is a desktop browser, not the APK on an allowed Fire TV target.
-* Panel answers render below their buttons, and the D-pad scrolls only as far as the
-  focused control, so some answers come into view only when focus moves past them.
-  The handoff's facts stay below the fold; only its next step is shown.
+* The D-pad scrolls only as far as the focused control. Center on Publish handoff
+  brings the rollback steps into view, and Down then passes the handoff's own answer on
+  the way to the evidence, so the handoff's facts and next step never appear on screen.
+  The Delivery velocity and Cloud spend answers come into view when Center opens them.
 * The named commit is one of this repository's own, standing in for a deploy feed,
   and the metric is generated. The board labels both.
-* The staged and recorded headlines play a short letter-scramble animation for under
-  a second before they settle; frames taken in that window show scrambled glyphs.
+* The board's headline plays a short letter-scramble animation for under a second
+  each time it changes (each answer, the staged rollback, the recorded decision);
+  frames taken in that window show scrambled glyphs.
   That is the page's own animation, not a capture fault.
 * Chromium's screencast drops a frame painted before the previous one is
   acknowledged and then sends nothing until the page paints again, so a very fast

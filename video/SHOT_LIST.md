@@ -21,7 +21,7 @@ on screen or in `correlation_trial_summary.json`.
 ## Platform shown, and what that costs
 
 **Every beat is desktop Chromium at 1920x1080 against a local server** started with
-`MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8843`, driven
+`MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8873`, driven
 by calling `window.navigateDpad` with `UP`, `DOWN`, `LEFT`, `RIGHT`, `SELECT` and
 `BACK`, which is the bridge the Leanback `MainActivity` calls for each remote key.
 No mouse is used.
