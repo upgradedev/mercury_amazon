@@ -136,7 +136,7 @@ only and contacts nothing outside the server.
 
 The repository is private today. The event's [FAQ](https://amazonappdev2026.devpost.com/details/faqs) sets the rule for that
 case: "Add the Amazon and Devpost reviewers as collaborators before the submission
-deadline". That is an owner step and it has not been done yet; until it is, `git clone`
+deadline". That is an owner step taken near submission; until then, `git clone`
 works only for collaborators. The MIT [LICENSE](LICENSE) file stays in the repository
 either way. If you hold the source, start at `pip install`. The install depends on your
 network; one clean install here ran past ten minutes. No credentials and no AWS account
