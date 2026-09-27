@@ -2409,16 +2409,31 @@
       // fight the remote.
       document.addEventListener('mercury:focuschange', function (event) {
         var label = event.detail && event.detail.label;
-        el('hintFocus').textContent = 'Focused: ' + (label || 'nothing yet');
+        var target = event.detail && event.detail.element;
+        // "Focused" only when it is: in a desktop browser the cursor is placed on load
+        // without taking keyboard focus (so Tab still starts at the skip link), and
+        // there CENTER or Enter acts on the cursor while the document has the focus.
+        var real = !!target && document.activeElement === target;
+        el('hintFocus').textContent = (real ? 'Focused: ' : 'Cursor on: ') + (label || 'nothing yet');
         // The navigator scrolls only when a control leaves the viewport. The key
         // bar is fixed over the bottom of it, so a control behind the bar counts as
         // visible there; bring it clear of the bar here. scroll-margin sets the gap.
-        var target = event.detail && event.detail.element;
         var bar = document.querySelector('.keybar');
         if (target && bar && bar.offsetHeight && target.getBoundingClientRect
             && target.getBoundingClientRect().bottom > bar.getBoundingClientRect().top) {
           target.scrollIntoView({ block: 'nearest' });
         }
+      });
+
+      // Keyboard focus that lands outside the ring (the skip link, a text field) is
+      // where the viewer is; the ring steps aside, and the legend follows focus.
+      document.addEventListener('focusin', function (event) {
+        var node = event.target;
+        if (!node || typeof node.matches !== 'function' || node.matches('[data-tv-focusable]')) { return; }
+        var name = node.getAttribute('aria-label')
+          || (node.labels && node.labels[0] && node.labels[0].textContent)
+          || node.textContent || '';
+        el('hintFocus').textContent = 'Focused: ' + (String(name).trim() || 'a control outside the remote ring');
       });
 
       // BACK on the remote leaves a panel before it leaves the application.
