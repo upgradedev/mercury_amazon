@@ -1200,7 +1200,7 @@ given a substitute number.
   `git log --oneline 6dd76bd..HEAD` lists what it lacks. Readiness gate G2 fails for
   that reason until the deployment is updated. It runs in labelled offline-fixture
   mode. The APK still requires the separate allowed-target receipt below.
-* **No published video.** One 173.96 s take, recorded at `ad12202` with the figures this
+* **No published video.** One 170.61 s take, recorded at `df5db06` with the figures this
   build prints, is rendered locally and not yet uploaded (see `video/README.md`).
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole

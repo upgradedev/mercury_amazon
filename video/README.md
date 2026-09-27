@@ -6,12 +6,12 @@ the video itself.
 
 | Item | Value |
 |---|---|
-| Recorded commit | `ad122025f409910b46d90429dabb7bd3db83043b`, reported by the server's own `/health` during the take |
-| File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260927/mercury_amazon/output/`, outside git |
-| Length | 173.96 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.6 LUFS integrated |
-| SHA-256 | `b159ed8dcab07f2a41d3a9a3a688b58d6b8d4c7a7c1b6be22ed699b382f7c004` |
+| Recorded commit | `df5db06ff398bcde36d1985a9910a68d137f0b63`, reported by the server's own `/health` during the take |
+| File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260928/mercury_amazon/output/`, outside git |
+| Length | 170.61 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.3 LUFS integrated |
+| SHA-256 | `41f831a2be036b49a1172963012c38d9e9fc33ce09c364c3c86fd0cd9fe12cc4` |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 2308 in the final narration. This take re-synthesized beats 1 to 4 only (1236 characters in 5 calls; beat 2 twice, shortened to keep the video under 175 s) and reused beats 5 to 11 from the previous take's cache; 3946 sent across all calls since the first take |
+| Characters synthesized | 2249 in the final narration. This take re-synthesized beats 1, 5, 7, 8, 10 and 11 (1146 characters in 6 calls) and reused beats 2, 3, 4, 6 and 9 from the previous take's cache; 5092 sent across all calls since the first take |
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
 
 Next to the mp4 sit `video-receipt.json` (commit, duration, SHA-256, voice, characters),
@@ -21,26 +21,37 @@ receipt are in the sibling `narration/` and `capture/` folders.
 
 ## What the video shows, and what it does not
 
-* A 4 second title card: "Mercury. Recorded from a local run of commit ad12202. Public
-  deployment pending." A 3 second closing card repeats the commit and says the public
+* A 4 second title card that says what the product is before where the take came
+  from: "Mercury. An incident board for the team's Fire TV. It names the deploy behind
+  a spike only when it can." One smaller line under it reads: local run of commit
+  df5db06 in desktop Chromium, offline fixtures, record-only rollback, public
+  deployment pending. A 3 second closing card repeats the commit and says the public
   deployment and the Fire TV runtime receipt are pending.
 * Between them, one continuous take of the page served by
-  `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8843`,
+  `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8873`,
   recorded by desktop Chromium at 1920x1080. Every key is sent through
   `window.navigateDpad`, the bridge the Leanback `MainActivity` calls for the remote.
   No mouse, no edits, no speed changes; every screen is the page answering a real
-  response from that server.
+  response from that server. The capture adds one 1x1 px marker in the bottom-right
+  corner and flips its colour after each press, only so the recorder is sent the frame
+  the page is showing (see Known weaknesses).
 * The board's own labels stay in frame: OFFLINE FIXTURE on the metric, STAND-IN on the
   commit, record-only on the rollback, and SYNTHETIC on the spend figures.
 * It is not a Fire TV or Android TV runtime proof. No device or emulator appears, and
   the narration says so. The candidate Android TV Emulator receipt is still pending.
-* After Confirm, the take shows the D-pad cursor moving to Publish handoff and the page
-  scrolling to the rollback steps (frame at 103 s). Later builds keep the board and its
-  RECORDED, no pipeline contacted figure on screen, and move to Publish handoff only on
-  the next press; CENTER still publishes, so the journey below is unchanged. A new take
-  would show that instead. The take also shows How it answers and Who it is for as
-  prose under the board and three tiles in the evidence wall; later builds open that
-  prose from a fourth tile, How it answers, on its own row under the three.
+* After Confirm the board stays where it is: the large figure reads RECORDED, no
+  pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next
+  press: Publish responder handoff (from 99.4 s to 112.8 s). The capture refuses
+  to continue unless the page is still at the top at that moment. Center then
+  publishes the handoff and the page shows the rollback steps, where 02 Confirm says
+  the token has been spent; Down lands on the evidence sentence, 50.0% over 58
+  namings in 1160 synthetic labelled cases (from 119.3 s).
+* The runtime filter is named in the opening beat and on the board: the checkout-api
+  verdict reads Only runtime change, and release-train reads 5 runtime changes landed.
+* The held-out figures are the ones the board and the README print: 90.0% refusals
+  (beat 2), 50.0% precision over 58 namings if a fault shows within 75 minutes
+  (beat 4, and on the board as 50.0% held-out precision, synthetic, at most 75
+  minutes of lag).
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture is shown at 87.5% so the captions sit in a band under it and never
   cover the board. The page itself was captured at full 1920x1080.
@@ -75,8 +86,13 @@ The environment for steps 2 to 5: `MERCURY_VIDEO_ROOT` (the output folder),
 `MERCURY_RELEASE_SHA` (the recorded commit), `FFMPEG`, `FFPROBE`, and for step 2
 `ELEVENLABS_API_KEY`, which is read from the environment and never printed or stored.
 The capture reads `MERCURY_CAPTURE_URL` (default port 8803; this take used
-`http://127.0.0.1:8843/`).
-The previous take, from commit `cf4ae18`, is kept in `reviews/videos_20260926/` and is
+`http://127.0.0.1:8873/`).
+The take before this one, from commit `ad12202`, is kept in `reviews/videos_20260927/`
+and is superseded: it showed the page scrolling to the rollback steps after Confirm,
+and How it answers as prose under the board. A first take at `bcadcdc` on 2026-09-28
+is kept beside this output as `superseded_bcadcdc/`: its last beat held "Sending GET
+.../health" throughout, although the page showed the build line, because the recorder
+missed the frame (fixed by the repaint marker). An earlier take, from commit `cf4ae18`, is kept in `reviews/videos_20260926/` and is
 superseded: it spoke the in-sample 81.1% and 52.2% over 113 namings and showed a
 60 minute window, which the board and the README no longer print. This take speaks the
 held-out 90.0% refusals and 50.0% over 58 namings that the board prints after the
@@ -105,6 +121,12 @@ record at that commit; the title card and the Check line both name it.
   The handoff's facts stay below the fold; only its next step is shown.
 * The named commit is one of this repository's own, standing in for a deploy feed,
   and the metric is generated. The board labels both.
-* The staged headline plays a short letter-scramble animation for under a second
-  before it settles on the rollback target; frames taken in that window show
-  scrambled glyphs. That is the page's own animation, not a capture fault.
+* The staged and recorded headlines play a short letter-scramble animation for under
+  a second before they settle; frames taken in that window show scrambled glyphs.
+  That is the page's own animation, not a capture fault.
+* Chromium's screencast drops a frame painted before the previous one is
+  acknowledged and then sends nothing until the page paints again, so a very fast
+  answer could be missing from the recording although the page shows it. The capture
+  flips a 1x1 px marker three times after every press to force those paints. Every
+  beat boundary, every press and every caption cue of this take was extracted and
+  looked at; each shows the answer the narration describes.
