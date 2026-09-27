@@ -2104,7 +2104,13 @@
         setReason('btnConfirm', 'confirmReason', false,
           'That token has been spent. Confirming again is refused by name. Stage again for a new one.',
           'Disabled until a rollback has been staged and a governance token issued');
-        if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnHandoff')); }
+        // The payoff is the board saying RECORDED, so the board stays where it is.
+        // Publish handoff is the next stop, but the screen moves to it only on the
+        // next D-pad press; CENTER still publishes, as the remote's smoke path expects.
+        if (window.mercuryNav) {
+          if (typeof window.mercuryNav.defer === 'function') { window.mercuryNav.defer(el('btnHandoff')); }
+          else { window.mercuryNav.setFocus(el('btnHandoff')); }
+        }
 
         var box = document.createElement('div');
         box.appendChild(h('span', 'tag tag-ok', res.body.status));
@@ -2512,6 +2518,12 @@
         // without taking keyboard focus (so Tab still starts at the skip link), and
         // there CENTER or Enter acts on the cursor while the document has the focus.
         var real = !!target && document.activeElement === target;
+        if (event.detail && event.detail.pending) {
+          // Deferred: the control is the next stop but is not on screen yet, and
+          // the screen stays put until the next press.
+          el('hintFocus').textContent = 'Next press: ' + (label || 'nothing yet');
+          return;
+        }
         el('hintFocus').textContent = (real ? 'Focused: ' : 'Cursor on: ') + (label || 'nothing yet');
         // The navigator scrolls only when a control leaves the viewport. The key
         // bar is fixed over the bottom of it, so a control behind the bar counts as

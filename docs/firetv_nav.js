@@ -132,16 +132,17 @@
    * second key handler of its own. Guarded because this file is also executed
    * outside a browser by the navigation spec.
    */
-  function announceFocus(element) {
+  function announceFocus(element, pending) {
     var CustomEventCtor = typeof window !== 'undefined' ? window.CustomEvent : null;
     if (typeof document.dispatchEvent !== 'function' || typeof CustomEventCtor !== 'function') return;
     document.dispatchEvent(new CustomEventCtor(FOCUS_EVENT, {
-      detail: { element: element, label: labelOf(element) }
+      detail: { element: element, label: labelOf(element), pending: pending === true }
     }));
   }
 
   function SpatialNavigator() {
     this.current = null;
+    this.pending = false;
     this.enabled = true;
   }
 
@@ -167,6 +168,7 @@
    */
   SpatialNavigator.prototype.setFocus = function (element, options) {
     if (!element) return;
+    this.pending = false;
     var previous = document.querySelector('.' + FOCUS_CLASS);
     if (previous && previous !== element) previous.classList.remove(FOCUS_CLASS);
     element.classList.add(FOCUS_CLASS);
@@ -180,6 +182,32 @@
       element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
     announceFocus(element);
+  };
+
+  /**
+   * Make an element the next stop without moving the screen to it. The page uses
+   * this after a result it wants left in view: the cursor belongs to the element,
+   * so CENTER acts on it, but no ring is drawn and nothing scrolls until the next
+   * D-pad press, which first brings it into view. Keyboard focus moves there
+   * without scrolling, so Enter and Tab agree with the remote.
+   */
+  SpatialNavigator.prototype.defer = function (element) {
+    if (!element) return;
+    var previous = document.querySelector('.' + FOCUS_CLASS);
+    if (previous) previous.classList.remove(FOCUS_CLASS);
+    // current before focus(): the focusin listener below then sees the cursor
+    // already there and does not call setFocus, which would scroll.
+    this.current = element;
+    this.pending = true;
+    if (typeof element.focus === 'function') element.focus({ preventScroll: true });
+    announceFocus(element, true);
+  };
+
+  /** Bring a deferred cursor into view with its ring. True when there was one. */
+  SpatialNavigator.prototype.reveal = function () {
+    if (!this.pending || !this.current) return false;
+    this.setFocus(this.current);
+    return true;
   };
 
   SpatialNavigator.prototype.focusFirst = function (options) {
@@ -217,6 +245,11 @@
   /** Move focus one step in a direction. Returns the element focused, or null. */
   SpatialNavigator.prototype.move = function (direction) {
     if (!this.enabled) return null;
+    // The first press after a deferred cursor only shows where it is.
+    if (this.pending && this.current && isVisible(this.current)) {
+      this.reveal();
+      return this.current;
+    }
     var all = this.candidates();
     if (!all.length) return null;
 
@@ -241,6 +274,7 @@
       this.focusFirst();
       return null;
     }
+    this.reveal();
     this.current.click();
     return this.current;
   };

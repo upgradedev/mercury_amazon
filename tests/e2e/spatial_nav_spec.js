@@ -246,6 +246,34 @@ test('each focus change is announced to the page with the control label', () => 
   ], 'the key hint bar is fed by the navigator, not by a second key handler');
 });
 
+test('a deferred cursor draws no ring until the next press, which only reveals it', () => {
+  const cells = grid();
+  const { nav, document } = loadNavigator(cells);
+  const announced = [];
+  document.addEventListener('mercury:focuschange', (event) => {
+    announced.push([event.detail.element.id, event.detail.pending]);
+  });
+  nav.setFocus(at(cells, 0, 0));
+  nav.defer(at(cells, 2, 2));
+  assert.strictEqual(nav.current.id, 'r2c2');
+  assert.strictEqual(cells.filter((c) => c.hasClass('tv-focused')).length, 0, 'no ring while deferred');
+  // The first press, in any direction, lands on the deferred control, not beyond it.
+  assert.strictEqual(nav.move('UP').id, 'r2c2');
+  assert.ok(at(cells, 2, 2).hasClass('tv-focused'));
+  assert.strictEqual(nav.move('UP').id, 'r1c2', 'after the reveal the next press moves as usual');
+  assert.deepStrictEqual(announced.slice(0, 3), [['r0c0', false], ['r2c2', true], ['r2c2', false]]);
+});
+
+test('SELECT on a deferred cursor reveals it and clicks it once', () => {
+  const cells = grid();
+  const { nav, bridge } = loadNavigator(cells);
+  nav.defer(at(cells, 1, 1));
+  assert.strictEqual(bridge('SELECT'), true);
+  assert.strictEqual(at(cells, 1, 1).clicked, 1);
+  assert.ok(at(cells, 1, 1).hasClass('tv-focused'));
+  assert.strictEqual(nav.pending, false);
+});
+
 test('only one element carries the focus class at a time', () => {
   const cells = grid();
   const { nav } = loadNavigator(cells);

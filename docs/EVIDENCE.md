@@ -1042,7 +1042,7 @@ be replaced with its run URL and digests only after that workflow succeeds.
 
 The manifest declarations, Gradle wiring and key handling contract are checked by 30 structural tests
 plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
-23 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
+25 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
 walks the browser form of the same golden path. None of those substitutes for the
 pending Android TV receipt.
 
@@ -1078,7 +1078,7 @@ because it shells out to `git log` for the commit fallback.
 ```bash
 python -m pytest tests/ -q                                    # 650 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2000 statements
-node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
+node tests/e2e/spatial_nav_spec.js                            # 25/25 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
 python scripts/tune_attribution.py                            # the train-only sweep

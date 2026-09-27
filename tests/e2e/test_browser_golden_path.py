@@ -105,6 +105,16 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
             assert "No deployment pipeline was contacted" in page.locator("#incidentOutput").inner_text()
 
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnHandoff"
+            # The payoff stays on screen: Publish handoff is the next stop, but the
+            # board does not scroll to it and no ring is drawn until the next press.
+            hero = page.evaluate(
+                "(() => { const r = document.querySelector('#heroFigure').getBoundingClientRect();"
+                " return { top: r.top, bottom: r.bottom, text: document.querySelector('#heroFigure').textContent,"
+                " label: document.querySelector('#heroFigureLabel').textContent,"
+                " rings: document.querySelectorAll('.tv-focused').length }; })()")
+            assert hero["text"] == "RECORDED" and hero["label"] == "no pipeline contacted", hero
+            assert 0 <= hero["top"] and hero["bottom"] <= 1080, f"the RECORDED hero left the screen: {hero}"
+            assert hero["rings"] == 0, hero
             page.keyboard.press("Enter")
             page.locator("#handoffOutput .tag-live").wait_for(timeout=10_000)
             assert "D-pad demo responder" in page.locator("#handoffOutput").inner_text()
@@ -192,6 +202,11 @@ def test_every_later_screen_can_still_publish_the_shared_handoff_by_d_pad():
                 page.evaluate("window.navigateDpad('SELECT')")
                 page.wait_for_function(
                     "window.__journey.some(e => e.indexOf('rollback_confirmed:') === 0)", timeout=10_000)
+                in_view = page.evaluate(
+                    "(() => { const r = document.querySelector('#heroFigure').getBoundingClientRect();"
+                    " return r.top >= 0 && r.bottom <= innerHeight"
+                    " && document.querySelector('#heroFigure').textContent === 'RECORDED'; })()")
+                assert in_view, "after Confirm the RECORDED hero has to stay on the TV screen"
                 page.evaluate("window.navigateDpad('SELECT')")
                 page.wait_for_function(
                     "window.__journey.some(e => e.indexOf('handoff_published:') === 0)", timeout=10_000)
