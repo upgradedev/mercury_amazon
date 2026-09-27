@@ -122,6 +122,15 @@ def engine_v1() -> IncidentCorrelator:
     return IncidentCorrelator(attribution_window_minutes=60, max_commits_in_window=1)
 
 
+def engine_v2() -> IncidentCorrelator:
+    """Chosen on the train split by ``python scripts/tune_attribution.py``, then frozen.
+
+    75 minute window ending at the onset, names a change only when exactly one landed in
+    it, no service scope. Frozen before its first held-out run.
+    """
+    return IncidentCorrelator(attribution_window_minutes=75, max_commits_in_window=1)
+
+
 #: Every engine scored here, oldest first. The last one is the shipped default.
 ENGINES: dict[str, dict] = {
     "v1_2026_09_08": {
@@ -131,8 +140,15 @@ ENGINES: dict[str, dict] = {
             "names a change only when exactly one commit landed in the window."
         ),
     },
+    "v2_2026_09_27": {
+        "build": engine_v2,
+        "description": (
+            "As v1, with the attribution window widened to 75 minutes. Chosen on the train "
+            "split by python scripts/tune_attribution.py and frozen before its held-out run."
+        ),
+    },
 }
-SHIPPED_ENGINE = "v1_2026_09_08"
+SHIPPED_ENGINE = "v2_2026_09_27"
 
 
 # ------------------------------------------------------------------- Scoring
