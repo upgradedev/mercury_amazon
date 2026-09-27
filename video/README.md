@@ -6,12 +6,12 @@ the video itself.
 
 | Item | Value |
 |---|---|
-| Recorded commit | `cf4ae181fa3cfda74791b8dfe64666641564f938`, reported by the server's own `/health` during the take |
-| File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260926/mercury_amazon/output/`, outside git |
-| Length | 170.44 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.4 LUFS integrated |
-| SHA-256 | `b0c4728045b88266904d5604a25f36ec87f2a7100c6706934e206f4b3272022c` |
+| Recorded commit | `ad122025f409910b46d90429dabb7bd3db83043b`, reported by the server's own `/health` during the take |
+| File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260927/mercury_amazon/output/`, outside git |
+| Length | 173.96 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.6 LUFS integrated |
+| SHA-256 | `b159ed8dcab07f2a41d3a9a3a688b58d6b8d4c7a7c1b6be22ed699b382f7c004` |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 2272 in the final narration; 2710 sent across all calls, because two beats were corrected and synthesized again |
+| Characters synthesized | 2308 in the final narration. This take re-synthesized beats 1 to 4 only (1236 characters in 5 calls; beat 2 twice, shortened to keep the video under 175 s) and reused beats 5 to 11 from the previous take's cache; 3946 sent across all calls since the first take |
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
 
 Next to the mp4 sit `video-receipt.json` (commit, duration, SHA-256, voice, characters),
@@ -21,11 +21,11 @@ receipt are in the sibling `narration/` and `capture/` folders.
 
 ## What the video shows, and what it does not
 
-* A 4 second title card: "Mercury. Recorded from a local run of commit cf4ae18. Public
+* A 4 second title card: "Mercury. Recorded from a local run of commit ad12202. Public
   deployment pending." A 3 second closing card repeats the commit and says the public
   deployment and the Fire TV runtime receipt are pending.
 * Between them, one continuous take of the page served by
-  `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8803`,
+  `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8843`,
   recorded by desktop Chromium at 1920x1080. Every key is sent through
   `window.navigateDpad`, the bridge the Leanback `MainActivity` calls for the remote.
   No mouse, no edits, no speed changes; every screen is the page answering a real
@@ -67,7 +67,13 @@ the voice cannot drift from the picture.
 The environment for steps 2 to 5: `MERCURY_VIDEO_ROOT` (the output folder),
 `MERCURY_RELEASE_SHA` (the recorded commit), `FFMPEG`, `FFPROBE`, and for step 2
 `ELEVENLABS_API_KEY`, which is read from the environment and never printed or stored.
-A first take, from commit `924a58c`, was superseded and is kept beside the output as
+The capture reads `MERCURY_CAPTURE_URL` (default port 8803; this take used
+`http://127.0.0.1:8843/`).
+The previous take, from commit `cf4ae18`, is kept in `reviews/videos_20260926/` and is
+superseded: it spoke the in-sample 81.1% and 52.2% over 113 namings and showed a
+60 minute window, which the board and the README no longer print. This take speaks the
+held-out 90.0% refusals and 50.0% over 58 namings that the board prints after the
+runtime filter. A first take, from commit `924a58c`, was superseded and is kept beside the output as
 `superseded_924a58c/`. Reviewing it found two faults, both fixed before this take: the
 captions were burned 4 s late, because the subtitles filter runs before the title
 card is joined, and one beat gave the wrong reason for the spend fixture (the run is
@@ -92,3 +98,6 @@ record at that commit; the title card and the Check line both name it.
   The handoff's facts stay below the fold; only its next step is shown.
 * The named commit is one of this repository's own, standing in for a deploy feed,
   and the metric is generated. The board labels both.
+* The staged headline plays a short letter-scramble animation for under a second
+  before it settles on the rollback target; frames taken in that window show
+  scrambled glyphs. That is the page's own animation, not a capture fault.
