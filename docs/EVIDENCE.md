@@ -242,9 +242,11 @@ gate 1, no scope** (pooled train precision 52.4% to 64.1%, recall 12.1% to 12.5%
 `python scripts/tune_attribution.py --check` re-runs the sweep in CI and compares every
 field of `attribution_tuning_summary.json` except its timestamp. That engine was frozen
 and then scored on held-out beside the engine it replaced. Held-out was scored in steps,
-all recorded in git: v1 alone (dc01f11), then v1 and the frozen v2 (9b9ac1a). Two later
-runs changed no engine and no earlier figure: one added the breakdown fields (93960ed),
-the other the delay-ceiling rows below (2026-09-27, after the audit).
+all recorded in git: v1 alone (dc01f11), then v1 and the frozen v2 (9b9ac1a). Three
+later runs changed no engine and no earlier figure: one added the breakdown fields
+(93960ed), one the delay-ceiling rows below (8dffcb8), and one the 20 seed spread
+(6a101e7). That is five held-out scoring runs in all, two of which produced the
+comparison.
 
 | Held-out, synthetic corpus | v1: 60 minute window (2026-09-08) | v2: 75 minute window (shipped) |
 |---|---|---|
@@ -993,7 +995,7 @@ because it shells out to `git log` for the commit fallback.
 
 ```bash
 python -m pytest tests/ -q                                    # 645 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 1992 statements
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2000 statements
 node tests/e2e/spatial_nav_spec.js                            # 23/23 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each

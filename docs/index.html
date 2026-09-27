@@ -1345,7 +1345,8 @@
     function answerSentence(data) {
       var kind = verdictKind(data);
       if (kind === 'attributed') {
-        var short = accuracyShort(data);
+        // Spoken and announced, so the lag is written out: "75m" reads as metres.
+        var short = accuracyShort(data).replace(/\u2264(\d+)m\u00a0lag/, 'if it shows within $1 minutes');
         return data.service + ': attributed to commit ' + data.offending_commit.sha
           + (short ? ', ' + short : '') + '.';
       }
