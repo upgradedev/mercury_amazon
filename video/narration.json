@@ -1,6 +1,6 @@
 {
   "schema": "mercury.video_narration/1",
-  "status": "RENDERED LOCALLY, NOT UPLOADED. The current take was recorded on 2026-09-27 from a local run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. Each beat's seconds are its measured hold: the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. This is not the Fire TV track runtime proof: the candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
+  "status": "RENDERED LOCALLY, NOT UPLOADED. The current take was recorded on 2026-09-28 from a local run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. Each beat's seconds are its measured hold: the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. This is not the Fire TV track runtime proof: the candidate Android TV Emulator receipt is still pending; the event FAQ permits that route and does not require physical hardware.",
   "project": "mercury_amazon",
   "title": "Mercury: Fire TV incident board",
   "source_of_truth": "scripts/build_video_plan.py",
@@ -13,95 +13,95 @@
       "outputFormat": "mp3_44100_128"
     }
   },
-  "target_duration_seconds": 166.949,
+  "target_duration_seconds": 163.607,
   "max_allowed_seconds": 180.0,
   "beats": [
     {
       "beat_id": "beat_01_question",
       "timestamp_start": 0.0,
-      "timestamp_end": 16.022,
-      "narration_text": "An incident starts, and someone asks what we just deployed. Most of the time nobody can honestly say. Mercury, an incident board for the team TV, asks a narrower question: can this spike be pinned on one change?",
-      "caption_text": "An incident starts, and someone asks what we just deployed. Most of the time nobody can honestly say. Mercury, an incident board for the team TV, asks a narrower question: can this spike be pinned on one change?",
+      "timestamp_end": 16.858,
+      "narration_text": "Mercury is an incident board for the team's Fire TV. When errors spike, the room asks which deploy did it. Mercury counts only commits that touch runtime files, and names one only when exactly one landed before the spike.",
+      "caption_text": "Mercury is an incident board for the team's Fire TV. When errors spike, the room asks which deploy did it. Mercury counts only commits that touch runtime files, and names one only when exactly one landed before the spike.",
       "visual_action": "The loaded board at 1920x1080, focus on Ask what changed. No key pressed."
     },
     {
       "beat_id": "beat_02_board_on_load",
-      "timestamp_start": 16.022,
-      "timestamp_end": 34.041,
+      "timestamp_start": 16.858,
+      "timestamp_end": 34.877,
       "narration_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody ninety percent of the time. A refusal never calls the deploy innocent.",
       "caption_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody 90.0% of the time. A refusal never calls the deploy innocent.",
       "visual_action": "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
     },
     {
       "beat_id": "beat_03_crowded_refusal",
-      "timestamp_start": 34.041,
-      "timestamp_end": 51.595,
+      "timestamp_start": 34.877,
+      "timestamp_end": 52.431,
       "narration_text": "Down walks the rows. Release train shows a spike well above its baseline, but several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
       "caption_text": "Down walks the rows. release-train shows a spike well above its baseline, but several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
       "visual_action": "D-pad Down four times to release-train, then Center. The verdict reads Cannot attribute this with the number of changes that landed, Next reads No rollback offered, and Stage rollback and Confirm are disabled."
     },
     {
       "beat_id": "beat_04_named_with_odds",
-      "timestamp_start": 51.595,
-      "timestamp_end": 71.378,
+      "timestamp_start": 52.431,
+      "timestamp_end": 72.214,
       "narration_text": "On checkout A P I, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause fifty percent of the time, over fifty eight namings, if a fault shows within seventy five minutes.",
       "caption_text": "On checkout-api, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause 50.0% of the time, over 58 namings, if a fault shows within 75 minutes.",
       "visual_action": "D-pad Up three times to checkout-api, then Center. The verdict names the commit as the only runtime change, quotes its message, and reads 50.0% held-out precision (synthetic, \u226475m lag)."
     },
     {
       "beat_id": "beat_05_provenance",
-      "timestamp_start": 71.378,
-      "timestamp_end": 85.449,
-      "narration_text": "Each half says where it came from. The metric is an offline fixture, generated locally, and the striped stamp says so. The commit is one of Mercury's own, standing in for a deploy feed, and the dashed stamp says that too.",
-      "caption_text": "Each half says where it came from. The metric is an offline fixture, generated locally, and the striped stamp says so. The commit is one of Mercury's own, standing in for a deploy feed, and the dashed stamp says that too.",
+      "timestamp_start": 72.214,
+      "timestamp_end": 82.849,
+      "narration_text": "The reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
+      "caption_text": "The reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
       "visual_action": "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN stamp against Mercury's commits. No key pressed."
     },
     {
       "beat_id": "beat_06_stage",
-      "timestamp_start": 85.449,
-      "timestamp_end": 96.966,
+      "timestamp_start": 82.849,
+      "timestamp_end": 94.366,
       "narration_text": "Only a named change can be rolled back. Up, right, center: staging returns a single use token bound to a hash of this exact proposal, and the lease counts down on the board.",
       "caption_text": "Only a named change can be rolled back. Up, Right, Center: staging returns a single-use token bound to a hash of this exact proposal, and the lease counts down on the board.",
       "visual_action": "D-pad Up, Right to Stage rollback, Center. The board reads Rollback staged, the lease in seconds as the large figure, and Next reads Staged. Next: confirm, record-only."
     },
     {
       "beat_id": "beat_07_confirm",
-      "timestamp_start": 96.966,
-      "timestamp_end": 108.622,
-      "narration_text": "Right, then center confirms. The server spends the token, and the recorded only card says it plainly: no deployment pipeline was contacted. Confirming again is refused.",
-      "caption_text": "Right, then Center confirms. The server spends the token, and the Recorded only card says it plainly: no deployment pipeline was contacted. Confirming again is refused.",
-      "visual_action": "D-pad Right to Confirm, Center. The board stays in view: the large figure reads RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next press: Publish responder handoff."
+      "timestamp_start": 94.366,
+      "timestamp_end": 108.484,
+      "narration_text": "Right, then center confirms. The server spends the token, and the board holds the result: recorded, no pipeline contacted. The rollback is recorded, not sent.",
+      "caption_text": "Right, then Center confirms. The server spends the token, and the board holds the result: RECORDED, no pipeline contacted. The rollback is recorded, not sent.",
+      "visual_action": "D-pad Right to Confirm, Center. Nothing scrolls: the large figure reads RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next press: Publish responder handoff."
     },
     {
       "beat_id": "beat_08_handoff",
-      "timestamp_start": 108.622,
-      "timestamp_end": 118.374,
-      "narration_text": "Center publishes a fixed responder handoff. Its next step repeats the boundary: this fixture never contacts a deployment pipeline.",
-      "caption_text": "Center publishes a fixed responder handoff. Its next step repeats the boundary: this fixture never contacts a deployment pipeline.",
-      "visual_action": "Center on Publish handoff; the server answers HTTP 200. D-pad Down brings the handoff's next step into view on the way to the evidence tiles."
+      "timestamp_start": 108.484,
+      "timestamp_end": 122.741,
+      "narration_text": "Center publishes the handoff, and the steps show the token spent: confirming again is refused. Down reaches the evidence behind the odds: fifty eight namings, in eleven hundred sixty synthetic cases.",
+      "caption_text": "Center publishes the handoff, and the steps show the token spent: confirming again is refused. Down reaches the evidence behind the odds: 58 namings, in 1160 synthetic cases.",
+      "visual_action": "Center on the deferred Publish handoff; the server answers HTTP 200 and the page scrolls to the rollback steps, where 02 Confirm reads that the token has been spent and confirming again is refused by name. D-pad Down lands on Incident evidence and brings Evidence behind the board into view: 50.0% over 58 namings in 1160 synthetic labelled cases."
     },
     {
       "beat_id": "beat_09_dpad",
-      "timestamp_start": 118.374,
-      "timestamp_end": 130.541,
+      "timestamp_start": 122.741,
+      "timestamp_end": 134.908,
       "narration_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens delivery velocity, and Back now reads: back to the wall.",
       "caption_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens Delivery velocity, and BACK now reads: Back to the wall.",
       "visual_action": "D-pad Right to Delivery velocity, Center. The panel opens and the BACK legend changes from Exit to the Fire TV launcher to Back to the wall."
     },
     {
       "beat_id": "beat_10_fixtures",
-      "timestamp_start": 130.541,
-      "timestamp_end": 147.491,
-      "narration_text": "Down brings the answer into view: a recording, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic, because this run is in offline mode.",
-      "caption_text": "Down brings the answer into view: a recording, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic, because this run is in offline mode.",
-      "visual_action": "D-pad Down reveals the DORA answer with its OFFLINE FIXTURE stamp. Back returns to the wall and the legend changes back. Right to Cloud spend, Center, Down: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC."
+      "timestamp_start": 134.908,
+      "timestamp_end": 147.493,
+      "narration_text": "Its answer is a recording, stamped offline fixture, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic.",
+      "caption_text": "Its answer is a recording, stamped OFFLINE FIXTURE, because no GitHub token is set. BACK returns to the wall, not out of the app. Cloud spend is a fixture too, marked SYNTHETIC.",
+      "visual_action": "D-pad Down to Check shows the rest of the DORA answer with its OFFLINE FIXTURE stamp. Back returns to the wall and the legend changes back. Right to Cloud spend, Center, Down: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC."
     },
     {
       "beat_id": "beat_11_build_check",
-      "timestamp_start": 147.491,
-      "timestamp_end": 166.949,
-      "narration_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This take is a desktop browser at Fire TV resolution, driven through the D pad bridge the Leanback app calls. No device or emulator run is shown, and a public deployment is pending.",
-      "caption_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This take is a desktop browser at Fire TV resolution, driven through the D-pad bridge the Leanback app calls. No device or emulator run is shown, and a public deployment is pending.",
+      "timestamp_start": 147.493,
+      "timestamp_end": 163.607,
+      "narration_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This is a desktop browser at Fire TV resolution, driven through the D pad bridge the Leanback app calls. No device or emulator run is shown.",
+      "caption_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. This is a desktop browser at Fire TV resolution, driven through the D-pad bridge the Leanback app calls. No device or emulator run is shown.",
       "visual_action": "Center on Check. The connection line reads GET /health returned 200, the build's short SHA, and GitHub live: no, fixture mode."
     }
   ]

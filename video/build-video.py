@@ -11,8 +11,9 @@ What changed for this repository, so the kit's pixel-reading sync gate
 (``scripts/verify_video_sync.py``) runs on the result unchanged:
 
   1. A silent title card opens the video and a silent closing card ends it, both
-     rendered here with Pillow. The title card states the commit that was recorded
-     and that the public deployment is pending.
+     rendered here with Pillow. The title card says what Mercury does first, then in
+     one smaller line the commit that was recorded, that the metrics are offline
+     fixtures and the rollback record-only, and that the public deployment is pending.
   2. The capture is scaled to 87.5% and placed at the top of the frame, and the
      captions sit in the band underneath it, so no caption ever covers what the
      board shows. The page itself was captured at 1920x1080.
@@ -127,17 +128,22 @@ def main() -> None:
     short = RELEASE_SHA[:7]
     title_png = CARDS / "title.png"
     outro_png = CARDS / "outro.png"
+    # The product first: a judge reads what Mercury does before where the take came
+    # from. The provenance stays on the card, in one smaller line, and again on the
+    # closing card.
     card(title_png, [
-        ("Mercury.", "bahnschrift.ttf", 120, AMBER),
-        (f"Recorded from a local run of commit {short}.", "segoeui.ttf", 58, INK),
-        ("Public deployment pending.", "segoeui.ttf", 58, INK),
+        ("Mercury", "bahnschrift.ttf", 120, AMBER),
+        ("An incident board for the team's Fire TV.", "segoeui.ttf", 58, INK),
+        ("It names the deploy behind a spike only when it can.", "segoeui.ttf", 58, INK),
         ("", "segoeui.ttf", 30, INK_2),
-        ("Desktop Chromium at 1920x1080, driven through the Fire TV D-pad bridge.", "segoeui.ttf", 34, INK_2),
-        ("Metrics are offline fixtures. Rollback is record-only.", "segoeui.ttf", 34, INK_2),
+        (f"Local run of commit {short} in desktop Chromium: offline fixtures, record-only rollback.",
+         "segoeui.ttf", 34, INK_2),
+        ("Public deployment pending.", "segoeui.ttf", 34, INK_2),
     ])
     card(outro_png, [
         ("Mercury", "bahnschrift.ttf", 110, AMBER),
-        (f"Local run of commit {short}.", "segoeui.ttf", 54, INK),
+        ("One deploy, or why not.", "segoeui.ttf", 54, INK),
+        (f"Recorded from a local run of commit {short}, with offline fixtures.", "segoeui.ttf", 40, INK_2),
         ("Public deployment and Fire TV runtime receipt pending.", "segoeui.ttf", 40, INK_2),
     ])
 

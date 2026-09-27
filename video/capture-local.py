@@ -65,6 +65,12 @@ ROWS_ANSWERED = """() => { const rows = document.querySelectorAll('[data-row-ver
     .includes(r.getAttribute('data-verdict'))); }"""
 
 
+BOARD_RECORDED = """() => document.getElementById('heroFigure').textContent.trim() === 'RECORDED'
+  && /recorded, not sent/i.test(document.getElementById('heroEyebrow').textContent)
+  && window.scrollY === 0
+  && /^Next press: Publish responder handoff/.test(document.getElementById('hintFocus').textContent)"""
+
+
 def text_appears(selector: str, needle: str) -> str:
     return (
         "() => { const n = document.querySelector(%s); return !!n && n.textContent.includes(%s); }"
@@ -98,7 +104,9 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
     ],
     "beat_07_confirm": [
         (0.2, "RIGHT", "Confirm rollback", None),
-        (1.0, "SELECT", "Publish responder handoff", text_appears("#rbResultState", "No deployment pipeline was contacted")),
+        # The payoff stays on the board: the large figure reads RECORDED, the page has
+        # not scrolled, and Publish handoff is only the next stop (no ring yet).
+        (1.0, "SELECT", "Publish responder handoff", BOARD_RECORDED),
     ],
     "beat_08_handoff": [
         (0.3, "SELECT", "Refresh shared handoff", text_appears("#handoffOutput", "Next step")),

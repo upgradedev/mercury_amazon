@@ -39,10 +39,10 @@ TTS = {
 # (beat_id, seconds, narration_text, caption_text or None, visual_action)
 BEATS = [
     (
-        "beat_01_question", 16.022,
-        "An incident starts, and someone asks what we just deployed. Most of the time "
-        "nobody can honestly say. Mercury, an incident board for the team TV, asks "
-        "a narrower question: can this spike be pinned on one change?",
+        "beat_01_question", 16.858,
+        "Mercury is an incident board for the team's Fire TV. When errors spike, the "
+        "room asks which deploy did it. Mercury counts only commits that touch runtime "
+        "files, and names one only when exactly one landed before the spike.",
         None,
         "The loaded board at 1920x1080, focus on Ask what changed. No key pressed.",
     ),
@@ -55,38 +55,42 @@ BEATS = [
         "generated cases held out from tuning, it saw a real anomaly and named nobody "
         "90.0% of the time. A refusal never calls the deploy innocent.",
         "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot "
-        "attribute, Cannot attribute and Insufficient data, each from the server's answer.",
+        "attribute, Cannot attribute and Insufficient data, each from the server's "
+        "answer.",
     ),
     (
         "beat_03_crowded_refusal", 17.554,
         "Down walks the rows. Release train shows a spike well above its baseline, but "
-        "several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot "
-        "attribute this, and offers no rollback. Rolling back would be a guess.",
+        "several runtime changes landed in the window before it, and no metric says "
+        "which one did it. Mercury cannot attribute this, and offers no rollback. "
+        "Rolling back would be a guess.",
         "Down walks the rows. release-train shows a spike well above its baseline, but "
-        "several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot "
-        "attribute this, and offers no rollback. Rolling back would be a guess.",
+        "several runtime changes landed in the window before it, and no metric says "
+        "which one did it. Mercury cannot attribute this, and offers no rollback. "
+        "Rolling back would be a guess.",
         "D-pad Down four times to release-train, then Center. The verdict reads Cannot "
         "attribute this with the number of changes that landed, Next reads No rollback "
         "offered, and Stage rollback and Confirm are disabled.",
     ),
     (
         "beat_04_named_with_odds", 19.783,
-        "On checkout A P I, exactly one runtime change landed before the spike, so Mercury "
-        "names it, and prints its own odds: on held-out generated cases a named commit is "
-        "the cause fifty percent of the time, over fifty eight namings, if a fault shows "
-        "within seventy five minutes.",
-        "On checkout-api, exactly one runtime change landed before the spike, so Mercury "
-        "names it, and prints its own odds: on held-out generated cases a named commit is "
-        "the cause 50.0% of the time, over 58 namings, if a fault shows within 75 minutes.",
-        "D-pad Up three times to checkout-api, then Center. The verdict names the commit as the "
-        "only runtime change, quotes its message, and reads 50.0% held-out precision "
-        "(synthetic, ≤75m lag).",
+        "On checkout A P I, exactly one runtime change landed before the spike, so "
+        "Mercury names it, and prints its own odds: on held-out generated cases a named "
+        "commit is the cause fifty percent of the time, over fifty eight namings, if a "
+        "fault shows within seventy five minutes.",
+        "On checkout-api, exactly one runtime change landed before the spike, so "
+        "Mercury names it, and prints its own odds: on held-out generated cases a named "
+        "commit is the cause 50.0% of the time, over 58 namings, if a fault shows "
+        "within 75 minutes.",
+        "D-pad Up three times to checkout-api, then Center. The verdict names the "
+        "commit as the only runtime change, quotes its message, and reads 50.0% "
+        "held-out precision (synthetic, ≤75m lag).",
     ),
     (
-        "beat_05_provenance", 14.071,
-        "Each half says where it came from. The metric is an offline fixture, generated "
-        "locally, and the striped stamp says so. The commit is one of Mercury's own, "
-        "standing in for a deploy feed, and the dashed stamp says that too.",
+        "beat_05_provenance", 10.635,
+        "The reading and the commit each carry a stamp. The metric is an offline "
+        "fixture, generated locally. The commit is one of Mercury's own, standing in "
+        "for a deploy feed.",
         None,
         "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN "
         "stamp against Mercury's commits. No key pressed.",
@@ -99,68 +103,75 @@ BEATS = [
         "Only a named change can be rolled back. Up, Right, Center: staging returns a "
         "single-use token bound to a hash of this exact proposal, and the lease counts "
         "down on the board.",
-        "D-pad Up, Right to Stage rollback, Center. The board reads Rollback staged, the "
-        "lease in seconds as the large figure, and Next reads Staged. Next: confirm, "
-        "record-only.",
+        "D-pad Up, Right to Stage rollback, Center. The board reads Rollback staged, "
+        "the lease in seconds as the large figure, and Next reads Staged. Next: "
+        "confirm, record-only.",
     ),
     (
-        "beat_07_confirm", 11.656,
-        "Right, then center confirms. The server spends the token, and the recorded only "
-        "card says it plainly: no deployment pipeline was contacted. Confirming again is "
-        "refused.",
-        "Right, then Center confirms. The server spends the token, and the Recorded only "
-        "card says it plainly: no deployment pipeline was contacted. Confirming again is "
-        "refused.",
-        "D-pad Right to Confirm, Center. The board stays in view: the large figure reads "
-        "RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the key "
-        "legend reads Next press: Publish responder handoff.",
+        "beat_07_confirm", 14.118,
+        "Right, then center confirms. The server spends the token, and the board holds "
+        "the result: recorded, no pipeline contacted. The rollback is recorded, not "
+        "sent.",
+        "Right, then Center confirms. The server spends the token, and the board holds "
+        "the result: RECORDED, no pipeline contacted. The rollback is recorded, not "
+        "sent.",
+        "D-pad Right to Confirm, Center. Nothing scrolls: the large figure reads "
+        "RECORDED, no pipeline contacted, under Rollback recorded, not sent, and the "
+        "key legend reads Next press: Publish responder handoff.",
     ),
     (
-        "beat_08_handoff", 9.752,
-        "Center publishes a fixed responder handoff. Its next step repeats the boundary: "
-        "this fixture never contacts a deployment pipeline.",
-        None,
-        "Center on Publish handoff; the server answers HTTP 200. D-pad Down brings the "
-        "handoff's next step into view on the way to the evidence tiles.",
+        "beat_08_handoff", 14.257,
+        "Center publishes the handoff, and the steps show the token spent: confirming "
+        "again is refused. Down reaches the evidence behind the odds: fifty eight "
+        "namings, in eleven hundred sixty synthetic cases.",
+        "Center publishes the handoff, and the steps show the token spent: confirming "
+        "again is refused. Down reaches the evidence behind the odds: 58 namings, in "
+        "1160 synthetic cases.",
+        "Center on the deferred Publish handoff; the server answers HTTP 200 and the "
+        "page scrolls to the rollback steps, where 02 Confirm reads that the token has "
+        "been spent and confirming again is refused by name. D-pad Down lands on "
+        "Incident evidence and brings Evidence behind the board into view: 50.0% over "
+        "58 namings in 1160 synthetic labelled cases.",
     ),
     (
         "beat_09_dpad", 12.167,
-        "The ring jumps to the nearest control in the direction pressed, and the label at "
-        "the bottom right names it. Center opens delivery velocity, and Back now reads: "
-        "back to the wall.",
-        "The ring jumps to the nearest control in the direction pressed, and the label at "
-        "the bottom right names it. Center opens Delivery velocity, and BACK now reads: "
-        "Back to the wall.",
+        "The ring jumps to the nearest control in the direction pressed, and the label "
+        "at the bottom right names it. Center opens delivery velocity, and Back now "
+        "reads: back to the wall.",
+        "The ring jumps to the nearest control in the direction pressed, and the label "
+        "at the bottom right names it. Center opens Delivery velocity, and BACK now "
+        "reads: Back to the wall.",
         "D-pad Right to Delivery velocity, Center. The panel opens and the BACK legend "
         "changes from Exit to the Fire TV launcher to Back to the wall.",
     ),
     (
-        "beat_10_fixtures", 16.95,
-        "Down brings the answer into view: a recording, because no GitHub token is set. "
-        "Back returns to the wall, not out of the app. Cloud spend is a fixture too, "
-        "marked synthetic, because this run is in offline mode.",
-        None,
-        "D-pad Down reveals the DORA answer with its OFFLINE FIXTURE stamp. Back returns "
-        "to the wall and the legend changes back. Right to Cloud spend, Center, Down: "
-        "the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC.",
+        "beat_10_fixtures", 12.585,
+        "Its answer is a recording, stamped offline fixture, because no GitHub token is "
+        "set. Back returns to the wall, not out of the app. Cloud spend is a fixture "
+        "too, marked synthetic.",
+        "Its answer is a recording, stamped OFFLINE FIXTURE, because no GitHub token is "
+        "set. BACK returns to the wall, not out of the app. Cloud spend is a fixture "
+        "too, marked SYNTHETIC.",
+        "D-pad Down to Check shows the rest of the DORA answer with its OFFLINE FIXTURE "
+        "stamp. Back returns to the wall and the legend changes back. Right to Cloud "
+        "spend, Center, Down: the spend answer carries OFFLINE FIXTURE and says its "
+        "figures are SYNTHETIC.",
     ),
     (
-        "beat_11_build_check", 19.458,
+        "beat_11_build_check", 16.114,
         "Last, the server reports its build: the commit on the opening card, in fixture "
-        "mode. This take is a desktop browser at Fire TV resolution, driven through the "
-        "D pad bridge the Leanback app calls. No device or emulator run is shown, and a "
-        "public deployment is pending.",
+        "mode. This is a desktop browser at Fire TV resolution, driven through the D "
+        "pad bridge the Leanback app calls. No device or emulator run is shown.",
         "Last, the server reports its build: the commit on the opening card, in fixture "
-        "mode. This take is a desktop browser at Fire TV resolution, driven through the "
-        "D-pad bridge the Leanback app calls. No device or emulator run is shown, and a "
-        "public deployment is pending.",
-        "Center on Check. The connection line reads GET /health returned 200, the build's "
-        "short SHA, and GitHub live: no, fixture mode.",
+        "mode. This is a desktop browser at Fire TV resolution, driven through the "
+        "D-pad bridge the Leanback app calls. No device or emulator run is shown.",
+        "Center on Check. The connection line reads GET /health returned 200, the "
+        "build's short SHA, and GitHub live: no, fixture mode.",
     ),
 ]
 
 STATUS = (
-    "RENDERED LOCALLY, NOT UPLOADED. The current take was recorded on 2026-09-27 from a local "
+    "RENDERED LOCALLY, NOT UPLOADED. The current take was recorded on 2026-09-28 from a local "
     "run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, "
     "driven through the D-pad bridge the Leanback app calls. Each beat's seconds are "
     "its measured hold: the length of its synthesized audio plus a 0.65 s tail, from "
