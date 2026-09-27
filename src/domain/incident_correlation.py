@@ -53,6 +53,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 
+from src.domain.change_scope import ServiceScope
 from src.domain.provenance import UNKNOWN_PROVENANCE, Provenance
 
 DEFAULT_ANOMALY_FACTOR = 3.0
@@ -238,6 +239,9 @@ class CommitRef:
     message: str
     author: str
     committed_at: datetime
+    #: The files the commit changed, when the source knows them. None means unknown, and
+    #: an unknown commit is always a candidate: missing data never narrows the window.
+    paths: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -273,6 +277,10 @@ class IncidentCorrelation:
     #: The attribution window this answer was reached with, so a refusal can say how
     #: wide the window it refused over was.
     attribution_window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+    #: Commits inside the window whose file list touched nothing the service is built
+    #: from, and which were therefore not counted in ``commits_in_window``. Reported so
+    #: the answer never hides a change it saw; not a finding that they are harmless.
+    commits_set_aside: int = 0
 
     @property
     def can_attribute(self) -> bool:
@@ -311,6 +319,14 @@ class IncidentCorrelation:
                 "least two. That is missing data, not a finding about any deploy."
             )
         if self.attribution_refusal is AttributionRefusal.NO_CANDIDATE_IN_WINDOW:
+            if self.commits_set_aside:
+                return (
+                    f"Mercury cannot attribute this anomaly to a change: no commit that touched "
+                    f"a file {self.service_name} is built from landed in the {window} minutes "
+                    f"before {ends_at}. {self._set_aside_clause()} That is not evidence that no "
+                    "change caused it; a change outside the window, one of those, or a cause "
+                    "that is not a change at all, are all still open."
+                )
             return (
                 f"Mercury cannot attribute this anomaly to a change: no commit landed in the "
                 f"{window} minutes before {ends_at}. That is an empty window, not evidence that "
@@ -318,14 +334,27 @@ class IncidentCorrelation:
                 "change at all, are both still open."
             )
         if self.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED:
-            return (
+            statement = (
                 f"Mercury cannot attribute this anomaly to any one change: "
                 f"{self.commits_in_window} landed in the {window} minutes before {ends_at}, and "
                 "nothing in the metric says which of them did it. That is a refusal to guess, "
                 "not a finding that none of them caused it; rolling back on this answer would "
                 "be a guess."
             )
+            if self.commits_set_aside:
+                statement += " " + self._set_aside_clause()
+            return statement
         return None
+
+    def _set_aside_clause(self) -> str:
+        count = self.commits_set_aside
+        noun = "commit" if count == 1 else "commits"
+        verb = "was" if count == 1 else "were"
+        return (
+            f"{count} other {noun} in that window changed no file the service is built from "
+            f"and {verb} not counted as candidates; that is a reading of the file lists, not a "
+            "finding that those changes are harmless."
+        )
 
     @property
     def attribution_is_ambiguous(self) -> bool:
@@ -408,6 +437,7 @@ class IncidentCorrelator:
         window_anchor: WindowAnchor = WindowAnchor.ONSET,
         min_baseline_points: int = DEFAULT_MIN_BASELINE_POINTS,
         max_commits_in_window: int | None = DEFAULT_MAX_COMMITS_IN_WINDOW,
+        service_scope: ServiceScope | None = None,
     ) -> None:
         self.anomaly_factor = anomaly_factor
         self.attribution_window_minutes = attribution_window_minutes
@@ -417,6 +447,9 @@ class IncidentCorrelator:
         #: None means name the closest candidate however many there were, which is what
         #: this correlator did until 2026-09-08.
         self.max_commits_in_window = max_commits_in_window
+        #: When set, a commit whose file list touches nothing in this scope is not a
+        #: candidate. A commit with no file list is always a candidate.
+        self.service_scope = service_scope
 
     def correlate(
         self,
@@ -501,10 +534,15 @@ class IncidentCorrelator:
         # difference between naming the cause and naming whatever shipped since.
         window_end = onset_at if (self.window_anchor is WindowAnchor.ONSET and onset_at) else latest.at
         window_start = window_end - timedelta(minutes=self.attribution_window_minutes)
-        candidates = sorted(
+        in_window = sorted(
             (c for c in commits if window_start <= c.committed_at <= window_end),
             key=lambda c: c.committed_at,
         )
+        if self.service_scope is not None:
+            candidates = [c for c in in_window if self.service_scope.touches(c.paths) is not False]
+        else:
+            candidates = in_window
+        set_aside = len(in_window) - len(candidates)
 
         def unattributed(refusal: AttributionRefusal, explanation: str) -> IncidentCorrelation:
             return IncidentCorrelation(
@@ -525,6 +563,19 @@ class IncidentCorrelator:
                 onset_at=onset_at,
                 baseline_points=baseline_points,
                 attribution_window_minutes=self.attribution_window_minutes,
+                commits_set_aside=set_aside,
+            )
+
+        if not candidates and set_aside:
+            return unattributed(
+                AttributionRefusal.NO_CANDIDATE_IN_WINDOW,
+                f"{series.metric_name} is {factor:.2f} times baseline. {set_aside} commit(s) landed in "
+                f"the {self.attribution_window_minutes} minutes before "
+                f"{'the onset' if onset_at else 'the reading'}, and none of them changed a file "
+                f"{service_name} is built from, so none was counted as a candidate and Mercury "
+                "cannot attribute it to a change. That is a reading of their file lists, not a "
+                "finding that they are harmless: one of them, a change outside the window, or a "
+                "cause that is not a change at all, are all still open.",
             )
 
         if not candidates:
@@ -566,6 +617,12 @@ class IncidentCorrelator:
             f"{'the onset' if onset_at else 'the reading'}, "
             f"the closest change inside the {self.attribution_window_minutes} minute attribution window."
         )
+        if set_aside:
+            explanation += (
+                f" {set_aside} other commit(s) in the window changed no file {service_name} is "
+                "built from and were not counted as candidates; that is a reading of their file "
+                "lists, not a finding that they are harmless."
+            )
         if len(candidates) > 1:
             explanation += (
                 f" It is not the only candidate: {len(candidates)} changes landed inside that window, "
@@ -593,4 +650,5 @@ class IncidentCorrelator:
             onset_at=onset_at,
             baseline_points=baseline_points,
             attribution_window_minutes=self.attribution_window_minutes,
+            commits_set_aside=set_aside,
         )

@@ -95,3 +95,11 @@ def test_the_wilson_interval_brackets_the_rate():
     low, high = split.wilson_interval(29, 71)
     assert low < 29 / 71 < high
     assert split.wilson_interval(0, 0) is None
+
+
+def test_the_tuning_script_cannot_reach_the_held_out_side():
+    """Parameters are chosen by scripts/tune_attribution.py, on train corpora only."""
+    source = (REPO_ROOT / "scripts" / "tune_attribution.py").read_text(encoding="utf-8")
+    for forbidden in ("held_out_corpus", "HELD_OUT_SEED", "split_stream", "held_out ="):
+        assert forbidden not in source, f"the tuning script references {forbidden}"
+    assert "from attribution_split import SYNTHETIC_LABEL, train_corpus" in source

@@ -237,6 +237,8 @@ def test_the_readme_never_claims_conformity():
     "src/infrastructure/fixtures/commit_stream_fixture.json",
     "correlation_trial_summary.json",
     "attribution_holdout_summary.json",
+    "attribution_tuning_summary.json",
+    "src/infrastructure/fixtures/commit_paths_fixture.json",
 ])
 def test_every_committed_data_artifact_declares_its_origin(fixture_path):
     data = json.loads((REPO_ROOT / fixture_path).read_text(encoding="utf-8"))

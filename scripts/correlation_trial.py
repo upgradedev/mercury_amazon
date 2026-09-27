@@ -131,6 +131,11 @@ from src.infrastructure.local_git_adapter import LocalGitCommitProvider  # noqa:
 #: Where the recorded deployment stream lives. Real commits, recorded once.
 COMMIT_STREAM_PATH = REPO_ROOT / "src" / "infrastructure" / "fixtures" / "commit_stream_fixture.json"
 
+#: Which files each recorded commit changed, recorded separately by
+#: ``python scripts/record_commit_paths.py`` so the stream above stays byte-identical.
+#: The corpus generator never reads it; only the correlator does.
+COMMIT_PATHS_PATH = REPO_ROOT / "src" / "infrastructure" / "fixtures" / "commit_paths_fixture.json"
+
 #: Where the scored summary is written. The README quotes it and a test compares them.
 SUMMARY_PATH = REPO_ROOT / "correlation_trial_summary.json"
 
@@ -241,17 +246,31 @@ def load_commit_stream(path: Path = COMMIT_STREAM_PATH) -> tuple[list[CommitRef]
             "  python scripts/correlation_trial.py --record"
         )
     payload = json.loads(path.read_text(encoding="utf-8"))
+    paths = load_commit_paths()
     commits = [
         CommitRef(
             sha=entry["sha"],
             message=entry.get("message", ""),
             author=entry.get("author", "unknown"),
             committed_at=datetime.fromisoformat(entry["committed_at"]).astimezone(timezone.utc),
+            paths=paths.get(entry["sha"]),
         )
         for entry in payload["commits"]
     ]
     commits.sort(key=lambda c: c.committed_at)
     return commits, payload
+
+
+def load_commit_paths(path: Path = COMMIT_PATHS_PATH) -> dict[str, tuple[str, ...]]:
+    """The recorded file list of each commit, or nothing when it was never recorded.
+
+    A commit without a file list stays a candidate for every service, so a missing
+    recording can only make the correlator name less, never more.
+    """
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return {sha: tuple(files) for sha, files in payload.get("paths_by_sha", {}).items()}
 
 
 def thin(commits: list[CommitRef], stride: int) -> list[CommitRef]:
