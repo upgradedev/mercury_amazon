@@ -1,40 +1,35 @@
 # Mercury: a Fire TV incident board that names a deploy only when it can
 
-> **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
+> **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one runtime change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
-![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only runtime change before the spike, at 50.0% held-out precision on a synthetic corpus assuming at most 75 minutes of lag, with its labelled commit message; the next action reads Record-only rollback to the preceding commit; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
+![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, One deploy, or why not, and API reachable; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only runtime change before the spike, at 50.0% held-out precision on a synthetic corpus assuming at most 75 minutes of lag, with its commit message quoted; the next action reads Record-only rollback to the preceding commit; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
-*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own, standing in for a deploy.*
+*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**What it does.** When an error metric spikes, Mercury answers one question on the
-room's TV: can this be pinned on one change? It counts as a deploy only a commit that
-changed a runtime file, and names one only when exactly one landed in the 75 minutes
-before the spike started. Beside the name it prints how often that is right on a
-held-out split it was not tuned on: 50.0% (n=58 namings, synthetic corpus), under the
-corpus's assumption that a regression shows within 75 minutes. At longer delays it is
-lower: 41.5% at 90 minutes, 27.3% at 180
-([table](docs/EVIDENCE.md#the-figure-depends-on-an-assumed-delay)). Otherwise it says it cannot attribute, and why. A
-named change can be rolled back from the remote, behind five checks and a single-use
-token.
+**Status:** runs end to end on a laptop with offline fixtures and no credentials; Fire TV runtime evidence, the video and public access are still pending ([details](#what-is-real-and-what-is-not)).
+
+**What it does.** An error metric spikes during an incident and the room asks which
+deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
+is that it cannot say: no change landed before the spike, or several did. It says which,
+and never calls a deploy innocent. It counts as a deploy only a commit that changed a
+runtime file, so a README edit is never blamed for a 5XX spike, and it names one only
+when exactly one landed in the 75 minutes before the spike started. Beside the name it
+prints how often that is right on a held-out split it was not tuned on: 50.0% (n=58
+namings, synthetic corpus), under the corpus's assumption that a regression shows within
+75 minutes. At longer delays it is lower: 41.5% at 90 minutes, 27.3% at 180
+([table](docs/EVIDENCE.md#the-figure-depends-on-an-assumed-delay)). A named change can be
+rolled back from the remote, behind five checks and a single-use token.
 
 **Amazon technology.** Fire TV: a Leanback Android app in `app/` hosts the board in a
 WebView and forwards the remote's D-pad keys to it. AWS: the server runs on Lambda
 behind a function URL, keeps handoffs and spent tokens in DynamoDB, and reads
 CloudWatch error metrics and Cost Explorer spend when it has credentials.
 
-**Honest status.** Real: the correlation engine, scored on 1160 labelled cases per side of a train and held-out split, all synthetic; commits
-read from real git history; the governed rollback and its refusals, each tested; the
-Leanback app source. Simulated: every metric series on the board is an offline
-fixture, and a confirmed rollback is recorded, never sent to a pipeline. Missing: a
-Fire TV or Android TV runtime receipt (runtime evidence pending), a published video (a
-render exists locally, pending upload), a public deployment of this build, and a public
-repository.
-
 | Link | What you get today |
 |---|---|
-| [Live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/) | Build `6dd76bd`, probed 2026-09-26: older than this branch and the design above, and it loads Google Fonts. Its `/health` reports the build SHA |
 | [Run it locally](#run-it-locally) | The build in the picture, with no credentials |
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
+| [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-650%20collected-brightgreen.svg)](tests/)
@@ -199,14 +194,34 @@ required at any stage of submission or judging".
 
 ## What is real and what is not
 
+**Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
+held-out split, all synthetic; commits read from real git history, with their file lists;
+the governed rollback and its refusals, each tested; the Leanback app source.
+**Simulated:** every metric series on the board is an offline fixture, and a confirmed
+rollback is recorded, never sent to a pipeline. **Missing:**
+
+- **A Fire TV or Android TV runtime receipt** (runtime evidence pending). An Android TV
+  emulator attempt on 2026-09-27 (API 30 TV image, an APK built from an earlier commit
+  of this branch) reached the TV launcher, but `adb` stayed unauthorized, so the APK was
+  never installed and no D-pad journey ran. Its receipt records the status
+  `BLOCKED_ADB_UNAUTHORIZED` and is not a runtime proof.
+- **A published video.** A render exists locally, pending upload. It was recorded from
+  an earlier build, so its figures are older than the ones on this page.
+- **A public deployment of this build.** The
+  [live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
+  serves build `6dd76bd`, probed 2026-09-26: older than this branch and the design
+  above, and it loads Google Fonts. Its `/health` reports the build SHA.
+- **A public repository.** Private until the reviewers are added as collaborators; see
+  [Run it locally](#run-it-locally).
+
 | Part | On the board today | Live path |
 |---|---|---|
 | Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists |
-| Commits | Real commits from this repository's `git log`, stamped STAND-IN because they stand in for a deploy feed | GitHub REST API with `GITHUB_TOKEN` |
+| Commits | Real commits from this repository's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy | GitHub REST API with `GITHUB_TOKEN`. It returns no file lists, so every commit stays a candidate there |
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source and a CI build workflow | **Runtime evidence pending**: no Android TV emulator receipt yet. The target proof is an emulator run; the event FAQ does not require a physical Fire TV |
+| Fire TV | App source and a CI build workflow | **Runtime evidence pending**: no Android TV emulator run has completed; the 2026-09-27 attempt stopped before install. The target proof is an emulator run; the event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on
