@@ -1,6 +1,6 @@
 # Acceptance testbook
 
-**Product:** Mercury Fire TV Incident Commander
+**Product:** Mercury, a Fire TV incident board
 **Persona:** the on-call engineer holding the remote during a production incident.
 
 Each scenario below is either **Automated** and names the test that covers it, or

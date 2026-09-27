@@ -32,7 +32,7 @@ def test_root_serves_the_cockpit_page(client):
     res = client.get("/")
     assert res.status_code == 200
     assert "Mercury" in res.text
-    assert "Fire TV Incident Commander" in res.text
+    assert "<title>Mercury Fire TV incident board</title>" in res.text
 
 
 def test_cockpit_scripts_are_served_next_to_the_page(client):

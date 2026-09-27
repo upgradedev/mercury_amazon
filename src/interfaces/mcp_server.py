@@ -70,7 +70,7 @@ COCKPIT_ASSET_TYPES = {
 }
 
 app = FastAPI(
-    title="Mercury Fire TV Incident Commander",
+    title="Mercury Fire TV incident board",
     description=(
         "HTTP tool server for the Mercury 10-foot engineering war room on Fire TV. "
         "Telemetry responses declare whether they are live or a recorded fixture."
