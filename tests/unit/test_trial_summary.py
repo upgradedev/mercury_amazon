@@ -15,15 +15,30 @@ from src.infrastructure import trial_summary
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+def _held_out(recorded: dict) -> dict:
+    row = next(r for r in recorded["engines"] if r["engine"] == recorded["shipped_engine"])
+    return row["held_out"]
+
+
+def _summary(precision: float) -> dict:
+    """The smallest file the reader accepts: a shipped engine with a held-out block."""
+    return {"shipped_engine": "e", "engines": [
+        {"engine": "e", "held_out": {"cases": 10, "naming_precision": precision}}]}
+
+
 def test_the_committed_summary_is_reported_verbatim():
+    """The figure on the wire is the shipped engine's held-out figure, not the in-sample one."""
     accuracy = trial_summary.naming_accuracy()
-    recorded = json.loads((REPO_ROOT / "correlation_trial_summary.json").read_text(encoding="utf-8"))
+    recorded = json.loads((REPO_ROOT / "attribution_holdout_summary.json").read_text(encoding="utf-8"))
+    held = _held_out(recorded)
     assert accuracy["measured"] is True
-    assert accuracy["precision_when_it_names_a_commit"] == recorded["headline"]["naming_precision"]
-    assert accuracy["namings_measured"] == recorded["headline"]["times_a_commit_was_named"]
-    assert accuracy["recall_on_regressions"] == recorded["headline"]["naming_recall_on_regressions"]
-    assert accuracy["corpus_cases"] == recorded["cases"]
-    assert accuracy["measured_by_command"] == "python scripts/correlation_trial.py"
+    assert accuracy["split"] == "held-out"
+    assert accuracy["precision_when_it_names_a_commit"] == held["naming_precision"]
+    assert accuracy["precision_95ci"] == held["naming_precision_95ci"]
+    assert accuracy["namings_measured"] == held["times_a_commit_was_named"]
+    assert accuracy["recall_on_regressions"] == held["naming_recall_on_regressions"]
+    assert accuracy["corpus_cases"] == held["cases"]
+    assert accuracy["measured_by_command"] == "python scripts/attribution_split.py"
 
 
 def test_a_missing_summary_reports_unknown_rather_than_a_plausible_number(tmp_path):
@@ -32,7 +47,7 @@ def test_a_missing_summary_reports_unknown_rather_than_a_plausible_number(tmp_pa
     assert accuracy["precision_when_it_names_a_commit"] is None
     assert accuracy["namings_measured"] is None
     assert "no measured accuracy" in accuracy["note"]
-    assert "python scripts/correlation_trial.py" in accuracy["note"]
+    assert "python scripts/attribution_split.py" in accuracy["note"]
 
 
 def test_a_malformed_summary_is_not_read_as_a_measurement(tmp_path):
@@ -43,7 +58,8 @@ def test_a_malformed_summary_is_not_read_as_a_measurement(tmp_path):
 
 def test_a_summary_without_a_precision_field_is_not_a_measurement(tmp_path):
     partial = tmp_path / "partial.json"
-    partial.write_text(json.dumps({"cases": 10, "headline": {}}), encoding="utf-8")
+    partial.write_text(json.dumps({"shipped_engine": "e", "engines": [{"engine": "e", "held_out": {}}]}),
+                       encoding="utf-8")
     assert trial_summary.naming_accuracy(partial)["measured"] is False
 
 
@@ -62,11 +78,11 @@ def test_the_summary_is_cached_for_the_life_of_the_process(tmp_path):
     rather than left for somebody to file as a provenance bug.
     """
     path = tmp_path / "summary.json"
-    path.write_text(json.dumps({"cases": 10, "headline": {"naming_precision": 0.5}}), encoding="utf-8")
+    path.write_text(json.dumps(_summary(0.5)), encoding="utf-8")
     first = trial_summary.naming_accuracy(path)
     assert first["precision_when_it_names_a_commit"] == 0.5
 
-    path.write_text(json.dumps({"cases": 10, "headline": {"naming_precision": 0.9}}), encoding="utf-8")
+    path.write_text(json.dumps(_summary(0.9)), encoding="utf-8")
     assert trial_summary.naming_accuracy(path)["precision_when_it_names_a_commit"] == 0.5, (
         "the cache is no longer holding, so the docstring's warning about needing a "
         "restart is now wrong and should be removed"
@@ -78,6 +94,7 @@ def test_the_summary_is_cached_for_the_life_of_the_process(tmp_path):
 def test_the_note_carries_the_denominator_not_only_the_rate():
     """A precision without its sample size is a rate somebody can inflate by naming less."""
     note = trial_summary.naming_accuracy()["note"]
-    recorded = json.loads((REPO_ROOT / "correlation_trial_summary.json").read_text(encoding="utf-8"))
-    assert str(recorded["headline"]["times_a_commit_was_named"]) in note
-    assert str(recorded["cases"]) in note
+    held = _held_out(json.loads((REPO_ROOT / "attribution_holdout_summary.json").read_text(encoding="utf-8")))
+    assert str(held["times_a_commit_was_named"]) in note
+    assert str(held["cases"]) in note
+    assert "held-out" in note and "synthetic" in note

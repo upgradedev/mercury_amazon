@@ -195,6 +195,18 @@ def figures(cases: list, commits: list[CommitRef], correlator: IncidentCorrelato
         "false_attributions_on_exogenous_spikes": false_exo,
         "quiet_rate_on_healthy_series": head["quiet_rate_on_healthy_series"],
         "quiet_on_healthy_series": quiet,
+        "healthy_series": len(healthy),
+        "exogenous_spikes": len(exogenous),
+        "wrong_namings": named - hits,
+        "exogenous_refused_no_candidate": sum(1 for v in exogenous if v.outcome == trial.CORRECT_REFUSAL),
+        "exogenous_refused_crowded": sum(1 for v in exogenous if v.outcome == trial.CORRECT_REFUSAL_CROWDED),
+        "regressions_refused_no_candidate": sum(
+            1 for v in regressions if v.outcome == trial.REFUSED_ON_REGRESSION),
+        "regressions_refused_crowded": sum(
+            1 for v in regressions if v.outcome == trial.REFUSED_CROWDED_ON_REGRESSION),
+        "regressions_named_wrong_commit": sum(1 for v in regressions if v.outcome == trial.WRONG_COMMIT),
+        "regressions_never_called_an_anomaly": sum(
+            1 for v in regressions if v.outcome == trial.MISSED_REGRESSION),
         "unexpected_outcomes": summary["unexpected_outcomes"],
     }
 

@@ -16,25 +16,26 @@ from two inputs, a metric series and a list of commits, using explicit rules:
 5. Recommend rolling back to the commit immediately preceding the named one.
 
 Every step reports what it did, and the answer it gives most often is a refusal.
-Against the labelled corpus in ``scripts/correlation_trial.py``, this class sees an
-anomaly and names nobody 81.1% of the time: 225 times because nothing landed in the
-window and 261 times because too much did. Those two are counted apart, in the trial
-and on the wire, because a refusal for want of a candidate is the data being empty
-while a refusal for a crowded window is a decision.
+On the held-out split scored by ``scripts/attribution_split.py`` (a synthetic,
+self-authored corpus, tuned on a separate train split), this class sees an anomaly
+and names nobody 93.1% of the time: 207 times because nothing landed in the window
+and 335 times because too much did. Those two are counted apart, in the trial and on
+the wire, because a refusal for want of a candidate is the data being empty while a
+refusal for a crowded window is a decision.
 
 Rule 4 is what naming precision rests on and it was chosen from a published sweep.
-Naming the closest of several changes is where the wrong names came from: of the 36
-regressions where this class now names the wrong commit, 35 had the real cause outside
-the window entirely, where no rule with this window could have reached it, and 0 had
-the cause inside the window with more than one candidate. A further 18 wrong namings
-blamed a commit for an exogenous spike no commit caused, 54 wrong of 113 in all. When
-it does name a commit, the
-commit it names is the one that caused the reading 52.2% of the time over 113
-namings, which is close enough to a coin toss that the figure travels with the
-answer: see ``src/infrastructure/trial_summary.py``.
+Naming the closest of several changes is where the wrong names came from. On that
+held-out split, when this class names a commit it is the one that caused the reading
+62.5% of the time over 40 namings (95% interval 47.0% to 75.8%); 14 of its 15 wrong
+namings blamed a commit for an exogenous spike no commit caused. That is far enough
+from certain that the figure travels with the answer: see
+``src/infrastructure/trial_summary.py``. The 60 minute window shipped until
+2026-09-27 read 40.8% over 71 namings on the same split, and 52.2% over 113 on the
+corpus its gate was chosen on.
 
-Every figure above is written by ``python scripts/correlation_trial.py`` into
-``correlation_trial_summary.json`` and a test compares the two.
+Every figure above is written by ``python scripts/attribution_split.py`` into
+``attribution_holdout_summary.json``, and the whole-stream breakdown by
+``python scripts/correlation_trial.py`` into ``correlation_trial_summary.json``.
 
 **A refusal is a refusal, not an acquittal.** The three verdicts that name nothing
 (``NO_CANDIDATE_IN_WINDOW``, ``WINDOW_TOO_CROWDED``, ``INSUFFICIENT_DATA``) say that
@@ -57,7 +58,11 @@ from src.domain.change_scope import ServiceScope
 from src.domain.provenance import UNKNOWN_PROVENANCE, Provenance
 
 DEFAULT_ANOMALY_FACTOR = 3.0
-DEFAULT_ATTRIBUTION_WINDOW_MINUTES = 60
+#: 75 minutes since 2026-09-27, chosen on the train split by
+#: ``python scripts/tune_attribution.py`` and scored on a held-out split by
+#: ``python scripts/attribution_split.py``. It was 60 before; the old engine is kept
+#: reproducible there as ``v1_2026_09_08``.
+DEFAULT_ATTRIBUTION_WINDOW_MINUTES = 75
 
 #: How many readings must sit strictly before an onset for the mean of them to be
 #: called a baseline. Two is the smallest number that is a mean of more than one
@@ -363,8 +368,8 @@ class IncidentCorrelation:
         Unreachable at the shipped settings, and deliberately kept. With
         ``max_commits_in_window = 1`` a crowded window is refused rather than named, so
         this is false on every attribution the default correlator makes and
-        ``correlation_trial_summary.json`` records 0 of 54 wrong namings disclosed this
-        way. It is what an answer owes an operator when somebody widens the gate, which
+        ``correlation_trial_summary.json`` records none of its wrong namings disclosed
+        this way. It is what an answer owes an operator when somebody widens the gate, which
         ``--max-commits-in-window`` in the trial does, and the disclosure is measured
         there rather than removed on the assumption nobody will.
         """

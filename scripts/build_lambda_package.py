@@ -16,6 +16,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_FILES = (
     Path("correlation_trial_summary.json"),
+    # The held-out figure the answer carries beside a named commit (trial_summary.py).
+    Path("attribution_holdout_summary.json"),
     Path("src/infrastructure/fixtures/commit_stream_fixture.json"),
     Path("docs/index.html"),
     Path("docs/firetv_nav.js"),

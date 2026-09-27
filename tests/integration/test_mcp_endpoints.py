@@ -158,7 +158,8 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
     # Which commit the reading is placed after is itself a choice, so the sentence
     # has to name the rule that chose it, not merely admit that something moved.
     assert "placed" in detail
-    assert "alone in its 60 minute attribution window" in detail
+    # The window is the correlator's own, 75 minutes since 2026-09-27.
+    assert "alone in its 75 minute attribution window" in detail
     assert "the commits are real, this metric is not" in detail
 
 
@@ -312,18 +313,21 @@ def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client
 def test_every_answer_carries_the_measured_worth_of_naming_a_commit(client):
     """An attribution ships the precision it was measured at, next to the name.
 
-    The figure comes from correlation_trial_summary.json, which
-    ``python scripts/correlation_trial.py`` writes, so the number on the wire is the
-    number in the README rather than one recomputed per request.
+    The figure comes from attribution_holdout_summary.json, which
+    ``python scripts/attribution_split.py`` writes: the shipped engine's precision on
+    the held-out split, so the number on the wire is the number in the README rather
+    than one recomputed per request, and not the in-sample figure it replaced.
     """
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
     accuracy = data["attribution"]["measured_accuracy"]
-    assert accuracy["measured_by_command"] == "python scripts/correlation_trial.py"
+    assert accuracy["measured_by_command"] == "python scripts/attribution_split.py"
     if accuracy["measured"]:
-        summary = json.loads((REPO_ROOT / "correlation_trial_summary.json").read_text(encoding="utf-8"))
-        assert accuracy["precision_when_it_names_a_commit"] == summary["headline"]["naming_precision"]
-        assert accuracy["namings_measured"] == summary["headline"]["times_a_commit_was_named"]
-        assert accuracy["corpus_cases"] == summary["cases"]
+        summary = json.loads((REPO_ROOT / "attribution_holdout_summary.json").read_text(encoding="utf-8"))
+        held = next(r for r in summary["engines"] if r["engine"] == summary["shipped_engine"])["held_out"]
+        assert accuracy["split"] == "held-out"
+        assert accuracy["precision_when_it_names_a_commit"] == held["naming_precision"]
+        assert accuracy["namings_measured"] == held["times_a_commit_was_named"]
+        assert accuracy["corpus_cases"] == held["cases"]
     else:
         assert accuracy["precision_when_it_names_a_commit"] is None
         assert "no measured accuracy" in accuracy["note"]

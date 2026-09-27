@@ -2,14 +2,15 @@
 
 > **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
 
-![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 52.2% naming precision, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
+![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, Names one change, or why not; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only change before the spike, at 62.5% held-out precision, with its labelled commit message; the next action is a record-only rollback; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own, standing in for a deploy.*
 
 **What it does.** When an error metric spikes, Mercury answers one question on the
 room's TV: can this be pinned on one change? It names a change only when exactly one
-landed in the hour before the spike started, and prints beside the name how often that
-is right: 52.2% (n=113 namings). Otherwise it says it cannot attribute, and why. A
+landed in the 75 minutes before the spike started, and prints beside the name how often
+that is right on a held-out split it was not tuned on: 62.5% (n=40 namings, synthetic
+corpus). Otherwise it says it cannot attribute, and why. A
 named change can be rolled back from the remote, behind five checks and a single-use
 token.
 
@@ -18,7 +19,7 @@ WebView and forwards the remote's D-pad keys to it. AWS: the server runs on Lamb
 behind a function URL, keeps handoffs and spent tokens in DynamoDB, and reads
 CloudWatch error metrics and Cost Explorer spend when it has credentials.
 
-**Honest status.** Real: the correlation engine, scored on 1160 labelled cases; commits
+**Honest status.** Real: the correlation engine, scored on 1160 labelled cases per side of a train and held-out split, all synthetic; commits
 read from real git history; the governed rollback and its refusals, each tested; the
 Leanback app source. Simulated: every metric series on the board is an offline
 fixture, and a confirmed rollback is recorded, never sent to a pipeline. Missing: a
@@ -33,7 +34,7 @@ repository.
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-610%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-636%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -61,20 +62,21 @@ flowchart LR
     Q["Someone asks:<br/>what broke?"]
     Q --> M["1. What broke<br/>the error rate against<br/>a baseline taken from<br/>before the spike started"]
     M --> C["2. Can any one change<br/>be blamed for it?"]
-    C -.->|"reading under 3.0x its baseline<br/>(99.5% quiet on healthy series)"| S["Nothing needs reverting.<br/>The only verdict that<br/>may say so"]
-    C -.->|"no deploy landed before the onset<br/>(62.0% of exogenous spikes)"| N["Cannot attribute, and says why.<br/>Names no commit, offers no rollback,<br/>and does not call any deploy innocent"]
-    C -.->|"more than one change landed<br/>(239 of 600 regressions)"| N
+    C -.->|"reading under 3.0x its baseline<br/>(200 of 200 held-out healthy series quiet)"| S["Nothing needs reverting.<br/>The only verdict that<br/>may say so"]
+    C -.->|"no deploy landed before the onset<br/>(190 of 300 held-out exogenous spikes)"| N["Cannot attribute, and says why.<br/>Names no commit, offers no rollback,<br/>and does not call any deploy innocent"]
+    C -.->|"more than one change landed<br/>(324 of 600 held-out regressions)"| N
     C ==>|"exactly one change landed"| R["3. Name it, and stage a<br/>governed rollback behind<br/>five conditions"]
 ```
 
 `POST /mcp/tools/what_changed` reads an error metric series and a commit history. It
 decides whether the metric stepped up to 3.0 times a baseline taken from before the
-step, then looks at the 60 minutes before the step started. **The dotted paths are
-the product.** On a labelled corpus the correlator sees an anomaly and names nobody
-81.1% of the time, because that hour usually holds no change or several. A refusal
-says which, and never claims a deploy is innocent: an empty window says nothing about
-a change outside it. When it does name a change it is right 52.2% of the time, and
-the board prints that figure next to the name.
+step, then looks at the 75 minutes before the step started. **The dotted paths are
+the product.** On the held-out half of a synthetic labelled corpus the correlator sees
+an anomaly and names nobody 93.1% of the time, because that window usually holds no
+change or several. A refusal says which, and never claims a deploy is innocent: an
+empty window says nothing about a change outside it. When it does name a change it is
+right 62.5% of the time on that held-out split (25 of 40, 95% interval 47% to 76%),
+and the board prints that figure next to the name.
 
 The board shows five services, one per answer. Each row is its own live response from
 the server; the readings come from the offline fixture.
@@ -146,7 +148,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 610 passed
+# 636 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -200,10 +202,16 @@ hardware.
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on
 load, and the page makes no request to another origin.
 
-The engine's limits are measured, not hidden. Naming recall is 9.8%: it names the
-cause of fewer than one regression in ten. The 52.2% was measured on a synthetic
-corpus whose crowding threshold was chosen on that same corpus; two held-out seeds
-gave 53.3% and 55.7%. A crowded window is refused, not ranked. The full list is in
+The engine's limits are measured, not hidden. Every figure comes from a synthetic
+corpus the authors wrote. Settings are now tuned on a train split and reported on a
+held-out split (a time cut of the commit stream with fixed seeds, scored by
+`python scripts/attribution_split.py`). On held-out, naming recall is 4.2%: it names the cause
+of about one regression in twenty-four. Widening the window from 60 to 75 minutes on
+2026-09-27 raised held-out precision from 40.8% to 62.5% and cut wrong namings from
+42 to 15, but it did not raise recall (4.8% before), it refuses more often (93.1%
+against 87.8%), and it blames a commit for more spikes no commit caused (14 of 300
+against 9). The 52.2% this page printed before was in-sample. A crowded window is
+refused, not ranked. The full list is in
 [Known limitations](docs/EVIDENCE.md#known-limitations).
 
 ---
@@ -217,8 +225,8 @@ gave 53.3% and 55.7%. A crowded window is refused, not ranked. The full list is 
 - **Who pays:** whoever owns the on-call rota, usually a head of platform or of
   engineering, from the tooling line that already pays for paging and observability.
 - **Why now, as a hypothesis:** teams ship many small changes a day, so the hour
-  before a spike often holds several. This repository shows the pattern: a 60 minute
-  window ending on one of its commits holds 2.78 commits on average. A tool that says
+  before a spike often holds several. This repository shows the pattern: a 75 minute
+  window ending on one of its commits holds 2.98 commits on average. A tool that says
   "I cannot tell which" is safer to act on than one that guesses.
 - **What would falsify it:** responders who say the TV is the wrong screen, because
   everyone is remote, or who say the attribution is not worth reading.
@@ -234,8 +242,11 @@ first ten conversations are in
 
 [`docs/EVIDENCE.md`](docs/EVIDENCE.md) holds every measurement with its command:
 
-- `python scripts/correlation_trial.py` scores 1160 labelled cases and prints the
-  ablation, the threshold sweep and the held-out seeds.
+- `python scripts/attribution_split.py` scores the engine on a train and a held-out
+  split, 1160 synthetic labelled cases each, and writes the figure the board prints;
+  `python scripts/tune_attribution.py` is the train-only sweep the window was chosen from.
+- `python scripts/correlation_trial.py` scores the whole-stream corpus and prints the
+  ablation, the threshold sweep and the density sweep.
 - `python scripts/benchmark_suite.py` times every endpoint and the governance token.
 - `python scripts/measure_legibility.py` measures every text size on the TV screen
   (smallest 24px).

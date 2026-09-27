@@ -143,6 +143,10 @@ SUMMARY_PATH = REPO_ROOT / "correlation_trial_summary.json"
 #: ``window_minutes // SERIES_POINTS`` minute periods over a 60 minute window, so 10.
 POLL_CADENCE_MINUTES = 60 // SERIES_POINTS
 
+#: The window the 2026-09-08 ablation rows were measured at. Kept fixed so that history
+#: is reproducible by running the script rather than remembered.
+ABLATION_WINDOW_MINUTES = 60
+
 #: Fixed so the published figures can be reproduced. ``--seed`` changes the corpus.
 DEFAULT_SEED = 20260908
 
@@ -846,6 +850,7 @@ def correlator_from(args, max_commits_in_window: int | None = "unset") -> Incide
     ``--baseline-mode trailing --window-anchor reading --max-commits-in-window none``.
     """
     return IncidentCorrelator(
+        attribution_window_minutes=args.attribution_window,
         baseline_mode=BaselineMode(args.baseline_mode),
         window_anchor=WindowAnchor(args.window_anchor),
         min_baseline_points=args.min_baseline_points,
@@ -866,12 +871,16 @@ def ablation(
     separately in :func:`gate_sweep` because it is a different kind of decision.
     """
     rows = []
+    # Pinned to the window these rows were first measured at, so the history they carry
+    # does not move when the shipped window does. The window widened from 60 to 75
+    # minutes on 2026-09-27; see scripts/attribution_split.py.
     for label, mode, anchor in (
         ("trailing baseline, window ends at the reading", BaselineMode.TRAILING, WindowAnchor.READING),
         ("pre-onset baseline, window ends at the reading", BaselineMode.PRE_ONSET, WindowAnchor.READING),
         ("pre-onset baseline, window ends at the onset", BaselineMode.PRE_ONSET, WindowAnchor.ONSET),
     ):
         correlator = IncidentCorrelator(
+            attribution_window_minutes=ABLATION_WINDOW_MINUTES,
             baseline_mode=mode, window_anchor=anchor,
             min_baseline_points=args.min_baseline_points, max_commits_in_window=None,
         )
@@ -883,6 +892,7 @@ def ablation(
             "baseline_mode": mode.value,
             "window_anchor": anchor.value,
             "crowding_gate": None,
+            "attribution_window_minutes": ABLATION_WINDOW_MINUTES,
             "hit_rate_fresh_look": head["hit_rate_fresh_look"],
             "hit_rate_late_look": head["hit_rate_late_look"],
             "naming_precision": head["naming_precision"],
@@ -981,7 +991,7 @@ def build_summary(args) -> dict:
         "noise_sigma": args.noise_sigma,
         "correlator": {
             "anomaly_factor": DEFAULT_ANOMALY_FACTOR,
-            "attribution_window_minutes": DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+            "attribution_window_minutes": correlator.attribution_window_minutes,
             "series_points": SERIES_POINTS,
             "poll_cadence_minutes": POLL_CADENCE_MINUTES,
             "baseline_mode": correlator.baseline_mode.value,
@@ -1041,7 +1051,8 @@ def print_report(summary: dict) -> None:
     print(f"  hit rate, all regressions:            {head['hit_rate_all_regressions']}")
     print(f"    on a fresh look:                    {head['hit_rate_fresh_look']}")
     print(f"    on a late look:                     {head['hit_rate_late_look']}")
-    print(f"    cause inside the 60 minute window:  {head['hit_rate_cause_inside_the_attribution_window']}")
+    print(f"    cause inside the {conf['attribution_window_minutes']} minute window:  "
+          f"{head['hit_rate_cause_inside_the_attribution_window']}")
     print(f"  false attribution on uncaused anomalies: {head['false_attribution_rate_on_uncaused_anomalies']}")
     print(f"    on exogenous spikes alone:          {head['false_attribution_rate_on_exogenous_spikes']}")
     print(f"  correct refusal on exogenous spikes:  {head['correct_refusal_rate_on_exogenous_spikes']}")
@@ -1077,7 +1088,8 @@ def print_report(summary: dict) -> None:
         print(f"    {name} ({block['cases']} cases)")
         for outcome, count in block["outcomes"].items():
             print(f"      {count:>5}  {outcome}")
-    print("  what each half of the detector change is worth (no crowding gate in any row):")
+    print(f"  what each half of the 2026-09-08 detector change is worth (no crowding gate, "
+          f"{ABLATION_WINDOW_MINUTES} minute window in every row):")
     for row in summary.get("ablation", []):
         print(f"    {row['detector']:<48} fresh {row['hit_rate_fresh_look']}  "
               f"late {row['hit_rate_late_look']}  precision {row['naming_precision']} "
@@ -1120,6 +1132,9 @@ def main() -> int:
                         default=WindowAnchor.ONSET.value,
                         help="'reading' ends the attribution window when somebody looked rather "
                              "than when the spike started")
+    parser.add_argument("--attribution-window", type=int, default=DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+                        help="attribution window in minutes; 60 reproduces the engine published "
+                             "before 2026-09-27")
     parser.add_argument("--min-baseline-points", type=int, default=DEFAULT_MIN_BASELINE_POINTS,
                         help="readings that must sit before an onset for their mean to be a baseline")
     parser.add_argument("--max-commits-in-window", type=_gate, default=DEFAULT_MAX_COMMITS_IN_WINDOW,

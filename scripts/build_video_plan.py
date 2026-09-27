@@ -49,22 +49,23 @@ BEATS = [
     (
         "beat_02_board_on_load", 18.297,
         "It answered as the page loaded, before any key was pressed. Most answers are "
-        "refusals: on eleven hundred and sixty generated, labelled cases, it saw a real "
-        "anomaly and named nobody eighty one percent of the time. A refusal never calls "
-        "the deploy innocent.",
+        "refusals: on eleven hundred and sixty generated, labelled cases held out from "
+        "tuning, it saw a real anomaly and named nobody ninety three percent of the time. "
+        "A refusal never calls the deploy innocent.",
         "It answered as the page loaded, before any key was pressed. Most answers are "
-        "refusals: on 1160 generated, labelled cases, it saw a real anomaly and named "
-        "nobody 81.1% of the time. A refusal never calls the deploy innocent.",
+        "refusals: on 1160 generated, labelled cases held out from tuning, it saw a real "
+        "anomaly and named nobody 93.1% of the time. A refusal never calls the deploy "
+        "innocent.",
         "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot "
         "attribute, Cannot attribute and Insufficient data, each from the server's answer.",
     ),
     (
         "beat_03_crowded_refusal", 18.019,
         "Down walks the rows. Release train shows a spike well above its baseline, but "
-        "several changes landed in the hour before it, and no metric says which one did it. Mercury cannot "
+        "several changes landed in the window before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
         "Down walks the rows. release-train shows a spike well above its baseline, but "
-        "several changes landed in the hour before it, and no metric says which one did it. Mercury cannot "
+        "several changes landed in the window before it, and no metric says which one did it. Mercury cannot "
         "attribute this, and offers no rollback. Rolling back would be a guess.",
         "D-pad Down four times to release-train, then Center. The verdict reads Cannot "
         "attribute this with the number of changes that landed, Next reads No rollback "
@@ -73,13 +74,13 @@ BEATS = [
     (
         "beat_04_named_with_odds", 16.393,
         "On checkout A P I, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on that corpus a named commit is the cause fifty "
-        "two percent of the time, over one hundred and thirteen namings.",
+        "it, and prints its own odds: on held-out cases a named commit is the cause sixty "
+        "two percent of the time, over forty namings.",
         "On checkout-api, exactly one change landed before the spike, so Mercury names "
-        "it, and prints its own odds: on that corpus a named commit is the cause 52.2% "
-        "of the time, over 113 namings.",
+        "it, and prints its own odds: on held-out cases a named commit is the cause 62.5% "
+        "of the time, over 40 namings.",
         "D-pad Up three times to checkout-api, then Center. The verdict names the commit, "
-        "quotes its message, and reads 52.2% naming precision.",
+        "quotes its message, and reads 62.5% held-out precision.",
     ),
     (
         "beat_05_provenance", 14.071,

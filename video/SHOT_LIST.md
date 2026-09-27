@@ -53,7 +53,7 @@ is still pending, and the video says so in its closing beat.
 | 1 | `beat_01_question` | none | The loaded board, focus on Ask what changed |
 | 2 | `beat_02_board_on_load` | none | Five rows answered on load: Attributed, Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data |
 | 3 | `beat_03_crowded_refusal` | Down x4, Center | release-train: Cannot attribute this, N changes landed; Next: No rollback offered; Stage and Confirm disabled |
-| 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named, its message quoted, 52.2% naming precision |
+| 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named, its message quoted, 62.5% held-out precision |
 | 5 | `beat_05_provenance` | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
 | 6 | `beat_06_stage` | Up, Right, Center | Rollback staged, the lease counting down as the large figure, Next: confirm, record-only |
 | 7 | `beat_07_confirm` | Right, Center | The rollback steps: 02 says the token is spent, 03 Recorded only says no deployment pipeline was contacted |
@@ -73,7 +73,11 @@ number of changes in the release-train window, the lease, the latency and the SH
 The spend figures are synthetic and are not read aloud.
 
 Two figures are spoken from the script because they describe the labelled corpus,
-not this run: 81.1% named nobody on a real anomaly (beat 2), and 52.2% precision over
-113 namings (beat 4). Both are written by `python scripts/correlation_trial.py` into
-`correlation_trial_summary.json`. If a re-run moves them, change the beat in
-`scripts/build_video_plan.py` and re-render that beat.
+not this run: 93.1% named nobody on a real anomaly (beat 2), and 62.5% precision over
+40 namings (beat 4), both on the held-out split of the synthetic corpus. Both are
+written by `python scripts/attribution_split.py` into
+`attribution_holdout_summary.json`. Until 2026-09-27 these beats quoted the in-sample
+81.1% and 52.2% over 113 namings. If a re-run moves them, change the beat in
+`scripts/build_video_plan.py` and re-render that beat. Beats 2 to 4 were rewritten on
+2026-09-27 and their hold times still come from the earlier audio, so they need a
+fresh narration render before the next cut.

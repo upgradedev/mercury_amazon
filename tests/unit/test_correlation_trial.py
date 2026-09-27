@@ -610,7 +610,9 @@ def test_the_summary_file_was_written_by_the_committed_command():
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
     assert summary["measured_by_command"] == "python scripts/correlation_trial.py"
     assert summary["correlator"]["anomaly_factor"] == 3.0
-    assert summary["correlator"]["attribution_window_minutes"] == 60
+    # 75 since 2026-09-27: chosen on the train split by scripts/tune_attribution.py and
+    # scored on held-out by scripts/attribution_split.py. 60 reproduces the old engine.
+    assert summary["correlator"]["attribution_window_minutes"] == 75
     assert summary["unexpected_outcomes"] == 0
 
 
