@@ -394,8 +394,10 @@
     .hero-foot .hero-accuracy { margin-top: 0; max-width: 80ch; }
 
     .wall { display: grid; grid-template-columns: 1fr; gap: 3px; background-color: var(--seam); padding: 3px 0; }
+    /* A column from the top, so four tiles of different lengths line up by their
+       eyebrows, with the open hint on one line along the bottom. */
     .tile {
-      display: block; width: 100%; text-align: left; cursor: pointer;
+      display: flex; flex-direction: column; justify-content: flex-start; width: 100%; text-align: left; cursor: pointer;
       background-color: var(--flap); border: 0; padding: 1rem 1.1rem; color: var(--ink); font: inherit;
     }
     .tile:hover { background-color: #23262C; }
@@ -408,7 +410,7 @@
     .tile-headline { display: block; font-family: var(--display); font-size: 1.45rem; font-weight: 700; margin: 0.35rem 0 0.25rem; color: var(--amber); }
     .tile-headline[data-empty="true"] { color: var(--ink-2); font-weight: 600; }
     .tile-sub { display: block; color: var(--ink-2); font-size: var(--fs-small); }
-    .tile-open { display: block; margin-top: 0.7rem; font-family: var(--display); font-size: var(--fs-label); letter-spacing: 0.2em;
+    .tile-open { display: block; margin-top: auto; padding-top: 0.7rem; font-family: var(--display); font-size: var(--fs-label); letter-spacing: 0.2em;
                  text-transform: uppercase; color: var(--amber); font-weight: 600; }
 
     .panel { background-color: var(--flap); border-top: 3px solid var(--amber); padding: 1.3rem 1.2rem; }
@@ -565,7 +567,7 @@
       body { padding-bottom: 1.5rem; }
     }
     @media (min-width: 1000px) {
-      .wall { grid-template-columns: repeat(3, 1fr); }
+      .wall { grid-template-columns: repeat(4, 1fr); }
     }
     /* 10-foot mode. Root type goes to 24px, the floor for reading at three metres,
        and every token that was a fraction of a rem is raised to at least 1rem, in
@@ -655,6 +657,7 @@
       .tv-host .hero-cause .quote { font-size: 1em; }
       .tv-host .hero-actions { margin-top: 0.7rem; }
       .tv-host .departures { margin-top: 0.75rem; }
+      .tv-host .wall { grid-template-columns: repeat(4, 1fr); }
       .tv-host .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
       .tv-host .answer { padding-bottom: 0.8rem; }
     }
@@ -800,37 +803,6 @@
         </div>
       </section>
 
-      <!-- ------------------------------------------------------ How it answers -->
-      <section class="screen" id="how" aria-labelledby="howTitle">
-        <p class="section-kicker">How it answers</p>
-        <h2 id="howTitle">One change named, or none</h2>
-        <ol class="how">
-          <li>
-            <span class="step-no">01</span>
-            <h3>Read the reading</h3>
-            <p>The error rate now, against a baseline taken before the spike began.</p>
-          </li>
-          <li>
-            <span class="step-no">02</span>
-            <h3>Blame one change or none</h3>
-            <p>A commit is named only when exactly one change landed in the window. Otherwise
-              Mercury says it cannot attribute, and why. A refusal clears no deploy.</p>
-            <p class="verdicts"><span class="v-a">Attributed</span><span class="v-c">Cannot attribute</span><span class="v-n">Nothing to revert</span><span class="v-i">Insufficient data</span></p>
-          </li>
-          <li>
-            <span class="step-no">03</span>
-            <h3>Govern the rollback</h3>
-            <p>Stage it, then confirm it with a single-use token. The dispatcher in use says
-              whether anything left the building.</p>
-          </li>
-        </ol>
-        <p class="lede who-for"><strong>Who it is for:</strong> the team that owns an on-call rota and
-          a TV in the room where incidents are worked. A team without the room can open this same page
-          in a laptop browser, where the arrow keys and Enter do what the remote does.
-          <strong>Who would pay:</strong> whoever owns that
-          rota. Nobody has been asked yet, so that is a hypothesis, not a finding.</p>
-      </section>
-
       <!-- ---------------------------------------------------- Governed rollback -->
       <section class="screen" id="rollback" aria-labelledby="rollbackTitle">
         <p class="section-kicker">Act on it</p>
@@ -918,6 +890,13 @@
           <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
+
+        <button class="tile" data-tv-focusable data-panel="how" data-tv-label="How it answers panel">
+          <span class="tile-eyebrow">How it answers</span>
+          <span class="tile-headline">One change named, or none</span>
+          <span class="tile-sub">The three steps behind every answer, the four verdicts, and who it is for. Opening it makes no call.</span>
+          <span class="tile-open">Center to open</span>
+        </button>
       </section>
 
       <!-- ----------------------------------------------------------- Panels -->
@@ -928,7 +907,7 @@
           of that came from. The rollback controls stay on the board, so the action is never buried.</p>
         <div class="actions-bar">
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
         </div>
         <div class="console">
           <div class="console-header">
@@ -953,7 +932,7 @@
           <button class="btn" data-tv-focusable data-tv-label="Scan stale pull requests" data-action="prs"
                   title="Call POST /mcp/tools/get_pr_bottlenecks and render the response">Scan stale pull requests</button>
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
         </div>
         <div class="console">
           <div class="console-header">
@@ -978,7 +957,7 @@
           <button class="btn" data-tv-focusable data-tv-label="Audit observability gaps" data-action="observability"
                   title="Call POST /mcp/tools/audit_observability for the current service">Audit observability gaps</button>
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
         </div>
         <div class="console">
           <div class="console-header">
@@ -990,6 +969,39 @@
               body appears here with the data source it came from.</div>
           </div>
         </div>
+      </section>
+
+      <section id="panel-how" class="panel" data-panel-body hidden aria-labelledby="howTitle">
+        <h2 id="howTitle">How it answers: one change named, or none</h2>
+        <div class="actions-bar">
+          <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
+                  title="Return to the panels">Back to wall</button>
+        </div>
+        <ol class="how">
+          <li>
+            <span class="step-no">01</span>
+            <h3>Read the reading</h3>
+            <p>The error rate now, against a baseline taken before the spike began.</p>
+          </li>
+          <li>
+            <span class="step-no">02</span>
+            <h3>Blame one change or none</h3>
+            <p>A commit is named only when exactly one change landed in the window. Otherwise
+              Mercury says it cannot attribute, and why. A refusal clears no deploy.</p>
+            <p class="verdicts"><span class="v-a">Attributed</span><span class="v-c">Cannot attribute</span><span class="v-n">Nothing to revert</span><span class="v-i">Insufficient data</span></p>
+          </li>
+          <li>
+            <span class="step-no">03</span>
+            <h3>Govern the rollback</h3>
+            <p>Stage it, then confirm it with a single-use token. The dispatcher in use says
+              whether anything left the building.</p>
+          </li>
+        </ol>
+        <p class="lede who-for"><strong>Who it is for:</strong> the team that owns an on-call rota and
+          a TV in the room where incidents are worked. A team without the room can open this same page
+          in a laptop browser, where the arrow keys and Enter do what the remote does.
+          <strong>Who would pay:</strong> whoever owns that
+          rota. Nobody has been asked yet, so that is a hypothesis, not a finding.</p>
       </section>
 
       <!-- ---------------------------------------------------------- Connection
