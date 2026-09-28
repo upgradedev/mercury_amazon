@@ -144,12 +144,70 @@
     this.current = null;
     this.pending = false;
     this.enabled = true;
+    this.scope = null;
+    this.scopeInset = null;
   }
 
+  /** True when the element may be a stop: inside the open panel, if one is open. */
+  SpatialNavigator.prototype.inScope = function (element) {
+    if (!this.scope) return true;
+    return !!element && typeof this.scope.contains === 'function' && this.scope.contains(element);
+  };
+
   SpatialNavigator.prototype.candidates = function () {
+    var self = this;
     return Array.prototype.slice
       .call(document.querySelectorAll(FOCUSABLE_SELECTOR))
-      .filter(isVisible);
+      .filter(isVisible)
+      .filter(function (element) { return self.inScope(element); });
+  };
+
+  /**
+   * Keep the remote inside one region (an open panel) until release() is called.
+   * The page calls this when a panel opens and releases it when BACK closes the
+   * panel. Before, the ring walked out of an open panel to the board or to
+   * Connection while the legend still said BACK leads back to the wall.
+   *
+   * Only the D-pad is contained. Tab and a mouse still reach every control, as a
+   * keyboard user expects; the next arrow press brings the cursor back into the
+   * region. options.bottomInset (a number, or a function returning one) is the
+   * height of anything fixed over the bottom of the viewport, such as a key bar.
+   */
+  SpatialNavigator.prototype.contain = function (element, options) {
+    this.scope = element || null;
+    this.scopeInset = options && options.bottomInset !== undefined ? options.bottomInset : null;
+  };
+
+  SpatialNavigator.prototype.release = function () {
+    this.scope = null;
+    this.scopeInset = null;
+  };
+
+  /**
+   * At the edge of a contained region, UP or DOWN scrolls the rest of the region
+   * into view, a step at a time, instead of leaving it. That is how a long answer
+   * in a panel is read with a remote. Returns true when the page scrolled.
+   */
+  SpatialNavigator.prototype.scrollScope = function (direction) {
+    var scope = this.scope;
+    if (!scope || typeof scope.getBoundingClientRect !== 'function') return false;
+    if (typeof window === 'undefined' || typeof window.scrollBy !== 'function') return false;
+    var height = window.innerHeight || 0;
+    if (!height) return false;
+    var inset = typeof this.scopeInset === 'function' ? this.scopeInset() : (this.scopeInset || 0);
+    var visible = Math.max(1, height - inset);
+    var step = Math.round(visible * 0.6);
+    var rect = scope.getBoundingClientRect();
+    // How far the region runs past the edge being pressed toward; nothing when it
+    // already ends inside the viewport.
+    var hidden;
+    if (direction === DIRECTIONS.DOWN) hidden = rect.bottom - visible;
+    else if (direction === DIRECTIONS.UP) hidden = -rect.top;
+    else return false;
+    if (!(hidden >= 1)) return false;
+    var distance = Math.min(step, hidden);
+    window.scrollBy(0, direction === DIRECTIONS.DOWN ? distance : -distance);
+    return true;
   };
 
   /** True when the element's box is already wholly inside the viewport. */
@@ -248,8 +306,9 @@
   /** Move focus one step in a direction. Returns the element focused, or null. */
   SpatialNavigator.prototype.move = function (direction) {
     if (!this.enabled) return null;
-    // The first press after a deferred cursor only shows where it is.
-    if (this.pending && this.current && isVisible(this.current)) {
+    // The first press after a deferred cursor only shows where it is, unless a
+    // panel has opened since and the deferred control is outside it.
+    if (this.pending && this.current && isVisible(this.current) && this.inScope(this.current)) {
       this.reveal();
       return this.current;
     }
@@ -266,8 +325,12 @@
     if (!best) best = pick(from, all, this.current, direction, centreScore);
 
     // No candidate in that direction: hold focus rather than wrapping, which is
-    // what a 10-foot UI should do. Wrapping loses the viewer's place.
-    if (!best) return this.current;
+    // what a 10-foot UI should do. Wrapping loses the viewer's place. Inside an
+    // open panel, UP and DOWN at its edge scroll the rest of the panel instead.
+    if (!best) {
+      this.scrollScope(direction);
+      return this.current;
+    }
     this.setFocus(best);
     return best;
   };

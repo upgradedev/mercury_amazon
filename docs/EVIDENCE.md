@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-650 tests and a re-measure on an idle machine is pending**.
+653 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 650 passed
+# 653 passed
 ```
 
 #### Step 3: Start the server
@@ -1042,7 +1042,7 @@ be replaced with its run URL and digests only after that workflow succeeds.
 
 The manifest declarations, Gradle wiring and key handling contract are checked by 30 structural tests
 plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
-25 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
+32 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
 walks the browser form of the same golden path. None of those substitutes for the
 pending Android TV receipt.
 
@@ -1076,7 +1076,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 650 passed
+python -m pytest tests/ -q                                    # 653 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2000 statements
 node tests/e2e/spatial_nav_spec.js                            # 25/25 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

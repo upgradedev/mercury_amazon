@@ -421,6 +421,100 @@ def test_down_from_the_primary_enters_the_board_and_up_comes_back(browser, base_
         context.close()
 
 
+WHERE_THE_CURSOR_IS = """() => {
+  const c = window.mercuryNav.current;
+  const panel = c && c.closest('[data-panel-body]');
+  return { panel: panel ? panel.id : null,
+           label: c && (c.getAttribute('data-tv-label') || c.id),
+           tile: c && c.getAttribute('data-panel'),
+           move: document.querySelector('#hintMove').textContent,
+           back: document.querySelector('#hintBack').textContent };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host",
+    [(1920, 1080, False), (960, 540, True)],
+    ids=["tv-browser-1920x1080-keyboard", "firetv-webview-960x540-bridge"],
+)
+def test_an_open_panel_holds_the_remote_until_back_closes_it(browser, base_url, width, height, host):
+    """With a panel open, DOWN used to walk out to Connection > Check.
+
+    The legend still said BACK goes back to the wall, and UP walked on to the board.
+    Every direction, pressed again and again, has to keep the cursor inside the open
+    panel, and the legend has to say so; BACK then closes the panel onto its tile and
+    the whole page is reachable again. At 1920x1080 the keys are real key presses; in
+    the Fire TV WebView they go through window.navigateDpad, as the remote's do.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=width, height=height, host=host)
+
+    def press(direction):
+        if host:
+            assert page.evaluate(f"window.navigateDpad('{direction}')") is True
+        else:
+            page.keyboard.press("Arrow" + direction.capitalize())
+
+    try:
+        wait_for_board(page)
+        for panel in ("incident", "velocity", "spend", "how"):
+            page.evaluate(
+                f"""() => {{ window.mercuryNav.setFocus(document.querySelector('.tile[data-panel="{panel}"]'));
+                            return window.navigateDpad('SELECT'); }}""")
+            opened = page.evaluate(WHERE_THE_CURSOR_IS)
+            assert opened["panel"] == f"panel-{panel}", opened
+            assert opened["move"] == "Move within this panel", opened
+            assert opened["back"] == "Back to the wall", opened
+            for direction in ["DOWN"] * 5 + ["RIGHT"] * 3 + ["UP"] * 5 + ["LEFT"] * 3 + ["DOWN"] * 3:
+                press(direction)
+                where = page.evaluate(WHERE_THE_CURSOR_IS)
+                assert where["panel"] == f"panel-{panel}", (
+                    f"{direction} in the {panel} panel moved the cursor out to {where['label']}")
+                assert where["move"] == "Move within this panel" and where["back"] == "Back to the wall", where
+            assert page.evaluate("window.navigateDpad('BACK')") is True
+            closed = page.evaluate(WHERE_THE_CURSOR_IS)
+            assert closed["tile"] == panel and closed["panel"] is None, closed
+            assert closed["move"] == "Move" and closed["back"] == "Exit to the Fire TV launcher", closed
+        # Closed, the page is whole again: DOWN from the last tile reaches Connection.
+        page.evaluate("window.navigateDpad('DOWN')")
+        assert page.evaluate("window.mercuryNav.current.id") == "btnCheck"
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+def test_down_at_the_foot_of_a_long_panel_scrolls_it_into_view_above_the_key_bar(browser, base_url):
+    """Held inside the panel, the remote still reads all of it.
+
+    The incident evidence runs well past one 960x540 screen. Before containment the
+    only way to see its foot with the remote was to walk out of the panel. DOWN at the
+    panel's last control now scrolls it, a step at a time, until its bottom clears the
+    key bar, and UP brings its heading back.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=960, height=540, host=True)
+    try:
+        wait_for_board(page)
+        page.evaluate(
+            """() => { window.mercuryNav.setFocus(document.querySelector('.tile[data-panel="incident"]'));
+                      return window.navigateDpad('SELECT'); }""")
+        geometry = """() => { const r = document.querySelector('#panel-incident').getBoundingClientRect();
+            const bar = document.querySelector('.keybar').getBoundingClientRect();
+            return { top: r.top, bottom: r.bottom, bar: bar.top, inner: innerHeight }; }"""
+        start = page.evaluate(geometry)
+        assert start["bottom"] > start["bar"], f"the panel fits, so this proves nothing: {start}"
+        for _ in range(12):
+            page.evaluate("window.navigateDpad('DOWN')")
+        end = page.evaluate(geometry)
+        assert abs(end["bottom"] - end["bar"]) <= 2, f"the panel's foot is not just above the key bar: {end}"
+        assert page.evaluate(WHERE_THE_CURSOR_IS)["panel"] == "panel-incident"
+        for _ in range(12):
+            page.evaluate("window.navigateDpad('UP')")
+        top = page.evaluate(geometry)
+        assert abs(top["top"]) <= 1, f"UP did not bring the panel heading back: {top}"
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 def test_nothing_is_announced_on_load_and_a_press_is_answered_in_one_sentence(browser, base_url):
     """The board used to be read out by a screen reader the moment the page loaded.
 

@@ -1061,7 +1061,7 @@
         <circle cx="12" cy="12" r="10.5" fill="#16181C" stroke="#ABA597" stroke-width="1.5"/>
         <circle cx="12" cy="12" r="3.6" fill="#0B0C0E" stroke="#ABA597" stroke-width="1.5"/>
         <path d="M12 3.6 L14 6.4 H10 Z M12 20.4 L14 17.6 H10 Z M3.6 12 L6.4 10 V14 Z M20.4 12 L17.6 10 V14 Z" fill="#EEE7D8"/>
-      </svg> Move</span>
+      </svg> <span id="hintMove">Move</span></span>
     <span class="hint"><span class="key">CENTER</span> Select</span>
     <span class="hint"><span class="key">BACK</span> <span id="hintBack">Exit to the Fire TV launcher</span></span>
     <span class="focused-label" id="hintFocus">Focused: nothing yet</span>
@@ -1753,6 +1753,12 @@
 
     function panels() { return document.querySelectorAll('[data-panel-body]'); }
 
+    /* Height of the remote's key bar where it is shown (0 where it is hidden). */
+    function keybarHeight() {
+      var bar = document.querySelector('.keybar');
+      return bar && bar.offsetHeight ? bar.getBoundingClientRect().height : 0;
+    }
+
     /* A tile headline is a figure too. Its stamps sit above it, in the tile's
        stamp slot, and are cleared when the headline is not a figure (a failure). */
     function tileHeadline(id, text, provenances) {
@@ -1773,6 +1779,10 @@
       Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = true; });
       el('wall').hidden = false;
       el('hintBack').textContent = 'Exit to the Fire TV launcher';
+      el('hintMove').textContent = 'Move';
+      // Release the panel before placing the cursor on its tile: the tile is
+      // outside the panel, and the whole page is reachable again.
+      if (window.mercuryNav) { window.mercuryNav.release(); }
       // The wall sits in the evidence area now, below the board, so returning to it
       // no longer jumps to the top of the page: the navigator scrolls to the tile.
       var origin = state.lastPanel
@@ -1795,7 +1805,12 @@
       Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = panel !== target; });
       el('wall').hidden = true;
       el('hintBack').textContent = 'Back to the wall';
+      // The remote stays inside the open panel until BACK closes it, and the legend
+      // says so. UP and DOWN at the panel's edge scroll the rest of it into view,
+      // clear of the key bar, instead of walking out to the board or Connection.
+      el('hintMove').textContent = 'Move within this panel';
       if (window.mercuryNav) {
+        window.mercuryNav.contain(target, { bottomInset: keybarHeight });
         window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));
       }
       // Bring the whole panel up, not just its first button: the result, and the

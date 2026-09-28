@@ -355,6 +355,137 @@ test('setFocus can place the cursor without moving keyboard focus', () => {
   assert.strictEqual(at(cells, 0, 1).focused, 1, 'a remote press moves keyboard focus with it');
 });
 
+/**
+ * An open panel between the board and Connection, as the page lays it out: the
+ * last board row above it, Connection > Check below it, a control off to its
+ * right, and three buttons in one row inside it. Before containment, DOWN from
+ * any panel button walked out to Check while the legend still said BACK returns
+ * to the wall.
+ */
+function panelLayout(panelHeight) {
+  const row = makeElement('row4', 86, 400, 1748, 58);
+  const load = makeElement('load', 86, 700, 300, 60);
+  const scan = makeElement('scan', 400, 700, 300, 60);
+  const back = makeElement('back', 714, 700, 200, 60);
+  const outside = makeElement('outside', 1500, 700, 200, 60);
+  const check = makeElement('check', 86, 700 + panelHeight + 40, 150, 60);
+  const members = new Set([load, scan, back]);
+  const top = 600;
+  const panel = {
+    contains: (element) => members.has(element),
+    getBoundingClientRect: () => ({ left: 80, top, width: 1000, height: panelHeight,
+      right: 1080, bottom: top + panelHeight })
+  };
+  return { row, load, scan, back, outside, check, panel, all: [row, load, scan, back, outside, check] };
+}
+
+test('an open panel holds the remote in every direction until it is released', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.contain(p.panel);
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load', 'DOWN does not walk out to Connection > Check');
+  bridge('UP');
+  assert.strictEqual(nav.current.id, 'load', 'UP does not walk out to the board');
+  bridge('LEFT');
+  assert.strictEqual(nav.current.id, 'load');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'scan', 'movement inside the panel is unchanged');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'back');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'back', 'RIGHT does not jump to a control beside the panel');
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'back');
+  nav.release();
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'check', 'once released, DOWN reaches the rest of the page again');
+});
+
+test('a cursor put outside the open panel by Tab or a mouse comes back in on the next press', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.contain(p.panel);
+  nav.setFocus(p.check, { domFocus: false });
+  bridge('UP');
+  assert.strictEqual(nav.current.id, 'load', 'the first control of the panel, in reading order');
+});
+
+test('a deferred cursor outside the open panel is not revealed while the panel is open', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.defer(p.row);
+  nav.contain(p.panel);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load');
+  assert.strictEqual(p.row.hasClass('tv-focused'), false);
+});
+
+test('UP and DOWN at the edge of a long panel scroll the rest of it into view, clear of the key bar', () => {
+  const p = panelLayout(2000); // runs from 600 to 2600 in a 1080 viewport
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  nav.contain(p.panel, { bottomInset: () => 62 });
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load', 'the cursor stays in the panel');
+  // 60% of the 1018px left above the key bar, and never past the panel's bottom.
+  assert.deepStrictEqual(scrolled, [611]);
+  bridge('UP');
+  // The panel's top is still 600px down in this static shim, so there is nothing above to show.
+  assert.deepStrictEqual(scrolled, [611], 'UP does not scroll when the panel top is in view');
+});
+
+test('UP at the top of a panel scrolled past its heading brings the heading back, a step at a time', () => {
+  const p = panelLayout(2000);
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  // The same panel after the viewer has read 900px down it.
+  p.panel.getBoundingClientRect = () => ({ left: 80, top: -900, width: 1000, height: 2000, right: 1080, bottom: 1100 });
+  nav.contain(p.panel, { bottomInset: 62 });
+  nav.setFocus(p.load, { domFocus: false });
+  nav.move('UP');
+  nav.move('DOWN');
+  assert.deepStrictEqual(scrolled, [-611, 82], 'up one step; down only the 82px still under the key bar');
+  assert.strictEqual(nav.current.id, 'load');
+});
+
+test('DOWN at the edge of a panel that already fits holds without scrolling', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  nav.contain(p.panel, { bottomInset: 62 });
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.deepStrictEqual(scrolled, []);
+  assert.strictEqual(nav.current.id, 'load');
+});
+
+test('the Android smoke path, RIGHT then RIGHT from Ask, is unchanged after a panel closes', () => {
+  const ask = makeElement('ask', 80, 470, 400, 78);
+  const stage = makeElement('stage', 495, 470, 326, 78);
+  const confirm = makeElement('confirm', 836, 470, 326, 78);
+  const inside = makeElement('inside', 86, 1500, 300, 60);
+  const panel = { contains: (element) => element === inside,
+    getBoundingClientRect: () => ({ left: 80, top: 1400, width: 1000, height: 200, right: 1080, bottom: 1600 }) };
+  const { nav, bridge } = loadNavigator([ask, stage, confirm, inside]);
+  nav.contain(panel);
+  nav.setFocus(inside);
+  nav.release();
+  nav.setFocus(ask);
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'stage');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'confirm');
+});
+
 // ---------------------------------------------------------------------- Runner
 
 let failures = 0;

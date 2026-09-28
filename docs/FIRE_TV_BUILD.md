@@ -103,6 +103,7 @@ writes `firetv_build_receipt.json` with `built_by_command`, `gradle_exit_code`,
 | Remote key | Effect |
 |---|---|
 | D-pad arrows | Move to the nearest enabled control |
+| D-pad arrows, panel open | Move only between the open panel's controls; Up or Down at its edge scrolls the rest of the panel into view. The legend reads Move within this panel until Back closes it |
 | Select / centre | Activate the focused control |
 | Back | Close a panel, then WebView history, then the app |
 
