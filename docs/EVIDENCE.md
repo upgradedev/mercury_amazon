@@ -1391,6 +1391,9 @@ several changes landed and nothing in the metric says which is a line a root cau
 record can carry; a confident wrong name is a line it cannot.
 
 The count of such teams is not given, because no source that counts them was read.
+The target list below does not reach this wedge yet: none of the ten is known to be
+in the regulation's scope, and whether any of Upgrade's three clients is a financial
+entity is the first thing to find out.
 
 ### Why now
 
@@ -1405,7 +1408,10 @@ The count of such teams is not given, because no source that counts them was rea
   open for a decision now.
 - **Many changes an hour.** Teams ship many small changes a day, so the window before
   a spike often holds several. This repository shows the pattern: a 75 minute window
-  ending on one of its commits holds 2.98 commits on average. A tool that says "I
+  ending on one of its commits holds 2.98 commits on average, the
+  `mean_commits_in_a_window_ending_at_a_commit` value that
+  `python scripts/correlation_trial.py` writes to `correlation_trial_summary.json`.
+  It is one repository's commit stream, not a survey of teams. A tool that says "I
   cannot tell which" is safer to act on than one that guesses.
 
 ### The three riskiest assumptions, and the cheapest test for each
