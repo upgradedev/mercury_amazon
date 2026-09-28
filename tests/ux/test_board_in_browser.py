@@ -515,6 +515,35 @@ def test_down_at_the_foot_of_a_long_panel_scrolls_it_into_view_above_the_key_bar
         context.close()
 
 
+def test_the_held_out_sentence_stays_in_the_evidence_whichever_row_is_asked(browser, base_url):
+    """The evidence header measures the correlator, and the server ships it with every answer.
+
+    The page used to clear it when the viewer walked to Nothing to revert or
+    Insufficient data, so the sentence under the board changed as the cursor moved.
+    The short figure under the verdict stays with a named commit only.
+    """
+    context, page, errors, _ = open_board(browser, base_url)
+    try:
+        wait_for_board(page)
+        for service in ("payments-worker", "quiet-service", "search-indexer", "checkout-api"):
+            page.evaluate(
+                f"""() => {{ window.mercuryNav.setFocus(document.querySelector('.btn-demo[data-service="{service}"]'));
+                            return window.navigateDpad('SELECT'); }}""")
+            wait_for_board(page, service)
+            shown = page.evaluate(
+                "() => ({ evidence: document.querySelector('#heroProvenance').textContent,"
+                " short: document.querySelector('#heroAccuracy').textContent,"
+                " verdict: document.querySelector('#hero').dataset.verdict })")
+            assert "Measured on a held-out split" in shown["evidence"], (service, shown)
+            if shown["verdict"] == "attributed":
+                assert "held-out precision" in shown["short"], (service, shown)
+            else:
+                assert shown["short"] == "", (service, shown)
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 def test_nothing_is_announced_on_load_and_a_press_is_answered_in_one_sentence(browser, base_url):
     """The board used to be read out by a screen reader the moment the page loaded.
 

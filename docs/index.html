@@ -1625,7 +1625,9 @@
 
       var accuracy = accuracyLine(data);
       // The short precision sits under a named commit only. Under a refusal it would
-      // read as the refusal's own score; the full sentence stays in the evidence.
+      // read as the refusal's own score. The full sentence stays in the evidence under
+      // every answer the server ships it with: it measures the correlator, not this
+      // answer, and it used to vanish when the viewer walked to a calm or empty row.
       var short = verdictKind(data) === 'attributed' ? accuracyShort(data) : '';
       var common = {
         flap: true,
@@ -1713,7 +1715,6 @@
           cause: 'The reading is ' + factor + '× its baseline, ' + under
             + ', so Mercury reports no anomaly, names no change and offers no rollback. '
             + 'If it keeps rising, ask again.',
-          accuracy: '',
           accuracyShort: ''
         });
       } else {
@@ -1728,7 +1729,6 @@
           figureLabel: metric.sample_size + ' data points',
           headline: 'Insufficient data',
           cause: data.explanation + (why ? ' ' + why : ''),
-          accuracy: '',
           accuracyShort: ''
         });
       }
