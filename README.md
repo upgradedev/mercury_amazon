@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 171 s demo video is rendered but not uploaded. Fire TV runtime evidence and public access are still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence and public access are still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -205,13 +205,16 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   of this branch) reached the TV launcher, but `adb` stayed unauthorized, so the APK was
   never installed and no D-pad journey ran. Its receipt records the status
   `BLOCKED_ADB_UNAUTHORIZED` and is not a runtime proof.
-- **A published video.** One take is rendered and not yet uploaded: 170.61 s
-  (ffprobe), 1920x1080, recorded at commit `df5db06` in desktop Chromium, every key sent
+- **A published video.** One take is rendered and not yet uploaded:
+  `reviews/videos_20260928/mercury_amazon/output/mercury-demo.mp4` in the workspace,
+  outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `df5db06` in desktop Chromium, every key sent
   through the D-pad bridge the Leanback app calls, with burned-in captions. It shows
   the figures this page prints: commit `7bd8b41` named as the only runtime change at
   50.0% held-out precision over 58 namings, and 90.0% refusals, and after Confirm the
   board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
-  and it says so. Details in [video/README.md](video/README.md).
+  and it says so. One press differs from this build: in the take, Down from an open
+  panel walks out to Connection > Check; this build keeps the remote in the panel
+  until Back. Details in [video/README.md](video/README.md).
 - **A public deployment of this build.** The
   [live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
   serves build `6dd76bd`, probed 2026-09-26: older than this branch and the design
