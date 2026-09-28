@@ -407,3 +407,53 @@ def test_a_slow_first_answer_never_lands_under_the_second_call_in_its_console():
             browser.close()
     finally:
         _stop_server(process)
+
+
+def test_a_refused_confirm_puts_its_reason_on_screen_above_the_key_bar():
+    """A refused Confirm opens Incident evidence, and the refusal has to be in view.
+
+    The rollback answers moved out of the correlation's console into their own. Placed
+    under the correlation, a refusal rendered below a panel longer than the screen, so
+    the viewer was sent to the panel and shown no reason. The server's refusal is
+    stood in for here by a 409 at the network, at the TV size and at the host layout.
+    """
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    sync_playwright = _browser_api()
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    process = _start_server(port)
+    try:
+        _wait_for_server(base, process)
+        with sync_playwright() as driver:
+            browser = driver.chromium.launch()
+            for width, height, host in [(1920, 1080, False), (960, 540, True)]:
+                context = browser.new_context(viewport={"width": width, "height": height})
+                if host:
+                    context.add_init_script(HOST_STUB)
+                page = context.new_page()
+                page.route("**/mcp/tools/demo_confirm_rollback", lambda route: route.fulfill(
+                    status=409, content_type="application/json",
+                    body='{"detail": "TOKEN_ALREADY_USED: that token has been spent"}'))
+                page.goto(base, wait_until="domcontentloaded")
+                page.locator("#btnStage:not([disabled])").wait_for(timeout=15_000)
+                page.evaluate("window.navigateDpad('RIGHT')")
+                page.evaluate("window.navigateDpad('SELECT')")
+                page.locator("#btnConfirm:not([disabled])").wait_for(timeout=10_000)
+                page.evaluate("window.navigateDpad('RIGHT')")
+                page.evaluate("window.navigateDpad('SELECT')")
+                page.locator("#rollbackOutput .error-card").wait_for(timeout=10_000)
+                shown = page.evaluate(
+                    "(() => { const c = document.querySelector('#rollbackOutput .error-card').getBoundingClientRect();"
+                    " const bar = document.querySelector('.keybar').getBoundingClientRect();"
+                    " return { top: c.top, bottom: c.bottom, bar: bar.top,"
+                    " header: document.querySelector('#rollbackEndpoint').textContent,"
+                    " text: document.querySelector('#rollbackOutput').innerText }; })()")
+                assert "TOKEN_ALREADY_USED" in shown["text"], shown
+                assert shown["header"] == "POST /mcp/tools/demo_confirm_rollback", shown
+                assert 0 <= shown["top"] and shown["bottom"] <= shown["bar"], (
+                    f"at {width}x{height} the refusal is off screen or under the key bar: {shown}")
+                context.close()
+            browser.close()
+    finally:
+        _stop_server(process)

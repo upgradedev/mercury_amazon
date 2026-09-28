@@ -917,10 +917,22 @@
         <p class="panel-desc">Everything the correlator used to reach the answer on the board: the metric
           series and its baseline, the attribution window, the commit it landed on, and where each half
           of that came from. The rollback controls stay on the board, so the action is never buried;
-          what Stage and Confirm answered lands in the second console, under the call that returned it.</p>
+          what Stage and Confirm answered lands in the first console, under the call that returned it.</p>
         <div class="actions-bar">
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
                   title="Return to the panels">Back to wall</button>
+        </div>
+        <!-- The rollback console leads: a refused Stage or Confirm opens this panel, and
+             its reason has to be on screen, not under a correlation longer than the TV. -->
+        <div class="console">
+          <div class="console-header">
+            <span id="rollbackEndpoint">Governed rollback: no call made</span>
+            <span id="rollbackLatency" class="latency"></span>
+          </div>
+          <div id="rollbackOutput" aria-live="polite">
+            <div class="empty-state-card">Nothing staged for this answer. Stage and Confirm on the board,
+              and each response lands here under the call that returned it.</div>
+          </div>
         </div>
         <div class="console">
           <div class="console-header">
@@ -930,16 +942,6 @@
           <div id="incidentOutput" aria-live="polite">
             <div class="empty-state-card">No correlation requested yet. Ask what changed on the board and
               the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
-          </div>
-        </div>
-        <div class="console">
-          <div class="console-header">
-            <span id="rollbackEndpoint">Governed rollback: no call made</span>
-            <span id="rollbackLatency" class="latency"></span>
-          </div>
-          <div id="rollbackOutput" aria-live="polite">
-            <div class="empty-state-card">Nothing staged for this answer. Stage and Confirm on the board,
-              and each response lands here under the call that returned it.</div>
           </div>
         </div>
       </section>
