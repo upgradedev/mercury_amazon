@@ -363,3 +363,47 @@ def test_each_incident_console_shows_the_request_its_header_names():
             browser.close()
     finally:
         _stop_server(process)
+
+
+def test_a_slow_first_answer_never_lands_under_the_second_call_in_its_console():
+    """Opening Delivery velocity fires the DORA call; Scan stale pull requests shares its console.
+
+    If the viewer pressed Scan while DORA was still in flight, the header switched to
+    get_pr_bottlenecks and the late DORA body was then painted under it. The DORA
+    response is held here until the pull request answer is on screen, then released.
+    """
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    sync_playwright = _browser_api()
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    process = _start_server(port)
+    try:
+        _wait_for_server(base, process)
+        with sync_playwright() as driver:
+            browser = driver.chromium.launch()
+            page = browser.new_page(viewport={"width": 1920, "height": 1080})
+            held = []
+            page.route("**/mcp/tools/get_dora_velocity_report", lambda route: held.append(route))
+            page.goto(base, wait_until="domcontentloaded")
+            page.locator("#btnStage:not([disabled])").wait_for(timeout=15_000)
+
+            page.locator('.tile[data-panel="velocity"]').click()
+            page.wait_for_function("document.querySelector('#doraOutput .loading-card') !== null")
+            assert len(held) == 1, "opening the panel should have sent the DORA call"
+            page.locator('[data-action="prs"]').click()
+            page.wait_for_function("!document.querySelector('#doraOutput .loading-card')")
+            assert "Past the 36 hour SLA" in page.locator("#doraOutput").inner_text()
+
+            with page.expect_response(lambda r: r.url.endswith("/get_dora_velocity_report")):
+                held[0].continue_()
+            # Give the late answer every chance to paint before reading the console.
+            page.evaluate("new Promise(r => setTimeout(r, 300))")
+            header = page.locator("#doraEndpoint").inner_text()
+            shown = page.locator("#doraOutput").inner_text()
+            assert header == "POST /mcp/tools/get_pr_bottlenecks", header
+            assert "Past the 36 hour SLA" in shown, shown
+            assert "Deploys per day" not in shown, shown
+            browser.close()
+    finally:
+        _stop_server(process)

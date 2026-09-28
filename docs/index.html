@@ -2378,11 +2378,20 @@
       return m.change_failure_rate_pct === 0 ? 'n/a, nothing failed to recover from' : 'no recovery recorded yet';
     }
 
+    /* Velocity and spend each hold two calls in one console. Opening a panel fires its
+       first call, so a press on the second one could land first, set the header to its
+       own endpoint, and then be painted over by the slower first answer. Each console
+       numbers its calls, and only the newest one writes the header's latency and body. */
+    var consoleSeq = { dora: 0, cost: 0 };
+
     async function loadDora() {
+      var mine = ++consoleSeq.dora;
       el('doraEndpoint').textContent = 'POST /mcp/tools/get_dora_velocity_report';
       showLoading('doraOutput', 'Calling POST /mcp/tools/get_dora_velocity_report ...');
       try {
-        var res = await post('/mcp/tools/get_dora_velocity_report', {}, 'doraLatency');
+        var res = await post('/mcp/tools/get_dora_velocity_report', {}, null);
+        if (mine !== consoleSeq.dora) { return; }
+        writeLatency('doraLatency', res.status, res.elapsedMs);
         var data = res.body;
         var m = data.metrics;
         var box = document.createElement('div');
@@ -2401,6 +2410,8 @@
           data.tier + ', from ' + data.sample_size + ' records over ' + data.window_days + ' days.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.dora) { return; }
+        latencyOf('doraLatency', error);
         showError('doraOutput', error.message);
         tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
@@ -2408,10 +2419,13 @@
     }
 
     async function loadPrs() {
+      var mine = ++consoleSeq.dora;
       el('doraEndpoint').textContent = 'POST /mcp/tools/get_pr_bottlenecks';
       showLoading('doraOutput', 'Calling POST /mcp/tools/get_pr_bottlenecks ...');
       try {
-        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, 'doraLatency');
+        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, null);
+        if (mine !== consoleSeq.dora) { return; }
+        writeLatency('doraLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
         box.appendChild(provenanceBlock(data.provenance, true));
@@ -2436,6 +2450,8 @@
         el('tileVelocitySub').textContent = data.total_open + ' pull requests open.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.dora) { return; }
+        latencyOf('doraLatency', error);
         showError('doraOutput', error.message);
         tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
@@ -2443,10 +2459,13 @@
     }
 
     async function loadCost() {
+      var mine = ++consoleSeq.cost;
       el('costEndpoint').textContent = 'POST /mcp/tools/get_aws_cost_anomalies';
       showLoading('costOutput', 'Calling POST /mcp/tools/get_aws_cost_anomalies ...');
       try {
-        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, 'costLatency');
+        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, null);
+        if (mine !== consoleSeq.cost) { return; }
+        writeLatency('costLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
         box.appendChild(provenanceBlock(data.provenance, true));
@@ -2472,6 +2491,8 @@
         el('tileSpendSub').textContent = data.anomalies.length + ' service anomalies over the day average.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.cost) { return; }
+        latencyOf('costLatency', error);
         showError('costOutput', error.message);
         tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
@@ -2479,11 +2500,14 @@
     }
 
     async function loadObservability() {
+      var mine = ++consoleSeq.cost;
       el('costEndpoint').textContent = 'POST /mcp/tools/audit_observability';
       showLoading('costOutput', 'Calling POST /mcp/tools/audit_observability ...');
       try {
         var res = await post('/mcp/tools/audit_observability',
-          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
+          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, null);
+        if (mine !== consoleSeq.cost) { return; }
+        writeLatency('costLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
         box.appendChild(kv([
@@ -2499,6 +2523,8 @@
         tileHeadline('tileSpendHeadline', data.missing_signals.length + ' signals missing');
         el('tileSpendSub').textContent = 'Observability gap score ' + data.observability_gap_score + '.';
       } catch (error) {
+        if (mine !== consoleSeq.cost) { return; }
+        latencyOf('costLatency', error);
         showError('costOutput', error.message);
         tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
