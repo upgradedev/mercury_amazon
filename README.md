@@ -209,8 +209,9 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   `reviews/videos_20260928/mercury_amazon/output/mercury-demo.mp4` in the workspace,
   outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `df5db06` in desktop Chromium, every key sent
   through the D-pad bridge the Leanback app calls, with burned-in captions. It shows
-  the figures this page prints: commit `7bd8b41` named as the only runtime change at
-  50.0% held-out precision over 58 namings, and 90.0% refusals, and after Confirm the
+  the figures this page prints, 50.0% held-out precision over 58 namings and 90.0%
+  refusals, with commit `7bd8b41` named as the only runtime change (the stand-in is
+  the newest lone runtime commit, so a later build names a later one), and after Confirm the
   board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
   and it says so. Two presses differ from this build. In the take, Down from an open
   panel walks out to Connection > Check, where this build keeps the remote in the
