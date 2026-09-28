@@ -273,6 +273,17 @@ def test_focus_ring_is_dimensioned_for_ten_foot_viewing(html):
     assert "box-shadow" in body
 
 
+def test_the_parked_board_after_confirm_draws_a_visible_ring(html):
+    """After Confirm the cursor is deferred and no .tv-focused ring is drawn,
+    so the parked board itself must show where keyboard focus waits."""
+    park = re.search(r"#hero\[tabindex=\"-1\"\]:focus\s*\{(.+?)\}", html, re.DOTALL)
+    assert park, "the parked board needs its own focus rule"
+    body = park.group(1)
+    assert "outline: none" not in body
+    width = re.search(r"outline:\s*(\d+)px", body)
+    assert width and int(width.group(1)) >= 3, "the parked ring must read from a sofa"
+
+
 # ---------------------------------------------------------------- UX and shape
 
 def test_responsive_and_ten_foot_breakpoints_are_present(html):

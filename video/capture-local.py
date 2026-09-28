@@ -179,11 +179,14 @@ def main() -> None:
     log: list[dict[str, object]] = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(args=["--force-device-scale-factor=1"])
+        # Reduced motion, so the headline's split-flap animation renders
+        # instantly: frames taken mid-flip show scrambled glyphs.
         context = browser.new_context(
             viewport={"width": 1920, "height": 1080},
             device_scale_factor=1,
             record_video_dir=str(CAPTURE / "raw"),
             record_video_size={"width": 1920, "height": 1080},
+            reduced_motion="reduce",
         )
         page = context.new_page()
         created = time.monotonic()

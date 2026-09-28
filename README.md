@@ -32,7 +32,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-657%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-662%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -153,7 +153,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 657 passed
+# 662 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -228,7 +228,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 | Part | On the board today | Live path |
 |---|---|---|
 | Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists |
-| Commits | Real commits from this repository's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy | GitHub REST API with `GITHUB_TOKEN`. It returns no file lists, so every commit stays a candidate there |
+| Commits | Real commits from this repository's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |

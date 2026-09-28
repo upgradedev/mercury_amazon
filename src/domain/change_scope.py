@@ -86,8 +86,8 @@ class ServiceScope:
                 "A commit counts as a deploy candidate only when it changed at least one of "
                 "these paths, the files the server is built from. A commit that changed none of "
                 "them deploys no code and is set aside; that is a reading of its file list, not "
-                "a finding that it is harmless. A commit whose file list is unknown (the GitHub "
-                "commits API does not return one) stays a candidate."
+                "a finding that it is harmless. A commit whose file list is unknown (its per-commit "
+                "read failed or hit the endpoint's cap) stays a candidate."
             ),
             "defined_in": "src/domain/change_scope.py",
         }
