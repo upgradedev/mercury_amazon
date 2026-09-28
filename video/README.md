@@ -52,6 +52,13 @@ receipt are in the sibling `narration/` and `capture/` folders.
   (beat 2), 50.0% precision over 58 namings if a fault shows within 75 minutes
   (beat 4, and on the board as 50.0% held-out precision, synthetic, at most 75
   minutes of lag).
+* It differs from the current build in one press. In the take (beat 10; the frame
+  at 139.6 s shows it), Down from the open Delivery velocity panel, and later from
+  Cloud spend, walks out of the panel to Check in the Connection section while the
+  legend still reads Back to the wall. The current build holds
+  the remote inside an open panel until Back closes it: Down at the panel's foot
+  scrolls the rest of the answer into view instead. The capture journey and the shot
+  list describe the current build, so the next take shows Back, Down, Down to Check.
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture is shown at 87.5% so the captions sit in a band under it and never
   cover the board. The page itself was captured at full 1920x1080.

@@ -133,15 +133,19 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
         (0.8, "RIGHT", "Delivery velocity panel", None),
         (("sentence", 1, 0.0), "SELECT", "Load DORA velocity", text_appears("#doraOutput", "offline-fixture")),
     ],
+    # An open panel holds the remote until BACK: DOWN at its foot scrolls the rest of
+    # the answer into view and the cursor stays on the panel's button.
     "beat_10_fixtures": [
-        (0.2, "DOWN", "Check connection", None),
+        (0.2, "DOWN", "Load DORA velocity", None),
         (("sentence", 1, 0.0), "BACK", "Delivery velocity panel", None),
         (("sentence", 2, 0.0), "RIGHT", "Cloud spend panel", None),
         (("sentence", 2, 0.8), "SELECT", "Scan AWS spend", text_appears("#costOutput", "offline-fixture")),
-        (("sentence", 2, 2.0), "DOWN", "Check connection", None),
+        (("sentence", 2, 2.0), "BACK", "Cloud spend panel", None),
     ],
     "beat_11_build_check": [
-        (0.4, "SELECT", "Check connection",
+        (0.2, "DOWN", "How it answers panel", None),
+        (0.6, "DOWN", "Check connection", None),
+        (1.0, "SELECT", "Check connection",
          r"() => /^GET \/health returned 200[^\n]*Build/.test(document.getElementById('connDetail').textContent)"),
     ],
 }

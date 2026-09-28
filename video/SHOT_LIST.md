@@ -49,8 +49,12 @@ is still pending, and the video says so in its closing beat.
 * Down from Refresh handoff scrolls past the handoff's own answer to Evidence behind
   the board, which prints the held-out sentence: 50.0% over 58 namings in 1160
   synthetic labelled cases. The handoff's next step stays below the fold.
-* A panel's answer renders below its buttons. Center brings the top of it into view;
-  Down to the next control (Check, in the Connection section) shows the rest.
+* A panel's answer renders below its buttons. Center brings the top of it into view.
+  An open panel holds the remote until Back closes it: Down at its foot scrolls the
+  rest into view and the cursor stays on the panel's button. Check, in the Connection
+  section, is reached from the wall, under the How it answers tile.
+  The current take was recorded before this change, at `df5db06`: in it, Down from
+  the Delivery velocity panel walks out to Check, and so does Down from Cloud spend.
 * `DPAD_RECORD_ONLY_DEMO` and the `NONE` external effect are in the server's response
   but are not rendered on the page, so no beat claims to show them.
 * Never press Center on **Read aloud** or **Setup**; the video has no product audio.
@@ -68,8 +72,8 @@ is still pending, and the video says so in its closing beat.
 | 7 | `beat_07_confirm` | Right, Center | The board, not scrolled: RECORDED, no pipeline contacted, under Rollback recorded, not sent; the legend reads Next press: Publish responder handoff |
 | 8 | `beat_08_handoff` | Center, Down | Publish handoff answers HTTP 200 and the page shows the rollback steps (token spent, confirming again refused); Down lands on Incident evidence under the held-out sentence: 50.0% over 58 namings in 1160 synthetic labelled cases |
 | 9 | `beat_09_dpad` | Right, Center | Delivery velocity opens; the BACK legend changes to Back to the wall |
-| 10 | `beat_10_fixtures` | Down, Back, Right, Center, Down | DORA answer with OFFLINE FIXTURE; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures |
-| 11 | `beat_11_build_check` | Center on Check | GET /health returned 200, the build's short SHA, GitHub live: no, fixture mode |
+| 10 | `beat_10_fixtures` | Down, Back, Right, Center, Back | DORA answer with OFFLINE FIXTURE, scrolled within the panel; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures; Back to the wall |
+| 11 | `beat_11_build_check` | Down, Down, Center on Check | GET /health returned 200, the build's short SHA, GitHub live: no, fixture mode |
 
 The title card before beat 1 says what the product is first: Mercury. An incident
 board for the team's Fire TV. It names the deploy behind a spike only when it can.

@@ -152,10 +152,10 @@ BEATS = [
         "Its answer is a recording, stamped OFFLINE FIXTURE, because no GitHub token is "
         "set. BACK returns to the wall, not out of the app. Cloud spend is a fixture "
         "too, marked SYNTHETIC.",
-        "D-pad Down to Check shows the rest of the DORA answer with its OFFLINE FIXTURE "
-        "stamp. Back returns to the wall and the legend changes back. Right to Cloud "
-        "spend, Center, Down: the spend answer carries OFFLINE FIXTURE and says its "
-        "figures are SYNTHETIC.",
+        "D-pad Down scrolls the rest of the DORA answer into view with its OFFLINE "
+        "FIXTURE stamp; the cursor stays in the panel. Back returns to the wall and the "
+        "legend changes back. Right to Cloud spend, Center: the spend answer carries "
+        "OFFLINE FIXTURE and says its figures are SYNTHETIC. Back to the wall.",
     ),
     (
         "beat_11_build_check", 16.114,
@@ -165,8 +165,8 @@ BEATS = [
         "Last, the server reports its build: the commit on the opening card, in fixture "
         "mode. This is a desktop browser at Fire TV resolution, driven through the "
         "D-pad bridge the Leanback app calls. No device or emulator run is shown.",
-        "Center on Check. The connection line reads GET /health returned 200, the "
-        "build's short SHA, and GitHub live: no, fixture mode.",
+        "Down to How it answers, Down to Check, Center. The connection line reads GET "
+        "/health returned 200, the build's short SHA, and GitHub live: no, fixture mode.",
     ),
 ]
 
