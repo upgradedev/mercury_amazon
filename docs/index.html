@@ -474,7 +474,7 @@
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
       background-color: var(--seam); border-top: 1px solid var(--rule);
       padding: 0.55rem 4vw; display: none; gap: 0.5rem 1.4rem;
-      align-items: center; flex-wrap: wrap; font-size: var(--fs-small); color: var(--ink-2);
+      align-items: center; flex-wrap: nowrap; font-size: var(--fs-small); color: var(--ink-2);
     }
     .keybar .hint { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
     .keybar .hint svg { width: 1.6em; height: 1.6em; flex: none; }
@@ -484,7 +484,12 @@
       background-color: var(--flap); border: 1px solid var(--rule); color: var(--ink);
       padding: 0.05rem 0.45rem;
     }
-    .keybar .focused-label { margin-left: auto; color: var(--amber); font-weight: 600; }
+    /* One row, always: a long control name at a narrow television width used to wrap
+       the bar onto a second row over the page. The name gives way at its end instead. */
+    .keybar .focused-label {
+      margin-left: auto; color: var(--amber); font-weight: 600;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     /* Inside the Fire TV app the remote is the only input, so the legend needs no
        introduction; in a desktop browser it says whose keys these are. */
     .keybar .remote-note { color: var(--ink); font-weight: 600; }
@@ -1808,7 +1813,7 @@
       // The remote stays inside the open panel until BACK closes it, and the legend
       // says so. UP and DOWN at the panel's edge scroll the rest of it into view,
       // clear of the key bar, instead of walking out to the board or Connection.
-      el('hintMove').textContent = 'Move within this panel';
+      el('hintMove').textContent = 'Move in panel';
       if (window.mercuryNav) {
         window.mercuryNav.contain(target, { bottomInset: keybarHeight });
         window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));

@@ -462,14 +462,14 @@ def test_an_open_panel_holds_the_remote_until_back_closes_it(browser, base_url, 
                             return window.navigateDpad('SELECT'); }}""")
             opened = page.evaluate(WHERE_THE_CURSOR_IS)
             assert opened["panel"] == f"panel-{panel}", opened
-            assert opened["move"] == "Move within this panel", opened
+            assert opened["move"] == "Move in panel", opened
             assert opened["back"] == "Back to the wall", opened
             for direction in ["DOWN"] * 5 + ["RIGHT"] * 3 + ["UP"] * 5 + ["LEFT"] * 3 + ["DOWN"] * 3:
                 press(direction)
                 where = page.evaluate(WHERE_THE_CURSOR_IS)
                 assert where["panel"] == f"panel-{panel}", (
                     f"{direction} in the {panel} panel moved the cursor out to {where['label']}")
-                assert where["move"] == "Move within this panel" and where["back"] == "Back to the wall", where
+                assert where["move"] == "Move in panel" and where["back"] == "Back to the wall", where
             assert page.evaluate("window.navigateDpad('BACK')") is True
             closed = page.evaluate(WHERE_THE_CURSOR_IS)
             assert closed["tile"] == panel and closed["panel"] is None, closed
