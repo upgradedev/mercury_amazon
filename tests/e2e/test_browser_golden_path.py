@@ -96,13 +96,13 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnStage"
             page.keyboard.press("Enter")
             page.locator("#btnConfirm:not([disabled])").wait_for(timeout=10_000)
-            assert "PENDING_CONFIRMATION" in page.locator("#incidentOutput").inner_text()
+            assert "PENDING_CONFIRMATION" in page.locator("#rollbackOutput").inner_text()
 
             page.keyboard.press("ArrowRight")
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnConfirm"
             page.keyboard.press("Enter")
             page.wait_for_function("document.querySelector('#heroEyebrow').textContent.includes('recorded, not sent')")
-            assert "No deployment pipeline was contacted" in page.locator("#incidentOutput").inner_text()
+            assert "No deployment pipeline was contacted" in page.locator("#rollbackOutput").inner_text()
 
             assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnHandoff"
             # The payoff stays on screen: Publish handoff is the next stop, but the
@@ -237,5 +237,129 @@ def test_every_later_screen_can_still_publish_the_shared_handoff_by_d_pad():
             browser.close()
         assert published[0].startswith("handoff_published:checkout-api-active:revision-1:")
         assert published[1].startswith("handoff_published:checkout-api-active:revision-2:")
+    finally:
+        _stop_server(process)
+
+
+# The incident panel's consoles, each as the header's endpoint and the text under it.
+# The panel is hidden until opened, so this reads textContent, not what is painted.
+READ_INCIDENT_CONSOLES = """
+Array.from(document.querySelectorAll('#panel-incident .console')).map(c => ({
+  header: c.querySelector('.console-header span').textContent.trim(),
+  text: c.querySelector('.console-header').nextElementSibling.textContent
+}))
+"""
+
+
+def _markers(tool: str, body: dict) -> list[str]:
+    """Strings that only a rendering of this tool's response would put on screen."""
+    if tool == "what_changed":
+        return ["Baseline mean", body["explanation"]]
+    if tool == "demo_stage_rollback":
+        return [body["state"], body["payload_hash"][:24]]
+    if tool == "demo_confirm_rollback":
+        return [body["status"], body["output"]]
+    raise AssertionError(f"no markers defined for {tool}")
+
+
+def _assert_every_console_shows_what_it_names(page, bodies: dict, step: str) -> list[dict]:
+    """Each console header names one call; the text under it must be that call's answer.
+
+    The header is read from the page and the expected answer from the network, so the
+    check does not trust anything the page says about itself.
+    """
+    import re
+
+    consoles = page.evaluate(READ_INCIDENT_CONSOLES)
+    for console in consoles:
+        named = re.match(r"POST /mcp/tools/(\w+)$", console["header"])
+        for tool, body in bodies.items():
+            shown = [m for m in _markers(tool, body) if m in console["text"]]
+            if named and named.group(1) == tool:
+                assert len(shown) == len(_markers(tool, body)), (
+                    f"after {step}, the console headed {console['header']!r} does not show that"
+                    f" call's answer: {console}")
+            else:
+                assert not shown, (
+                    f"after {step}, the console headed {console['header']!r} shows the answer of"
+                    f" {tool}: {shown} in {console}")
+        if named:
+            assert named.group(1) in bodies, (
+                f"after {step}, a console names {console['header']!r}, which was never called")
+    return consoles
+
+
+def test_each_incident_console_shows_the_request_its_header_names():
+    """Ask, Stage and Confirm used to share one console headed POST /mcp/tools/what_changed.
+
+    After Confirm, the Incident evidence panel showed RECORDED_ONLY, the action and the
+    commit under that header, and the metric series, baseline and window it promised were
+    gone until the next load. Every step of the journey now has to leave each console
+    showing the answer of the call its header names, and a fresh Ask has to put the
+    correlation back and clear the rollback that belonged to the previous answer.
+    """
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    sync_playwright = _browser_api()
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    process = _start_server(port)
+    try:
+        _wait_for_server(base, process)
+        with sync_playwright() as driver:
+            browser = driver.chromium.launch()
+            page = browser.new_page(viewport={"width": 1920, "height": 1080})
+            bodies: dict = {}
+
+            def answered(tool: str, press) -> None:
+                with page.expect_response(lambda r: r.url.endswith("/mcp/tools/" + tool)) as info:
+                    press()
+                bodies[tool] = info.value.json()
+
+            page.goto(base, wait_until="domcontentloaded")
+            page.locator("#btnStage:not([disabled])").wait_for(timeout=15_000)
+            # The board also asks for every other service row on load. Let those land
+            # first, so the answer recorded below is the one this press asked for.
+            page.wait_for_load_state("networkidle")
+
+            # Ask, from the remote: CENTER on Ask what changed.
+            page.locator("#btnWhatChanged").focus()
+            answered("what_changed", lambda: page.keyboard.press("Enter"))
+            page.locator("#btnStage:not([disabled])").wait_for(timeout=10_000)
+            page.wait_for_function("!document.querySelector('#incidentOutput .loading-card')")
+            _assert_every_console_shows_what_it_names(page, bodies, "Ask")
+
+            page.keyboard.press("ArrowRight")
+            answered("demo_stage_rollback", lambda: page.keyboard.press("Enter"))
+            page.locator("#btnConfirm:not([disabled])").wait_for(timeout=10_000)
+            _assert_every_console_shows_what_it_names(page, bodies, "Stage")
+
+            page.keyboard.press("ArrowRight")
+            answered("demo_confirm_rollback", lambda: page.keyboard.press("Enter"))
+            page.wait_for_function(
+                "document.querySelector('#heroEyebrow').textContent.includes('recorded, not sent')")
+            _assert_every_console_shows_what_it_names(page, bodies, "Confirm")
+
+            # Open the panel the way a viewer does and read what is painted.
+            page.locator('.tile[data-panel="incident"]').click()
+            painted = page.locator("#panel-incident").inner_text()
+            assert "Baseline mean" in painted, painted
+            assert bodies["demo_confirm_rollback"]["status"] in painted, painted
+            headers = [c["header"] for c in page.evaluate(READ_INCIDENT_CONSOLES)]
+            assert "POST /mcp/tools/what_changed" in headers, headers
+            assert "POST /mcp/tools/demo_confirm_rollback" in headers, headers
+
+            # A fresh Ask owns the panel again: its correlation is shown, and the
+            # rollback console no longer names or shows the spent rollback.
+            del bodies["demo_stage_rollback"], bodies["demo_confirm_rollback"]
+            spent = page.evaluate(READ_INCIDENT_CONSOLES)
+            answered("what_changed", lambda: page.locator("#btnWhatChanged").click())
+            page.wait_for_function("!document.querySelector('#incidentOutput .loading-card')")
+            consoles = _assert_every_console_shows_what_it_names(page, bodies, "a second Ask")
+            for console in consoles:
+                assert "RECORDED_ONLY" not in console["text"], console
+                assert not console["header"].endswith("_rollback"), console
+            assert len(consoles) == len(spent), (spent, consoles)
+            browser.close()
     finally:
         _stop_server(process)

@@ -916,7 +916,8 @@
         <h2 id="incidentTitle">Incident evidence</h2>
         <p class="panel-desc">Everything the correlator used to reach the answer on the board: the metric
           series and its baseline, the attribution window, the commit it landed on, and where each half
-          of that came from. The rollback controls stay on the board, so the action is never buried.</p>
+          of that came from. The rollback controls stay on the board, so the action is never buried;
+          what Stage and Confirm answered lands in the second console, under the call that returned it.</p>
         <div class="actions-bar">
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
                   title="Return to the panels">Back to wall</button>
@@ -929,6 +930,16 @@
           <div id="incidentOutput" aria-live="polite">
             <div class="empty-state-card">No correlation requested yet. Ask what changed on the board and
               the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
+          </div>
+        </div>
+        <div class="console">
+          <div class="console-header">
+            <span id="rollbackEndpoint">Governed rollback: no call made</span>
+            <span id="rollbackLatency" class="latency"></span>
+          </div>
+          <div id="rollbackOutput" aria-live="polite">
+            <div class="empty-state-card">Nothing staged for this answer. Stage and Confirm on the board,
+              and each response lands here under the call that returned it.</div>
           </div>
         </div>
       </section>
@@ -1880,6 +1891,7 @@
         'Confirming is off until staging mints a single-use governance token.',
         'Disabled until a rollback has been staged and a governance token issued');
       state.staged = null;
+      resetRollbackConsole();
 
       try {
         var res = await post('/mcp/tools/what_changed',
@@ -1986,16 +1998,40 @@
       render('incidentOutput', box);
     }
 
+    /* The rollback console. Its header names the call whose answer is under it, and
+       both are written in one step, so a Stage or Confirm answer can never sit under
+       another call's name. The correlation keeps its own console above it. */
+    var ROLLBACK_IDLE = 'Governed rollback: no call made';
+    function showRollback(header, node) {
+      el('rollbackEndpoint').textContent = header;
+      render('rollbackOutput', node);
+    }
+    function rollbackError(header, message) {
+      el('rollbackEndpoint').textContent = header;
+      showError('rollbackOutput', message);
+    }
+    /* Refused on this page before any request was sent: no endpoint and no latency. */
+    function rollbackRefused(message) {
+      el('rollbackLatency').textContent = '';
+      rollbackError(ROLLBACK_IDLE, message);
+    }
+    function resetRollbackConsole() {
+      el('rollbackLatency').textContent = '';
+      showRollback(ROLLBACK_IDLE, h('div', 'empty-state-card',
+        'Nothing staged for this answer. Stage and Confirm on the board, and each response '
+        + 'lands here under the call that returned it.'));
+    }
+
     async function stageRollback() {
       var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
       if (!rec) {
-        showError('incidentOutput', 'No rollback target. Ask what changed first.');
+        rollbackRefused('No rollback target. Ask what changed first.');
         showPanel('incident');
         return;
       }
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.dpadDemoApproval && !secret) {
-        showError('incidentOutput',
+        rollbackRefused(
           'No governance secret entered. Staging a rollback needs the deployment secret, and the '
           + 'Setup fields have been opened in the Connection section for it. The server prints an ephemeral one at startup.');
         showPanel('incident');
@@ -2005,7 +2041,7 @@
       var stagePath = state.dpadDemoApproval ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback';
       if (!beginCall('btnStage')) { return; }
       var ask = askSeq;
-      showLoading('incidentOutput', 'Calling POST ' + stagePath + ' ...');
+      showRollback('POST ' + stagePath, h('div', 'loading-card', 'Calling POST ' + stagePath + ' ...'));
       try {
         var res = await post(stagePath, {
           action_id: (state.dpadDemoApproval ? 'tv-demo-' : 'tv-') + Date.now(),
@@ -2021,7 +2057,7 @@
         // Somebody asked again while this was in flight: that answer owns the board,
         // and this token is left to expire unused.
         if (ask !== askSeq) { return; }
-        writeLatency('incidentLatency', res.status, res.elapsedMs);
+        writeLatency('rollbackLatency', res.status, res.elapsedMs);
         state.staged = res.body;
 
         setHero({
@@ -2061,15 +2097,15 @@
           ['Lease left', res.body.lease_seconds_remaining + ' s']
         ]));
         box.appendChild(h('p', 'row', res.body.confirmation_prompt));
-        render('incidentOutput', box);
+        showRollback('POST ' + stagePath, box);
         announce('Rollback to ' + res.body.target_commit_sha + ' staged. Confirm is now available.');
         speak(res.body.confirmation_prompt);
         reportHostEvent('rollback_staged', res.body.action_id + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
         if (ask !== askSeq) { return; }
-        latencyOf('incidentLatency', error);
-        showError('incidentOutput', error.message);
+        latencyOf('rollbackLatency', error);
+        rollbackError('POST ' + stagePath, error.message);
         showPanel('incident');
       } finally {
         endCall('btnStage');
@@ -2102,18 +2138,18 @@
     async function confirmRollback() {
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.staged) {
-        showError('incidentOutput', 'Nothing is staged.');
+        rollbackRefused('Nothing is staged.');
         showPanel('incident');
         return;
       }
       var confirmPath = state.dpadDemoApproval ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback';
       if (!beginCall('btnConfirm')) { return; }
-      showLoading('incidentOutput', 'Calling POST ' + confirmPath + ' ...');
+      showRollback('POST ' + confirmPath, h('div', 'loading-card', 'Calling POST ' + confirmPath + ' ...'));
       try {
         var res = await post(confirmPath, {
           action_id: state.staged.action_id,
           governance_token: state.staged.governance_token
-        }, 'incidentLatency', secret);
+        }, 'rollbackLatency', secret);
 
         var sent = res.body.status === 'DISPATCH_ACCEPTED';
         setHero({
@@ -2170,7 +2206,7 @@
           ['Commit', res.body.target_commit_sha]
         ]));
         box.appendChild(h('p', 'row', res.body.output));
-        render('incidentOutput', box);
+        showRollback('POST ' + confirmPath, box);
         announce(res.body.status === 'DISPATCH_ACCEPTED'
           ? 'Rollback to ' + res.body.target_commit_sha + ' sent.'
           : 'Rollback to ' + res.body.target_commit_sha + ' recorded, not sent.');
@@ -2178,7 +2214,7 @@
         reportHostEvent('rollback_confirmed', res.body.status + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
-        showError('incidentOutput', error.message);
+        rollbackError('POST ' + confirmPath, error.message);
         showPanel('incident');
       } finally {
         endCall('btnConfirm');

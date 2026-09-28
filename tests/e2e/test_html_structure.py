@@ -374,7 +374,7 @@ def test_async_regions_announce_themselves_to_assistive_technology(html):
     press inside them rewrites them.
     """
     assert html.count('aria-live="polite"') >= 4
-    for region in ["boardStatus", "incidentOutput", "doraOutput", "costOutput"]:
+    for region in ["boardStatus", "incidentOutput", "rollbackOutput", "doraOutput", "costOutput"]:
         assert region in html
     hero_live = re.search(r'<div id="heroLive"[^>]*>', html).group(0)
     assert "aria-live" not in hero_live, "the answer row must not announce itself on load"

@@ -32,7 +32,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-654%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-655%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -153,7 +153,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 654 passed
+# 655 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
