@@ -260,22 +260,20 @@ refused, not ranked. The full list is in
 
 ## Who it is for and who pays
 
-**This is a commercial hypothesis, not a finding.** Nobody has been asked yet.
+**This is a commercial hypothesis, not a finding.** Nobody has been asked yet, and the
+price below is an untested hypothesis. The user is the on-call responder; the payer is
+whoever owns the on-call rota, from the tooling line that already pays for paging.
 
-- **Who uses it:** the on-call responder, in a room where incidents are worked
-  together and a TV is on the wall.
-- **Who pays:** whoever owns the on-call rota, usually a head of platform or of
-  engineering, from the tooling line that already pays for paging and observability.
-- **Why now, as a hypothesis:** teams ship many small changes a day, so the hour
-  before a spike often holds several. This repository shows the pattern: a 75 minute
-  window ending on one of its commits holds 2.98 commits on average. A tool that says
-  "I cannot tell which" is safer to act on than one that guesses.
-- **What would falsify it:** responders who say the TV is the wrong screen, because
-  everyone is remote, or who say the attribution is not worth reading.
+| Question | Answer |
+|---|---|
+| Population | A ceiling, not a count of rotas: "In 2025, more than 10 million persons were employed as ICT specialists across the European Union (EU)", per [Eurostat](https://ec.europa.eu/eurostat/statistics-explained/index.php?title=ICT_specialists_in_employment). How many of them carry a pager is not measured anywhere this repository has read. |
+| Price hypothesis | Untested: $20 per responder on the rota per month. It sits just under the [PagerDuty Professional](https://www.pagerduty.com/pricing/incident-management/) list price of $21 per user per month billed yearly, and level with [Grafana Assistant](https://grafana.com/pricing/) at $20 per active AI user, a comparable tool that investigates an alert. |
+| Wedge | Platform teams at EU financial entities that run their own services on a rota. Since 17 January 2025 the [Digital Operational Resilience Act](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554) requires processes "to ensure that root causes are identified, documented and addressed". Mercury writes no report; it answers, or refuses on the record, the first question that record has to answer. |
+| Why now | The same regulation, in force since 17 January 2025, and a budget line reopening: [Atlassian](https://www.atlassian.com/software/opsgenie/migration) says "Opsgenie customers have until April 5th, 2027 to complete their move to Jira Service Management." Mercury replaces no pager, but the line it would sit on is being re-decided. |
+| Riskiest assumption | That incidents are worked in a room with a shared screen. The cheapest test is one question to the four rota owners on the target list: where was your last incident worked, and was a screen on? |
 
-There is no price and no market size here, because no figure has been read from a
-dated public source yet. The buyer, the budget line, the basis for a price and the
-first ten conversations are in
+Every quote, the date each page was read, the command that fetched it, the other two
+risky assumptions and their tests, and the first ten conversations are in
 [Who would buy this, and why](docs/EVIDENCE.md#who-would-buy-this-and-why).
 
 ---

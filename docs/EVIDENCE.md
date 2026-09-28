@@ -1265,10 +1265,16 @@ given a substitute number.
 ## Who would buy this, and why
 
 **This section is a commercial hypothesis, not a finding.** Nothing in it has been
-tested against a buyer. There is no price in it, no market size, no revenue
-projection and no conversion rate, because no figure of that kind exists here that
-was produced by anything, and an invented one would be worth less than the gap it
-fills.
+tested against a buyer. It carries three kinds of figure and keeps them apart: a
+figure quoted from a public page that was fetched and read on 2026-09-28, with the
+link and the exact sentence; a price hypothesis, which is untested and says so; and
+one piece of arithmetic on an assumed rota size, labelled ESTIMATE. There is no
+revenue projection and no conversion rate, because nothing here has produced one.
+
+**How the pages were read.** Each page below was fetched on 2026-09-28 with
+`curl -sL -A "<desktop Chrome user agent>" -o page.html "<url>"`, its tags were
+stripped to plain text, and the quoted sentence was copied from that text. A page that
+could not be fetched contributes no figure; the two that failed are named below.
 
 **The buyer.** An engineering organisation that carries on-call: one production
 service, a paging rota, and someone whose week is worse when an incident runs long.
@@ -1288,24 +1294,150 @@ second is a guess about where this work happens, and it has never been checked w
 a responder. Those two are not the same kind of claim and this section does not
 treat them as one.
 
+### The population
+
+The one population figure read from a primary source this session is Eurostat's
+count of ICT specialists in the EU, from
+[ICT specialists in employment](https://ec.europa.eu/eurostat/statistics-explained/index.php?title=ICT_specialists_in_employment)
+(the page says "Data extracted in April 2026"):
+
+> "In 2025, more than 10 million persons were employed as ICT specialists across the European Union (EU)."
+> ([Eurostat](https://ec.europa.eu/eurostat/statistics-explained/index.php?title=ICT_specialists_in_employment), read 2026-09-28)
+
+It is a ceiling, not the buyer. Eurostat's own definition is wide: "ICT specialists
+are defined as persons who have the ability to develop, operate and maintain ICT
+systems and for whom ICTs constitute the main part of their job", and its occupation
+list includes ICT sales professionals, graphic and multimedia designers and IT
+trainers, none of whom carries a pager. How many of the ten million sit on an on-call
+rota is not measured by any source read here, and that gap is part of the second
+riskiest assumption below.
+
+Two sources were tried and give no figure:
+
+- The United States Bureau of Labor Statistics. `www.bls.gov` and `download.bls.gov`
+  both answered 403 to this fetch. The public API at `api.bls.gov` returned a single
+  value for a series identifier, but the page that says what that identifier counts
+  could not be read, so the value is not used.
+- The ECB's list of supervised banks, which would have counted the largest part of
+  the wedge below. The connection failed, so the wedge is **not counted**.
+
+**Distribution context, not buyers.** Amazon's
+[Fire TV developer page](https://developer.amazon.com/fire-tv) says "Develop for the
+leading streaming devices with over 250 million Fire TV devices worldwide." That says
+the screen Mercury renders on is common and cheap to put on a wall. It says nothing
+about whether incidents are worked in front of one.
+
+### The willingness-to-pay basis
+
 **The budget line.** The engineering tooling line that already carries the on-call
 paging subscription and the observability subscription. Mercury is not asking for a
 new line: it sits on the screen those two tools are already read on, and its claim
 is about the minutes between the page and the rollback, which is what that line is
 bought to shorten.
 
-**The willingness-to-pay basis.** These organisations already pay per seat for
-incident management and paging, and per host or per ingested gigabyte for metrics
-and logs. The comparable line items, with list prices their vendors publish openly,
-are PagerDuty and Atlassian Opsgenie or Jira Service Management for paging, and
-Datadog and Grafana Cloud for observability. Those published pages are the basis a
-price should be argued from, and the honest state of it is that **no figure from
-them is restated here, because none has been read and recorded against a date by
-anyone working on this repository.** Doing that, and writing down the date the page
-was read, is the next step and is not one that can be faked from memory.
+The comparable list prices, read from the vendors' own pricing pages on 2026-09-28:
 
-**The first ten conversations.** A target list, not a pipeline. None of these has
-been contacted, and no one has agreed to anything.
+- **Paging.** [PagerDuty incident management pricing](https://www.pagerduty.com/pricing/incident-management/)
+  shows the Professional plan as "$21 per user /month" on yearly billing and $25 on
+  monthly billing, and the Business plan as $41 yearly and $49 monthly. Its free plan
+  covers "up to 5 users".
+- **An assistant that investigates an alert.** [Grafana's pricing page](https://grafana.com/pricing/)
+  lists Grafana Assistant Pro as "Starts at $20.00 / active AI user" with a "Platform
+  fee of $19 per month". The same page describes an investigation as a task where you
+  "point it at an alert, incident, or question" and it returns a report with findings.
+  This is the nearest published price for the job Mercury does.
+- **Observability seats.** The same Grafana page says a Cloud Pro account without
+  Enterprise plugins "is priced at $8 per active user per month".
+
+### The price hypothesis
+
+**Price hypothesis, untested: $20 per responder on the rota per month, billed
+yearly.** Nobody has been shown this number. The reasoning:
+
+1. Mercury is a second opinion that sits beside the pager, not a replacement for it,
+   so it should not cost more than the pager seat the buyer already pays, which is
+   $21 per user per month on
+   [PagerDuty's Professional plan](https://www.pagerduty.com/pricing/incident-management/).
+2. [Grafana](https://grafana.com/pricing/) charges $20 per active AI user for an
+   assistant that is pointed at an alert and reports what it found. That is the published going rate for the same
+   question, asked by a vendor the buyer may already use.
+3. It is priced per responder on the rota, not per viewer, because the television is
+   shared and the rota is the unit the buyer already counts and pays for.
+
+ESTIMATE, on an assumed rota of eight responders that nobody has measured: eight
+times $20 is $160 per month, or $1,920 a year, per rota. It is arithmetic on a
+hypothesis and it is not a revenue figure.
+
+### The wedge
+
+**The first narrow customer:** the platform team at an EU financial entity that runs
+its own production services on an on-call rota.
+
+**Why they feel the pain now.** Since 17 January 2025 they have been subject to
+Regulation (EU) 2022/2554, the Digital Operational Resilience Act, read from
+[EUR-Lex](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554).
+Article 64: "It shall apply from 17 January 2025." Article 17(1): "Financial entities
+shall define, establish and implement an ICT-related incident management process to
+detect, manage and notify ICT-related incidents." Article 17(2) asks for processes
+"to ensure that root causes are identified, documented and addressed in order to
+prevent the occurrence of such incidents." For a major incident, Article 19(4)(c)
+asks for "a final report, when the root cause analysis has been completed".
+
+So this team has to write down what caused an incident, on a date, for a regulator.
+Mercury does not write that report and does not make anyone meet the regulation. It
+answers, or refuses on the record with its reason, the first question that report
+has to answer, and it prints how often its answer is right. A refusal that says
+several changes landed and nothing in the metric says which is a line a root cause
+record can carry; a confident wrong name is a line it cannot.
+
+The count of such teams is not given, because no source that counts them was read.
+
+### Why now
+
+- **A dated regulation.** The Digital Operational Resilience Act has applied since
+  17 January 2025, quoted above.
+- **A budget line being re-decided.** Atlassian's
+  [Opsgenie migration page](https://www.atlassian.com/software/opsgenie/migration)
+  says "Opsgenie customers have until April 5th, 2027 to complete their move to Jira
+  Service Management." and gives Jun 4, 2025 as the end of sale. Every team on
+  Opsgenie is choosing its paging tool again before that date. Mercury does not page
+  anyone and replaces no pager; the claim is only that the line it would sit on is
+  open for a decision now.
+- **Many changes an hour.** Teams ship many small changes a day, so the window before
+  a spike often holds several. This repository shows the pattern: a 75 minute window
+  ending on one of its commits holds 2.98 commits on average. A tool that says "I
+  cannot tell which" is safer to act on than one that guesses.
+
+### The three riskiest assumptions, and the cheapest test for each
+
+Each test is one the owner can run this week, without building anything.
+
+1. **Incidents are worked in a room with a shared screen.** If everyone is remote,
+   the television premise is wrong and no price fixes it. *Test:* ask the four rota
+   owners at the top of the list below one question: where was your last incident
+   worked, and was a shared screen on? Four messages. *Kill line:* fewer than two of
+   the four describe a shared screen. The product then ships as the laptop page it
+   already is, because the same page and the same HTTP surface render there and the
+   five-condition governance path does not care what screen confirmed it.
+2. **A refusal is worth reading, and enough of the ten million are on a rota to
+   matter.** On the measured hit rate in [How often it is right](#how-often-it-is-right)
+   the engine is not a product yet unless a responder values being told "I cannot
+   tell". *Test:* replay `POST /mcp/tools/what_changed` on the last ten incidents of
+   the maintainer's own rota whose cause a postmortem already records, and write down
+   for each whether Mercury named the right change, named a wrong one, or refused,
+   and whether the responder says the answer would have changed the first ten
+   minutes. One afternoon, and it needs no buyer. *Kill line:* any wrong name on a
+   real incident, or refusals the responder says they would not have read.
+3. **The price is $20 per responder, paid from the paging and observability line.**
+   *Test:* in the same four conversations, state the price hypothesis and record yes,
+   no or the counter-offer, and which budget line they would pay it from. *Kill
+   line:* nobody names the paging or observability line, which means the budget
+   premise is wrong even if the price is not.
+
+### The first ten conversations
+
+A target list, not a pipeline. None of these has been contacted, and no one has
+agreed to anything.
 
 1. Upgrade (`upgrade.net.gr`), the maintainer's own consultancy: its own on-call
    rota, and the only place where the access to install this already exists.
@@ -1325,21 +1457,10 @@ been contacted, and no one has agreed to anything.
 10. Amazon's Fire TV developer relations, as a distribution conversation rather
     than a revenue one.
 
-**What would falsify it.** Two different things, and they fail differently.
-
-If responders say the television is the wrong screen, because everyone is remote
-and the room is empty, then the delivery premise is wrong and no price fixes it.
-That is the first question to ask and it has not been asked. It would cost the
-surface, not the product: the same page and the same HTTP surface already render
-on a laptop, and the five-condition governance path does not care what screen
-confirmed it.
-
-If responders say the attribution is not worth reading, that is fatal, and the
-measured hit rate in [How often it is right](#how-often-it-is-right) is the reason
-to take that seriously: on the evidence there, the engine is not a product yet.
-What would make it one is a ranked candidate set in place of a refusal on a
-crowded window, which the corpus points straight at; a runtime file-list filter
-shipped on 2026-09-27 as a constraint, and this corpus cannot say whether it helps,
-because its labels let any commit cause a regression. The other fix it pointed at, a
-baseline drawn from before the onset, shipped on 2026-09-08 and is measured above. No commercial claim here rests on a figure that has not been
-measured, and none of the figures above is a commercial figure.
+**What would make the engine a product.** A ranked candidate set in place of a
+refusal on a crowded window, which the corpus points straight at; a runtime file-list
+filter shipped on 2026-09-27 as a constraint, and this corpus cannot say whether it
+helps, because its labels let any commit cause a regression. The other fix it pointed
+at, a baseline drawn from before the onset, shipped on 2026-09-08 and is measured
+above. No figure in this section is a measured commercial figure: the quoted ones
+describe the world, the price is a hypothesis, and the rota arithmetic is an ESTIMATE.

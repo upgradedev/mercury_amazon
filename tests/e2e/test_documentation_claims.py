@@ -458,34 +458,66 @@ def test_the_readme_cleartext_claim_matches_the_manifests():
     assert "tools:replace" in debug_manifest
 
 
-def test_the_buyer_section_declares_itself_a_hypothesis_and_invents_no_numbers():
+def test_the_buyer_section_declares_itself_a_hypothesis_and_sources_every_figure():
     """The commercial section is the easiest place in a README to make things up.
 
-    The rule it is held to is the one that was set for it: name the buyer, the
-    budget line, the basis and the first calls, and state plainly that none of it
-    has been tested. A price, a market size or a conversion rate would all be
-    fabrications, so this test refuses them by shape rather than by review.
+    The rule it is held to: name the buyer, the budget line, the basis and the first
+    calls, and state plainly that none of it has been tested with a buyer. A figure
+    is allowed only where it can be checked or where it says what it is: every
+    paragraph, list or table row that states a currency amount or a count in
+    millions must carry the link it was read from, or call itself a hypothesis or an
+    ESTIMATE. An unsourced number is the fabrication this test refuses, by shape
+    rather than by review, and a market size in money or a percentage is refused
+    outright because no source read for this section produces one.
     """
     assert "## Who would buy this, and why" in EVIDENCE
     section = EVIDENCE.split("## Who would buy this, and why")[1].split("\n## ")[0]
     # The README carries the short form of the same section, held to the same rule.
     assert "## Who it is for and who pays" in README
     short = README.split("## Who it is for and who pays")[1].split("\n## ")[0]
-    assert "commercial hypothesis, not a finding" in " ".join(short.split()).lower()
+    short_lowered = " ".join(short.split()).lower()
+    assert "commercial hypothesis, not a finding" in short_lowered
+    assert "price hypothesis" in short_lowered and "untested" in short_lowered
 
     # Normalised, because a required sentence can be split across a wrap.
     lowered = " ".join(section.split()).lower()
     assert "commercial hypothesis, not a finding" in lowered
     assert "none of these has been contacted" in lowered
-    for required in ["the buyer.", "the budget line.", "the willingness-to-pay basis."]:
+    assert "price hypothesis, untested" in lowered
+    for required in ["the buyer.", "the budget line.", "the willingness-to-pay basis",
+                     "the wedge", "why now", "the three riskiest assumptions"]:
         assert required in lowered, f"the section does not name {required!r}"
+    # Each quoted page is linked, and the date it was read is on record.
+    assert "fetched on 2026-09-28" in lowered
+    for source in [
+        "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=ICT_specialists_in_employment",
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554",
+        "https://www.atlassian.com/software/opsgenie/migration",
+        "https://www.pagerduty.com/pricing/incident-management/",
+        "https://grafana.com/pricing/",
+    ]:
+        assert source in section, f"the section no longer links the page it quotes: {source}"
+
+    figure = re.compile(r"[$€£]\s?\d|\d[\d,.]*\s?million", re.IGNORECASE)
+    for text, where in ((section, "docs/EVIDENCE.md"), (short, "README.md")):
+        blocks = []
+        for paragraph in re.split(r"\n\s*\n", text):
+            rows = [line for line in paragraph.splitlines() if line.startswith("|")]
+            blocks.extend(rows if rows else [paragraph])
+        for block in blocks:
+            if not figure.search(block):
+                continue
+            labelled = "http" in block or re.search(r"hypothesis|\bESTIMATE\b", block, re.IGNORECASE)
+            assert labelled, (
+                f"{where} states a figure with no link and no hypothesis label: "
+                f"{' '.join(block.split())[:160]!r}"
+            )
 
     forbidden = {
-        r"[$€£]\s?\d": "a currency figure",
         r"\barr\b": "an ARR claim",
         r"\btam\b": "a market size",
+        r"[$€£]\s?[\d,.]+\s?(?:bn|mn|million|billion)\b": "a market size in money",
         r"\d+\s?%": "a percentage",
-        r"\bper (?:seat|user|host|month) (?:for|at) [$€£]": "a price",
     }
     for pattern, what in forbidden.items():
         for text in (section, short):
