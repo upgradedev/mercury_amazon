@@ -126,7 +126,8 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
         (1.0, "SELECT", "Publish responder handoff", BOARD_RECORDED),
     ],
     "beat_08_handoff": [
-        (0.3, "SELECT", "Refresh shared handoff", text_appears("#handoffOutput", "Next step")),
+        # The cursor stays on Publish and the handoff's answer comes up above the key bar.
+        (0.3, "SELECT", "Publish responder handoff", text_appears("#handoffOutput", "Next step")),
         (("sentence", 1, 0.0), "DOWN", "Incident evidence panel", None),
     ],
     "beat_09_dpad": [

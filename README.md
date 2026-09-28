@@ -212,9 +212,11 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   the figures this page prints: commit `7bd8b41` named as the only runtime change at
   50.0% held-out precision over 58 namings, and 90.0% refusals, and after Confirm the
   board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
-  and it says so. One press differs from this build: in the take, Down from an open
-  panel walks out to Connection > Check; this build keeps the remote in the panel
-  until Back. Details in [video/README.md](video/README.md).
+  and it says so. Two presses differ from this build. In the take, Down from an open
+  panel walks out to Connection > Check, where this build keeps the remote in the
+  panel until Back; and Center on Publish handoff moves the cursor on to Refresh with
+  the handoff's answer below the fold, where this build stays on Publish and brings
+  the answer up. Details in [video/README.md](video/README.md).
 - **A public deployment of this build.** The
   [live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
   serves build `6dd76bd`, probed 2026-09-26: older than this branch and the design

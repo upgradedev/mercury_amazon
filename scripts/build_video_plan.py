@@ -127,9 +127,11 @@ BEATS = [
         "Center publishes the handoff, and the steps show the token spent: confirming "
         "again is refused. Down reaches the evidence behind the odds: 58 namings, in "
         "1160 synthetic cases.",
-        "Center on the deferred Publish handoff; the server answers HTTP 200 and the "
-        "page scrolls to the rollback steps, where 02 Confirm reads that the token has "
-        "been spent and confirming again is refused by name. D-pad Down lands on "
+        "Center on the deferred Publish handoff; the server answers HTTP 200, the "
+        "cursor stays on Publish, and the page scrolls until the handoff's responder, "
+        "facts and next step clear the key bar, under the rollback steps, where 02 "
+        "Confirm reads that the token has been spent and confirming again is refused "
+        "by name. D-pad Down lands on "
         "Incident evidence and brings Evidence behind the board into view: 50.0% over "
         "58 namings in 1160 synthetic labelled cases.",
     ),

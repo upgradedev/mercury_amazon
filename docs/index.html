@@ -2192,6 +2192,19 @@
 
     function handoffIncidentId() { return state.service + '-active'; }
 
+    /* Scroll just far enough that the bottom of node clears the key bar, without
+       pushing anchor (the control the cursor is on) off the top of the screen. */
+    function revealAboveKeybar(node, anchor) {
+      if (!node || !node.getBoundingClientRect) { return; }
+      var gap = 16;
+      var floor = window.innerHeight - keybarHeight() - gap;
+      var overflow = node.getBoundingClientRect().bottom - floor;
+      if (overflow <= 0) { return; }
+      var room = anchor ? anchor.getBoundingClientRect().top - gap : overflow;
+      var distance = Math.min(overflow, room);
+      if (distance > 0) { window.scrollBy(0, distance); }
+    }
+
     function renderHandoff(data) {
       state.handoffRevision = data.revision;
       var box = document.createElement('div');
@@ -2280,11 +2293,10 @@
         }
         renderHandoff(res.body);
         announce('Handoff published, shared revision ' + res.body.revision + '.');
-        // The handoff lives on the second screen beside the rollback steps, so
-        // publishing no longer opens a panel: the cursor moves to Refresh.
-        if (window.mercuryNav) {
-          window.mercuryNav.setFocus(document.querySelector('[data-action="handoff-refresh"]'));
-        }
+        // The cursor stays on Publish, and the answer it produced (responder, facts,
+        // next step) is brought up above the key bar. The cursor used to move on to
+        // Refresh while the answer stayed below the fold, behind the bar.
+        revealAboveKeybar(el('handoffOutput'), el('btnHandoff'));
         reportHostEvent('handoff_published', res.body.incident_id + ':revision-' + res.body.revision + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {

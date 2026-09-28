@@ -44,11 +44,13 @@ is still pending, and the video says so in its closing beat.
   Center then publishes and scrolls to the rollback steps, where **02 Confirm** says
   the token has been spent and confirming again is refused.
 * How it answers and Who it is for open from a fourth tile on its own row under the
-  three evidence tiles, so Down from Refresh handoff still lands on Incident evidence
+  three evidence tiles, so Down from Publish handoff still lands on Incident evidence
   and Right from there on Delivery velocity, as the capture journey expects.
-* Down from Refresh handoff scrolls past the handoff's own answer to Evidence behind
-  the board, which prints the held-out sentence: 50.0% over 58 namings in 1160
-  synthetic labelled cases. The handoff's next step stays below the fold.
+* Center on Publish handoff keeps the cursor there and scrolls until the handoff's
+  answer (responder, facts, next step) clears the key bar. Down from Publish handoff
+  then reaches Evidence behind the board, which prints the held-out sentence: 50.0%
+  over 58 namings in 1160 synthetic labelled cases. In the `df5db06` take the cursor
+  moved on to Refresh handoff instead and the handoff's next step stayed below the fold.
 * A panel's answer renders below its buttons. Center brings the top of it into view.
   An open panel holds the remote until Back closes it: Down at its foot scrolls the
   rest into view and the cursor stays on the panel's button. Check, in the Connection
@@ -70,7 +72,7 @@ is still pending, and the video says so in its closing beat.
 | 5 | `beat_05_provenance` | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
 | 6 | `beat_06_stage` | Up, Right, Center | Rollback staged, the lease counting down as the large figure, Next: confirm, record-only |
 | 7 | `beat_07_confirm` | Right, Center | The board, not scrolled: RECORDED, no pipeline contacted, under Rollback recorded, not sent; the legend reads Next press: Publish responder handoff |
-| 8 | `beat_08_handoff` | Center, Down | Publish handoff answers HTTP 200 and the page shows the rollback steps (token spent, confirming again refused); Down lands on Incident evidence under the held-out sentence: 50.0% over 58 namings in 1160 synthetic labelled cases |
+| 8 | `beat_08_handoff` | Center, Down | Publish handoff answers HTTP 200 and the page shows the handoff's responder, facts and next step under the rollback steps (token spent, confirming again refused); Down lands on Incident evidence under the held-out sentence: 50.0% over 58 namings in 1160 synthetic labelled cases |
 | 9 | `beat_09_dpad` | Right, Center | Delivery velocity opens; the BACK legend changes to Back to the wall |
 | 10 | `beat_10_fixtures` | Down, Back, Right, Center, Back | DORA answer with OFFLINE FIXTURE, scrolled within the panel; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures; Back to the wall |
 | 11 | `beat_11_build_check` | Down, Down, Center on Check | GET /health returned 200, the build's short SHA, GitHub live: no, fixture mode |

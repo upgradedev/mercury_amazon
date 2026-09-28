@@ -124,6 +124,18 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
             page.keyboard.press("Enter")
             page.locator("#handoffOutput .tag-live").wait_for(timeout=10_000)
             assert "D-pad demo responder" in page.locator("#handoffOutput").inner_text()
+            # The payoff of Publish is on screen: the cursor stays on Publish, and the
+            # handoff's last line clears the remote's key bar. The cursor used to move
+            # on to Refresh while the responder, facts and next step sat under the bar.
+            shown = page.evaluate(
+                "(() => { const out = document.querySelector('#handoffOutput').getBoundingClientRect();"
+                " const bar = document.querySelector('.keybar').getBoundingClientRect();"
+                " const publish = document.querySelector('#btnHandoff').getBoundingClientRect();"
+                " return { cursor: window.mercuryNav.current.id, bottom: out.bottom, bar: bar.top,"
+                " publishTop: publish.top }; })()")
+            assert shown["cursor"] == "btnHandoff", shown
+            assert shown["bottom"] <= shown["bar"], f"the handoff answer is under the key bar: {shown}"
+            assert shown["publishTop"] >= 0, f"Publish handoff left the top of the screen: {shown}"
             browser.close()
 
         demo_calls = [(url, auth) for url, auth in calls if "/demo_" in url or "/demo-handoff" in url]

@@ -52,7 +52,8 @@ receipt are in the sibling `narration/` and `capture/` folders.
   (beat 2), 50.0% precision over 58 namings if a fault shows within 75 minutes
   (beat 4, and on the board as 50.0% held-out precision, synthetic, at most 75
   minutes of lag).
-* It differs from the current build in one press. In the take (beat 10; the frame
+* It differs from the current build in two presses; the second, Publish handoff, is
+  under Known weaknesses. In the take (beat 10; the frame
   at 139.6 s shows it), Down from the open Delivery velocity panel, and later from
   Cloud spend, walks out of the panel to Check in the Connection section while the
   legend still reads Back to the wall. The current build holds
@@ -126,6 +127,8 @@ record at that commit; the title card and the Check line both name it.
 * The D-pad scrolls only as far as the focused control. Center on Publish handoff
   brings the rollback steps into view, and Down then passes the handoff's own answer on
   the way to the evidence, so the handoff's facts and next step never appear on screen.
+  The current build differs here too: the cursor stays on Publish handoff and the page
+  scrolls until the handoff's answer clears the key bar.
   The Delivery velocity and Cloud spend answers come into view when Center opens them.
 * The named commit is one of this repository's own, standing in for a deploy feed,
   and the metric is generated. The board labels both.
