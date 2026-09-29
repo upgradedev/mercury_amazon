@@ -119,6 +119,13 @@ def test_browser_completes_record_only_dpad_journey_without_a_typed_secret():
             assert hero["rings"] == 0, hero
             # Keyboard focus agrees: it waits on the board, not on the off-screen control.
             assert hero["active"] == "hero", hero
+            # And the wait is visible: the parked board draws the ring the
+            # deferred cursor withholds, so the screen never shows no ring.
+            outline = page.evaluate(
+                "(() => { const s = getComputedStyle(document.querySelector('#hero'));"
+                " return { style: s.outlineStyle, width: s.outlineWidth }; })()")
+            assert outline["style"] == "solid" and float(outline["width"].replace("px", "")) >= 2, (
+                f"the parked board shows no visible ring: {outline}")
             # The evidence keeps the held-out measurement of the answer that was acted on.
             assert "held-out split" in hero["evidence"], hero
             page.keyboard.press("Enter")

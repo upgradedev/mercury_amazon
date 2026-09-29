@@ -117,9 +117,11 @@
       padding: 0.6rem 1rem; font-weight: 700; text-decoration: none;
     }
     .skip-link:focus { top: 0.5rem; }
-    /* The board takes keyboard focus only as a parking place after Confirm; the
-       D-pad legend says where the next press goes, so it draws no outline. */
-    #hero[tabindex="-1"]:focus { outline: none; }
+    /* The board takes keyboard focus only as a parking place after Confirm. The
+       deferred cursor draws no ring until the next press, so the parked board
+       draws one itself: where focus waits is always visible, and the D-pad
+       legend still says where the next press goes. */
+    #hero[tabindex="-1"]:focus { outline: 3px solid var(--amber); outline-offset: 3px; }
 
     /* Keyboard focus for anyone not using the D-pad ring. */
     a:focus-visible, button:focus-visible, input:focus-visible {

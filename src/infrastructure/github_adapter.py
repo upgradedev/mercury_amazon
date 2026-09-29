@@ -49,6 +49,9 @@ DEFAULT_REPO = "upgradedev/mercury_amazon"
 DEFAULT_WINDOW_DAYS = 30
 PER_PAGE = 100
 MAX_PAGES = 5
+# The single-commit endpoint caps the files it returns. A full page may hide a
+# runtime file past the cap, so a capped read is unknown, not a clean bill.
+COMMIT_FILES_CAP = 300
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "github_telemetry_fixture.json"
 
 
@@ -394,11 +397,37 @@ class GitHubTelemetryAdapter:
         except Exception as exc:
             return self._fixture_pr_radar(f"Live GitHub call failed ({type(exc).__name__}: {exc}).")
 
+    def _commit_paths(self, full_sha: str) -> list[str] | None:
+        """Filenames changed by one commit, or None when the API does not say.
+
+        The commits list carries no file lists, so each commit costs one extra
+        read. A failed read leaves the list unknown and the commit a candidate;
+        missing data never sets a change aside.
+        """
+        if not full_sha:
+            return None
+        try:
+            detail = self._get(f"/repos/{self.repository}/commits/{full_sha}")
+        except Exception:
+            return None
+        files = detail.get("files") if isinstance(detail, dict) else None
+        if not isinstance(files, list):
+            return None
+        if len(files) >= COMMIT_FILES_CAP:
+            return None
+        return [
+            str(item.get("filename", ""))
+            for item in files
+            if isinstance(item, dict) and item.get("filename")
+        ]
+
     def list_recent_commits(self, limit: int = 10) -> list[dict[str, Any]]:
         """Return recent default-branch commits, used by the incident correlator.
 
         Returns an empty list when no live call is possible. The caller decides
-        what to display; this adapter never invents a commit.
+        what to display; this adapter never invents a commit. Each commit counts
+        one list read plus one files read, so a call costs at most ``limit + 2``
+        requests against the token's rate limit.
         """
         if not self.can_call_live:
             return []
@@ -412,12 +441,14 @@ class GitHubTelemetryAdapter:
             commits = []
             for entry in payload[:limit]:
                 commit = entry.get("commit", {})
+                full_sha = entry.get("sha", "")
                 commits.append({
-                    "sha": entry.get("sha", "")[:7],
-                    "full_sha": entry.get("sha", ""),
+                    "sha": full_sha[:7],
+                    "full_sha": full_sha,
                     "message": (commit.get("message") or "").splitlines()[0] if commit.get("message") else "",
                     "author": (commit.get("author") or {}).get("name", "unknown"),
                     "committed_at": (commit.get("author") or {}).get("date", ""),
+                    "paths": self._commit_paths(full_sha),
                 })
             return commits
         except Exception:

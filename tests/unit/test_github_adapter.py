@@ -190,3 +190,44 @@ def test_the_committed_fixture_declares_where_it_came_from():
         "change_failure_rate_percentage", "mean_time_to_recovery_hours",
         "sample_size", "window_days",
     }
+def test_recent_commits_carry_their_file_lists_from_a_per_commit_read():
+    routes = {
+        f"/repos/{REPO}": {"default_branch": "main"},
+        f"/repos/{REPO}/commits": [
+            {"sha": "aaa111", "commit": {"message": "ship it", "author": {"name": "D", "date": _iso(15)}}},
+            {"sha": "bbb222", "commit": {"message": "docs", "author": {"name": "D", "date": _iso(25)}}},
+        ],
+        f"/repos/{REPO}/commits/aaa111": {"files": [{"filename": "src/app.py"}, {"filename": "README.md"}]},
+        f"/repos/{REPO}/commits/bbb222": {"files": [{"filename": "README.md"}]},
+    }
+    adapter = GitHubTelemetryAdapter(token="ghp_test", repository=REPO, client=make_client(routes))
+    commits = adapter.list_recent_commits(limit=5)
+    assert commits[0]["paths"] == ["src/app.py", "README.md"]
+    assert commits[1]["paths"] == ["README.md"]
+
+
+def test_a_failed_per_commit_read_leaves_the_file_list_unknown():
+    """A commit whose files cannot be read stays a candidate: missing data
+    never sets a change aside."""
+    routes = {
+        f"/repos/{REPO}": {"default_branch": "main"},
+        f"/repos/{REPO}/commits": [
+            {"sha": "aaa111", "commit": {"message": "ship it", "author": {"name": "D", "date": _iso(15)}}},
+        ],
+    }
+    adapter = GitHubTelemetryAdapter(token="ghp_test", repository=REPO, client=make_client(routes))
+    assert adapter.list_recent_commits(limit=5)[0]["paths"] is None
+
+
+def test_a_capped_file_list_stays_unknown():
+    """The single-commit endpoint caps its file list; a full page may hide a
+    runtime file, so it is unknown, not a clean bill."""
+    routes = {
+        f"/repos/{REPO}": {"default_branch": "main"},
+        f"/repos/{REPO}/commits": [
+            {"sha": "aaa111", "commit": {"message": "mega merge", "author": {"name": "D", "date": _iso(15)}}},
+        ],
+        f"/repos/{REPO}/commits/aaa111": {"files": [{"filename": f"f{i}.txt"} for i in range(300)]},
+    }
+    adapter = GitHubTelemetryAdapter(token="ghp_test", repository=REPO, client=make_client(routes))
+    assert adapter.list_recent_commits(limit=5)[0]["paths"] is None

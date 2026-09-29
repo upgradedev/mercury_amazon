@@ -307,9 +307,9 @@ that define how that artefact is built and deployed.
 Everything else is not a runtime path for this server: the README and the other
 documents, tests, CI, the video plan and the Fire TV client in `app/`. A commit whose
 file list is unknown stays a candidate, so missing data never makes Mercury more willing
-to name a change. Local git and the checked-in recording supply file lists; the GitHub
-commits API Mercury reads with a `GITHUB_TOKEN` does not, so with a token set every
-commit stays a candidate and the filter has nothing to act on. A commit set aside is
+to name a change. Local git, the checked-in recording and the GitHub path supply file
+lists; the GitHub path reads each commit's files with one extra call per commit, and a
+failed or capped read stays a candidate. A commit set aside is
 counted on the wire (`attribution.commits_set_aside`) and in the refusal wording, which
 says it is a reading of file lists, not a finding that those changes are harmless.
 `tests/unit/test_change_scope.py` parses the Dockerfile and the packager and fails if
@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-657 tests and a re-measure on an idle machine is pending**.
+662 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 657 passed
+# 662 passed
 ```
 
 #### Step 3: Start the server
@@ -1076,8 +1076,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 657 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2000 statements
+python -m pytest tests/ -q                                    # 662 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2047 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
