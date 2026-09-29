@@ -1,17 +1,15 @@
 # Demo video
 
-**Status: rendered locally, not uploaded.** One take exists outside this repository.
-It has no public link until the owner uploads it, and nothing in this directory is
-the video itself.
+**Status: rendered locally, not uploaded.** The current take is the audit-build take below. It has no public link until the owner uploads it, and nothing in this directory is the video itself.
 
 | Item | Value |
 |---|---|
-| Recorded commit | `df5db06ff398bcde36d1985a9910a68d137f0b63`, reported by the server's own `/health` during the take |
-| File | `mercury-demo.mp4`, on the owner's machine in the workspace folder `reviews/videos_20260928/mercury_amazon/output/`, outside git |
+| Recorded commit | `0aed20ab83ab5af6cb2af41b33b85fd5f1414f3c` (audit branch `muse/audit-mercury-20260928`), reported by the server's own `/health` during the take |
+| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_muse_20260929/mercury_amazon/output/`, outside git |
 | Length | 170.61 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.3 LUFS integrated |
-| SHA-256 | `41f831a2be036b49a1172963012c38d9e9fc33ce09c364c3c86fd0cd9fe12cc4` |
+| SHA-256 | `8f5f3c34db92a1a8b7fec8225839836e7d40a02fcb9ea397c779f301f7983ca2` |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 2249 in the final narration. This take re-synthesized beats 1, 5, 7, 8, 10 and 11 (1146 characters in 6 calls) and reused beats 2, 3, 4, 6 and 9 from the previous take's cache; 5092 sent across all calls since the first take |
+| Characters synthesized | 2249 in the final narration, 0 new: all 11 beats reused from the `reviews/videos_20260928` cache (cache keys match), generated with no ElevenLabs key in the environment, so no synthesis call was possible |
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
 
 Next to the mp4 sit `video-receipt.json` (commit, duration, SHA-256, voice, characters),
@@ -24,7 +22,7 @@ receipt are in the sibling `narration/` and `capture/` folders.
 * A 4 second title card that says what the product is before where the take came
   from: "Mercury. An incident board for the team's Fire TV. It names the deploy behind
   a spike only when it can." One smaller line under it reads: local run of commit
-  df5db06 in desktop Chromium, offline fixtures, record-only rollback, public
+  0aed20a in desktop Chromium, offline fixtures, record-only rollback, public
   deployment pending. A 3 second closing card repeats the commit and says the public
   deployment and the Fire TV runtime receipt are pending.
 * Between them, one continuous take of the page served by
@@ -52,14 +50,11 @@ receipt are in the sibling `narration/` and `capture/` folders.
   (beat 2), 50.0% precision over 58 namings if a fault shows within 75 minutes
   (beat 4, and on the board as 50.0% held-out precision, synthetic, at most 75
   minutes of lag).
-* It differs from the current build in two presses; the second, Publish handoff, is
-  under Known weaknesses. In the take (beat 10; the frame
-  at 139.6 s shows it), Down from the open Delivery velocity panel, and later from
-  Cloud spend, walks out of the panel to Check in the Connection section while the
-  legend still reads Back to the wall. The current build holds
-  the remote inside an open panel until Back closes it: Down at the panel's foot
-  scrolls the rest of the answer into view instead. The capture journey and the shot
-  list describe the current build, so the next take shows Back, Down, Down to Check.
+* This take matches the current build: Down from the open Delivery velocity panel,
+  and later from Cloud spend, scrolls the rest of the answer into view while the
+  remote stays inside the panel, and the journey shows Back, Down, Down to Check.
+  After Confirm the parked board draws the amber ring (the audit fix), so a ring is
+  visible while the RECORDED payoff stays on screen.
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture is shown at 87.5% so the captions sit in a band under it and never
   cover the board. The page itself was captured at full 1920x1080.
@@ -95,7 +90,10 @@ The environment for steps 2 to 5: `MERCURY_VIDEO_ROOT` (the output folder),
 `ELEVENLABS_API_KEY`, which is read from the environment and never printed or stored.
 The capture reads `MERCURY_CAPTURE_URL` (default port 8803; this take used
 `http://127.0.0.1:8873/`).
-The take before this one, from commit `ad12202`, is kept in `reviews/videos_20260927/`
+The take before this one, from commit `df5db06`, is kept in `reviews/videos_20260928/`
+and is superseded: it predates the audit build (no parked ring after Confirm) and
+was captured without reduced-motion emulation, so headline frames in the scramble
+window show scrambled glyphs. The take before that, from commit `ad12202`, is kept in `reviews/videos_20260927/`
 and is superseded: it showed the page scrolling to the rollback steps after Confirm,
 and How it answers as prose under the board. A first take at `bcadcdc` on 2026-09-28
 is kept beside this output as `superseded_bcadcdc/`: its last beat held "Sending GET
@@ -132,10 +130,9 @@ record at that commit; the title card and the Check line both name it.
   The Delivery velocity and Cloud spend answers come into view when Center opens them.
 * The named commit is one of this repository's own, standing in for a deploy feed,
   and the metric is generated. The board labels both.
-* The board's headline plays a short letter-scramble animation for under a second
-  each time it changes (each answer, the staged rollback, the recorded decision);
-  frames taken in that window show scrambled glyphs.
-  That is the page's own animation, not a capture fault.
+* The board's headline scramble animation is suppressed in this take: the capture
+  emulates `prefers-reduced-motion: reduce`, so no frame shows scrambled glyphs.
+  (On a real TV with motion enabled the animation still plays for under a second.)
 * Chromium's screencast drops a frame painted before the previous one is
   acknowledged and then sends nothing until the page paints again, so a very fast
   answer could be missing from the recording although the page shows it. The capture
