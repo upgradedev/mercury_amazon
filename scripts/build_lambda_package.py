@@ -16,11 +16,24 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_FILES = (
     Path("correlation_trial_summary.json"),
+    # The held-out figure the answer carries beside a named commit (trial_summary.py).
+    Path("attribution_holdout_summary.json"),
     Path("src/infrastructure/fixtures/commit_stream_fixture.json"),
     Path("docs/index.html"),
     Path("docs/firetv_nav.js"),
     Path("docs/webmcp_bridge.js"),
     Path("docs/manifest.json"),
+    # The board's self-hosted typefaces and their SIL OFL licences. The Fire TV app
+    # loads the page from this Lambda, and a television may never reach a font CDN.
+    Path("docs/barlow-latin-400.woff2"),
+    Path("docs/barlow-latin-600.woff2"),
+    Path("docs/barlow-condensed-latin-500.woff2"),
+    Path("docs/barlow-condensed-latin-600.woff2"),
+    Path("docs/barlow-condensed-latin-700.woff2"),
+    Path("docs/jetbrains-mono-latin.woff2"),
+    Path("docs/OFL-Barlow.txt"),
+    Path("docs/OFL-BarlowCondensed.txt"),
+    Path("docs/OFL-JetBrainsMono.txt"),
 )
 RUNTIME_REQUIREMENTS = (
     "fastapi==0.141.1",

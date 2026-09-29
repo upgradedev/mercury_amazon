@@ -32,7 +32,9 @@ from src.domain.deployment_evidence import (
     DeploymentEvidenceLedger,
     DeploymentMarker,
 )
+from src.domain.change_scope import MERCURY_SERVICE_SCOPE
 from src.domain.governed_rollback import GovernanceTokenError, RollbackDenialReason
+from src.domain.incident_correlation import IncidentCorrelator
 from src.domain.incident_handoff import HandoffConflict, IncidentHandoffStore
 from src.domain.telemetry_completeness import TelemetryAbsenceDetector
 from src.infrastructure.aws_cost_adapter import AWSCostAdapter
@@ -49,6 +51,7 @@ from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
 from src.infrastructure.trial_summary import naming_accuracy
+from src.interfaces.handoff_routes import register_handoff_routes
 
 logger = logging.getLogger("mercury.mcp")
 
@@ -65,10 +68,11 @@ COCKPIT_ASSET_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
     ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
 }
 
 app = FastAPI(
-    title="Mercury Fire TV Incident Commander",
+    title="Mercury Fire TV incident board",
     description=(
         "HTTP tool server for the Mercury 10-foot engineering war room on Fire TV. "
         "Telemetry responses declare whether they are live or a recorded fixture."
@@ -127,9 +131,16 @@ cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
 local_git_provider = LocalGitCommitProvider()
 recorded_commit_provider = RecordedCommitProvider()
+# The shipped engine: the domain defaults plus the runtime filter, so a commit that
+# changed no file the server is built from (src/domain/change_scope.py) is never named
+# as the deploy behind a spike. Scored as v3_2026_09_27_runtime by
+# python scripts/attribution_split.py.
+incident_correlator = IncidentCorrelator(service_scope=MERCURY_SERVICE_SCOPE)
 incident_use_case = DiagnoseIncidentUseCase(
-    cloudwatch_adapter, github_adapter, local_git_provider, recorded_commit_provider
+    cloudwatch_adapter, github_adapter, local_git_provider, recorded_commit_provider,
+    correlator=incident_correlator,
 )
+
 
 # Selected by MERCURY_ROLLBACK_DISPATCH. None unless a deployment asks for it, in
 # which case the use case keeps its record-only default and nothing is contacted.
@@ -253,10 +264,6 @@ class HandoffUpdateRequest(BaseModel):
     current_action: str = Field(min_length=1, max_length=500)
     confirmed_facts: list[str] = Field(min_length=1, max_length=10)
     next_step: str = Field(min_length=1, max_length=500)
-    expected_revision: int | None = Field(default=None, ge=0)
-
-
-class DemoHandoffRequest(BaseModel):
     expected_revision: int | None = Field(default=None, ge=0)
 
 
@@ -414,6 +421,10 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
         # whether to revert, not the moment they read the README.
         "attribution": {
             "commits_in_window": correlation.commits_in_window,
+            # Commits inside the window that changed no runtime file and so were not
+            # counted. Reported so the answer never hides a change it saw.
+            "commits_set_aside": correlation.commits_set_aside,
+            "candidate_filter": MERCURY_SERVICE_SCOPE.describe() if incident_correlator.service_scope else None,
             "is_ambiguous": correlation.attribution_is_ambiguous,
             "can_attribute": correlation.can_attribute,
             # True only when the reading is inside its baseline. A refusal to
@@ -429,7 +440,7 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "measured_accuracy": naming_accuracy(),
             "claim_strength": "TEMPORAL_CANDIDATE_ONLY",
             "causality_statement": (
-                "The named change is the sole change in the configured time window. "
+                "The named change is the sole deploy candidate in the configured time window. "
                 "Temporal proximity does not prove it caused the anomaly."
             ),
         },
@@ -449,6 +460,8 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "author": commit.author,
             "message": commit.message,
             "committed_at": commit.committed_at.isoformat(),
+            # The runtime files it changed; None when its file list is unknown.
+            "runtime_files": MERCURY_SERVICE_SCOPE.runtime_files(commit.paths),
         }
 
     if correlation.rollback_is_available and correlation.offending_commit is not None:
@@ -544,30 +557,6 @@ async def get_handoff(incident_id: str) -> dict[str, Any]:
     if item is None:
         raise HTTPException(status_code=404, detail=f"No shared state for incident '{incident_id}'.")
     return item.to_dict()
-
-
-@app.post("/mcp/tools/demo_update_handoff")
-async def demo_update_handoff(req: DemoHandoffRequest) -> dict[str, Any]:
-    """Publish fixed fixture content; accept no responder-authored text."""
-    _validate_record_only_demo("tv-demo-handoff")
-    payload = recorded_demo_handoff(incident_use_case, deployment_evidence)
-    if payload is None:
-        raise HTTPException(status_code=409, detail="The labelled demo handoff is unavailable.")
-    try:
-        item = incident_handoffs.update(**payload, expected_revision=req.expected_revision)
-    except HandoffConflict as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
-
-
-@app.get("/mcp/demo-handoff")
-async def get_demo_handoff() -> dict[str, Any]:
-    """Read the single fixed demo handoff without exposing operator state."""
-    _validate_record_only_demo("tv-demo-handoff")
-    item = incident_handoffs.get("checkout-api-active")
-    if item is None:
-        raise HTTPException(status_code=404, detail="No recorded demo handoff exists yet.")
-    return {**item.to_dict(), "authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
 
 
 @app.post("/webhooks/github/workflow_run", dependencies=[Depends(require_operator)])
@@ -686,6 +675,11 @@ def _validate_record_only_demo(action_id: str) -> None:
         )
 
 
+register_handoff_routes(
+    app, incident_handoffs, require_operator, _validate_record_only_demo,
+    lambda: recorded_demo_handoff(incident_use_case, deployment_evidence))
+
+
 @app.post("/mcp/tools/demo_stage_rollback")
 async def demo_stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
     """Stage only the checked-in demo target, with no external side effect.
@@ -774,9 +768,8 @@ async def serve_cockpit():
 async def serve_cockpit_asset(asset_name: str):
     """Serve the cockpit's sibling assets at the paths the page requests them from.
 
-    The page is written once and served from both GitHub Pages and this server, so
-    it links its script, manifest and service worker relatively. This route makes
-    those relative links resolve here too.
+    The page is written once and served from both GitHub Pages and this server, so it
+    links its scripts, manifest and self-hosted fonts relatively; this resolves them here.
 
     Only the extensions in :data:`COCKPIT_ASSET_TYPES` are served, and only files
     that resolve to a direct child of ``docs/``, so this cannot be walked out of

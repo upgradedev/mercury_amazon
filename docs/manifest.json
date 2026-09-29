@@ -1,12 +1,12 @@
 {
-  "name": "Mercury Fire TV Incident Commander",
+  "name": "Mercury Fire TV incident board",
   "short_name": "Mercury",
-  "description": "A 10-foot incident war room: what broke, which change caused it, and a governed rollback from the remote.",
+  "description": "An incident board for the TV in the room where incidents are worked: what broke, whether one change can be blamed, and a governed rollback from the remote.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#0A0D12",
-  "theme_color": "#0A0D12",
+  "background_color": "#0B0C0E",
+  "theme_color": "#0B0C0E",
   "icons": [],
   "note": "icons is deliberately empty. No icon files are committed, and a manifest that names files which are not there produces a 404 on every load."
 }

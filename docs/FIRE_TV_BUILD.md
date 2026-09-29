@@ -37,7 +37,7 @@ candidate without this Gradle property and without `COCKPIT_URL`:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell monkey -p com.amazon.mercury.wallboard \
+adb shell monkey -p io.github.upgradedev.mercury.wallboard \
   -c android.intent.category.LEANBACK_LAUNCHER 1
 ```
 
@@ -103,6 +103,7 @@ writes `firetv_build_receipt.json` with `built_by_command`, `gradle_exit_code`,
 | Remote key | Effect |
 |---|---|
 | D-pad arrows | Move to the nearest enabled control |
+| D-pad arrows, panel open | Move only between the open panel's controls; Up or Down at its edge scrolls the rest of the panel into view. The legend reads Move in panel until Back closes it |
 | Select / centre | Activate the focused control |
 | Back | Close a panel, then WebView history, then the app |
 

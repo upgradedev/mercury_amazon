@@ -9,6 +9,11 @@ This adapter closes the gap with real data rather than invented data: it shells
 out to ``git log`` in the checkout the server is running from. The commits are
 genuine, and the provenance says ``local-git`` so nobody mistakes them for the
 GitHub API.
+
+Each commit carries the files it changed (``git log --name-only --no-renames``), so the
+correlator can set aside a commit that changed no file the server is built from. A
+commit git lists no files for, such as a merge, gets ``paths`` of None, which the
+correlator treats as unknown and keeps as a candidate.
 """
 from __future__ import annotations
 
@@ -17,7 +22,9 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-LOG_FORMAT = "%h%x1f%an%x1f%aI%x1f%s"
+#: One record per commit, opened by a record separator so the file list ``--name-only``
+#: prints after it can be told apart from the next commit's header.
+LOG_FORMAT = "%x1e%h%x1f%an%x1f%aI%x1f%s"
 
 
 class LocalGitCommitProvider:
@@ -41,8 +48,10 @@ class LocalGitCommitProvider:
             return []
         try:
             result = subprocess.run(
-                ["git", "log", f"-{max(1, min(limit, 100))}", f"--pretty=format:{LOG_FORMAT}"],
-                capture_output=True, text=True, cwd=str(self.repo_root), timeout=self.timeout,
+                ["git", "-c", "core.quotePath=false", "log", f"-{max(1, min(limit, 100))}",
+                 "--name-only", "--no-renames", f"--pretty=format:{LOG_FORMAT}"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                cwd=str(self.repo_root), timeout=self.timeout,
             )
         except Exception:
             return []
@@ -51,16 +60,21 @@ class LocalGitCommitProvider:
             return []
 
         commits: list[dict[str, Any]] = []
-        for line in result.stdout.splitlines():
-            parts = line.split("\x1f")
+        for record in result.stdout.split(""):
+            lines = [line for line in record.splitlines() if line.strip()]
+            if not lines:
+                continue
+            parts = lines[0].split("")
             if len(parts) != 4:
                 continue
             short_sha, author, committed_at, subject = parts
+            paths = tuple(line.strip() for line in lines[1:])
             commits.append({
                 "sha": short_sha,
                 "full_sha": short_sha,
                 "message": subject,
                 "author": author,
                 "committed_at": committed_at,
+                "paths": list(paths) if paths else None,
             })
         return commits

@@ -12,29 +12,38 @@ from two inputs, a metric series and a list of commits, using explicit rules:
    before the reading, because a change that landed after a spike started cannot
    have caused it.
 4. Name one only when exactly ``max_commits_in_window`` or fewer landed there.
-   Otherwise say how many landed and name none of them.
+   Otherwise say how many landed and name none of them. When a ``service_scope`` is
+   given (the shipped server gives the runtime paths in ``change_scope.py``), a commit
+   whose file list touches none of those paths is not counted: it deployed no code.
 5. Recommend rolling back to the commit immediately preceding the named one.
 
 Every step reports what it did, and the answer it gives most often is a refusal.
-Against the labelled corpus in ``scripts/correlation_trial.py``, this class sees an
-anomaly and names nobody 81.1% of the time: 225 times because nothing landed in the
-window and 261 times because too much did. Those two are counted apart, in the trial
-and on the wire, because a refusal for want of a candidate is the data being empty
-while a refusal for a crowded window is a decision.
+On the held-out split scored by ``scripts/attribution_split.py`` (a synthetic,
+self-authored corpus, tuned on a separate train split), this class as the server
+wires it, with the runtime filter, sees an anomaly and names nobody 90.0% of the
+time: 278 times because no candidate landed in the window and 246 times because too
+many did. Those two are counted apart, in the trial and on
+the wire, because a refusal for want of a candidate is the data being empty while a
+refusal for a crowded window is a decision.
 
 Rule 4 is what naming precision rests on and it was chosen from a published sweep.
-Naming the closest of several changes is where the wrong names came from: of the 36
-regressions where this class now names the wrong commit, 35 had the real cause outside
-the window entirely, where no rule with this window could have reached it, and 0 had
-the cause inside the window with more than one candidate. A further 18 wrong namings
-blamed a commit for an exogenous spike no commit caused, 54 wrong of 113 in all. When
-it does name a commit, the
-commit it names is the one that caused the reading 52.2% of the time over 113
-namings, which is close enough to a coin toss that the figure travels with the
-answer: see ``src/infrastructure/trial_summary.py``.
+Naming the closest of several changes is where the wrong names came from. On that
+held-out split, when the server's correlator names a commit it is the one that caused
+the reading 50.0% of the time over 58 namings (95% interval 37.5% to 62.5%). Without
+the runtime filter the same split reads 62.5% over 40, because the generator's labels
+let a commit that changed no runtime file cause a regression: 14 of the filtered
+engine's 16 wrong namings on regressions are such labels. That level assumes, as the
+generator does, that a regression shows within 75 minutes, which is also this class's
+default window; the held-out split shares the assumption and cannot test it, and at
+longer delay ceilings the same figure falls (41.5% at 90 minutes, 27.3% at 180). That
+is far enough from certain that the figure travels with the answer: see
+``src/infrastructure/trial_summary.py``. The 60 minute window shipped until
+2026-09-27 read 40.8% over 71 namings on the same split, and 52.2% over 113 on the
+corpus its gate was chosen on.
 
-Every figure above is written by ``python scripts/correlation_trial.py`` into
-``correlation_trial_summary.json`` and a test compares the two.
+Every figure above is written by ``python scripts/attribution_split.py`` into
+``attribution_holdout_summary.json``, and the whole-stream breakdown by
+``python scripts/correlation_trial.py`` into ``correlation_trial_summary.json``.
 
 **A refusal is a refusal, not an acquittal.** The three verdicts that name nothing
 (``NO_CANDIDATE_IN_WINDOW``, ``WINDOW_TOO_CROWDED``, ``INSUFFICIENT_DATA``) say that
@@ -53,10 +62,15 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 
+from src.domain.change_scope import ServiceScope
 from src.domain.provenance import UNKNOWN_PROVENANCE, Provenance
 
 DEFAULT_ANOMALY_FACTOR = 3.0
-DEFAULT_ATTRIBUTION_WINDOW_MINUTES = 60
+#: 75 minutes since 2026-09-27, chosen on the train split by
+#: ``python scripts/tune_attribution.py`` and scored on a held-out split by
+#: ``python scripts/attribution_split.py``. It was 60 before; the old engine is kept
+#: reproducible there as ``v1_2026_09_08``.
+DEFAULT_ATTRIBUTION_WINDOW_MINUTES = 75
 
 #: How many readings must sit strictly before an onset for the mean of them to be
 #: called a baseline. Two is the smallest number that is a mean of more than one
@@ -238,6 +252,9 @@ class CommitRef:
     message: str
     author: str
     committed_at: datetime
+    #: The files the commit changed, when the source knows them. None means unknown, and
+    #: an unknown commit is always a candidate: missing data never narrows the window.
+    paths: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -273,6 +290,10 @@ class IncidentCorrelation:
     #: The attribution window this answer was reached with, so a refusal can say how
     #: wide the window it refused over was.
     attribution_window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES
+    #: Commits inside the window whose file list touched nothing the service is built
+    #: from, and which were therefore not counted in ``commits_in_window``. Reported so
+    #: the answer never hides a change it saw; not a finding that they are harmless.
+    commits_set_aside: int = 0
 
     @property
     def can_attribute(self) -> bool:
@@ -311,6 +332,14 @@ class IncidentCorrelation:
                 "least two. That is missing data, not a finding about any deploy."
             )
         if self.attribution_refusal is AttributionRefusal.NO_CANDIDATE_IN_WINDOW:
+            if self.commits_set_aside:
+                return (
+                    f"Mercury cannot attribute this anomaly to a change: no commit that touched "
+                    f"a file {self.service_name} is built from landed in the {window} minutes "
+                    f"before {ends_at}. {self._set_aside_clause()} That is not evidence that no "
+                    "change caused it; a change outside the window, one of those, or a cause "
+                    "that is not a change at all, are all still open."
+                )
             return (
                 f"Mercury cannot attribute this anomaly to a change: no commit landed in the "
                 f"{window} minutes before {ends_at}. That is an empty window, not evidence that "
@@ -318,14 +347,27 @@ class IncidentCorrelation:
                 "change at all, are both still open."
             )
         if self.attribution_refusal is AttributionRefusal.WINDOW_TOO_CROWDED:
-            return (
+            statement = (
                 f"Mercury cannot attribute this anomaly to any one change: "
                 f"{self.commits_in_window} landed in the {window} minutes before {ends_at}, and "
                 "nothing in the metric says which of them did it. That is a refusal to guess, "
                 "not a finding that none of them caused it; rolling back on this answer would "
                 "be a guess."
             )
+            # The set-aside count is in the explanation and on the wire
+            # (``commits_set_aside``); the statement stays short enough for the board.
+            return statement
         return None
+
+    def _set_aside_clause(self) -> str:
+        count = self.commits_set_aside
+        noun = "commit" if count == 1 else "commits"
+        verb = "was" if count == 1 else "were"
+        return (
+            f"{count} other {noun} in that window changed no file the service is built from "
+            f"and {verb} not counted as candidates; that is a reading of the file lists, not a "
+            "finding that those changes are harmless."
+        )
 
     @property
     def attribution_is_ambiguous(self) -> bool:
@@ -334,8 +376,8 @@ class IncidentCorrelation:
         Unreachable at the shipped settings, and deliberately kept. With
         ``max_commits_in_window = 1`` a crowded window is refused rather than named, so
         this is false on every attribution the default correlator makes and
-        ``correlation_trial_summary.json`` records 0 of 54 wrong namings disclosed this
-        way. It is what an answer owes an operator when somebody widens the gate, which
+        ``correlation_trial_summary.json`` records none of its wrong namings disclosed
+        this way. It is what an answer owes an operator when somebody widens the gate, which
         ``--max-commits-in-window`` in the trial does, and the disclosure is measured
         there rather than removed on the assumption nobody will.
         """
@@ -408,6 +450,7 @@ class IncidentCorrelator:
         window_anchor: WindowAnchor = WindowAnchor.ONSET,
         min_baseline_points: int = DEFAULT_MIN_BASELINE_POINTS,
         max_commits_in_window: int | None = DEFAULT_MAX_COMMITS_IN_WINDOW,
+        service_scope: ServiceScope | None = None,
     ) -> None:
         self.anomaly_factor = anomaly_factor
         self.attribution_window_minutes = attribution_window_minutes
@@ -417,6 +460,9 @@ class IncidentCorrelator:
         #: None means name the closest candidate however many there were, which is what
         #: this correlator did until 2026-09-08.
         self.max_commits_in_window = max_commits_in_window
+        #: When set, a commit whose file list touches nothing in this scope is not a
+        #: candidate. A commit with no file list is always a candidate.
+        self.service_scope = service_scope
 
     def correlate(
         self,
@@ -501,10 +547,15 @@ class IncidentCorrelator:
         # difference between naming the cause and naming whatever shipped since.
         window_end = onset_at if (self.window_anchor is WindowAnchor.ONSET and onset_at) else latest.at
         window_start = window_end - timedelta(minutes=self.attribution_window_minutes)
-        candidates = sorted(
+        in_window = sorted(
             (c for c in commits if window_start <= c.committed_at <= window_end),
             key=lambda c: c.committed_at,
         )
+        if self.service_scope is not None:
+            candidates = [c for c in in_window if self.service_scope.touches(c.paths) is not False]
+        else:
+            candidates = in_window
+        set_aside = len(in_window) - len(candidates)
 
         def unattributed(refusal: AttributionRefusal, explanation: str) -> IncidentCorrelation:
             return IncidentCorrelation(
@@ -525,6 +576,19 @@ class IncidentCorrelator:
                 onset_at=onset_at,
                 baseline_points=baseline_points,
                 attribution_window_minutes=self.attribution_window_minutes,
+                commits_set_aside=set_aside,
+            )
+
+        if not candidates and set_aside:
+            return unattributed(
+                AttributionRefusal.NO_CANDIDATE_IN_WINDOW,
+                f"{series.metric_name} is {factor:.2f} times baseline. {set_aside} commit(s) landed in "
+                f"the {self.attribution_window_minutes} minutes before "
+                f"{'the onset' if onset_at else 'the reading'}, and none of them changed a file "
+                f"{service_name} is built from, so none was counted as a candidate and Mercury "
+                "cannot attribute it to a change. That is a reading of their file lists, not a "
+                "finding that they are harmless: one of them, a change outside the window, or a "
+                "cause that is not a change at all, are all still open.",
             )
 
         if not candidates:
@@ -550,7 +614,10 @@ class IncidentCorrelator:
                 f"{self.max_commits_in_window} this correlator will name from, so it names none of "
                 "them. Nothing here says which of those changes did it, and rolling back the closest "
                 "one is as likely to revert an innocent change as the guilty one. This is a refusal "
-                "to attribute, not a finding that none of them did it.",
+                "to attribute, not a finding that none of them did it."
+                + (f" {set_aside} other commit(s) in the window changed no file {service_name} is "
+                   "built from and were not counted; that is a reading of their file lists, not a "
+                   "finding that they are harmless." if set_aside else ""),
             )
 
         offending = candidates[-1]
@@ -566,6 +633,12 @@ class IncidentCorrelator:
             f"{'the onset' if onset_at else 'the reading'}, "
             f"the closest change inside the {self.attribution_window_minutes} minute attribution window."
         )
+        if set_aside:
+            explanation += (
+                f" {set_aside} other commit(s) in the window changed no file {service_name} is "
+                "built from and were not counted as candidates; that is a reading of their file "
+                "lists, not a finding that they are harmless."
+            )
         if len(candidates) > 1:
             explanation += (
                 f" It is not the only candidate: {len(candidates)} changes landed inside that window, "
@@ -593,4 +666,5 @@ class IncidentCorrelator:
             onset_at=onset_at,
             baseline_points=baseline_points,
             attribution_window_minutes=self.attribution_window_minutes,
+            commits_set_aside=set_aside,
         )

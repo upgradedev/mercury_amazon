@@ -3,89 +3,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mercury Fire TV Incident Commander</title>
-  <meta name="description" content="A 10-foot incident war room: what broke, which change caused it, and a governed rollback from the remote.">
+  <title>Mercury Fire TV incident board</title>
+  <meta name="description" content="An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0A0D12">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <meta name="theme-color" content="#0B0C0E">
+  <link rel="preload" href="barlow-condensed-latin-700.woff2" as="font" type="font/woff2" crossorigin>
   <style>
+    /* ------------------------------------------------------------------ Fonts
+       Served from this page's own origin, never from a font CDN: a Fire TV on an
+       on-call room network may never reach one, and the board must read the same
+       there. Latin subset only, and only the faces this page renders (measured
+       with document.fonts after driving every row and panel). SIL Open Font
+       License 1.1; the licences sit beside the files as OFL-*.txt. JetBrains Mono
+       is one variable file, so its two weights share it. */
+    @font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url(barlow-latin-400.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(barlow-latin-600.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 500; font-display: swap;
+      src: url(barlow-condensed-latin-500.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(barlow-condensed-latin-600.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 700; font-display: swap;
+      src: url(barlow-condensed-latin-700.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url(jetbrains-mono-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap;
+      src: url(jetbrains-mono-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
     /* ------------------------------------------------------------------ Theme
-       Dark is the default on purpose. This page's first home is a television on
-       a wall in a room with the lights down, and most TV browsers report no
-       colour-scheme preference at all. A viewer who has asked for light gets it.
-    */
+       The incident departures board. One theme, dark, on purpose: this page's
+       first home is a television on the wall of a room with the lights down, read
+       the way an airport departures board is read, from across the concourse.
+       Most TV browsers report no colour-scheme preference at all, and a board that
+       turned white on a phone would stop being the same object. Every colour is
+       still painted explicitly, including the page ground.
+
+       Tokens, not literals. Amber is the board's lettering and the focus ring and
+       nothing else; the four verdicts have their own colours so an answer is never
+       read as a highlight, and the fixture stamp has a hazard colour of its own. */
     :root {
-      color-scheme: dark light;
-      --bg:        #0A0D12;
-      --panel:     #11151D;
-      --inset:     #161B24;
-      --line:      #273040;
-      --line-soft: #1C2330;
-      --text:      #EEF2F6;
-      --muted:     #97A3B4;
-      --focus:     #FFC145;
-      --focus-ink: #0A0D12;
-      --alarm:     #FF5A47;
-      --alarm-dim: rgba(255, 90, 71, 0.14);
-      --calm:      #3CD68A;
-      --calm-dim:  rgba(60, 214, 138, 0.14);
-      --info:      #6FB6FF;
-      --info-dim:  rgba(111, 182, 255, 0.14);
-      --amber-dim: rgba(255, 193, 69, 0.14);
-      --shadow:    0 18px 48px rgba(0, 0, 0, 0.45);
-      --sans: "Archivo", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      color-scheme: dark;
+      /* Ground and panels */
+      --board:       #0B0C0E;   /* board black, the wall behind the flaps */
+      --flap:        #16181C;   /* one flap panel */
+      --flap-hi:     #1D2025;   /* the upper half of a flap, lit from above */
+      --seam:        #050506;   /* the hinge line through every flap */
+      --rule:        #2A2E35;
+      --rule-soft:   #1F2227;
+      /* Lettering */
+      --ink:         #EEE7D8;   /* flap lettering, warm white */
+      --ink-2:       #ABA597;   /* secondary lettering */
+      --amber:       #FFB23F;   /* board amber: primary data, focus ring */
+      --amber-ink:   #140C00;
+      --amber-glow:  rgba(255, 178, 63, 0.30);
+      /* Verdict semantics, deliberately apart from the accent */
+      --v-attributed:  #FF5B4C;  /* signal red: one change named */
+      --v-cannot:      #8DB4DC;  /* steel blue: cannot attribute */
+      --v-nothing:     #4AD48E;  /* green: inside its baseline, nothing to revert */
+      --v-insufficient:#A7ACB3;  /* neutral grey: not enough data */
+      --v-staged:      #FFB23F;
+      /* State semantics */
+      --ok:          #4AD48E;
+      --warn:        #FFB23F;
+      --critical:    #FF5B4C;
+      --hazard:      #FFD23A;   /* simulated / offline fixture stamp */
+      --hazard-ink:  #0B0C0E;
+
+      --sans: "Barlow", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      --display: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Segoe UI", sans-serif;
       --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg:        #F3F5F8;
-        --panel:     #FFFFFF;
-        --inset:     #EDF0F4;
-        --line:      #CBD3DD;
-        --line-soft: #DFE4EB;
-        --text:      #0A0D12;
-        --muted:     #56616F;
-        --focus:     #8A4B00;
-        --focus-ink: #FFFFFF;
-        --alarm:     #B3271A;
-        --alarm-dim: rgba(179, 39, 26, 0.10);
-        --calm:      #0A6E45;
-        --calm-dim:  rgba(10, 110, 69, 0.10);
-        --info:      #14549E;
-        --info-dim:  rgba(20, 84, 158, 0.10);
-        --amber-dim: rgba(138, 75, 0, 0.10);
-        --shadow:    0 10px 30px rgba(10, 13, 18, 0.10);
-      }
+
+      /* Type scale, desktop. The television breakpoint rewrites these, so every
+         size on the page moves together and nothing is left under the floor. */
+      --fs-label: 0.72rem;   /* column heads, eyebrows */
+      --fs-small: 0.8rem;    /* notes, key hints */
+      --fs-op:    0.9rem;    /* operational: reasons, provenance, stamps */
+      --fs-body:  1rem;
+      --fs-lead:  1.12rem;
+      --fs-row:   1.3rem;
+      --fs-h2:    1.7rem;
+      --fs-head:  clamp(1.9rem, 3.4vw, 3.1rem);
+      --fs-figure:clamp(3rem, 6vw, 5.2rem);
     }
 
     /* ------------------------------------------------------------------ Base */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 17px; }
+    html { font-size: 17px; background-color: #0B0C0E; }
     body {
-      background: var(--bg);
-      color: var(--text);
+      background-color: var(--board);
+      color: var(--ink);
       font-family: var(--sans);
-      line-height: 1.5;
+      font-size: var(--fs-body);
+      line-height: 1.45;
       -webkit-font-smoothing: antialiased;
-      padding-bottom: 5.5rem; /* room for the fixed key hint bar */
+      padding-bottom: 2rem;
     }
-    .shell { max-width: 2200px; margin: 0 auto; padding: 3vh 4vw 2rem; }
+    .shell { max-width: 2200px; margin: 0 auto; padding: 2.2vh 4vw 2rem; }
     .mono { font-family: var(--mono); }
-    h1, h2, h3 { font-weight: 800; letter-spacing: -0.015em; line-height: 1.1; }
+    h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.02; text-wrap: balance; }
+    p { text-wrap: pretty; }
 
     .skip-link {
       position: absolute; left: 0.5rem; top: -4rem; z-index: 50;
-      background: var(--focus); color: var(--focus-ink);
-      padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 700; text-decoration: none;
+      background-color: var(--amber); color: var(--amber-ink);
+      padding: 0.6rem 1rem; font-weight: 700; text-decoration: none;
     }
     .skip-link:focus { top: 0.5rem; }
+    /* The board takes keyboard focus only as a parking place after Confirm; the
+       D-pad legend says where the next press goes, so it draws no outline. */
+    #hero[tabindex="-1"]:focus { outline: none; }
 
     /* Keyboard focus for anyone not using the D-pad ring. */
     a:focus-visible, button:focus-visible, input:focus-visible {
-      outline: 3px solid var(--focus);
+      outline: 3px solid var(--amber);
       outline-offset: 3px;
     }
 
@@ -94,305 +132,546 @@
 
     /* 10-foot focus ring. Deliberately loud: it has to read from a sofa. */
     .tv-focused {
-      outline: 4px solid var(--focus) !important;
+      outline: 4px solid var(--amber) !important;
       outline-offset: 4px !important;
-      box-shadow: 0 0 0 4px var(--amber-dim), 0 0 30px rgba(255, 193, 69, 0.35) !important;
-      border-radius: 12px;
+      box-shadow: 0 0 0 4px var(--amber-glow), 0 0 32px rgba(255, 178, 63, 0.35) !important;
+    }
+
+    .cell-label, .demo-states-label, .section-kicker {
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
     }
 
     /* ---------------------------------------------------------------- Header */
     .topbar {
-      display: flex; flex-wrap: wrap; gap: 1rem 1.5rem;
-      align-items: center; justify-content: space-between;
-      padding-bottom: 1rem; border-bottom: 1px solid var(--line-soft); margin-bottom: 1.5rem;
+      display: flex; gap: 0.8rem 1.5rem; align-items: center; justify-content: space-between;
+      padding-bottom: 0.7rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--rule);
     }
-    .wordmark { display: flex; align-items: baseline; gap: 0.6rem; }
-    .wordmark strong { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.02em; }
-    .wordmark span { color: var(--muted); font-size: 0.82rem; letter-spacing: 0.09em; text-transform: uppercase; }
-
-    .conn-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem; }
-    /* The setup fields, off the first screen until asked for. */
-    .setup-row {
-      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.82rem;
-      background: var(--inset); border: 1px solid var(--line); border-radius: 0.6rem;
-      padding: 0.8rem 1rem; margin-bottom: 0.8rem;
+    .wordmark { display: flex; align-items: center; gap: 0.65rem; }
+    .wordmark .wm-text { display: flex; align-items: baseline; gap: 0.65rem; }
+    .wordmark svg { width: 1.9rem; height: 1.9rem; flex: none; }
+    .wordmark strong {
+      font-family: var(--display); font-weight: 700; font-size: 1.55rem;
+      letter-spacing: 0.16em; color: var(--ink);
     }
-    .setup-row[hidden] { display: none; }
-    .setup-row .note { flex-basis: 100%; }
-    .conn-bar label, .setup-row label { color: var(--muted); }
-    .setup-row input {
-      background: var(--panel); border: 1px solid var(--line); color: var(--text);
-      padding: 0.45rem 0.6rem; border-radius: 0.4rem; font: inherit; font-size: 0.82rem; min-width: 13rem;
+    .wordmark .wm-text > span {
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-small);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber);
+      padding-left: 0.65rem; border-left: 1px solid var(--rule);
+    }
+    .conn-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    /* What the board is for, in one line beside its name. */
+    .thesis {
+      flex: 1 1 auto; min-width: 0;
+      font-family: var(--display); font-weight: 500; font-size: var(--fs-lead);
+      letter-spacing: 0.03em; color: var(--ink);
     }
     .state-pill {
-      padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
-      letter-spacing: 0.07em; text-transform: uppercase; border: 1px solid;
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-op);
+      letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 0.2rem 0.7rem; border: 1px solid; background-color: var(--board);
     }
-    .state-unknown     { color: var(--muted); border-color: var(--line); background: transparent; }
-    .state-checking    { color: var(--info);  border-color: var(--info);  background: var(--info-dim); }
-    .state-reachable   { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
-    .state-unreachable { color: var(--alarm); border-color: var(--alarm); background: var(--alarm-dim); }
-    .note { color: var(--muted); font-size: 0.78rem; }
+    .state-pill::before { content: ""; width: 0.5em; height: 0.5em; border-radius: 50%; background-color: currentColor; }
+    .state-unknown     { color: var(--ink-2); border-color: var(--rule); }
+    .state-checking    { color: var(--v-cannot); border-color: var(--v-cannot); }
+    .state-reachable   { color: var(--ok); border-color: var(--ok); }
+    .state-unreachable { color: var(--critical); border-color: var(--critical); }
+    .note { color: var(--ink-2); font-size: var(--fs-small); max-width: 70ch; }
 
-    /* ------------------------------------------------------------------ Hero */
-    .hero {
-      background: var(--panel); border: 1px solid var(--line);
-      border-left: 8px solid var(--line); border-radius: 1rem;
-      padding: 1.4rem 1.5rem 1.2rem; box-shadow: var(--shadow); margin-bottom: 1.2rem;
+    /* ------------------------------------------------------------ The board
+       One grid, four columns, used by the column heads, the answer row and every
+       departure row under it, so the board lines up the way a real one does. */
+    .board-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.4fr) minmax(0, 1.3fr) minmax(0, 1.35fr);
+      column-gap: 1.4rem;
     }
-    .hero[data-state="alarm"] { border-left-color: var(--alarm); }
-    .hero[data-state="calm"]  { border-left-color: var(--calm); }
-    .hero[data-state="busy"]  { border-left-color: var(--info); }
+    .board-heads { padding: 0 1.1rem 0.35rem; }
+
+    .hero { margin-bottom: 1.4rem; }
+    .answer {
+      background-color: var(--flap);
+      border-top: 3px solid var(--rule);
+      padding: 1rem 1.1rem 1rem;
+      position: relative;
+    }
+    .hero[data-verdict="attributed"]   .answer { border-top-color: var(--v-attributed); }
+    .hero[data-verdict="cannot"]       .answer { border-top-color: var(--v-cannot); }
+    .hero[data-verdict="nothing"]      .answer { border-top-color: var(--v-nothing); }
+    .hero[data-verdict="insufficient"] .answer { border-top-color: var(--v-insufficient); }
+    .hero[data-verdict="staged"]       .answer,
+    .hero[data-verdict="asking"]       .answer { border-top-color: var(--amber); }
+    .hero[data-verdict="recorded"]     .answer { border-top-color: var(--amber); }
+
+    .answer .cell { min-width: 0; }
+    .answer .cell-label { display: none; }
+
+    .board-service {
+      font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1.05;
+      color: var(--amber); overflow-wrap: anywhere;
+    }
+    .board-metric { font-family: var(--display); font-weight: 500; font-size: var(--fs-small); letter-spacing: 0.03em; color: var(--ink-2); margin-top: 0.3rem; overflow-wrap: anywhere; }
+
+    .hero-figure { display: grid; justify-items: start; align-content: start; }
+    .hero-figure-value {
+      font-family: var(--display); font-weight: 700; line-height: 0.88;
+      font-size: var(--fs-figure); color: var(--amber);
+      font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
+    }
+    /* A word in the figure slot (RECORDED, SENT) steps down so it fits its column. */
+    .hero-figure-value[data-long="true"] { font-size: calc(var(--fs-figure) * 0.58); line-height: 1; }
+    .hero-figure-label {
+      font-family: var(--display); font-weight: 500; font-size: var(--fs-lead);
+      color: var(--ink-2); margin-top: 0.25rem; letter-spacing: 0.04em;
+    }
+    /* Provenance sits beside the figure it qualifies, inside the answer row. */
+    .hero-source { margin-top: 0.55rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
 
     .hero-eyebrow {
-      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 0.7rem;
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
+      margin-bottom: 0.35rem;
     }
-    .hero[data-state="alarm"] .hero-eyebrow { color: var(--alarm); }
-    .hero[data-state="calm"]  .hero-eyebrow { color: var(--calm); }
-    .hero[data-state="busy"]  .hero-eyebrow { color: var(--info); }
+    .hero[data-verdict="attributed"]   .hero-eyebrow { color: var(--v-attributed); }
+    .hero[data-verdict="cannot"]       .hero-eyebrow { color: var(--v-cannot); }
+    .hero[data-verdict="nothing"]      .hero-eyebrow { color: var(--v-nothing); }
+    .hero[data-verdict="recorded"]     .hero-eyebrow { color: var(--amber); }
+    .hero[data-verdict="insufficient"] .hero-eyebrow { color: var(--v-insufficient); }
+    .hero[data-verdict="staged"]       .hero-eyebrow,
+    .hero[data-verdict="asking"]       .hero-eyebrow { color: var(--amber); }
 
-    .hero-answer { display: flex; gap: 1.8rem; align-items: flex-start; flex-wrap: wrap; }
-    .hero-figure { flex: 0 0 auto; min-width: 7ch; }
-    .hero-figure-value {
-      font-family: var(--mono); font-weight: 700; line-height: 0.9;
-      font-size: clamp(3.2rem, 6.6vw, 7rem); letter-spacing: -0.04em;
+    /* The verdict line, lettered like a split flap: a dark strip with a hinge
+       through the middle. When a real answer arrives it flips in letter by letter. */
+    .hero-headline {
+      font-size: var(--fs-head); letter-spacing: 0.01em; color: var(--ink);
+      overflow-wrap: anywhere;
     }
-    .hero[data-state="alarm"] .hero-figure-value { color: var(--alarm); }
-    .hero[data-state="calm"]  .hero-figure-value { color: var(--calm); }
-    .hero-figure-label {
-      color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem;
-      letter-spacing: 0.06em; text-transform: uppercase;
+    .hero[data-verdict="attributed"]   .hero-headline { color: var(--v-attributed); }
+    .hero[data-verdict="cannot"]       .hero-headline { color: var(--v-cannot); }
+    .hero[data-verdict="nothing"]      .hero-headline { color: var(--v-nothing); }
+    .hero[data-verdict="recorded"]     .hero-headline { color: var(--ink); }
+    .hero[data-verdict="insufficient"] .hero-headline { color: var(--v-insufficient); }
+    .flap-word { white-space: nowrap; }
+    .hero-headline[data-long="true"] { font-size: calc(var(--fs-head) * 0.74); }
+    .flap-cell {
+      display: inline-block; text-align: center; overflow: hidden; vertical-align: bottom;
+      background-color: var(--seam); color: var(--amber);
     }
-    .hero-text { flex: 1 1 24ch; min-width: 0; }
-    .hero-headline { font-size: clamp(1.5rem, 2.9vw, 2.9rem); margin-bottom: 0.5rem; overflow-wrap: break-word; }
-    .hero-cause { font-size: clamp(1.15rem, 1.3vw, 1.4rem); color: var(--muted); overflow-wrap: break-word; }
-    .hero-cause .quote { color: var(--text); }
+    .flap-cell.settled { background-color: transparent; color: inherit; }
+    .hero-accuracy { display: block; font-size: var(--fs-op); color: var(--ink-2); margin-top: 0.45rem; }
+    /* Why this change: when it landed against the onset, from the same response. */
+    .hero-evidence { display: block; font-size: var(--fs-op); color: var(--ink); margin-top: 0.45rem; line-height: 1.3; }
+    .hero-evidence:empty { display: none; }
 
-    .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1.2rem; }
-    .demo-states { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px dashed var(--line-soft); }
-    .demo-states-label {
-      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 0.6rem;
+    .cell-next .reason { display: block; font-size: var(--fs-op); color: var(--ink); line-height: 1.35; }
+
+    .hero-cause {
+      grid-column: 1 / -1; font-size: var(--fs-lead); color: var(--ink-2);
+      padding-right: max(0px, calc(100% - 70ch));
+      margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--rule);
+      overflow-wrap: break-word;
     }
-    .demo-states-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
-    .btn-demo { font-family: var(--mono); font-size: 0.85rem; }
-    .btn-demo[aria-pressed="true"] { border-color: var(--focus); color: var(--focus); }
-    .btn-sub {
-      display: block; font-family: var(--sans); font-weight: 400;
-      color: var(--muted); font-size: 0.78rem; margin-top: 0.2rem;
+    .hero-cause .quote { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
+    .hero-cause .quote-label {
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2); margin-right: 0.6em;
     }
-    .btn-demo[aria-pressed="true"] .btn-sub { color: var(--text); }
-    .hero-reasons { margin-top: 0.6rem; display: grid; gap: 0.15rem; }
-    .hero-foot {
-      margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--line-soft);
-      display: flex; gap: 0.5rem 1.2rem; flex-wrap: wrap; align-items: center;
+
+    .hero-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: stretch; margin: 0.9rem 0 0; }
+
+    /* --------------------------------------------------------------- Stamps */
+    .src-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      color: var(--ink-2); font-size: var(--fs-op);
     }
-    .src-badge { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1rem;
-                 color: var(--muted); font-size: 0.8rem; }
-    /* Provenance beside the figure it qualifies, inside the hero card and therefore
-       inside the first viewport height at 1920x1080. */
-    .hero-source { margin-top: 0.7rem; display: grid; gap: 0.3rem; justify-items: start; }
-    .hero-source .src-badge { margin-right: 0; }
-    .hero-accuracy { margin-top: 0.5rem; color: var(--muted); font-size: 0.95rem; max-width: 34ch; }
+    .tag {
+      display: inline-block; font-family: var(--display); font-weight: 700;
+      font-size: var(--fs-op); letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 0.08rem 0.5rem; border: 2px solid; line-height: 1.3;
+    }
+    .tag-ok      { color: var(--ok);  border-color: var(--ok);  background-color: var(--board); }
+    .tag-warn    { color: var(--critical); border-color: var(--critical); background-color: var(--board); }
+    .tag-live    { color: var(--ok);  border-color: var(--ok);  background-color: var(--board); }
+    /* Real data standing in for something else: this repository's own commits where a
+       deploy feed would be. Not green, which would read as a live deploy feed, and not
+       the hazard plate, which means generated. A dashed rule: a stand-in. */
+    .tag-standin { color: var(--ink); border-color: var(--ink-2); border-style: dashed; background-color: var(--board); }
+    /* The evidence panel's verdict tag uses the board's verdict tokens, so a verdict is one
+       colour everywhere: INSUFFICIENT_DATA is grey here as on the board, never green. */
+    .tag[data-verdict="attributed"]   { color: var(--v-attributed);   border-color: var(--v-attributed); }
+    .tag[data-verdict="cannot"]       { color: var(--v-cannot);       border-color: var(--v-cannot); }
+    .tag[data-verdict="nothing"]      { color: var(--v-nothing);      border-color: var(--v-nothing); }
+    .tag[data-verdict="insufficient"] { color: var(--v-insufficient); border-color: var(--v-insufficient); }
+    /* The fixture stamp: hazard stripes round a solid plate, so the lettering sits
+       on one flat colour and the stripes say "not production" before it is read. */
+    .tag-fixture {
+      color: var(--hazard-ink); border: 4px solid transparent;
+      background-color: var(--hazard);
+      background-image: linear-gradient(var(--hazard), var(--hazard)),
+        repeating-linear-gradient(-45deg, var(--hazard-ink) 0 5px, var(--hazard) 5px 10px);
+      background-origin: padding-box, border-box;
+      background-clip: padding-box, border-box;
+    }
 
     /* --------------------------------------------------------------- Buttons */
     .btn {
-      font: inherit; font-weight: 700; cursor: pointer;
-      background: var(--inset); color: var(--text);
-      border: 2px solid var(--line); border-radius: 0.6rem;
-      padding: 0.7rem 1.1rem; text-align: left;
+      font: inherit; font-weight: 600; cursor: pointer;
+      background-color: var(--flap); color: var(--ink);
+      border: 2px solid var(--rule); padding: 0.6rem 1rem; text-align: left;
     }
-    .btn:hover { border-color: var(--muted); }
+    .btn:hover { border-color: var(--ink-2); }
     .btn-primary {
-      background: var(--focus); color: var(--focus-ink); border-color: var(--focus);
-      font-size: 1.05rem; padding: 0.85rem 1.4rem;
+      font-family: var(--display); font-weight: 700; font-size: 1.3rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      background-color: var(--amber); color: var(--amber-ink); border-color: var(--amber);
+      padding: 0.6rem 1.5rem; display: inline-flex; align-items: center; gap: 0.6rem;
     }
-    .btn-primary:hover { filter: brightness(1.08); }
-    .btn-danger { background: var(--alarm); color: #FFFFFF; border-color: var(--alarm); }
-    .btn-danger:hover { filter: brightness(1.08); }
-    .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
-    .btn[disabled]:hover { border-color: var(--line); filter: none; }
-    .reason { color: var(--muted); font-size: 0.82rem; }
+    .btn-primary svg { width: 1.1em; height: 1.1em; flex: none; }
+    .btn-primary:hover { background-color: #FFC266; }
+    .btn-danger { background-color: var(--flap); color: var(--ink); border-color: var(--v-attributed); }
+    .btn-danger:hover { background-color: #2A1614; }
+    .btn[disabled] { color: var(--ink-2); border-color: var(--rule); border-style: dashed; cursor: not-allowed; }
+    .btn[disabled]:hover { background-color: var(--flap); }
+    /* A call in flight from this control: it stays in the remote's ring, so focus is
+       not lost, but a second press is ignored until the server answers. */
+    .btn[aria-busy="true"] { cursor: progress; border-style: dashed; }
+    .reason { color: var(--ink-2); font-size: var(--fs-op); }
 
-    /* ------------------------------------------------------------------ Wall */
-    .wall { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    /* ------------------------------------------------------------ Departures */
+    .departures { margin-top: 1.1rem; }
+    .departures-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.35rem; padding: 0 1.1rem; }
+    .departures-rows { display: grid; gap: 3px; background-color: var(--seam); padding: 3px 0; }
+    .btn-demo {
+      width: 100%; border: 0; padding: 0.42rem 1.1rem; position: relative;
+      background-color: var(--flap);
+      background-image: linear-gradient(to bottom, var(--flap-hi) 0, var(--flap-hi) 50%, var(--flap) 50%);
+      font-family: var(--display); font-weight: 600; font-size: var(--fs-row); line-height: 1.2;
+      align-items: baseline;
+    }
+    .btn-demo:hover { background-image: none; background-color: #23262C; }
+    .btn-demo .row-service { color: var(--ink); overflow-wrap: anywhere; }
+    .btn-demo .row-reading { color: var(--amber); font-variant-numeric: tabular-nums; }
+    .btn-demo .row-verdict { grid-column: 3 / span 2; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; }
+    .row-sha { font-family: var(--mono); font-weight: 600; font-size: 0.82em; text-transform: none; letter-spacing: 0; margin-left: 0.6em; }
+    .btn-demo[aria-pressed="true"] { box-shadow: inset 6px 0 0 var(--amber); }
+    .btn-demo[aria-pressed="true"] .row-service { color: var(--amber); }
+    .row-verdict[data-verdict="attributed"]   { color: var(--v-attributed); }
+    .row-verdict[data-verdict="cannot"]       { color: var(--v-cannot); }
+    .row-verdict[data-verdict="nothing"]      { color: var(--v-nothing); }
+    .row-verdict[data-verdict="insufficient"] { color: var(--v-insufficient); }
+    .row-verdict[data-verdict="failed"]       { color: var(--critical); }
+    .departures .note { margin: 0.6rem 1.1rem 0; }
+
+    /* --------------------------------------------------------- Second screen */
+    .screen { margin-top: 2.6rem; }
+    .screen > h2 { font-size: var(--fs-h2); letter-spacing: 0.04em; text-transform: uppercase; margin: 0.3rem 0 0.9rem; }
+    .section-kicker { color: var(--amber); }
+    .lede { color: var(--ink-2); font-size: var(--fs-lead); max-width: 65ch; margin-bottom: 1rem; }
+
+    .how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; background-color: var(--seam); padding: 3px 0; list-style: none; }
+    .how li { background-color: var(--flap); padding: 1rem 1.1rem; }
+    .how .step-no { font-family: var(--display); font-weight: 700; font-size: 2.2rem; line-height: 1; color: var(--amber); }
+    .how h3 { font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.35rem 0 0.35rem; }
+    .how p { color: var(--ink-2); font-size: var(--fs-body); max-width: 40ch; }
+    .how .verdicts { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin-top: 0.5rem; font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: var(--fs-small); }
+    .how .verdicts .v-a { color: var(--v-attributed); }
+    .how .verdicts .v-c { color: var(--v-cannot); }
+    .how .verdicts .v-n { color: var(--v-nothing); }
+    .how .verdicts .v-i { color: var(--v-insufficient); }
+    .who-for { margin: 1rem 0 0; }
+    .who-for strong { color: var(--ink); font-weight: 600; }
+
+    .rollback-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; background-color: var(--seam); padding: 3px 0; list-style: none; }
+    .rollback-steps li { background-color: var(--flap); padding: 0.9rem 1.1rem; position: relative; }
+    .rollback-steps .step-head { display: flex; align-items: baseline; gap: 0.6rem; font-family: var(--display); font-weight: 700; font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .rollback-steps .step-head b { color: var(--amber); font-weight: 700; }
+    .rollback-steps .step-state { margin-top: 0.4rem; font-size: var(--fs-op); color: var(--ink); overflow-wrap: anywhere; }
+    .rollback-steps li[data-done="true"] { box-shadow: inset 0 3px 0 var(--v-nothing); }
+    .handoff { margin-top: 1rem; }
+    .handoff .actions-bar { margin-bottom: 0.8rem; }
+
+    /* ------------------------------------------------------------- Evidence */
+    .evidence-note { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
+    .hero-foot { display: flex; gap: 0.5rem 1.2rem; flex-wrap: wrap; align-items: baseline; }
+    .hero-foot .hero-accuracy { margin-top: 0; max-width: 80ch; }
+
+    .wall { display: grid; grid-template-columns: 1fr; gap: 3px; background-color: var(--seam); padding: 3px 0; }
+    /* A column from the top, so four tiles of different lengths line up by their
+       eyebrows, with the open hint on one line along the bottom. */
     .tile {
-      display: block; width: 100%; text-align: left; cursor: pointer;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 1rem;
-      padding: 1.25rem 1.35rem; color: inherit; font: inherit;
+      display: flex; flex-direction: column; justify-content: flex-start; width: 100%; text-align: left; cursor: pointer;
+      background-color: var(--flap); border: 0; padding: 1rem 1.1rem; color: var(--ink); font: inherit;
     }
-    .tile:hover { border-color: var(--muted); }
+    .tile:hover { background-color: #23262C; }
     .tile-eyebrow {
-      display: block; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted); font-weight: 700;
+      display: block; font-family: var(--display); font-weight: 600; font-size: var(--fs-label);
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
     }
-    .tile-headline { display: block; font-size: 1.15rem; font-weight: 800; margin: 0.5rem 0 0.35rem; }
-    .tile-sub { display: block; color: var(--muted); font-size: 0.88rem; }
-    .tile-open { display: block; margin-top: 0.9rem; font-size: 0.78rem; letter-spacing: 0.1em;
-                 text-transform: uppercase; color: var(--focus); font-weight: 700; }
+    .tile-stamp { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+    .tile-stamp:empty { display: none; }
+    .tile-headline { display: block; font-family: var(--display); font-size: 1.45rem; font-weight: 700; margin: 0.35rem 0 0.25rem; color: var(--amber); }
+    .tile-headline[data-empty="true"] { color: var(--ink-2); font-weight: 600; }
+    .tile-sub { display: block; color: var(--ink-2); font-size: var(--fs-small); }
+    .tile-open { display: block; margin-top: auto; padding-top: 0.7rem; font-family: var(--display); font-size: var(--fs-label); letter-spacing: 0.2em;
+                 text-transform: uppercase; color: var(--amber); font-weight: 600; }
 
-    /* --------------------------------------------------------------- Panels */
-    .panel {
-      background: var(--panel); border: 1px solid var(--line); border-radius: 1rem;
-      padding: 1.5rem; box-shadow: var(--shadow);
-    }
-    .panel h2 { font-size: 1.4rem; margin-bottom: 0.4rem; }
-    .panel-desc { color: var(--muted); font-size: 0.92rem; margin-bottom: 1.1rem; max-width: 80ch; }
+    .panel { background-color: var(--flap); border-top: 3px solid var(--amber); padding: 1.3rem 1.2rem; }
+    .panel h2 { font-size: var(--fs-h2); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+    .panel-desc { color: var(--ink-2); font-size: var(--fs-body); margin-bottom: 1rem; max-width: 70ch; }
     .actions-bar { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 1rem; }
 
-    .console {
-      background: var(--inset); border: 1px solid var(--line-soft);
-      border-radius: 0.7rem; padding: 1rem; min-height: 8rem;
-    }
+    .console { background-color: var(--board); border: 1px solid var(--rule); padding: 1rem; min-height: 6rem; }
     .console-header {
       display: flex; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
-      font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 0.8rem; font-weight: 700;
+      font-family: var(--mono); font-size: var(--fs-label); letter-spacing: 0.04em;
+      color: var(--ink-2); margin-bottom: 0.8rem;
     }
-    .latency { color: var(--muted); font-size: 0.78rem; letter-spacing: 0; text-transform: none; font-weight: 400; }
+    .latency { color: var(--ink-2); font-family: var(--mono); font-size: var(--fs-small); }
 
-    .empty-state-card { border: 1px dashed var(--line); border-radius: 0.5rem; padding: 0.9rem;
-                        color: var(--muted); font-size: 0.9rem; }
-    .loading-card { border: 1px dashed var(--info); border-radius: 0.5rem; padding: 0.9rem;
-                    color: var(--info); font-size: 0.9rem; }
-    .error-card { border: 1px solid var(--alarm); background: var(--alarm-dim); border-radius: 0.5rem;
-                  padding: 0.9rem; color: var(--text); font-size: 0.9rem; }
-    .error-card strong { color: var(--alarm); display: block; margin-bottom: 0.3rem; }
-    .error-detail { display: block; margin-top: 0.4rem; color: var(--muted); font-size: 0.82rem; }
-
-    .tag { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 0.3rem;
-           font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; border: 1px solid; }
-    .tag-ok      { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
-    .tag-warn    { color: var(--alarm); border-color: var(--alarm); background: var(--alarm-dim); }
-    .tag-live    { color: var(--calm);  border-color: var(--calm);  background: var(--calm-dim); }
-    .tag-fixture { color: var(--focus); border-color: var(--focus); background: var(--amber-dim); }
+    .empty-state-card { border: 1px dashed var(--rule); padding: 0.9rem; color: var(--ink-2); font-size: var(--fs-small); }
+    .loading-card { border: 1px dashed var(--v-cannot); padding: 0.9rem; color: var(--v-cannot); font-size: var(--fs-small); }
+    .error-card { border: 1px solid var(--critical); background-color: #2A1210; padding: 0.9rem; color: var(--ink); font-size: var(--fs-small); }
+    .error-card strong { color: var(--critical); display: block; margin-bottom: 0.3rem; }
+    .error-detail { display: block; margin-top: 0.4rem; color: var(--ink-2); font-size: var(--fs-small); }
 
     .provenance { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
-                  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--line-soft);
-                  color: var(--muted); font-size: 0.8rem; }
-    .provenance .src { font-family: var(--mono); color: var(--text); font-size: 0.8rem; }
+                  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--rule);
+                  color: var(--ink-2); font-size: var(--fs-op); }
+    .provenance .src { font-family: var(--mono); color: var(--ink); font-size: var(--fs-op); }
     .provenance .detail { flex: 1 1 20ch; min-width: 0; }
+    /* In a result the stamp comes first, above the figures it qualifies, so a figure
+       is never on screen while the word that says it is a fixture is below the fold. */
+    .provenance.lead { margin: 0 0 0.9rem; padding: 0 0 0.7rem; border-top: 0; border-bottom: 1px dashed var(--rule); }
 
     dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1.1rem; margin-top: 0.7rem; }
-    dl.kv dt { color: var(--muted); font-size: 0.85rem; }
-    dl.kv dd { font-size: 0.95rem; overflow-wrap: anywhere; }
+    dl.kv dt { color: var(--ink-2); font-size: var(--fs-small); }
+    dl.kv dd { font-size: var(--fs-body); overflow-wrap: anywhere; }
     .row { margin-top: 0.6rem; }
-    .row .sub { color: var(--muted); font-size: 0.82rem; display: block; }
+    .row .sub { color: var(--ink-2); font-size: var(--fs-small); display: block; }
+
+    /* Connection controls: useful, never the first thing on a television. */
+    .connection { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+    .connection .actions-bar { align-items: center; }
+    .setup-row {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: var(--fs-small);
+      background-color: var(--flap); border: 1px solid var(--rule);
+      padding: 0.8rem 1rem; margin-bottom: 0.8rem;
+    }
+    .setup-row .note { flex-basis: 100%; }
+    .setup-row label { color: var(--ink-2); }
+    .setup-row input {
+      background-color: var(--board); border: 1px solid var(--rule); color: var(--ink);
+      padding: 0.45rem 0.6rem; font: inherit; font-size: var(--fs-small); min-width: 13rem;
+    }
 
     /* ----------------------------------------------------------- Key hint bar */
+    /* The remote's key legend is a television affordance. It shows at television
+       width and whenever the page runs inside the Fire TV host or a TV browser,
+       whatever viewport that reports; a laptop has a keyboard and the focus ring,
+       and a phone has neither a remote nor room for one. */
     .keybar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-      background: var(--panel); border-top: 1px solid var(--line);
-      padding: 0.7rem 4vw; display: flex; gap: 0.6rem 1.4rem;
-      align-items: center; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted);
+      background-color: var(--seam); border-top: 1px solid var(--rule);
+      padding: 0.55rem 4vw; display: none; gap: 0.5rem 1.4rem;
+      align-items: center; flex-wrap: nowrap; font-size: var(--fs-small); color: var(--ink-2);
     }
-    .keybar .hint { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
-    /* The note explains a remote nuance and is the one item long enough to push
-       the bar sideways on a phone. It wraps instead. */
+    .keybar .hint { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+    .keybar .hint svg { width: 1.6em; height: 1.6em; flex: none; }
     .keybar .hint-note { white-space: normal; }
     .key {
-      font-family: var(--mono); font-weight: 700; font-size: 0.78rem;
-      background: var(--inset); border: 1px solid var(--line); color: var(--text);
-      border-radius: 0.3rem; padding: 0.1rem 0.45rem;
+      font-family: var(--mono); font-weight: 600; font-size: var(--fs-small);
+      background-color: var(--flap); border: 1px solid var(--rule); color: var(--ink);
+      padding: 0.05rem 0.45rem;
     }
-    .keybar .focused-label { margin-left: auto; color: var(--text); font-weight: 700; }
+    /* One row, always: a long control name at a narrow television width used to wrap
+       the bar onto a second row over the page. The name gives way at its end instead. */
+    .keybar .focused-label {
+      margin-left: auto; color: var(--amber); font-weight: 600;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* Inside the Fire TV app the remote is the only input, so the legend needs no
+       introduction; in a desktop browser it says whose keys these are. */
+    .keybar .remote-note { color: var(--ink); font-weight: 600; }
+    html.tv-host .keybar .remote-note { display: none; }
+    html.tv-host .keybar { display: flex; }
+    html.tv-host body { padding-bottom: 4.5rem; }
 
     [hidden] { display: none !important; }
+    /* Under 1400px, and not on the TV host, the answer keeps the change and why it was
+       named; the commit message itself is one press away in the evidence panel, which
+       keeps a laptop's first screen inside its word budget with the column heads shown.
+       The connection pill moves off those screens too: the Connection section reports it. */
+    @media (max-width: 1399.98px) {
+      html:not(.tv-host) .hero-cause[data-quote-only="true"] { display: none; }
+      html:not(.tv-host) .topbar .conn-bar { display: none; }
+    }
+    /* The board is the first screen, all of it; the explanation starts below it. */
+    @media (min-width: 601px) {
+      .hero { min-height: calc(100vh - 5.5rem); }
+    }
+    /* On a laptop the board used to stop short of the first screen's bottom edge and
+       leave an empty band under the last row. There the departure rows take up the
+       free height instead, the way a departures board fills its wall, up to a cap so
+       a tall window does not get tall rows. No text is added. The television layout
+       keeps its natural rows: its key bar is fixed over the bottom of the screen. */
+    @media (min-width: 601px) and (max-width: 1399.98px) {
+      html:not(.tv-host) .hero { display: flex; flex-direction: column; }
+      html:not(.tv-host) .departures { flex: 1 1 auto; display: flex; flex-direction: column; max-height: 21rem; }
+      html:not(.tv-host) .departures-rows { flex: 1 1 auto; grid-auto-rows: 1fr; }
+      html:not(.tv-host) .btn-demo { align-content: center; }
+    }
+    .sr-only {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
 
     /* ----------------------------------------------------------- Breakpoints */
     @media (max-width: 600px) {
-      .shell { padding: 2vh 5vw 1.5rem; }
-      .hero { padding: 1.25rem; border-left-width: 6px; }
-      .hero-answer { gap: 1rem; }
-      .hero-actions .btn { width: 100%; }
+      html { font-size: 16px; }
+      .shell { padding: 12px 16px 1.5rem; }
+      .topbar { margin-bottom: 0.7rem; }
+      .wordmark strong { font-size: 1.25rem; line-height: 1; }
+      .wordmark .wm-text { flex-direction: column; gap: 0.15rem; }
+      .wordmark .wm-text > span { padding-left: 0; border-left: 0; font-size: 0.78rem; }
+      .topbar { flex-wrap: wrap; }
+      .thesis { flex-basis: 100%; font-size: 1.2rem; line-height: 1.25; }
+      :root { --fs-label: 0.78rem; --fs-small: 0.84rem; }
+      .state-pill { font-size: 0.8rem; white-space: nowrap; padding: 0.2rem 0.55rem; }
+      .board-metric { font-size: 0.8rem; }
+      .hero-figure-label { font-size: 1rem; }
+      .hero-actions .btn-danger { flex: 1 1 calc(50% - 0.4rem); font-size: 0.92rem; min-height: 3.25rem; }
+      .board-heads { display: none; }
+      .answer { padding: 0.85rem 0.9rem; }
+      .answer.board-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 1rem; column-gap: 0.9rem; }
+      .answer .cell-verdict, .answer .cell-next { grid-column: 1 / -1; }
+      .answer .cell-label { display: block; margin-bottom: 0.15rem; }
+      .answer .cell-service .cell-label, .answer .cell-reading .cell-label { display: none; }
+      .answer .cell-verdict .cell-label, .answer .cell-next .cell-label { display: none; }
+      /* A phone reads the answer at arm's length: fewer, larger things, and the metric
+         slug, unreadable at this size, stays in the evidence panel. */
+      .board-metric { display: none; }
+      .answer { padding: 1.3rem 0.9rem 1.3rem; }
+      .hero-actions .btn-primary { padding-top: 0.9rem; padding-bottom: 0.9rem; }
+      .board-service { font-size: 1.55rem; }
+      .hero-figure-value { font-size: 3.6rem; }
+      .hero-headline { font-size: 2.2rem; }
+      .hero-actions { margin-top: 1rem; }
+      .hero-actions .btn-primary { flex: 1 1 100%; }
+      .hero-actions .btn-primary { justify-content: center; }
+      .hero-cause { font-size: var(--fs-body); }
+      .departures-head { padding: 0 0.9rem; }
+      .departures { margin-top: 3rem; }
+      .btn-demo { padding: 0.7rem 0.9rem; font-size: 1.15rem; }
+      .btn-demo.board-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr); }
+      .btn-demo .row-verdict { grid-column: 1 / -1; font-size: 0.95rem; }
+      .departures .note { margin: 0.6rem 0.9rem 0; }
+      .how, .rollback-steps { grid-template-columns: 1fr; }
       .setup-row input { min-width: 0; width: 100%; }
-      .conn-bar, .setup-row { width: 100%; }
-      .keybar { padding: 0.6rem 5vw; font-size: 0.75rem; }
-      .keybar .focused-label { margin-left: 0; width: 100%; }
-      /* A phone has no D-pad, and at this width the note alone made the fixed
-         bar 139px tall, which covered the answer it sits under. The keys and the
-         focused control still show; only the aside goes. */
-      .keybar .hint-note { display: none; }
-      body { padding-bottom: 7rem; }
+      /* A phone is the companion, not the television. It has no D-pad, so the
+         remote's key hints would describe keys it does not have; they go, and the
+         page stops reserving room for them. */
+      html:not(.tv-host) .keybar { display: none; }
+      body { padding-bottom: 1.5rem; }
     }
     @media (min-width: 1000px) {
       .wall { grid-template-columns: repeat(3, 1fr); }
+      /* How it answers is not evidence: it runs along the row under the three
+         evidence tiles, so the remote's moves between those three are unchanged. */
+      .wall .tile-how { grid-column: 1 / -1; }
     }
-    /* 10-foot mode. Root type goes to 24px, which is the floor for reading at
-       three metres, and the padding becomes a TV title-safe margin.
-
-       Raising the root alone was not enough, and that was the defect this block
-       now fixes. Every label, badge, provenance stamp and console line on this
-       page is set in fractions of a rem, so at a 24px root the headline read
-       across a room at 55.7px while the evidence under it rendered at 17.3px to
-       19.7px. The rules below put a floor of 1rem under all of it, in two tiers
-       so the reading order survives: supporting labels at the floor, panel body
-       copy a little above it.
+    /* 10-foot mode. Root type goes to 24px, the floor for reading at three metres,
+       and every token that was a fraction of a rem is raised to at least 1rem, in
+       tiers so the reading order survives: decoration at the floor, operational
+       text (reasons, provenance, stamps, the connection pill) a step above it.
 
        Measured, not eyeballed: python scripts/measure_legibility.py opens this
        page in Chromium at 1920x1080, drives it until the panels have content,
        and prints the smallest rendered size on screen. */
     @media (min-width: 1400px) {
       html { font-size: 24px; }
-      .shell { padding: 3.5vh 5vw 1.5rem; }
-      .keybar { padding: 0.7rem 5vw; }
-      .topbar { padding-bottom: 0.7rem; margin-bottom: 0.9rem; }
-      /* The key bar wraps onto a second line once its own text clears the floor,
-         and it is fixed, so the page has to reserve more room under the content
-         than it did. The measurement script fails when it stops clearing. */
-      body { padding-bottom: 7rem; }
-
-      /* Tier one: decoration. Eyebrows, keys, section labels and one-line notes,
-         at the floor. Nothing here changes what a viewer is about to do. */
-      .wordmark span,
-      .conn-bar,
-      .setup-row,
-      .setup-row input,
-      .note,
-      .hero-eyebrow,
-      .hero-figure-label,
-      .demo-states-label,
-      .btn-demo,
-      .btn-sub,
-      .tile-eyebrow,
-      .tile-open,
-      .console-header,
-      .latency,
-      .error-detail,
-      dl.kv dt,
-      .row .sub,
-      .keybar,
-      .key { font-size: 1rem; }
-
-      /* Tier two: the sentences a viewer actually reads off the wall. */
-      .panel-desc,
-      .tile-sub,
-      .empty-state-card,
-      .loading-card,
-      .error-card,
-      dl.kv dd { font-size: 1.08rem; }
-
-      /* Tier three: the operational text. Not a floor problem, a reading order
-         problem. These were at the floor, which put the sentence saying what the
-         D-pad is about to do at the same size as the decorative wordmark caption:
-         "Ready to stage a rollback of checkout-api to b485c43" is the last thing
-         read before an irreversible action, and the two provenance chips beside it
-         are what say whether the number driving it was live or a fixture. They now
-         sit above the body copy rather than under it. Measured by
-         python scripts/measure_legibility.py, which reports the smallest
-         operational reading separately from the smallest reading anywhere. */
-      .state-pill,
-      .src-badge,
-      .tag,
-      .hero-accuracy,
-      .provenance,
-      .provenance .src { font-size: 1.08rem; }
-      .reason { font-size: 1.15rem; }
-
-      /* Both inputs sit on one row with three controls beside them, and at 24px
-         the old 13rem minimum pushed the whole bar onto a second line. */
+      :root {
+        --fs-label: 1rem;
+        --fs-small: 1rem;
+        --fs-op:    1.08rem;
+        --fs-body:  1.08rem;
+        --fs-lead:  1.15rem;
+        --fs-row:   1.3rem;
+        --fs-h2:    1.6rem;
+        --fs-head:  2.6rem;
+        --fs-figure:4.2rem;
+      }
+      .shell { padding: 2.4vh 4.5vw 1.5rem; }
+      .keybar { padding: 0.45rem 4.5vw; display: flex; }
+      .wordmark .wm-text > span { font-size: 1rem; }
+      .board-service { font-size: 1.8rem; }
+      .reason, .cell-next .reason { font-size: 1.12rem; }
       .setup-row input { min-width: 9rem; }
+      body { padding-bottom: 4.2rem; }
+      /* The answer's why sits under the verdict it explains, beside the reading, not
+         in a full-width band under all four cells. As a band, a refusal's longer
+         sentence pushed the last departures behind the key bar; here every row stays
+         on the first screen in all four verdicts (tests/ux/test_board_in_browser.py). */
+      .board-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.3fr); }
+      .answer.board-grid { grid-template-rows: auto 1fr; }
+      .answer .cell-service   { grid-column: 1; grid-row: 1 / span 2; }
+      .answer .cell-reading   { grid-column: 2; grid-row: 1 / span 2; }
+      .answer .cell-verdict   { grid-column: 3; grid-row: 1; }
+      .answer .cell-next      { grid-column: 4; grid-row: 1; }
+      .hero-cause {
+        grid-column: 3 / -1; grid-row: 2; align-self: start;
+        font-size: var(--fs-op); line-height: 1.33;
+        margin-top: 0.55rem; padding: 0; border-top: 0;
+      }
+      .hero-cause .quote { font-size: 1em; }
+      .hero-actions { margin-top: 0.7rem; }
+      .departures { margin-top: 0.75rem; }
+      .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
+      .answer { padding-bottom: 0.8rem; }
+    }
+    /* The Fire TV app's WebView. A 1080p Fire TV reports a 960x540 CSS viewport
+       (two device pixels per CSS pixel), which the 1400px query above never sees,
+       so inside the host the same 10-foot board is drawn at 1.25vw to the rem: at
+       960 wide that is exactly the 1920 layout at half the CSS size, the same
+       physical size on the panel. Keep these rules in step with the block above;
+       tests/ux/test_board_in_browser.py measures both. */
+    @media (min-width: 900px) and (max-width: 1399.98px) {
+      html.tv-host {
+        font-size: 1.25vw;
+        --fs-label: 1rem;
+        --fs-small: 1rem;
+        --fs-op:    1.08rem;
+        --fs-body:  1.08rem;
+        --fs-lead:  1.15rem;
+        --fs-row:   1.3rem;
+        --fs-h2:    1.6rem;
+        --fs-head:  2.6rem;
+        --fs-figure:4.2rem;
+      }
+      .tv-host .shell { padding: 2.4vh 4.5vw 1.5rem; }
+      .tv-host .keybar { padding: 0.45rem 4.5vw; }
+      .tv-host .wordmark .wm-text > span { font-size: 1rem; }
+      .tv-host .board-service { font-size: 1.8rem; }
+      .tv-host .reason, .tv-host .cell-next .reason { font-size: 1.12rem; }
+      .tv-host .setup-row input { min-width: 9rem; }
+      .tv-host .board-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.3fr); }
+      .tv-host .answer.board-grid { grid-template-rows: auto 1fr; }
+      .tv-host .answer .cell-service   { grid-column: 1; grid-row: 1 / span 2; }
+      .tv-host .answer .cell-reading   { grid-column: 2; grid-row: 1 / span 2; }
+      .tv-host .answer .cell-verdict   { grid-column: 3; grid-row: 1; }
+      .tv-host .answer .cell-next      { grid-column: 4; grid-row: 1; }
+      .tv-host .hero-cause {
+        grid-column: 3 / -1; grid-row: 2; align-self: start;
+        font-size: var(--fs-op); line-height: 1.33;
+        margin-top: 0.55rem; padding: 0; border-top: 0;
+      }
+      .tv-host .hero-cause .quote { font-size: 1em; }
+      .tv-host .hero-actions { margin-top: 0.7rem; }
+      .tv-host .departures { margin-top: 0.75rem; }
+      .tv-host .wall { grid-template-columns: repeat(3, 1fr); }
+      .tv-host .wall .tile-how { grid-column: 1 / -1; }
+      .tv-host .departures-rows { gap: 0.125rem; padding: 0.125rem 0; }
+      .tv-host .answer { padding-bottom: 0.8rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -405,173 +684,229 @@
 
   <div class="shell">
     <header class="topbar">
+      <h1 class="sr-only">Mercury Fire TV incident board</h1>
       <div class="wordmark">
-        <strong>MERCURY</strong>
-        <span>Fire TV Incident Commander</span>
+        <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="28" height="13.5" fill="#1D2025"/>
+          <rect x="2" y="16.5" width="28" height="13.5" fill="#16181C"/>
+          <path d="M8.5 24 V8.5 L16 17 L23.5 8.5 V24" fill="none" stroke="#FFB23F" stroke-width="3.2" stroke-linejoin="miter"/>
+          <rect x="2" y="15.2" width="28" height="1.6" fill="#050506"/>
+        </svg>
+        <span class="wm-text"><strong>MERCURY</strong><span>Fire TV incident board</span></span>
       </div>
-
-      <!-- Two text fields used to sit here, on the first screen. On a television
-           that is a form standing between the viewer and the incident, and typing
-           into it with a D-pad is the worst interaction in the product. The page
-           defaults the API to its own origin and keeps both fields behind this
-           toggle, which is also opened automatically the moment an action needs
-           the governance secret. -->
+      <p class="thesis" id="thesis">One deploy, or why not.</p>
       <div class="conn-bar">
-        <button id="btnCheck" class="btn" data-tv-focusable data-tv-label="Check connection"
-                title="Send a real GET /health to the API and report the result">Check</button>
-        <button id="btnSpeak" class="btn" data-tv-focusable data-tv-label="Read summaries aloud"
-                aria-pressed="false"
-                title="Read each answer aloud with the browser's own speech synthesis">Read aloud: off</button>
-        <button id="btnSetup" class="btn" data-tv-focusable data-tv-label="Open connection setup"
-                aria-expanded="false" aria-controls="setupRow"
-                title="Show the API URL and governance secret fields. They are hidden so the first screen on a television is the incident, not a form.">Setup</button>
         <span id="connState" class="state-pill state-unknown">API not checked</span>
       </div>
     </header>
 
-    <div class="setup-row" id="setupRow" hidden>
-      <label for="apiBase">API</label>
-      <input id="apiBase" type="text" spellcheck="false" autocomplete="off"
-             title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
-             placeholder="http://127.0.0.1:8002">
-      <label for="opSecret">Secret</label>
-      <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
-             title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
-             placeholder="MERCURY_ROLLBACK_SECRET">
-      <label for="opResponder">Responder</label>
-      <input id="opResponder" type="text" spellcheck="false" autocomplete="off"
-             title="Name shown in the shared incident handoff state"
-             value="Primary responder" maxlength="128">
-      <p class="note">The API defaults to the origin this page was served from, so it is
-        usually already right. The secret is MERCURY_ROLLBACK_SECRET: the server prints an
-        ephemeral one at startup when the variable is unset.</p>
-    </div>
-
-    <p class="note" id="connDetail">The page has not called the API yet. The governance secret
-       is sent as an Authorization: Bearer header on the two rollback calls only. Never stored.</p>
-
     <main>
-      <!-- ------------------------------------------------------------- Hero -->
-      <section id="hero" class="hero" data-state="idle" aria-labelledby="heroHeadline">
-        <div id="heroLive" aria-live="polite">
-          <p class="hero-eyebrow" id="heroEyebrow">No answer yet</p>
-          <div class="hero-answer">
-            <div class="hero-figure">
-              <div class="hero-figure-value" id="heroFigure">?</div>
-              <div class="hero-figure-label" id="heroFigureLabel">Not measured</div>
-              <!-- Where the figure above came from. This lives inside the hero card,
-                   next to the number, because at 1920x1080 the hero footer renders
-                   below the fold and a wallboard is read from across a room without
-                   scrolling. -->
-              <div class="hero-source" id="heroSource"></div>
+      <!-- ------------------------------------------------------------- Hero
+           The first screen is one departures board. The column heads, the answer
+           row and the five service rows share a grid, so they line up. -->
+      <section id="hero" class="hero" data-state="idle" data-verdict="none" aria-labelledby="heroHeadline">
+        <div class="board-heads board-grid">
+          <p class="cell-label">Service</p>
+          <p class="cell-label">Reading</p>
+          <p class="cell-label">Verdict</p>
+          <p class="cell-label">Next</p>
+        </div>
+        <!-- Not a live region. The whole answer used to be one, and a screen reader read
+             it out on load, then again in full when the flap settled. The one sentence
+             worth hearing goes to #boardStatus, and only after somebody asked. -->
+        <div id="heroLive">
+          <div class="answer board-grid">
+            <div class="cell cell-service">
+              <p class="cell-label">Service</p>
+              <p class="board-service" id="heroService">Not asked</p>
+              <p class="board-metric" id="heroMetric"></p>
             </div>
-            <div class="hero-text">
-              <h1 class="hero-headline" id="heroHeadline">What broke?</h1>
-              <p class="hero-cause" id="heroCause">
-                Mercury has not called its API yet, so it is claiming nothing. Press
-                <strong>Ask what changed</strong> and this line will be replaced by the commit the
-                server attributes the anomaly to, or by its refusal to attribute it to anything.
-              </p>
+            <div class="cell cell-reading">
+              <p class="cell-label">Reading</p>
+              <div class="hero-figure">
+                <div class="hero-figure-value" id="heroFigure">?</div>
+                <div class="hero-figure-label" id="heroFigureLabel">Not measured</div>
+                <!-- Where the figure came from, beside the figure, inside the first
+                     screenful: a wallboard is read from across a room, unscrolled. -->
+                <div class="hero-source" id="heroSource"></div>
+              </div>
             </div>
+            <div class="cell cell-verdict">
+              <p class="cell-label">Verdict</p>
+              <p class="hero-eyebrow" id="heroEyebrow">No answer yet</p>
+              <h2 class="hero-headline" id="heroHeadline">What broke?</h2>
+              <span class="hero-evidence" id="heroEvidence"></span>
+              <span class="hero-accuracy" id="heroAccuracy"></span>
+            </div>
+            <div class="cell cell-next">
+              <p class="cell-label">Next</p>
+              <span class="reason" id="stageReason">Staging is off until the server returns a rollback target.</span>
+            </div>
+            <p class="hero-cause" id="heroCause">
+              Mercury has not called its API yet, so it is claiming nothing.
+            </p>
           </div>
         </div>
+
+        <p id="boardStatus" class="sr-only" role="status" aria-live="polite"></p>
 
         <div class="hero-actions">
           <button data-testid="primary-hero-action" id="btnWhatChanged" class="btn btn-primary"
                   data-tv-focusable data-tv-label="Ask what changed"
                   title="Call POST /mcp/tools/what_changed and render the correlator's verdict">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 10a7 7 0 1 1 2.05 4.95" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M1.5 9.5 L3.2 13.6 L7.1 11.6" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>
             Ask what changed
           </button>
           <button id="btnStage" class="btn btn-danger" data-tv-focusable data-tv-label="Stage governed rollback" disabled
                   aria-describedby="stageReason"
                   title="Disabled until a correlation returns a rollback target">
-            Stage governed rollback
+            Stage rollback
           </button>
           <button id="btnConfirm" class="btn btn-danger" data-tv-focusable data-tv-label="Confirm rollback" disabled
                   aria-describedby="confirmReason"
                   title="Disabled until a rollback has been staged and a governance token issued">
-            Confirm rollback
-          </button>
-          <button id="btnHandoff" class="btn" data-tv-focusable data-tv-label="Publish responder handoff" disabled
-                  title="Disabled until a correlation produces incident facts to share">
-            Publish handoff
+            Confirm
           </button>
         </div>
 
-        <div class="hero-reasons">
-          <span class="reason" id="stageReason">Staging is off until the server returns a rollback target.</span>
-          <span class="reason" id="confirmReason">Confirming is off until staging mints a single-use governance token.</span>
-        </div>
-
-        <!-- The four services the offline fixture knows about, one per answer the
-             correlator can give. Three of them make it refuse. The names are the
-             ones in SIMULATED_SERVICES in src/infrastructure/cloudwatch_adapter.py,
-             and a test fails the build if the two lists drift apart. -->
-        <div class="demo-states" role="group" aria-labelledby="demoStatesLabel">
-          <p class="demo-states-label" id="demoStatesLabel">Ask about another service</p>
-          <div class="demo-states-row">
-            <button class="btn btn-demo" data-service="checkout-api" aria-pressed="true" data-tv-focusable
+        <!-- The five departures: the four services the offline fixture knows, one
+             per answer the correlator can give, and one name it refuses. The names
+             are SIMULATED_SERVICES in src/infrastructure/cloudwatch_adapter.py, and a
+             test fails the build if the two lists drift apart. Every row's reading
+             and verdict is written from its own what_changed response. -->
+        <div class="departures demo-states" role="group" aria-label="All services">
+          <div class="departures-rows">
+            <button class="btn btn-demo board-grid" data-service="checkout-api" aria-pressed="true" data-tv-focusable
                     data-tv-label="Ask about checkout-api"
                     title="Correlate checkout-api, whose simulated spike lands minutes after a real commit">
-              checkout-api
-              <span class="btn-sub">spike just after a commit</span>
+              <span class="row-service">checkout-api</span>
+              <span class="row-reading" data-row-reading></span>
+              <span class="row-verdict" data-row-verdict>Not asked</span>
             </button>
-            <button class="btn btn-demo" data-service="payments-worker" aria-pressed="false" data-tv-focusable
+            <button class="btn btn-demo board-grid" data-service="payments-worker" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about payments worker"
                     title="Correlate payments-worker, whose reading stays under the anomaly threshold">
-              payments-worker
-              <span class="btn-sub">reading inside its own baseline</span>
+              <span class="row-service">payments-worker</span>
+              <span class="row-reading" data-row-reading></span>
+              <span class="row-verdict" data-row-verdict>Not asked</span>
             </button>
-            <button class="btn btn-demo" data-service="search-indexer" aria-pressed="false" data-tv-focusable
+            <button class="btn btn-demo board-grid" data-service="search-indexer" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about search indexer"
                     title="Correlate search-indexer, whose spike is hours away from any commit">
-              search-indexer
-              <span class="btn-sub">spike with an empty window</span>
+              <span class="row-service">search-indexer</span>
+              <span class="row-reading" data-row-reading></span>
+              <span class="row-verdict" data-row-verdict>Not asked</span>
             </button>
-            <button class="btn btn-demo" data-service="release-train" aria-pressed="false" data-tv-focusable
+            <button class="btn btn-demo board-grid" data-service="release-train" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about release train"
                     title="Correlate release-train, whose spike follows a burst of changes that Mercury refuses to choose between">
-              release-train
-              <span class="btn-sub">too many changes to name one</span>
+              <span class="row-service">release-train</span>
+              <span class="row-reading" data-row-reading></span>
+              <span class="row-verdict" data-row-verdict>Not asked</span>
             </button>
-            <button class="btn btn-demo" data-service="quiet-service" aria-pressed="false" data-tv-focusable
+            <button class="btn btn-demo board-grid" data-service="quiet-service" aria-pressed="false" data-tv-focusable
                     data-tv-label="Ask about a service Mercury does not know"
                     title="Ask about a name the offline fixture does not know, and watch it refuse">
-              quiet-service
-              <span class="btn-sub">a name the fixture refuses</span>
+              <span class="row-service">quiet-service</span>
+              <span class="row-reading" data-row-reading></span>
+              <span class="row-verdict" data-row-verdict>Not asked</span>
             </button>
           </div>
-          <p class="note">Without AWS credentials the metric series is generated locally, and it is
-            generated from the name of the service, so these four answers differ. A name that is not
-            on this list is refused rather than given an invented reading.</p>
-        </div>
-
-        <div class="hero-foot">
-          <span class="latency" id="heroLatency">No call measured yet.</span>
-          <span id="heroProvenance"></span>
         </div>
       </section>
 
-      <!-- ------------------------------------------------------------- Wall -->
+      <!-- ---------------------------------------------------- Governed rollback -->
+      <section class="screen" id="rollback" aria-labelledby="rollbackTitle">
+        <p class="section-kicker">Act on it</p>
+        <h2 id="rollbackTitle">Governed rollback and handoff</h2>
+        <ol class="rollback-steps">
+          <li id="rbStageStep" data-done="false">
+            <p class="step-head"><b>01</b> Stage</p>
+            <p class="step-state" id="rbStageState">Nothing staged. The Stage control on the board is live only when the answer carries a verified rollback target.</p>
+          </li>
+          <li id="rbConfirmStep" data-done="false">
+            <p class="step-head"><b>02</b> Confirm</p>
+            <p class="step-state"><span class="reason" id="confirmReason">Confirming is off until staging mints a single-use governance token.</span></p>
+          </li>
+          <li id="rbResultStep" data-done="false">
+            <p class="step-head"><b>03</b> <span id="rbResultHead">Recorded only</span></p>
+            <p class="step-state" id="rbResultState">No decision recorded yet.</p>
+            <p class="step-state" id="dispatchMode">Dispatcher not reported yet: the page has not read /health.</p>
+          </li>
+        </ol>
+
+        <div class="handoff">
+          <div class="actions-bar">
+            <button id="btnHandoff" class="btn" data-tv-focusable data-tv-label="Publish responder handoff" disabled
+                    title="Disabled until a correlation produces incident facts to share">
+              Publish handoff
+            </button>
+            <button class="btn" data-tv-focusable data-tv-label="Refresh shared handoff"
+                    data-action="handoff-refresh"
+                    title="Read the latest shared state so another responder can resume">Refresh handoff</button>
+          </div>
+          <div class="console">
+            <div class="console-header">
+              <span>Shared responder handoff</span>
+              <span id="handoffLatency" class="latency"></span>
+            </div>
+            <div id="handoffOutput">
+              <div class="empty-state-card">No handoff loaded. Publish or refresh to show the responder,
+                current action, confirmed facts and next step.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ Evidence
+           Everything that proves the board, kept whole and kept working: the raw
+           responses, both provenance stamps, the measured worth of a naming, and
+           the delivery and spend panels. -->
+      <section class="screen" id="evidence" aria-labelledby="evidenceTitle">
+        <p class="section-kicker">Evidence</p>
+        <h2 id="evidenceTitle">Evidence behind the board</h2>
+        <div class="evidence-note">
+          <div class="hero-foot">
+            <span class="latency" id="heroLatency">No call measured yet.</span>
+            <span id="heroProvenance"></span>
+          </div>
+          <p class="note">Without AWS credentials each metric series is generated locally from the
+            service name, so these answers differ. A name that is not on this list is refused rather
+            than given an invented reading.</p>
+          <p class="note" id="standInNote">Without a GitHub token, the commit named under a spike is the
+            newest lone commit in Mercury's own git history, standing in for a deploy.</p>
+        </div>
+      </section>
+
       <section id="wall" class="wall" aria-label="War room panels">
         <button class="tile" data-tv-focusable data-panel="incident" data-tv-label="Incident evidence panel">
           <span class="tile-eyebrow">Incident evidence</span>
-          <span class="tile-headline" id="tileIncidentHeadline">Not loaded</span>
+          <span class="tile-stamp" id="tileIncidentStamp"></span>
+          <span class="tile-headline" id="tileIncidentHeadline" data-empty="true">Not asked yet</span>
           <span class="tile-sub" id="tileIncidentSub">Metric series, baseline, attribution window and both provenance stamps.</span>
           <span class="tile-open">Center to open</span>
         </button>
 
         <button class="tile" data-tv-focusable data-panel="velocity" data-tv-label="Delivery velocity panel">
           <span class="tile-eyebrow">Delivery velocity</span>
-          <span class="tile-headline" id="tileVelocityHeadline">Not loaded</span>
-          <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog.</span>
+          <span class="tile-stamp" id="tileVelocityStamp"></span>
+          <span class="tile-headline" id="tileVelocityHeadline" data-empty="true">Not loaded yet</span>
+          <span class="tile-sub" id="tileVelocitySub">DORA proxies from workflow runs and merged pull requests, plus the review backlog. Opening it makes one call.</span>
           <span class="tile-open">Center to open</span>
         </button>
 
         <button class="tile" data-tv-focusable data-panel="spend" data-tv-label="Cloud spend panel">
           <span class="tile-eyebrow">Cloud spend</span>
-          <span class="tile-headline" id="tileSpendHeadline">Not loaded</span>
-          <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing.</span>
+          <span class="tile-stamp" id="tileSpendStamp"></span>
+          <span class="tile-headline" id="tileSpendHeadline" data-empty="true">Not loaded yet</span>
+          <span class="tile-sub" id="tileSpendSub">Month-to-date spend per service and the telemetry signals a service is missing. Opening it makes one call.</span>
+          <span class="tile-open">Center to open</span>
+        </button>
+
+        <button class="tile tile-how" data-tv-focusable data-panel="how" data-tv-label="How it answers panel">
+          <span class="tile-eyebrow">How it answers</span>
+          <span class="tile-headline">One change named, or none</span>
+          <span class="tile-sub">The three steps behind every answer, the four verdicts, and who it is for. Opening it makes no call.</span>
           <span class="tile-open">Center to open</span>
         </button>
       </section>
@@ -579,12 +914,25 @@
       <!-- ----------------------------------------------------------- Panels -->
       <section id="panel-incident" class="panel" data-panel-body hidden aria-labelledby="incidentTitle">
         <h2 id="incidentTitle">Incident evidence</h2>
-        <p class="panel-desc">Everything the correlator used to reach the answer in the hero: the metric
+        <p class="panel-desc">Everything the correlator used to reach the answer on the board: the metric
           series and its baseline, the attribution window, the commit it landed on, and where each half
-          of that came from. The rollback controls stay in the hero, so the action is never buried.</p>
+          of that came from. The rollback controls stay on the board, so the action is never buried;
+          what Stage and Confirm answered lands in the first console, under the call that returned it.</p>
         <div class="actions-bar">
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
+        </div>
+        <!-- The rollback console leads: a refused Stage or Confirm opens this panel, and
+             its reason has to be on screen, not under a correlation longer than the TV. -->
+        <div class="console">
+          <div class="console-header">
+            <span id="rollbackEndpoint">Governed rollback: no call made</span>
+            <span id="rollbackLatency" class="latency"></span>
+          </div>
+          <div id="rollbackOutput" aria-live="polite">
+            <div class="empty-state-card">Nothing staged for this answer. Stage and Confirm on the board,
+              and each response lands here under the call that returned it.</div>
+          </div>
         </div>
         <div class="console">
           <div class="console-header">
@@ -592,26 +940,8 @@
             <span id="incidentLatency" class="latency"></span>
           </div>
           <div id="incidentOutput" aria-live="polite">
-            <div class="empty-state-card">No correlation requested yet. Ask what changed in the hero and
+            <div class="empty-state-card">No correlation requested yet. Ask what changed on the board and
               the full verdict lands here, including the verdicts where Mercury cannot attribute.</div>
-          </div>
-        </div>
-        <div class="actions-bar">
-          <button class="btn btn-primary" data-tv-focusable data-tv-label="Publish shared handoff"
-                  data-action="handoff-publish"
-                  title="Publish responder, current action, confirmed facts and next step">Publish handoff</button>
-          <button class="btn" data-tv-focusable data-tv-label="Refresh shared handoff"
-                  data-action="handoff-refresh"
-                  title="Read the latest shared state so another responder can resume">Refresh handoff</button>
-        </div>
-        <div class="console">
-          <div class="console-header">
-            <span>Shared responder handoff</span>
-            <span id="handoffLatency" class="latency"></span>
-          </div>
-          <div id="handoffOutput" aria-live="polite">
-            <div class="empty-state-card">No handoff loaded. Publish or refresh to show the responder,
-              current action, confirmed facts and next step.</div>
           </div>
         </div>
       </section>
@@ -627,7 +957,7 @@
           <button class="btn" data-tv-focusable data-tv-label="Scan stale pull requests" data-action="prs"
                   title="Call POST /mcp/tools/get_pr_bottlenecks and render the response">Scan stale pull requests</button>
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
         </div>
         <div class="console">
           <div class="console-header">
@@ -652,7 +982,7 @@
           <button class="btn" data-tv-focusable data-tv-label="Audit observability gaps" data-action="observability"
                   title="Call POST /mcp/tools/audit_observability for the current service">Audit observability gaps</button>
           <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
-                  title="Return to the three panels">Back to wall</button>
+                  title="Return to the panels">Back to wall</button>
         </div>
         <div class="console">
           <div class="console-header">
@@ -665,16 +995,105 @@
           </div>
         </div>
       </section>
+
+      <section id="panel-how" class="panel" data-panel-body hidden aria-labelledby="howTitle">
+        <h2 id="howTitle">How it answers: one change named, or none</h2>
+        <div class="actions-bar">
+          <button class="btn" data-tv-focusable data-tv-label="Back to the wall" data-back
+                  title="Return to the panels">Back to wall</button>
+        </div>
+        <ol class="how">
+          <li>
+            <span class="step-no">01</span>
+            <h3>Read the reading</h3>
+            <p>The error rate now, against a baseline taken before the spike began.</p>
+          </li>
+          <li>
+            <span class="step-no">02</span>
+            <h3>Blame one change or none</h3>
+            <p>A commit is named only when exactly one change landed in the window. Otherwise
+              Mercury says it cannot attribute, and why. A refusal clears no deploy.</p>
+            <p class="verdicts"><span class="v-a">Attributed</span><span class="v-c">Cannot attribute</span><span class="v-n">Nothing to revert</span><span class="v-i">Insufficient data</span></p>
+          </li>
+          <li>
+            <span class="step-no">03</span>
+            <h3>Govern the rollback</h3>
+            <p>Stage it, then confirm it with a single-use token. The dispatcher in use says
+              whether anything left the building.</p>
+          </li>
+        </ol>
+        <p class="lede who-for"><strong>Who it is for:</strong> the team that owns an on-call rota and
+          a TV in the room where incidents are worked. A team without the room can open this same page
+          in a laptop browser, where the arrow keys and Enter do what the remote does.
+          <strong>Who would pay:</strong> whoever owns that
+          rota. Nobody has been asked yet, so that is a hypothesis, not a finding.</p>
+      </section>
+
+      <!-- ---------------------------------------------------------- Connection
+           Two text fields used to sit in the top bar, on the first screen. On a
+           television that is a form standing between the viewer and the incident,
+           and typing into it with a D-pad is the worst interaction in the product.
+           The page defaults the API to its own origin and keeps both fields behind
+           the Setup toggle, which also opens by itself the moment an action needs
+           the governance secret. -->
+      <section class="connection" aria-labelledby="connectionTitle">
+        <p class="section-kicker" id="connectionTitle">Connection</p>
+        <div class="actions-bar">
+          <button id="btnCheck" class="btn" data-tv-focusable data-tv-label="Check connection"
+                  title="Send a real GET /health to the API and report the result">Check</button>
+          <button id="btnSpeak" class="btn" data-tv-focusable data-tv-label="Read summaries aloud"
+                  aria-pressed="false"
+                  title="Read each answer aloud with the browser's own speech synthesis">Read aloud: off</button>
+          <button id="btnSetup" class="btn" data-tv-focusable data-tv-label="Open connection setup"
+                  aria-expanded="false" aria-controls="setupRow"
+                  title="Show the API URL and governance secret fields. They are hidden so the first screen on a television is the incident, not a form.">Setup</button>
+        </div>
+        <div class="setup-row" id="setupRow" hidden>
+          <label for="apiBase">API</label>
+          <input id="apiBase" type="text" spellcheck="false" autocomplete="off"
+                 title="Base URL of the Mercury API this page calls. Defaults to this page's own origin."
+                 placeholder="http://127.0.0.1:8002">
+          <label for="opSecret">Secret</label>
+          <input id="opSecret" type="password" spellcheck="false" autocomplete="off"
+                 title="MERCURY_ROLLBACK_SECRET. The server prints an ephemeral one at startup when the variable is unset."
+                 placeholder="MERCURY_ROLLBACK_SECRET">
+          <label for="opResponder">Responder</label>
+          <input id="opResponder" type="text" spellcheck="false" autocomplete="off"
+                 title="Name shown in the shared incident handoff state"
+                 value="Primary responder" maxlength="128">
+          <p class="note">The API defaults to the origin this page was served from, so it is
+            usually already right. The secret is MERCURY_ROLLBACK_SECRET: the server prints an
+            ephemeral one at startup when the variable is unset.</p>
+        </div>
+        <p class="note hint-note">Text fields are outside the D-pad ring, so the remote cannot get stuck in one.</p>
+        <p class="note" id="connDetail">The page has not called the API yet. The governance secret
+           is sent as an Authorization: Bearer header on the two rollback calls only. Never stored.</p>
+      </section>
     </main>
   </div>
 
   <footer class="keybar">
-    <span class="hint"><span class="key">&#9650;</span><span class="key">&#9660;</span><span class="key">&#9668;</span><span class="key">&#9658;</span> Move</span>
+    <span class="hint remote-note">Fire TV remote:</span>
+    <span class="hint">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="10.5" fill="#16181C" stroke="#ABA597" stroke-width="1.5"/>
+        <circle cx="12" cy="12" r="3.6" fill="#0B0C0E" stroke="#ABA597" stroke-width="1.5"/>
+        <path d="M12 3.6 L14 6.4 H10 Z M12 20.4 L14 17.6 H10 Z M3.6 12 L6.4 10 V14 Z M20.4 12 L17.6 10 V14 Z" fill="#EEE7D8"/>
+      </svg> <span id="hintMove">Move</span></span>
     <span class="hint"><span class="key">CENTER</span> Select</span>
     <span class="hint"><span class="key">BACK</span> <span id="hintBack">Exit to the Fire TV launcher</span></span>
-    <span class="hint hint-note">Text fields are outside the D-pad ring, so the remote cannot get stuck in one.</span>
     <span class="focused-label" id="hintFocus">Focused: nothing yet</span>
   </footer>
+  <script>
+    /* A television host: the Fire TV app injects MercuryHost, and TV browsers say so
+       in their user agent. Either one turns on the remote's key legend above. */
+    (function () {
+      var ua = navigator.userAgent || '';
+      if (window.MercuryHost || /AFT[A-Z]|Android TV|GoogleTV|BRAVIA|SMART-TV|SmartTV|Tizen|Web0S/i.test(ua)) {
+        document.documentElement.className += ' tv-host';
+      }
+    })();
+  </script>
 
   <script src="webmcp_bridge.js"></script>
   <script src="firetv_nav.js"></script>
@@ -693,6 +1112,7 @@
       connection: 'unknown',
       dpadDemoApproval: false,
       handoffRevision: 0,
+      panelLoaded: {},
       speak: false,
       /* Which service the next correlation asks about. Changed only by the demo
          state buttons, so the screen always names the service it answered for. */
@@ -700,6 +1120,27 @@
     };
 
     function el(id) { return document.getElementById(id); }
+
+    /* Every ask gets a number. A slower answer to an earlier ask (another row pressed
+       while the first call was in flight) still fills its own row, but never paints
+       the board, the evidence panel or the rollback target over the newer ask. */
+    var askSeq = 0;
+
+    /* Stage and Confirm are one call each. A second press while the first is in
+       flight (a remote's CENTER pressed twice) used to send a second request, and a
+       spent-token refusal then pulled the page away from the recorded result. */
+    function beginCall(buttonId) {
+      var button = el(buttonId);
+      if (button.getAttribute('aria-busy') === 'true') { return false; }
+      button.setAttribute('aria-busy', 'true');
+      button.setAttribute('aria-disabled', 'true');
+      return true;
+    }
+    function endCall(buttonId) {
+      var button = el(buttonId);
+      button.removeAttribute('aria-busy');
+      button.removeAttribute('aria-disabled');
+    }
 
     function reportHostEvent(eventName, detail) {
       try {
@@ -794,20 +1235,30 @@
       if (state.connection === 'unreachable' || !apiBase()) {
         card.appendChild(h('span', 'error-detail',
           'This page is static unless a Mercury API is running. Start it with '
-          + 'python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.'));
+          + 'python -m src.interfaces.mcp_server, then press Setup in the Connection section below to point this page at it.'));
       }
       render(targetId, card);
     }
 
-    function provenanceBlock(provenance) {
-      var box = h('div', 'provenance');
+    /* The stamp for a provenance. Commits read from this repository's own git history
+       are real, and the server calls them live, but on this board they stand in for a
+       deploy feed, and a green LIVE beside them read as one. They get their own stamp. */
+    function stampFor(provenance) {
+      if (provenance && provenance.data_source === 'local-git') {
+        return h('span', 'tag tag-standin', 'STAND-IN');
+      }
+      var live = provenance && provenance.is_live === true;
+      return h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
+        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE'));
+    }
+
+    function provenanceBlock(provenance, lead) {
+      var box = h('div', lead ? 'provenance lead' : 'provenance');
       if (!provenance) {
         box.appendChild(h('span', 'detail', 'This response carried no provenance stamp.'));
         return box;
       }
-      var live = provenance.is_live === true;
-      box.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
-        provenance.display_label || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
+      box.appendChild(stampFor(provenance));
       box.appendChild(h('span', 'src', provenance.data_source || 'unknown'));
       box.appendChild(h('span', 'detail', provenance.detail || ''));
       if (provenance.observed_at_utc) {
@@ -829,12 +1280,42 @@
        viewport height again. */
     function sourceBadge(provenance, label) {
       var wrap = h('span', 'src-badge');
-      var live = provenance && provenance.is_live === true;
-      wrap.appendChild(h('span', 'tag ' + (live ? 'tag-live' : 'tag-fixture'),
-        (provenance && provenance.display_label) || (live ? 'LIVE' : 'OFFLINE FIXTURE')));
-      wrap.appendChild(h('span', null,
-        label + ((provenance && provenance.data_source) ? ' (' + provenance.data_source + ')' : '')));
+      wrap.appendChild(stampFor(provenance));
+      // The source slug is printed unless it only repeats the stamp beside it.
+      var source = provenance && provenance.data_source;
+      var stamp = (provenance && provenance.display_label) || '';
+      var repeats = source && source.replace(/-/g, ' ').toLowerCase() === stamp.toLowerCase();
+      var caption = label + (source && !repeats ? (label ? ': ' : '') + source : '');
+      // Under the figure the stamp alone says what it qualifies; no caption needed.
+      if (caption) { wrap.appendChild(h('span', null, caption)); }
       return wrap;
+    }
+
+    /* Without a GitHub token the commits are Mercury's own history (local git, or the
+       checked-in recording of it), and the offline spike is placed after the newest
+       lone commit in it, so the board quotes one of this repository's commits against
+       checkout-api. The badge says so on the board, with a STAND-IN stamp in place of
+       a green LIVE, and in full to assistive technology and on hover, in the server's
+       own provenance sentence. */
+    function commitBadge(data) {
+      var provenance = data.commit_provenance;
+      var source = provenance && provenance.data_source;
+      var badge;
+      if (source === 'local-git') {
+        // Visible: the stand-in stamp and whose commits these are. The server's full
+        // sentence stays the accessible description and the hover text.
+        badge = h('span', 'src-badge');
+        badge.appendChild(stampFor(provenance));
+        badge.appendChild(h('span', null, 'Mercury’s commits'));
+      } else {
+        badge = sourceBadge(provenance, 'commits');
+      }
+      if (source === 'local-git' || source === 'offline-fixture') {
+        var said = 'Standing in for deploys of ' + data.service + ': ' + (provenance.detail || '');
+        badge.setAttribute('aria-description', said);
+        badge.title = said;
+      }
+      return badge;
     }
 
     /**
@@ -855,9 +1336,7 @@
         throw networkError;
       }
       var elapsed = performance.now() - started;
-      if (latencyTargetId) {
-        el(latencyTargetId).textContent = 'HTTP ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms';
-      }
+      if (latencyTargetId) { writeLatency(latencyTargetId, response.status, elapsed); }
       var body = null;
       try { body = await response.json(); } catch (parseError) { body = null; }
       if (!response.ok) {
@@ -868,11 +1347,23 @@
         }
         var failure = new Error('HTTP ' + response.status + '. ' + detail);
         failure.status = response.status;
+        failure.elapsedMs = elapsed;
         throw failure;
       }
       setConnection('reachable',
         'Last call: ' + path + ' returned ' + response.status + ' in ' + elapsed.toFixed(0) + ' ms.');
       return { body: body, elapsedMs: elapsed, status: response.status, url: url };
+    }
+
+    function writeLatency(targetId, status, elapsedMs) {
+      el(targetId).textContent = 'HTTP ' + status + ' in ' + elapsedMs.toFixed(0) + ' ms';
+    }
+    /* For a call whose answer may be dropped as stale: the label is written only once
+       the answer is known to be the one on screen. */
+    function latencyOf(targetId, failure) {
+      if (failure && failure.status !== undefined && failure.elapsedMs !== undefined) {
+        writeLatency(targetId, failure.status, failure.elapsedMs);
+      }
     }
 
     function post(path, payload, latencyTargetId, secret) {
@@ -885,6 +1376,26 @@
       }, latencyTargetId);
     }
 
+    /* One short sentence for a screen reader, after an action somebody took. Never
+       called for the answer the board fetches by itself on load. */
+    function announce(text) {
+      var status = el('boardStatus');
+      status.textContent = '';
+      // A fresh text node, a tick later, so the same sentence twice is read twice.
+      setTimeout(function () { status.textContent = text; }, 50);
+    }
+
+    function answerSentence(data) {
+      var kind = verdictKind(data);
+      if (kind === 'attributed') {
+        // Spoken and announced, so the lag is written out: "75m" reads as metres.
+        var short = accuracyShort(data).replace(/\u2264(\d+)m\u00a0lag/, 'if it shows within $1 minutes');
+        return data.service + ': attributed to commit ' + data.offending_commit.sha
+          + (short ? ', ' + short : '') + '.';
+      }
+      return data.service + ': ' + VERDICT_WORDS[kind].toLowerCase() + '.';
+    }
+
     function speak(text) {
       if (!state.speak || !text || !('speechSynthesis' in window)) { return; }
       window.speechSynthesis.cancel();
@@ -893,21 +1404,118 @@
 
     // ------------------------------------------------------------------ Hero
 
+    /* ------------------------------------------------------------ Split flap
+       The verdict line flips in letter by letter, the way a departures board
+       changes a row. It runs only when setHero is handed a real response (the
+       caller passes flap: true), never for the page's own "asking" state, and it
+       is instant under prefers-reduced-motion. Each letter cell is fixed to the
+       width of the letter it will settle on, so nothing reflows while it runs,
+       and when it finishes the cells collapse back into one text node, so the
+       heading reads as one string to assistive technology and to every script
+       that measures this page. The glyph each cell passes through is a function
+       of its position and the tick, not a random draw. */
+    var FLAP_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    var FLAP_TICK_MS = 38;
+    var flapTimer = null;
+
+    function prefersReducedMotion() {
+      try {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch (ignored) { return false; }
+    }
+
+    function stopFlap() {
+      if (flapTimer) { clearInterval(flapTimer); flapTimer = null; }
+      el('heroLive').removeAttribute('aria-busy');
+    }
+
+    function flapText(node, text, animate) {
+      stopFlap();
+      clear(node);
+      if (!animate || prefersReducedMotion() || !text) {
+        node.textContent = text;
+        return;
+      }
+      el('heroLive').setAttribute('aria-busy', 'true');
+      // Letters are grouped by word, and the spaces stay real spaces, so the line
+      // breaks while it flips are the line breaks of the settled text.
+      var cells = [];
+      var targets = [];
+      text.split(' ').forEach(function (word, wordIndex) {
+        if (wordIndex > 0) { node.appendChild(document.createTextNode(' ')); }
+        var group = h('span', 'flap-word');
+        for (var i = 0; i < word.length; i++) {
+          var cell = h('span', 'flap-cell', word.charAt(i));
+          group.appendChild(cell);
+          cells.push(cell);
+          targets.push(word.charAt(i));
+        }
+        node.appendChild(group);
+      });
+      // Fix each cell to the width of its final letter before anything flips.
+      cells.forEach(function (cell) {
+        var width = cell.getBoundingClientRect().width;
+        if (width > 0) { cell.style.width = width + 'px'; }
+      });
+      var spread = Math.max(cells.length, 1);
+      var settleAt = cells.map(function (cell, index) { return 3 + Math.floor(index * 16 / spread); });
+      var tick = 0;
+      flapTimer = setInterval(function () {
+        tick += 1;
+        var pending = 0;
+        cells.forEach(function (cell, index) {
+          var target = targets[index];
+          if (tick >= settleAt[index]) {
+            if (!cell.classList.contains('settled')) {
+              cell.textContent = target;
+              cell.classList.add('settled');
+            }
+            return;
+          }
+          pending += 1;
+          cell.textContent = FLAP_GLYPHS.charAt((index * 7 + tick * 5) % FLAP_GLYPHS.length);
+        });
+        if (!pending) {
+          stopFlap();
+          clear(node);
+          node.textContent = text;
+        }
+      }, FLAP_TICK_MS);
+    }
+
+    /* The staged lease, counted down on the board from the server's own figure. The
+       tick writes only the figure; nothing on the hero is a live region, so it is
+       never read out once a second. */
+    var leaseTimer = null;
+    function stopLease() { if (leaseTimer) { clearInterval(leaseTimer); leaseTimer = null; } }
+
     function setHero(config) {
       var hero = el('hero');
+      stopLease();
+      el('heroFigure').setAttribute('data-long', String(config.figure).length > 6 ? 'true' : 'false');
+      // A long verdict line steps down a size so the board keeps its shape.
+      el('heroHeadline').setAttribute('data-long', config.headline.length > 24 ? 'true' : 'false');
       hero.setAttribute('data-state', config.state);
+      hero.setAttribute('data-verdict', config.verdict || 'none');
       el('heroEyebrow').textContent = config.eyebrow;
       el('heroFigure').textContent = config.figure;
       el('heroFigureLabel').textContent = config.figureLabel;
-      el('heroHeadline').textContent = config.headline;
+      el('heroService').textContent = config.service || state.service;
+      el('heroMetric').textContent = config.metricName || '';
+      flapText(el('heroHeadline'), config.headline, config.flap === true);
+
+      el('heroEvidence').textContent = config.evidence || '';
 
       var cause = el('heroCause');
       clear(cause);
       if (config.quote) {
+        // Labelled, so the message reads as data about the change, not an instruction.
+        cause.appendChild(h('span', 'quote-label', 'Commit message'));
         cause.appendChild(h('span', 'quote', '“' + config.quote + '”'));
         cause.appendChild(document.createTextNode(' '));
       }
       cause.appendChild(document.createTextNode(config.cause));
+      cause.setAttribute('data-quote-only', config.quote && !config.cause ? 'true' : 'false');
 
       /* Provenance renders inside the hero card, beside the figure, so it is on the
          same screenful as the number it qualifies. The hero footer it used to live in
@@ -917,10 +1525,17 @@
       (config.badges || []).forEach(function (badge) { source.appendChild(badge); });
 
       /* What naming a commit is measured to be worth, from the labelled corpus, on the
-         screen at the moment somebody is deciding whether to revert. */
-      var prov = el('heroProvenance');
-      clear(prov);
-      if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+         board beside the verdict at the moment somebody is deciding whether to revert,
+         and in full, with the command that reproduces it, in the evidence below. */
+      el('heroAccuracy').textContent = config.accuracyShort || '';
+      /* The full sentence in the evidence changes only with a new answer. A staged or
+         recorded rollback says nothing about how often a naming is right, so it
+         leaves the measurement of the answer it acted on in place. */
+      if (config.accuracy !== undefined) {
+        var prov = el('heroProvenance');
+        clear(prov);
+        if (config.accuracy) { prov.appendChild(h('span', 'hero-accuracy', config.accuracy)); }
+      }
     }
 
     /* One sentence about how often this correlator names the right commit, taken from
@@ -929,11 +1544,48 @@
       var measured = data.attribution && data.attribution.measured_accuracy;
       if (!measured) { return ''; }
       if (!measured.measured) { return measured.note; }
-      return 'Measured: when this correlator names a commit it is the one that caused the '
-        + 'reading ' + Math.round(measured.precision_when_it_names_a_commit * 100) + '% of the time, '
-        + 'over ' + measured.namings_measured + ' namings in a corpus of ' + measured.corpus_cases
-        + ' labelled cases. Reproduce with ' + measured.measured_by_command + '.';
+      var ceiling = measured.assumed_delay_ceiling_minutes;
+      return 'Measured on a held-out split no setting was tuned on: when this correlator names a '
+        + 'commit it is the one that caused the reading '
+        + percent(measured.precision_when_it_names_a_commit) + ' of the time, over '
+        + measured.namings_measured + ' namings in ' + measured.corpus_cases
+        + ' synthetic labelled cases. '
+        + (ceiling
+          ? 'That assumes, as the generator does, a regression shows within ' + ceiling
+            + ' minutes of its commit, the same as the window; at longer delays it is lower. '
+          : 'The delay the corpus assumed is not recorded. ')
+        + 'Reproduce with ' + measured.measured_by_command + '.';
     }
+
+    function percent(fraction) { return (fraction * 100).toFixed(1) + '%'; }
+
+    /* The same measurement, short enough to sit on the board under the verdict. */
+    function accuracyShort(data) {
+      var measured = data.attribution && data.attribution.measured_accuracy;
+      if (!measured || !measured.measured) { return ''; }
+      // Held-out, on a corpus the authors generated, and only if a regression shows within
+      // the generator's delay ceiling (which the window equals): all three travel with it.
+      // Non-breaking spaces keep the parenthetical on one line when it wraps.
+      var ceiling = measured.assumed_delay_ceiling_minutes;
+      return percent(measured.precision_when_it_names_a_commit) + ' held-out precision (synthetic'
+        + (ceiling ? ',\u00a0\u2264' + ceiling + 'm\u00a0lag' : '') + ')';
+    }
+
+    /* Which of the four answers a response is, for colour and for the board rows.
+       Read from the verdict the server returned, never inferred from the numbers. */
+    function verdictKind(data) {
+      if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) { return 'attributed'; }
+      if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') { return 'cannot'; }
+      if (data.verdict === 'NO_ANOMALY') { return 'nothing'; }
+      return 'insufficient';
+    }
+
+    var VERDICT_WORDS = {
+      attributed: 'Attributed',
+      cannot: 'Cannot attribute',
+      nothing: 'Nothing to revert',
+      insufficient: 'Insufficient data'
+    };
 
     /* The sentence the server ships with a refusal: what Mercury cannot do and why, and
        that the reason is not a finding about the deploys. The local fallback is for a
@@ -949,15 +1601,67 @@
       el(reasonId).textContent = reason;
     }
 
+    /* The reading against its baseline. "baseline 2.95 to 38.06" read as a baseline
+       range with the headline figure inside it. */
+    function readingLabel(metric) {
+      return metric.current + ' vs ' + metric.baseline + ' baseline';
+    }
+
+    /* Why this change was named: when it landed against the onset, and how many
+       changes the window held. Both from the response; the minutes are the difference
+       between the two timestamps it carries, never a number written here. */
+    function landedLine(data) {
+      var commit = data.offending_commit;
+      var attribution = data.attribution || {};
+      var landed = Date.parse(commit && commit.committed_at);
+      var onset = Date.parse(attribution.onset_at);
+      if (!(landed <= onset)) { return ''; }
+      var minutes = Math.round((onset - landed) / 60000);
+      // Board language, terse: which change, and when against the spike.
+      var when = minutes < 1 ? 'under 1m pre-spike' : minutes + 'm pre-spike';
+      // With the runtime filter on, the count is of commits that changed a file the
+      // server is built from, and the board says "runtime" so nobody reads it as every
+      // commit in the window.
+      var kind = attribution.candidate_filter ? 'runtime change' : 'change';
+      if (attribution.commits_in_window === 1) { return 'Only ' + kind + ', ' + when; }
+      if (attribution.commits_in_window > 1) {
+        return 'Closest of ' + attribution.commits_in_window + ' ' + kind + 's, ' + when;
+      }
+      return 'Landed ' + when;
+    }
+
     function heroFromCorrelation(data) {
       var metric = data.metric;
       var factor = metric.anomaly_factor;
-      var badges = [
-        sourceBadge(data.metric_provenance, 'metric series'),
-        sourceBadge(data.commit_provenance, 'commit history')
-      ];
+      // The commits stamp belongs to answers the commit history took part in: a named
+      // change or a refusal about the window. Under no anomaly or no data no commit is
+      // involved, so no commit stamp is shown.
+      var usedCommits = data.verdict === 'ANOMALY_ATTRIBUTED'
+        || data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION';
+      var badges = [sourceBadge(data.metric_provenance, '')];
+      if (usedCommits) { badges.push(commitBadge(data)); }
 
       var accuracy = accuracyLine(data);
+      // The short precision sits under a named commit only. Under a refusal it would
+      // read as the refusal's own score. The full sentence stays in the evidence under
+      // every answer the server ships it with: it measures the correlator, not this
+      // answer, and it used to vanish when the viewer walked to a calm or empty row.
+      var short = verdictKind(data) === 'attributed' ? accuracyShort(data) : '';
+      var common = {
+        flap: true,
+        service: data.service,
+        metricName: metric.name,
+        verdict: verdictKind(data),
+        badges: badges,
+        accuracy: accuracy,
+        accuracyShort: short
+      };
+      function answer(fields) {
+        var merged = {};
+        Object.keys(common).forEach(function (key) { merged[key] = common[key]; });
+        Object.keys(fields).forEach(function (key) { merged[key] = fields[key]; });
+        setHero(merged);
+      }
 
       if (data.verdict === 'ANOMALY_ATTRIBUTED' && data.offending_commit) {
         /* Say out loud when the named commit was one of several candidates. The shipped
@@ -965,20 +1669,20 @@
            false unless somebody has turned that gate off, and the branch stays because
            the disclosure is what an ungated answer owes an operator. */
         var ambiguous = data.attribution && data.attribution.is_ambiguous;
-        setHero({
+        answer({
           state: 'alarm',
-          eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Incident attributed',
+          eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Attributed',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: 'Commit ' + data.offending_commit.sha + ' raised ' + metric.name + ' on ' + data.service,
+          figureLabel: readingLabel(metric),
+          headline: 'Commit ' + data.offending_commit.sha,
+          evidence: landedLine(data),
           quote: data.offending_commit.message,
-          cause: 'by ' + data.offending_commit.author + '. This is the closest change that landed before the spike started.'
-            + (ambiguous
-              ? ' It is not the only one: ' + data.attribution.commits_in_window
-                + ' changes landed inside the attribution window, and this rule names the closest.'
-              : ' It is the only change inside the attribution window.'),
-          badges: badges,
-          accuracy: accuracy
+          // The author and the timestamp are in the evidence panel; the board keeps
+          // the change itself.
+          cause: ambiguous
+            ? 'It is not the only one: ' + data.attribution.commits_in_window
+              + ' changes landed inside the attribution window, and this rule names the closest.'
+            : ''
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION'
                  && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
@@ -986,64 +1690,64 @@
            not name a change for it, because a burst of changes landed and nothing in a
            metric series says which of them did it. It is rendered as what it is, a
            refusal to attribute, never as a finding that the changes are innocent. */
-        setHero({
+        answer({
           state: 'alarm',
           eyebrow: 'Incident, too many changes to name one',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: 'Cannot attribute this. ' + data.attribution.commits_in_window
-            + ' changes landed before ' + metric.name + ' rose on ' + data.service,
+          figureLabel: readingLabel(metric),
+          headline: 'Cannot attribute this: ' + data.attribution.commits_in_window
+            + (data.attribution.candidate_filter ? ' runtime changes landed' : ' changes landed'),
           cause: refusalStatement(data,
             'Mercury names a change only when exactly one landed inside the attribution window. '
             + data.attribution.commits_in_window + ' did, so it cannot attribute this to any one of them, '
             + 'names none, and offers no rollback. That is a refusal to guess, not a finding that none of '
-            + 'them caused it.'),
-          badges: badges,
-          accuracy: accuracy
+            + 'them caused it.')
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION') {
         /* An empty window. It says nothing about changes outside the window, so the
            screen says cannot-attribute and never no-deploy. */
-        setHero({
+        answer({
           state: 'alarm',
           eyebrow: 'Incident, cannot attribute: window empty',
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: 'Cannot attribute this. No change landed in the window before ' + metric.name
-            + ' rose on ' + data.service,
+          figureLabel: readingLabel(metric),
+          headline: 'Cannot attribute this: no change in the window',
           cause: refusalStatement(data,
             'No change landed inside the attribution window before the onset, so Mercury cannot attribute '
             + 'this to a change, names no commit and offers no rollback. An empty window is not evidence that '
-            + 'no change caused it.'),
-          badges: badges,
-          accuracy: accuracy
+            + 'no change caused it.')
         });
       } else if (data.verdict === 'NO_ANOMALY') {
-        /* The one verdict that may say nothing needs reverting: the reading is inside
-           its own baseline, so there is nothing wrong to revert. */
-        setHero({
+        /* The one verdict that may say nothing needs reverting: the reading is under the
+           anomaly threshold. It can still sit above its baseline, and the board says so
+           rather than calling an elevated reading steady. The threshold is read from the
+           server's own explanation, never written here. */
+        var threshold = /below the ([\d.]+)x threshold/.exec(data.explanation || '');
+        var under = threshold ? 'under the ' + threshold[1] + '× threshold' : 'under the anomaly threshold';
+        answer({
           state: 'calm',
-          eyebrow: 'Steady',
+          eyebrow: under.charAt(0).toUpperCase() + under.slice(1),
           figure: factor + '×',
-          figureLabel: 'baseline ' + metric.baseline + ' to ' + metric.current,
-          headline: data.service + ' is inside its own baseline',
-          cause: 'Nothing changed enough to report, so nothing needs reverting on this reading. '
-            + 'Mercury offers no rollback when it can see no anomaly.',
-          badges: badges
+          figureLabel: readingLabel(metric),
+          headline: 'Nothing to revert',
+          cause: 'The reading is ' + factor + '× its baseline, ' + under
+            + ', so Mercury reports no anomaly, names no change and offers no rollback. '
+            + 'If it keeps rising, ask again.',
+          accuracyShort: ''
         });
       } else {
         // The refusal reason lives in the metric provenance, and it is the part
         // a viewer needs: the correlator's own sentence only says the series was
         // too short, not why the server declined to produce one.
         var why = data.metric_provenance && data.metric_provenance.detail;
-        setHero({
+        answer({
           state: 'idle',
           eyebrow: 'Cannot answer',
           figure: 'n/a',
           figureLabel: metric.sample_size + ' data points',
-          headline: 'Not enough data to answer for ' + data.service,
+          headline: 'Insufficient data',
           cause: data.explanation + (why ? ' ' + why : ''),
-          badges: badges
+          accuracyShort: ''
         });
       }
     }
@@ -1051,12 +1755,14 @@
     function heroFromFailure(message) {
       setHero({
         state: 'idle',
+        verdict: 'none',
         eyebrow: 'No answer',
         figure: '?',
         figureLabel: 'Not measured',
         headline: 'No Mercury API answered',
         cause: message + ' This page is static unless a Mercury API is running. '
-          + 'Start it with python -m src.interfaces.mcp_server, then press Setup at the top to point this page at it.',
+          + 'Start it with python -m src.interfaces.mcp_server, then press Setup in the Connection section below to point this page at it.',
+        accuracy: '',
         badges: []
       });
     }
@@ -1065,17 +1771,49 @@
 
     function panels() { return document.querySelectorAll('[data-panel-body]'); }
 
+    /* Height of the remote's key bar where it is shown (0 where it is hidden). */
+    function keybarHeight() {
+      var bar = document.querySelector('.keybar');
+      return bar && bar.offsetHeight ? bar.getBoundingClientRect().height : 0;
+    }
+
+    /* A tile headline is a figure too. Its stamps sit above it, in the tile's
+       stamp slot, and are cleared when the headline is not a figure (a failure). */
+    function tileHeadline(id, text, provenances) {
+      var node = el(id);
+      node.textContent = text;
+      node.removeAttribute('data-empty');
+      var slot = el(id.replace('Headline', 'Stamp'));
+      if (slot) {
+        clear(slot);
+        (provenances || []).forEach(function (provenance) {
+          if (provenance) { slot.appendChild(stampFor(provenance)); }
+        });
+      }
+    }
+
     function showWall() {
       state.view = 'wall';
       Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = true; });
       el('wall').hidden = false;
       el('hintBack').textContent = 'Exit to the Fire TV launcher';
-      window.scrollTo(0, 0);
+      el('hintMove').textContent = 'Move';
+      // Release the panel before placing the cursor on its tile: the tile is
+      // outside the panel, and the whole page is reachable again.
+      if (window.mercuryNav) { window.mercuryNav.release(); }
+      // The wall sits in the evidence area now, below the board, so returning to it
+      // no longer jumps to the top of the page: the navigator scrolls to the tile.
       var origin = state.lastPanel
         ? document.querySelector('.tile[data-panel="' + state.lastPanel + '"]')
         : null;
       if (window.mercuryNav) { window.mercuryNav.setFocus(origin || document.querySelector('.tile')); }
     }
+
+    /* The call a panel makes when it is first opened: pressing the tile is the ask. */
+    var PANEL_PRIMARY = {
+      velocity: function () { return loadDora(); },
+      spend: function () { return loadCost(); }
+    };
 
     function showPanel(name) {
       var target = el('panel-' + name);
@@ -1085,8 +1823,20 @@
       Array.prototype.forEach.call(panels(), function (panel) { panel.hidden = panel !== target; });
       el('wall').hidden = true;
       el('hintBack').textContent = 'Back to the wall';
+      // The remote stays inside the open panel until BACK closes it, and the legend
+      // says so. UP and DOWN at the panel's edge scroll the rest of it into view,
+      // clear of the key bar, instead of walking out to the board or Connection.
+      el('hintMove').textContent = 'Move in panel';
       if (window.mercuryNav) {
+        window.mercuryNav.contain(target, { bottomInset: keybarHeight });
         window.mercuryNav.setFocus(target.querySelector('[data-tv-focusable]'));
+      }
+      // Bring the whole panel up, not just its first button: the result, and the
+      // stamp that now leads it, sit under the buttons and were left below the fold.
+      if (typeof target.scrollIntoView === 'function') { target.scrollIntoView({ block: 'start' }); }
+      if (!state.panelLoaded[name] && PANEL_PRIMARY[name]) {
+        state.panelLoaded[name] = true;
+        PANEL_PRIMARY[name]();
       }
     }
 
@@ -1103,6 +1853,11 @@
       try {
         var result = await call('/health', { method: 'GET' }, null);
         state.dpadDemoApproval = result.body.dpad_demo_approval === true;
+        // Which dispatcher a confirmed rollback goes to, as the server reports it.
+        el('dispatchMode').textContent = 'Dispatcher: '
+          + (result.body.rollback_dispatch || 'not reported by /health')
+          + (result.body.rollback_dispatch === 'record-only'
+            ? '. A confirmed rollback is recorded and contacts no deployment pipeline.' : '.');
         var sha = result.body.build_sha ? result.body.build_sha.slice(0, 7) : 'unreported';
         setConnection('reachable',
           'GET /health returned ' + result.status + ' in ' + result.elapsedMs.toFixed(0)
@@ -1113,16 +1868,22 @@
       }
     }
 
-    async function loadWhatChanged() {
+    /* userAsked is true when a person pressed something. The answer fetched on load
+       is painted, never announced. */
+    async function loadWhatChanged(userAsked) {
+      var ask = ++askSeq;
+      var service = state.service;
       setHero({
         state: 'busy',
+        verdict: 'asking',
         eyebrow: 'Asking',
         figure: '...',
         figureLabel: 'call in flight',
-        headline: 'Asking the Mercury API what changed',
+        headline: 'Asking what changed',
         cause: 'POST /mcp/tools/what_changed for ' + state.service + ' over the last 60 minutes.',
         badges: []
       });
+      rowPending(state.service);
       el('heroLatency').textContent = 'Measuring.';
       showLoading('incidentOutput', 'Calling POST /mcp/tools/what_changed ...');
       setReason('btnStage', 'stageReason', false,
@@ -1132,11 +1893,14 @@
         'Confirming is off until staging mints a single-use governance token.',
         'Disabled until a rollback has been staged and a governance token issued');
       state.staged = null;
+      resetRollbackConsole();
 
       try {
         var res = await post('/mcp/tools/what_changed',
-          { service_name: state.service, time_window_minutes: 60 }, 'incidentLatency');
+          { service_name: service, time_window_minutes: 60 }, null);
         var data = res.body;
+        if (ask !== askSeq) { fillRow(data.service, data); return; }
+        writeLatency('incidentLatency', res.status, res.elapsedMs);
         state.lastCorrelation = data;
         reportHostEvent('what_changed', data.verdict + ':'
           + (data.commit_provenance ? data.commit_provenance.data_source : 'unknown') + ':'
@@ -1144,43 +1908,53 @@
         el('heroLatency').textContent =
           'POST /mcp/tools/what_changed answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
         heroFromCorrelation(data);
+        fillRow(data.service, data);
         renderIncidentDetail(data);
-        el('tileIncidentHeadline').textContent = data.verdict.split('_').join(' ').toLowerCase();
+        tileHeadline('tileIncidentHeadline', VERDICT_WORDS[verdictKind(data)]
+          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' to ' + data.offending_commit.sha : ''),
+          [data.metric_provenance, data.commit_provenance]);
         el('tileIncidentSub').textContent =
           data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';
 
         if (data.recommended_action) {
           setReason('btnStage', 'stageReason', true,
-            'Ready to stage a rollback of ' + data.recommended_action.target_service
-            + ' to ' + data.recommended_action.target_commit_sha
-            + (state.dpadDemoApproval
-              ? '. D-pad demo approval is record-only and contacts no deployment pipeline.'
-              : '. Needs the governance secret.'),
+            state.dpadDemoApproval
+              ? 'Record-only rollback: ' + data.recommended_action.target_commit_sha
+              : 'Rollback to ' + data.recommended_action.target_commit_sha + '. Needs the governance secret.',
             'Stage a governed rollback to ' + data.recommended_action.target_commit_sha);
         } else {
           setReason('btnStage', 'stageReason', false,
             (data.deployment_evidence && data.deployment_evidence.blocked_reason)
               ? data.deployment_evidence.blocked_reason
-              : 'This correlation produced no rollback target, so there is nothing to stage.',
+              : 'No rollback offered: this answer carries no rollback target.',
             'Disabled until verified deployment evidence returns a rollback target');
         }
         el('btnHandoff').disabled = false;
         el('btnHandoff').title = state.dpadDemoApproval
           ? 'Publish the fixed, record-only fixture handoff with the D-pad'
           : 'Publish the current incident facts using the operator secret';
+        if (userAsked === true) { announce(answerSentence(data)); }
         speak(data.voice_summary);
       } catch (error) {
+        if (ask !== askSeq) { rowFailed(service); return; }
+        latencyOf('incidentLatency', error);
         heroFromFailure(error.message);
+        if (userAsked === true) { announce('No Mercury API answered.'); }
+        rowFailed(service);
         el('heroLatency').textContent = 'The call did not complete.';
         showError('incidentOutput', error.message);
-        el('tileIncidentHeadline').textContent = 'Call failed';
+        tileHeadline('tileIncidentHeadline', 'Call failed');
         el('tileIncidentSub').textContent = error.message;
       }
     }
 
     function renderIncidentDetail(data) {
       var box = document.createElement('div');
-      box.appendChild(h('span', 'tag ' + (data.incident_detected ? 'tag-warn' : 'tag-ok'), data.verdict));
+      box.appendChild(provenanceBlock(data.metric_provenance, true));
+      box.appendChild(provenanceBlock(data.commit_provenance, true));
+      var verdictTag = h('span', 'tag', data.verdict);
+      verdictTag.setAttribute('data-verdict', verdictKind(data));
+      box.appendChild(verdictTag);
       box.appendChild(kv([
         ['Service', data.service],
         ['Metric', data.metric.name],
@@ -1203,8 +1977,13 @@
             + ((data.attribution && data.attribution.is_ambiguous)
               ? ' changes landed inside the window. This names the closest of them, which is the '
                 + 'case every wrong attribution in the trial with a reachable cause fell into.'
-              : ' change landed inside the window, so there was nothing else it could be.')]
-        ]));
+              : ' candidate landed inside the window, so there was nothing else it could be.')]
+        ].concat(data.offending_commit.runtime_files
+          ? [['Runtime files it changed', data.offending_commit.runtime_files.join(', ')]]
+          : []).concat(data.attribution && data.attribution.candidate_filter
+          ? [['Set aside, no runtime file', data.attribution.commits_set_aside
+              + ' in the window. ' + data.attribution.candidate_filter.rule]]
+          : [])));
       }
       if (data.recommended_action) {
         var rec = h('div', 'row');
@@ -1218,31 +1997,55 @@
             ? data.deployment_evidence.blocked_reason
             : 'No rollback is offered for this verdict. That is the correlator refusing, not a missing feature.'));
       }
-      box.appendChild(provenanceBlock(data.metric_provenance));
-      box.appendChild(provenanceBlock(data.commit_provenance));
       render('incidentOutput', box);
+    }
+
+    /* The rollback console. Its header names the call whose answer is under it, and
+       both are written in one step, so a Stage or Confirm answer can never sit under
+       another call's name. The correlation keeps its own console above it. */
+    var ROLLBACK_IDLE = 'Governed rollback: no call made';
+    function showRollback(header, node) {
+      el('rollbackEndpoint').textContent = header;
+      render('rollbackOutput', node);
+    }
+    function rollbackError(header, message) {
+      el('rollbackEndpoint').textContent = header;
+      showError('rollbackOutput', message);
+    }
+    /* Refused on this page before any request was sent: no endpoint and no latency. */
+    function rollbackRefused(message) {
+      el('rollbackLatency').textContent = '';
+      rollbackError(ROLLBACK_IDLE, message);
+    }
+    function resetRollbackConsole() {
+      el('rollbackLatency').textContent = '';
+      showRollback(ROLLBACK_IDLE, h('div', 'empty-state-card',
+        'Nothing staged for this answer. Stage and Confirm on the board, and each response '
+        + 'lands here under the call that returned it.'));
     }
 
     async function stageRollback() {
       var rec = state.lastCorrelation && state.lastCorrelation.recommended_action;
       if (!rec) {
-        showError('incidentOutput', 'No rollback target. Ask what changed first.');
+        rollbackRefused('No rollback target. Ask what changed first.');
         showPanel('incident');
         return;
       }
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.dpadDemoApproval && !secret) {
-        showError('incidentOutput',
+        rollbackRefused(
           'No governance secret entered. Staging a rollback needs the deployment secret, and the '
-          + 'Setup fields have been opened above for it. The server prints an ephemeral one at startup.');
+          + 'Setup fields have been opened in the Connection section for it. The server prints an ephemeral one at startup.');
         showPanel('incident');
         return;
       }
 
-      showLoading('incidentOutput', 'Calling POST /mcp/tools/stage_rollback ...');
+      var stagePath = state.dpadDemoApproval ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback';
+      if (!beginCall('btnStage')) { return; }
+      var ask = askSeq;
+      showRollback('POST ' + stagePath, h('div', 'loading-card', 'Calling POST ' + stagePath + ' ...'));
       try {
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_stage_rollback' : '/mcp/tools/stage_rollback', {
+        var res = await post(stagePath, {
           action_id: (state.dpadDemoApproval ? 'tv-demo-' : 'tv-') + Date.now(),
           target_service: rec.target_service,
           target_commit_sha: rec.target_commit_sha,
@@ -1252,20 +2055,35 @@
           offending_deployment_marker_id: rec.offending_deployment_marker_id,
           reason: 'Staged from the Fire TV cockpit after a what-changed correlation.',
           lease_sec: 300
-        }, 'incidentLatency', secret);
+        }, null, secret);
+        // Somebody asked again while this was in flight: that answer owns the board,
+        // and this token is left to expire unused.
+        if (ask !== askSeq) { return; }
+        writeLatency('rollbackLatency', res.status, res.elapsedMs);
         state.staged = res.body;
 
         setHero({
           state: 'busy',
+          verdict: 'staged',
+          flap: true,
+          service: res.body.target_service,
           eyebrow: 'Rollback staged',
           figure: Math.round(res.body.lease_seconds_remaining) + 's',
-          figureLabel: 'lease remaining',
-          headline: 'Roll back ' + res.body.target_service + ' to ' + res.body.target_commit_sha,
+          figureLabel: 'lease left to confirm',
+          headline: 'Roll back to ' + res.body.target_commit_sha,
           cause: res.body.confirmation_prompt,
           badges: []
         });
+        el('rbStageState').textContent = res.body.state + ': action ' + res.body.action_id
+          + ', ' + res.body.target_service + ' to ' + res.body.target_commit_sha
+          + ', lease ' + Math.round(res.body.lease_seconds_remaining) + ' s.';
+        el('rbStageStep').setAttribute('data-done', 'true');
         el('heroLatency').textContent =
-          'POST /mcp/tools/stage_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+          'POST ' + stagePath + ' answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+        startLease(res.body.lease_seconds_remaining);
+        setReason('btnStage', 'stageReason', true,
+          'Staged. Next: confirm' + (state.dpadDemoApproval ? ', record-only.' : '.'),
+          'Stage again to replace the staged rollback with a new lease');
         setReason('btnConfirm', 'confirmReason', true,
           'Token issued for action ' + res.body.action_id + '. It is valid once, for this exact change.',
           'Confirm rollback ' + res.body.action_id + ' with its single-use token');
@@ -1281,48 +2099,106 @@
           ['Lease left', res.body.lease_seconds_remaining + ' s']
         ]));
         box.appendChild(h('p', 'row', res.body.confirmation_prompt));
-        render('incidentOutput', box);
+        showRollback('POST ' + stagePath, box);
+        announce('Rollback to ' + res.body.target_commit_sha + ' staged. Confirm is now available.');
         speak(res.body.confirmation_prompt);
         reportHostEvent('rollback_staged', res.body.action_id + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
-        showError('incidentOutput', error.message);
+        if (ask !== askSeq) { return; }
+        latencyOf('rollbackLatency', error);
+        rollbackError('POST ' + stagePath, error.message);
         showPanel('incident');
+      } finally {
+        endCall('btnStage');
       }
+    }
+
+    /* Count the lease down from the seconds the server said were left, on this page's
+       monotonic clock. At zero Confirm goes off with the reason; the server would
+       refuse the token by then anyway. */
+    function startLease(secondsLeft) {
+      stopLease();
+      var endsAt = performance.now() + Number(secondsLeft) * 1000;
+      leaseTimer = setInterval(function () {
+        var left = Math.max(0, Math.ceil((endsAt - performance.now()) / 1000));
+        el('heroFigure').textContent = left + 's';
+        if (left === 0) {
+          stopLease();
+          state.staged = null;
+          el('heroEyebrow').textContent = 'Lease expired';
+          setReason('btnStage', 'stageReason', true,
+            'Lease expired. Stage again for a new token.',
+            'Stage the rollback again for a new lease and token');
+          setReason('btnConfirm', 'confirmReason', false,
+            'Lease expired, stage again for a new token.',
+            'Disabled: the lease on the staged rollback expired');
+        }
+      }, 1000);
     }
 
     async function confirmRollback() {
       var secret = state.dpadDemoApproval ? '' : requireSecret();
       if (!state.staged) {
-        showError('incidentOutput', 'Nothing is staged.');
+        rollbackRefused('Nothing is staged.');
         showPanel('incident');
         return;
       }
-      showLoading('incidentOutput', 'Calling POST /mcp/tools/confirm_rollback ...');
+      var confirmPath = state.dpadDemoApproval ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback';
+      if (!beginCall('btnConfirm')) { return; }
+      showRollback('POST ' + confirmPath, h('div', 'loading-card', 'Calling POST ' + confirmPath + ' ...'));
       try {
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_confirm_rollback' : '/mcp/tools/confirm_rollback', {
+        var res = await post(confirmPath, {
           action_id: state.staged.action_id,
           governance_token: state.staged.governance_token
-        }, 'incidentLatency', secret);
+        }, 'rollbackLatency', secret);
 
+        var sent = res.body.status === 'DISPATCH_ACCEPTED';
         setHero({
           state: 'calm',
-          eyebrow: 'Rollback ' + res.body.status.toLowerCase(),
-          figure: res.body.status === 'DISPATCH_ACCEPTED' ? 'SENT' : 'DRY',
-          figureLabel: 'governance result',
-          headline: res.body.status === 'DISPATCH_ACCEPTED'
-            ? res.body.target_service + ' dispatch accepted for ' + res.body.target_commit_sha
-            : res.body.target_service + ' decision recorded for ' + res.body.target_commit_sha,
-          cause: res.body.output,
+          verdict: 'recorded',
+          flap: true,
+          service: res.body.target_service,
+          eyebrow: sent ? 'Rollback sent' : 'Rollback recorded, not sent',
+          figure: sent ? 'SENT' : 'RECORDED',
+          // Read from the response: external_effect NONE is the server saying nothing
+          // outside it was contacted.
+          figureLabel: res.body.external_effect === 'NONE' ? 'no pipeline contacted' : 'handed to the pipeline',
+          headline: sent
+            ? 'Dispatch accepted for ' + res.body.target_commit_sha
+            : 'Decision recorded for ' + res.body.target_commit_sha,
+          // The server's own sentences, less the configuration instructions, which
+          // are for whoever runs the server and stay in the evidence panel.
+          cause: boardSentences(res.body.output),
           badges: []
         });
+        el('rbStageState').textContent = 'Staged, then confirmed: action ' + res.body.action_id + ', '
+          + res.body.target_service + ' to ' + res.body.target_commit_sha + '. The token is spent.';
+        setReason('btnStage', 'stageReason', false,
+          sent ? 'Sent. Next: publish the handoff.' : 'Recorded. Next: publish the handoff.',
+          'Disabled: this rollback is already confirmed. Ask what changed to start again');
+        el('rbResultHead').textContent = res.body.status === 'DISPATCH_ACCEPTED'
+          ? 'Dispatch accepted' : 'Recorded only';
+        el('rbResultState').textContent = boardSentences(res.body.output);
+        el('rbResultStep').setAttribute('data-done', 'true');
+        el('rbConfirmStep').setAttribute('data-done', 'true');
         el('heroLatency').textContent =
-          'POST /mcp/tools/confirm_rollback answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
+          'POST ' + confirmPath + ' answered ' + res.status + ' in ' + res.elapsedMs.toFixed(0) + ' ms.';
         setReason('btnConfirm', 'confirmReason', false,
           'That token has been spent. Confirming again is refused by name. Stage again for a new one.',
           'Disabled until a rollback has been staged and a governance token issued');
-        if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnHandoff')); }
+        // The payoff is the board saying RECORDED, so the board stays where it is.
+        // Publish handoff is the next stop, but the screen moves to it only on the
+        // next D-pad press; CENTER still publishes, as the remote's smoke path expects.
+        if (window.mercuryNav) {
+          if (typeof window.mercuryNav.defer === 'function') {
+            // Keyboard focus parks on the board it is reading, not on the control
+            // below the fold; the confirmed Confirm button no longer takes it.
+            el('hero').setAttribute('tabindex', '-1');
+            window.mercuryNav.defer(el('btnHandoff'), { park: el('hero') });
+          }
+          else { window.mercuryNav.setFocus(el('btnHandoff')); }
+        }
 
         var box = document.createElement('div');
         box.appendChild(h('span', 'tag tag-ok', res.body.status));
@@ -1332,17 +2208,45 @@
           ['Commit', res.body.target_commit_sha]
         ]));
         box.appendChild(h('p', 'row', res.body.output));
-        render('incidentOutput', box);
+        showRollback('POST ' + confirmPath, box);
+        announce(res.body.status === 'DISPATCH_ACCEPTED'
+          ? 'Rollback to ' + res.body.target_commit_sha + ' sent.'
+          : 'Rollback to ' + res.body.target_commit_sha + ' recorded, not sent.');
         speak('Rollback governance result for ' + res.body.target_service + ': ' + res.body.status + '.');
         reportHostEvent('rollback_confirmed', res.body.status + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
-        showError('incidentOutput', error.message);
+        rollbackError('POST ' + confirmPath, error.message);
         showPanel('incident');
+      } finally {
+        endCall('btnConfirm');
       }
     }
 
+    /* Sentences of a server message that are for the room, not for the operator who
+       configures the server: any sentence naming an environment variable is dropped
+       from the board. The whole message is in the incident panel. */
+    function boardSentences(text) {
+      return (String(text || '').match(/[^.]+(?:\.|$)/g) || [])
+        .map(function (sentence) { return sentence.trim(); })
+        .filter(function (sentence) { return sentence && !/MERCURY_[A-Z_]+/.test(sentence); })
+        .join(' ');
+    }
+
     function handoffIncidentId() { return state.service + '-active'; }
+
+    /* Scroll just far enough that the bottom of node clears the key bar, without
+       pushing anchor (the control the cursor is on) off the top of the screen. */
+    function revealAboveKeybar(node, anchor) {
+      if (!node || !node.getBoundingClientRect) { return; }
+      var gap = 16;
+      var floor = window.innerHeight - keybarHeight() - gap;
+      var overflow = node.getBoundingClientRect().bottom - floor;
+      if (overflow <= 0) { return; }
+      var room = anchor ? anchor.getBoundingClientRect().top - gap : overflow;
+      var distance = Math.min(overflow, room);
+      if (distance > 0) { window.scrollBy(0, distance); }
+    }
 
     function renderHandoff(data) {
       state.handoffRevision = data.revision;
@@ -1356,6 +2260,22 @@
         ['Updated', data.updated_at]
       ]));
       render('handoffOutput', box);
+    }
+
+    /* The revision the server holds now, read before a write: 0 when nothing has been
+       published yet. The server answers 200 either way. */
+    async function readHandoffRevision(secret) {
+      var headers = secret ? { 'Authorization': 'Bearer ' + secret } : {};
+      var path = state.dpadDemoApproval
+        ? '/mcp/demo-handoff/revision'
+        : '/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()) + '/revision';
+      var res = await call(path, { method: 'GET', headers: headers }, null);
+      state.handoffRevision = res.body.revision;
+      return res.body.revision;
+    }
+
+    function renderHandoffNote(text) {
+      el('handoffOutput').appendChild(h('p', 'row', text));
     }
 
     async function publishHandoff() {
@@ -1377,8 +2297,9 @@
         ? 'Stage the evidence-bound rollback and have a second responder confirm the exact digest.'
         : ((data.deployment_evidence && data.deployment_evidence.blocked_reason)
           || 'Keep investigating; Mercury has not produced an actionable target.');
-      try {
-        var payload = state.dpadDemoApproval ? {
+      var path = state.dpadDemoApproval ? '/mcp/tools/demo_update_handoff' : '/mcp/tools/update_handoff';
+      function payload() {
+        return state.dpadDemoApproval ? {
           expected_revision: state.handoffRevision
         } : {
           incident_id: handoffIncidentId(),
@@ -1388,18 +2309,43 @@
           next_step: next,
           expected_revision: state.handoffRevision
         };
-        var res = await post(state.dpadDemoApproval
-          ? '/mcp/tools/demo_update_handoff' : '/mcp/tools/update_handoff',
-          payload, 'handoffLatency', secret);
-        renderHandoff(res.body);
-        showPanel('incident');
-        if (window.mercuryNav) {
-          window.mercuryNav.setFocus(document.querySelector('[data-action="handoff-refresh"]'));
+      }
+      try {
+        /* The handoff is shared: another screen may have published since this page
+           loaded, and the server refuses a write against a stale revision. Read the
+           revision it holds now, then write against that one. */
+        await readHandoffRevision(secret);
+        var res;
+        try {
+          res = await post(path, payload(), 'handoffLatency', secret);
+        } catch (first) {
+          if (first.status !== 409) { throw first; }
+          // Someone published between the read and the write. The demo content is
+          // fixed, so the demo write is retried once against the revision read now.
+          // An operator's own text is never written over someone else's revision.
+          if (!state.dpadDemoApproval) {
+            var theirs = await call('/mcp/handoffs/' + encodeURIComponent(handoffIncidentId()),
+              { method: 'GET', headers: { 'Authorization': 'Bearer ' + secret } }, 'handoffLatency');
+            renderHandoff(theirs.body);
+            renderHandoffNote('Someone else updated this handoff first. Theirs is shown above; '
+              + 'publish again to replace it with yours.');
+            return;
+          }
+          await readHandoffRevision(secret);
+          res = await post(path, payload(), 'handoffLatency', secret);
         }
+        renderHandoff(res.body);
+        announce('Handoff published, shared revision ' + res.body.revision + '.');
+        // The cursor stays on Publish, and the answer it produced (responder, facts,
+        // next step) is brought up above the key bar. The cursor used to move on to
+        // Refresh while the answer stayed below the fold, behind the bar.
+        revealAboveKeybar(el('handoffOutput'), el('btnHandoff'));
         reportHostEvent('handoff_published', res.body.incident_id + ':revision-' + res.body.revision + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
-        showError('handoffOutput', error.message);
+        showError('handoffOutput', error.status === 409
+          ? 'Another screen published this handoff at the same moment, twice. Press Refresh handoff to see theirs.'
+          : error.message);
       }
     }
 
@@ -1414,6 +2360,7 @@
           ? '/mcp/demo-handoff' : '/mcp/handoffs/' + encodeURIComponent(handoffIncidentId());
         var res = await call(path, { method: 'GET', headers: headers }, 'handoffLatency');
         renderHandoff(res.body);
+        announce('Handoff refreshed, shared revision ' + res.body.revision + '.');
         reportHostEvent('handoff_refreshed', res.body.incident_id + ':revision-' + res.body.revision + ':'
           + (res.body.authorization_mode || 'OPERATOR_SECRET'));
       } catch (error) {
@@ -1421,42 +2368,69 @@
       }
     }
 
+    /* A zero here is either no failures or no runs at all, and the two read the same
+       as a bare "0%". Which one it is follows from the deploy frequency beside it:
+       successful runs in the window mean completed runs exist, so 0% is none failed. */
+    function failureRateText(m) {
+      if (m.change_failure_rate_pct !== 0) { return m.change_failure_rate_pct + '%'; }
+      return m.deployment_frequency_per_day > 0 ? '0%, no failed runs in the window' : 'n/a, no completed runs';
+    }
+    function recoveryText(m) {
+      if (m.mttr_hours !== 0) { return m.mttr_hours + ' h'; }
+      return m.change_failure_rate_pct === 0 ? 'n/a, nothing failed to recover from' : 'no recovery recorded yet';
+    }
+
+    /* Velocity and spend each hold two calls in one console. Opening a panel fires its
+       first call, so a press on the second one could land first, set the header to its
+       own endpoint, and then be painted over by the slower first answer. Each console
+       numbers its calls, and only the newest one writes the header's latency and body. */
+    var consoleSeq = { dora: 0, cost: 0 };
+
     async function loadDora() {
+      var mine = ++consoleSeq.dora;
       el('doraEndpoint').textContent = 'POST /mcp/tools/get_dora_velocity_report';
       showLoading('doraOutput', 'Calling POST /mcp/tools/get_dora_velocity_report ...');
       try {
-        var res = await post('/mcp/tools/get_dora_velocity_report', {}, 'doraLatency');
+        var res = await post('/mcp/tools/get_dora_velocity_report', {}, null);
+        if (mine !== consoleSeq.dora) { return; }
+        writeLatency('doraLatency', res.status, res.elapsedMs);
         var data = res.body;
         var m = data.metrics;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(h('span', 'tag tag-ok', data.tier));
         box.appendChild(kv([
           ['Deploys per day', m.deployment_frequency_per_day],
           ['Lead time', m.lead_time_hours + ' h'],
-          ['Change failure rate', m.change_failure_rate_pct + '%'],
-          ['Recovery time', m.mttr_hours + ' h'],
+          ['Change failure rate', failureRateText(m)],
+          ['Recovery time', recoveryText(m)],
           ['Records used', data.sample_size + ' over ' + data.window_days + ' days']
         ]));
-        box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        el('tileVelocityHeadline').textContent = m.deployment_frequency_per_day + ' deploys per day';
+        tileHeadline('tileVelocityHeadline', m.deployment_frequency_per_day + ' deploys per day', [data.provenance]);
         el('tileVelocitySub').textContent =
           data.tier + ', from ' + data.sample_size + ' records over ' + data.window_days + ' days.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.dora) { return; }
+        latencyOf('doraLatency', error);
         showError('doraOutput', error.message);
-        el('tileVelocityHeadline').textContent = 'Call failed';
+        tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
       }
     }
 
     async function loadPrs() {
+      var mine = ++consoleSeq.dora;
       el('doraEndpoint').textContent = 'POST /mcp/tools/get_pr_bottlenecks';
       showLoading('doraOutput', 'Calling POST /mcp/tools/get_pr_bottlenecks ...');
       try {
-        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, 'doraLatency');
+        var res = await post('/mcp/tools/get_pr_bottlenecks', {}, null);
+        if (mine !== consoleSeq.dora) { return; }
+        writeLatency('doraLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(kv([['Open', data.total_open], ['Past the 36 hour SLA', data.stale_count]]));
         if (!data.stale_prs.length) {
           box.appendChild(h('div', 'empty-state-card', 'No pull request is past the 36 hour review SLA.'));
@@ -1473,25 +2447,30 @@
               'Showing ' + data.stale_prs.length + ' of ' + data.stale_count + ' stale pull requests.'));
           }
         }
-        box.appendChild(provenanceBlock(data.provenance));
         render('doraOutput', box);
-        el('tileVelocityHeadline').textContent = data.stale_count + ' reviews past SLA';
+        tileHeadline('tileVelocityHeadline', data.stale_count + ' reviews past SLA', [data.provenance]);
         el('tileVelocitySub').textContent = data.total_open + ' pull requests open.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.dora) { return; }
+        latencyOf('doraLatency', error);
         showError('doraOutput', error.message);
-        el('tileVelocityHeadline').textContent = 'Call failed';
+        tileHeadline('tileVelocityHeadline', 'Call failed');
         el('tileVelocitySub').textContent = error.message;
       }
     }
 
     async function loadCost() {
+      var mine = ++consoleSeq.cost;
       el('costEndpoint').textContent = 'POST /mcp/tools/get_aws_cost_anomalies';
       showLoading('costOutput', 'Calling POST /mcp/tools/get_aws_cost_anomalies ...');
       try {
-        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, 'costLatency');
+        var res = await post('/mcp/tools/get_aws_cost_anomalies', {}, null);
+        if (mine !== consoleSeq.cost) { return; }
+        writeLatency('costLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
+        box.appendChild(provenanceBlock(data.provenance, true));
         box.appendChild(kv([
           ['Month to date', '$' + data.month_to_date_usd],
           ['Projected month end', '$' + data.projected_usd]
@@ -1509,24 +2488,28 @@
             box.appendChild(row);
           });
         }
-        box.appendChild(provenanceBlock(data.provenance));
         render('costOutput', box);
-        el('tileSpendHeadline').textContent = '$' + data.month_to_date_usd + ' month to date';
+        tileHeadline('tileSpendHeadline', '$' + data.month_to_date_usd + ' month to date', [data.provenance]);
         el('tileSpendSub').textContent = data.anomalies.length + ' service anomalies over the day average.';
         speak(data.voice_summary);
       } catch (error) {
+        if (mine !== consoleSeq.cost) { return; }
+        latencyOf('costLatency', error);
         showError('costOutput', error.message);
-        el('tileSpendHeadline').textContent = 'Call failed';
+        tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
       }
     }
 
     async function loadObservability() {
+      var mine = ++consoleSeq.cost;
       el('costEndpoint').textContent = 'POST /mcp/tools/audit_observability';
       showLoading('costOutput', 'Calling POST /mcp/tools/audit_observability ...');
       try {
         var res = await post('/mcp/tools/audit_observability',
-          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, 'costLatency');
+          { service_name: state.service, received_signals: ['error_rate', 'emf_logs'] }, null);
+        if (mine !== consoleSeq.cost) { return; }
+        writeLatency('costLatency', res.status, res.elapsedMs);
         var data = res.body;
         var box = document.createElement('div');
         box.appendChild(kv([
@@ -1539,11 +2522,13 @@
           'The received signals in this call are the two the cockpit knows it sends. '
           + 'Mercury does not discover a service’s real signal set.'));
         render('costOutput', box);
-        el('tileSpendHeadline').textContent = data.missing_signals.length + ' signals missing';
+        tileHeadline('tileSpendHeadline', data.missing_signals.length + ' signals missing');
         el('tileSpendSub').textContent = 'Observability gap score ' + data.observability_gap_score + '.';
       } catch (error) {
+        if (mine !== consoleSeq.cost) { return; }
+        latencyOf('costLatency', error);
         showError('costOutput', error.message);
-        el('tileSpendHeadline').textContent = 'Call failed';
+        tileHeadline('tileSpendHeadline', 'Call failed');
         el('tileSpendSub').textContent = error.message;
       }
     }
@@ -1559,6 +2544,54 @@
       , 'handoff-refresh': refreshHandoff
     };
 
+    // ------------------------------------------------------------ Departures
+
+    function rowFor(service) {
+      var rows = document.querySelectorAll('.btn-demo');
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].getAttribute('data-service') === service) { return rows[i]; }
+      }
+      return null;
+    }
+
+    function setRow(service, reading, words, kind, sha) {
+      var row = rowFor(service);
+      if (!row) { return; }
+      row.querySelector('[data-row-reading]').textContent = reading;
+      var verdict = row.querySelector('[data-row-verdict]');
+      clear(verdict);
+      verdict.appendChild(document.createTextNode(words));
+      if (sha) { verdict.appendChild(h('span', 'row-sha', sha)); }
+      verdict.setAttribute('data-verdict', kind);
+    }
+
+    function rowPending(service) { setRow(service, '', 'Asking', 'pending'); }
+    function rowFailed(service) { setRow(service, '', 'No answer', 'failed'); }
+
+    /* One row, written from that service's own what_changed response. */
+    function fillRow(service, data) {
+      var kind = verdictKind(data);
+      var reading = kind === 'insufficient' ? 'n/a' : data.metric.anomaly_factor + '×';
+      // The row says which answer; selecting it puts the reason on the board above.
+      setRow(service, reading, VERDICT_WORDS[kind], kind,
+        kind === 'attributed' ? data.offending_commit.sha : '');
+    }
+
+    /* Ask every other row its own question once, after the board's first answer.
+       These calls write only their own row: they never touch the answer row, the
+       selected service, the last correlation or the rollback controls. */
+    function refreshBoard() {
+      var rows = Array.prototype.slice.call(document.querySelectorAll('.btn-demo[data-service]'));
+      return Promise.all(rows.map(function (row) {
+        var service = row.getAttribute('data-service');
+        if (service === state.service) { return null; }
+        rowPending(service);
+        return post('/mcp/tools/what_changed', { service_name: service, time_window_minutes: 60 }, null)
+          .then(function (res) { fillRow(service, res.body); })
+          .catch(function () { rowFailed(service); });
+      }));
+    }
+
     /* The demo state buttons change which service the next correlation asks
        about. They exist because three of the four answers the correlator can
        give are refusals, and a refusal nobody can reach is not a control. */
@@ -1568,7 +2601,7 @@
       Array.prototype.forEach.call(document.querySelectorAll('[data-service]'), function (button) {
         button.setAttribute('aria-pressed', button.getAttribute('data-service') === name ? 'true' : 'false');
       });
-      loadWhatChanged();
+      loadWhatChanged(true);
     }
 
     function onClick(event) {
@@ -1596,7 +2629,7 @@
       el('btnCheck').addEventListener('click', checkConnection);
       el('btnSetup').addEventListener('click', toggleSetup);
       el('btnSpeak').addEventListener('click', toggleSpeech);
-      el('btnWhatChanged').addEventListener('click', loadWhatChanged);
+      el('btnWhatChanged').addEventListener('click', function () { loadWhatChanged(true); });
       el('btnStage').addEventListener('click', stageRollback);
       el('btnConfirm').addEventListener('click', confirmRollback);
       el('btnHandoff').addEventListener('click', publishHandoff);
@@ -1606,7 +2639,37 @@
       // fight the remote.
       document.addEventListener('mercury:focuschange', function (event) {
         var label = event.detail && event.detail.label;
-        el('hintFocus').textContent = 'Focused: ' + (label || 'nothing yet');
+        var target = event.detail && event.detail.element;
+        // "Focused" only when it is: in a desktop browser the cursor is placed on load
+        // without taking keyboard focus (so Tab still starts at the skip link), and
+        // there CENTER or Enter acts on the cursor while the document has the focus.
+        var real = !!target && document.activeElement === target;
+        if (event.detail && event.detail.pending) {
+          // Deferred: the control is the next stop but is not on screen yet, and
+          // the screen stays put until the next press.
+          el('hintFocus').textContent = 'Next press: ' + (label || 'nothing yet');
+          return;
+        }
+        el('hintFocus').textContent = (real ? 'Focused: ' : 'Cursor on: ') + (label || 'nothing yet');
+        // The navigator scrolls only when a control leaves the viewport. The key
+        // bar is fixed over the bottom of it, so a control behind the bar counts as
+        // visible there; bring it clear of the bar here. scroll-margin sets the gap.
+        var bar = document.querySelector('.keybar');
+        if (target && bar && bar.offsetHeight && target.getBoundingClientRect
+            && target.getBoundingClientRect().bottom > bar.getBoundingClientRect().top) {
+          target.scrollIntoView({ block: 'nearest' });
+        }
+      });
+
+      // Keyboard focus that lands outside the ring (the skip link, a text field) is
+      // where the viewer is; the ring steps aside, and the legend follows focus.
+      document.addEventListener('focusin', function (event) {
+        var node = event.target;
+        if (!node || typeof node.matches !== 'function' || node.matches('[data-tv-focusable]')) { return; }
+        var name = node.getAttribute('aria-label')
+          || (node.labels && node.labels[0] && node.labels[0].textContent)
+          || node.textContent || '';
+        el('hintFocus').textContent = 'Focused: ' + (String(name).trim() || 'a control outside the remote ring');
       });
 
       // BACK on the remote leaves a panel before it leaves the application.
@@ -1633,14 +2696,19 @@
       }
 
       // The D-pad cursor starts on the one thing the room came here to press,
-      // not on whatever happens to be first in the DOM.
-      if (window.mercuryNav) { window.mercuryNav.setFocus(el('btnWhatChanged')); }
+      // not on whatever happens to be first in the DOM. Keyboard focus moves there
+      // too only on a television host; in a desktop browser Tab still starts at the
+      // skip link, and the arrow keys start from the cursor.
+      if (window.mercuryNav) {
+        window.mercuryNav.setFocus(el('btnWhatChanged'),
+          { domFocus: document.documentElement.classList.contains('tv-host') });
+      }
 
       // A wallboard that waits for a click cannot be read in five seconds. Ask on
       // load when there is an origin to ask, and show the honest failure when
       // there is not. Nothing is painted before the answer arrives.
       if (apiBase()) {
-        checkConnection().then(loadWhatChanged);
+        checkConnection().then(function () { return loadWhatChanged(false); }).then(refreshBoard);
       } else {
         heroFromFailure('This page was opened from the file system, so it has no API origin.');
       }

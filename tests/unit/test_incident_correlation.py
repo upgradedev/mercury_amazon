@@ -284,11 +284,11 @@ def test_a_refusal_is_never_rendered_as_nothing_to_revert(make, refusal):
 def test_the_refusal_statement_says_what_the_refusal_is_not():
     """Each reason, and in the same sentence, what it does not establish."""
     empty = _empty_window().refusal_statement
-    assert "no commit landed in the 60 minutes" in empty
+    assert "no commit landed in the 75 minutes" in empty
     assert "not evidence that no change caused it" in empty
 
     crowded = _crowded_window().refusal_statement
-    assert "4 landed in the 60 minutes" in crowded
+    assert "4 landed in the 75 minutes" in crowded
     assert "not a finding that none of them caused it" in crowded
     assert "would be a guess" in crowded
 

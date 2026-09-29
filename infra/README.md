@@ -67,7 +67,9 @@ remove that interrupted run before accepting a D2 receipt.
 
 The public cockpit is deployed at
 `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`.
-`GET /health` publishes the immutable build SHA. The deployment is forced to labelled
+`GET /health` publishes the immutable build SHA. Probed on 2026-09-26 it reported
+`6dd76bd`, an older build than this repository's HEAD, so it has to be redeployed before
+it shows the current board. The deployment is forced to labelled
 offline fixtures and record-only rollback dispatch; its execution role cannot read live
 account telemetry. It does not claim a physical Fire TV run.
 `deploy_teardown_receipt.json` records a dated HTTP observation.

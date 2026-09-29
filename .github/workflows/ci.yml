@@ -78,6 +78,18 @@ jobs:
         # to the detector cannot leave a stale accuracy figure in the README.
         run: python scripts/correlation_trial.py --check
 
+      - name: Held-out attribution figures agree with the recorded summary
+        # The figure printed beside a named commit is measured on the held-out split.
+        # This proves attribution_holdout_summary.json is what the committed engine
+        # produces on that split: every field except the run metadata, including the
+        # split block and the delay-ceiling sensitivity rows.
+        run: python scripts/attribution_split.py --check
+
+      - name: Train-split tuning record agrees with a fresh sweep
+        # A test pins the shipped engine to attribution_tuning_summary.json, so the
+        # record itself is re-derived here rather than trusted.
+        run: python scripts/tune_attribution.py --check
+
       - name: D-pad spatial navigation spec (real navigator, executed in Node)
         run: node tests/e2e/spatial_nav_spec.js
 

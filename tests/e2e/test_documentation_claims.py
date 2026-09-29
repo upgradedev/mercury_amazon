@@ -20,6 +20,12 @@ if str(REPO_ROOT / "ci") not in sys.path:
 import readiness  # noqa: E402
 
 README = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+#: The long form behind the README. The measurements, their commands and the audit
+#: history moved here so the README reads in a minute, and every pin that held a
+#: figure in the README now holds it here, where the figure lives. The pins that are
+#: about the first thing a reader sees (the badges, the quickstart, the refusal
+#: wording, the persona review pointer) stay on the README.
+EVIDENCE = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
 BENCHMARKS = json.loads((REPO_ROOT / "benchmarks_summary.json").read_text(encoding="utf-8"))
 
 def _tracked_markdown() -> list[Path]:
@@ -54,7 +60,7 @@ MARKDOWN_FILES = _tracked_markdown()
 
 def _readme_benchmark_rows() -> dict[str, tuple[int, float, float]]:
     rows = {}
-    for line in README.splitlines():
+    for line in EVIDENCE.splitlines():
         match = re.match(
             r"\|\s*`?([\w ]+?)`?\s*\|\s*(\d+)\s*\|\s*([\d.]+) ms\s*\|\s*([\d.]+) ms\s*\|", line)
         if match:
@@ -65,7 +71,7 @@ def _readme_benchmark_rows() -> dict[str, tuple[int, float, float]]:
 @pytest.mark.parametrize("endpoint", list(BENCHMARKS["results"]))
 def test_every_measured_endpoint_appears_in_the_readme(endpoint):
     label = "Governance mint and verify" if endpoint == "governance_token_mint_and_verify" else endpoint
-    assert label in README, f"{endpoint} was measured but is not reported in the README"
+    assert label in EVIDENCE, f"{endpoint} was measured but is not reported in docs/EVIDENCE.md"
 
 
 def test_readme_benchmark_numbers_match_the_recorded_measurement():
@@ -107,7 +113,7 @@ def test_the_readme_test_count_matches_what_pytest_collects():
 
 
 def test_every_command_the_readme_cites_exists():
-    for command in re.findall(r"`(python (?:scripts|ci|-m)[^`]*)`", README):
+    for command in re.findall(r"`(python (?:scripts|ci|-m)[^`]*)`", README + EVIDENCE):
         parts = command.split()
         if parts[1] == "-m":
             continue
@@ -188,7 +194,7 @@ def test_documents_follow_the_official_android_tv_emulator_allowance():
 
 
 def test_the_readme_states_the_limitation_beside_each_capability():
-    limitations = README.split("## Known limitations")[-1]
+    limitations = EVIDENCE.split("## Known limitations")[-1]
     for required in ["No rollback dispatch has ever been fired", "Runtime evidence pending",
                      "Cost Explorer lags", "browser speech synthesis", "Local quickstart state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
@@ -218,7 +224,7 @@ def test_no_ai_filler_in_documentation(path):
 
 def test_the_readme_never_claims_conformity():
     for word in ["compliant", "conformity"]:
-        assert word not in README.lower(), f"the README claims {word!r}, which nobody has established"
+        assert word not in (README + EVIDENCE).lower(), f"the README claims {word!r}, which nobody has established"
 
 
 # -------------------------------------------------- Fixtures declare themselves
@@ -230,6 +236,9 @@ def test_the_readme_never_claims_conformity():
     "benchmarks_summary.json",
     "src/infrastructure/fixtures/commit_stream_fixture.json",
     "correlation_trial_summary.json",
+    "attribution_holdout_summary.json",
+    "attribution_tuning_summary.json",
+    "src/infrastructure/fixtures/commit_paths_fixture.json",
 ])
 def test_every_committed_data_artifact_declares_its_origin(fixture_path):
     data = json.loads((REPO_ROOT / fixture_path).read_text(encoding="utf-8"))
@@ -237,15 +246,21 @@ def test_every_committed_data_artifact_declares_its_origin(fixture_path):
     assert origin_fields & set(data), f"{fixture_path} does not say where it came from"
 
 
-def test_the_video_directory_does_not_attest_a_video():
-    video_readme = (REPO_ROOT / "video" / "README.md").read_text(encoding="utf-8")
-    assert "No video has been recorded" in video_readme
-    assert not (REPO_ROOT / "video" / "subtitles.srt").exists(), \
-        "a subtitle file asserts timing against a picture that does not exist"
-    assert not (REPO_ROOT / "video" / "subtitles.vtt").exists()
+def test_the_video_directory_does_not_attest_a_published_video():
+    """A render exists outside the repository and has not been uploaded.
+
+    The video files may say a local render exists, because one does, but none of
+    them may claim a published video, and no media or subtitle file is committed:
+    the render, its captions and its receipt live outside git until the owner
+    uploads it.
+    """
+    video_readme = (REPO_ROOT / "video" / "README.md").read_text(encoding="utf-8").lower()
+    assert "rendered locally" in video_readme and "not uploaded" in video_readme
+    for name in ["subtitles.srt", "subtitles.vtt", "captions.en.srt", "mercury-demo.mp4"]:
+        assert not (REPO_ROOT / "video" / name).exists(), f"video/{name} belongs with the render, outside git"
     for name in ["cue_sheet.json", "narration.json"]:
         data = json.loads((REPO_ROOT / "video" / name).read_text(encoding="utf-8"))
-        assert "PLAN ONLY" in data.get("status", ""), f"{name} does not declare itself a plan"
+        assert "NOT UPLOADED" in data.get("status", ""), f"{name} does not say the render is unpublished"
 
 
 def test_the_video_plan_claims_no_capability_the_repository_lacks():
@@ -266,7 +281,7 @@ def test_the_video_plan_claims_no_capability_the_repository_lacks():
 def test_the_video_plan_and_shot_list_agree_and_fit_the_time_limit():
     """A beat list that outruns the limit is a plan for a rejected submission."""
     shot_list = (REPO_ROOT / "video" / "SHOT_LIST.md").read_text(encoding="utf-8")
-    assert "PLAN ONLY" in shot_list, "the shot list does not declare itself a plan"
+    assert "NOT UPLOADED" in shot_list, "the shot list does not say the render is unpublished"
     assert "desktop rehearsal is not the final Fire TV track proof" in shot_list, \
         "the shot list must state that a browser rehearsal is not the APK runtime proof"
 
@@ -306,7 +321,7 @@ def test_the_readme_spatial_nav_assertion_count_matches_the_spec_run():
     whenever a case is added. Without this test it goes stale silently, which is
     exactly how it went stale once already.
     """
-    claimed = re.findall(r"(\d+) assertions in `tests/e2e/spatial_nav_spec\.js`", README)
+    claimed = re.findall(r"(\d+) assertions in `tests/e2e/spatial_nav_spec\.js`", EVIDENCE)
     assert claimed, "the README no longer states a spatial navigation assertion count"
 
     try:
@@ -328,7 +343,7 @@ def test_the_readme_spatial_nav_assertion_count_matches_the_spec_run():
 
 def test_the_readme_security_audit_check_count_matches_the_audit_run():
     """The README quotes a security-audit check count. Run the audit and compare."""
-    claimed = re.search(r"`python scripts/security_audit\.py` runs (\d+) checks", README)
+    claimed = re.search(r"`python scripts/security_audit\.py` runs (\d+) checks", EVIDENCE)
     assert claimed, "the README no longer states a security audit check count"
 
     env = dict(os.environ, MERCURY_ROLLBACK_SECRET="documentation-claim-test", MERCURY_OFFLINE="1")
@@ -362,7 +377,7 @@ def test_the_readme_coverage_numbers_match_the_recorded_measurement():
 
     badge = re.search(r"coverage-(\d+)%25-", README)
     assert badge, "the README no longer carries a coverage badge"
-    stated = re.search(r"(\d+)% of (\d+) statements", README)
+    stated = re.search(r"(\d+)% of (\d+) statements", EVIDENCE)
     assert stated, "the README no longer states a coverage percentage and statement count"
 
     assert int(stated.group(2)) == recorded["statements"], (
@@ -405,15 +420,16 @@ def test_no_document_claims_the_rollback_dispatcher_has_been_fired():
         for phrase in forbidden_phrasings:
             assert phrase not in lowered, f"{path.name} claims a dispatch happened: {phrase!r}"
 
-    readme_lower = " ".join(README.split()).lower()
-    assert "it has never been fired" in readme_lower
-    assert "no request has ever been sent to github.com" in readme_lower
+    evidence_lower = " ".join(EVIDENCE.split()).lower()
+    assert "it has never been fired" in evidence_lower
+    assert "no request has ever been sent to github.com" in evidence_lower
+    assert "has never been fired" in " ".join(README.split()).lower()
 
 
 def test_the_readme_dispatcher_test_count_matches_the_module_it_names():
     """The README quotes a test count for the dispatcher. Count them."""
     claimed = re.search(
-        r"the (\d+) tests in\s+`tests/unit/test_rollback_dispatcher\.py`", README, re.IGNORECASE)
+        r"the (\d+) tests in\s+`tests/unit/test_rollback_dispatcher\.py`", EVIDENCE, re.IGNORECASE)
     assert claimed, "the README no longer states a dispatcher test count"
 
     result = subprocess.run(
@@ -430,7 +446,7 @@ def test_the_readme_dispatcher_test_count_matches_the_module_it_names():
 
 def test_the_readme_cleartext_claim_matches_the_manifests():
     """The README describes where cleartext is permitted. Read the files."""
-    assert 'android:usesCleartextTraffic="false"' in README
+    assert 'android:usesCleartextTraffic="false"' in EVIDENCE
     main_manifest = (REPO_ROOT / "app" / "src" / "main" / "AndroidManifest.xml").read_text(
         encoding="utf-8"
     )
@@ -442,39 +458,76 @@ def test_the_readme_cleartext_claim_matches_the_manifests():
     assert "tools:replace" in debug_manifest
 
 
-def test_the_buyer_section_declares_itself_a_hypothesis_and_invents_no_numbers():
+def test_the_buyer_section_declares_itself_a_hypothesis_and_sources_every_figure():
     """The commercial section is the easiest place in a README to make things up.
 
-    The rule it is held to is the one that was set for it: name the buyer, the
-    budget line, the basis and the first calls, and state plainly that none of it
-    has been tested. A price, a market size or a conversion rate would all be
-    fabrications, so this test refuses them by shape rather than by review.
+    The rule it is held to: name the buyer, the budget line, the basis and the first
+    calls, and state plainly that none of it has been tested with a buyer. A figure
+    is allowed only where it can be checked or where it says what it is: every
+    paragraph, list or table row that states a currency amount or a count in
+    millions must carry the link it was read from, or call itself a hypothesis or an
+    ESTIMATE. An unsourced number is the fabrication this test refuses, by shape
+    rather than by review, and a market size in money or a percentage is refused
+    outright because no source read for this section produces one.
     """
-    assert "## Who would buy this, and why" in README
-    section = README.split("## Who would buy this, and why")[1].split("\n## ")[0]
+    assert "## Who would buy this, and why" in EVIDENCE
+    section = EVIDENCE.split("## Who would buy this, and why")[1].split("\n## ")[0]
+    # The README carries the short form of the same section, held to the same rule.
+    assert "## Who it is for and who pays" in README
+    short = README.split("## Who it is for and who pays")[1].split("\n## ")[0]
+    short_lowered = " ".join(short.split()).lower()
+    assert "commercial hypothesis, not a finding" in short_lowered
+    assert "price hypothesis" in short_lowered and "untested" in short_lowered
 
     # Normalised, because a required sentence can be split across a wrap.
     lowered = " ".join(section.split()).lower()
     assert "commercial hypothesis, not a finding" in lowered
     assert "none of these has been contacted" in lowered
-    for required in ["the buyer.", "the budget line.", "the willingness-to-pay basis."]:
+    assert "price hypothesis, untested" in lowered
+    for required in ["the buyer.", "the budget line.", "the willingness-to-pay basis",
+                     "the wedge", "why now", "the three riskiest assumptions"]:
         assert required in lowered, f"the section does not name {required!r}"
+    # Each quoted page is linked, and the date it was read is on record.
+    assert "fetched on 2026-09-28" in lowered
+    for source in [
+        "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=ICT_specialists_in_employment",
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554",
+        "https://www.atlassian.com/software/opsgenie/migration",
+        "https://www.pagerduty.com/pricing/incident-management/",
+        "https://grafana.com/pricing/",
+    ]:
+        assert source in section, f"the section no longer links the page it quotes: {source}"
+
+    figure = re.compile(r"[$€£]\s?\d|\d[\d,.]*\s?million", re.IGNORECASE)
+    for text, where in ((section, "docs/EVIDENCE.md"), (short, "README.md")):
+        blocks = []
+        for paragraph in re.split(r"\n\s*\n", text):
+            rows = [line for line in paragraph.splitlines() if line.startswith("|")]
+            blocks.extend(rows if rows else [paragraph])
+        for block in blocks:
+            if not figure.search(block):
+                continue
+            labelled = "http" in block or re.search(r"hypothesis|\bESTIMATE\b", block, re.IGNORECASE)
+            assert labelled, (
+                f"{where} states a figure with no link and no hypothesis label: "
+                f"{' '.join(block.split())[:160]!r}"
+            )
 
     forbidden = {
-        r"[$€£]\s?\d": "a currency figure",
         r"\barr\b": "an ARR claim",
         r"\btam\b": "a market size",
+        r"[$€£]\s?[\d,.]+\s?(?:bn|mn|million|billion)\b": "a market size in money",
         r"\d+\s?%": "a percentage",
-        r"\bper (?:seat|user|host|month) (?:for|at) [$€£]": "a price",
     }
     for pattern, what in forbidden.items():
-        found = re.search(pattern, section, re.IGNORECASE)
-        assert not found, f"the buyer section states {what}: {found.group(0)!r}"
+        for text in (section, short):
+            found = re.search(pattern, text, re.IGNORECASE)
+            assert not found, f"the buyer section states {what}: {found.group(0)!r}"
 
 
 def test_the_readme_structural_test_count_matches_the_module_it_describes():
     """The Fire TV section quotes a count of structural tests. Count them."""
-    claimed = re.search(r"checked by (\d+) structural tests", README)
+    claimed = re.search(r"checked by (\d+) structural tests", EVIDENCE)
     assert claimed, "the README no longer states a structural test count"
 
     result = subprocess.run(
@@ -500,9 +553,9 @@ def test_the_governance_overhead_percentage_is_the_arithmetic_of_the_recorded_ru
         r"governance check costs ([\d.]+) ms mean over (\d+) cycles, against a ([\d.]+) ms mean "
         r"for the cheapest endpoint round trip measured in the same run\. Guarding the rollback "
         r"therefore adds ([\d.]+) percent",
-        " ".join(README.split()),
+        " ".join(EVIDENCE.split()),
     )
-    assert stated, "the README no longer states the comparative number in the expected shape"
+    assert stated, "docs/EVIDENCE.md no longer states the comparative number in the expected shape"
 
     governance = BENCHMARKS["results"]["governance_token_mint_and_verify"]
     endpoints = {name: stats for name, stats in BENCHMARKS["results"].items()
@@ -619,7 +672,7 @@ def test_the_recorded_runtime_belongs_to_the_suite_this_repository_ships():
     collected = int(badge.group(1))
     if recorded["tests_collected"] == collected:
         return
-    prose = _live_prose(README)
+    prose = _live_prose(EVIDENCE)
     for phrase in readiness.stale_timing_disclosure(recorded["tests_collected"], collected):
         assert phrase in prose, (
             f"the runtime was measured over {recorded['tests_collected']} tests and this suite "
@@ -642,7 +695,7 @@ def test_the_stale_timing_disclosure_names_the_live_count_and_no_other():
     recorded = _timing()
     badge = re.search(r"tests-(\d+)(?:%20|[\s_+-])*collected", README)
     collected = int(badge.group(1))
-    prose = _live_prose(README)
+    prose = _live_prose(README + "\n" + EVIDENCE)
     pending = "re-measure on an idle machine is pending"
     if recorded["tests_collected"] == collected:
         assert pending not in prose, (
@@ -675,7 +728,7 @@ def test_every_passed_count_a_document_quotes_is_the_count_the_suite_records():
     collected = int(badge.group(1))
     record_is_current = recorded["tests_collected"] == collected
     if not record_is_current and not recorded["bootstrap"]:
-        prose = _live_prose(README)
+        prose = _live_prose(EVIDENCE)
         required = readiness.stale_timing_disclosure(recorded["tests_collected"], collected)
         assert all(phrase in prose for phrase in required), (
             f"the runtime record was measured over {recorded['tests_collected']} tests and the "
@@ -741,17 +794,17 @@ def test_the_published_range_spans_more_than_one_named_condition():
         f"the record holds only {sorted(conditions)} runs; the published figure must span "
         "a condition where the machine was busy, measured rather than guessed"
     )
-    assert recorded["machine"] in README, \
+    assert recorded["machine"] in EVIDENCE, \
         "the README does not name the machine the runtime was measured on"
-    assert "moves with machine load" in README, \
+    assert "moves with machine load" in EVIDENCE and "moves with machine load" in README, \
         "the README presents the runtime as a constant, which is what failed before"
-    assert f"{recorded['loaded_max_seconds']} seconds" in README, (
+    assert f"{recorded['loaded_max_seconds']} seconds" in EVIDENCE, (
         f"the README does not publish the loaded run at {recorded['loaded_max_seconds']} s, "
         "so the quiet range reads as a ceiling"
     )
     workers = max(run["background_cpu_workers"] for run in recorded["runs"]
                   if run["condition"] == "loaded")
-    assert f"{workers} CPU-saturating background processes" in README, \
+    assert f"{workers} CPU-saturating background processes" in EVIDENCE, \
         "the README does not say how much background load produced the high figure"
 
 
@@ -768,7 +821,7 @@ def test_the_readme_publishes_how_its_own_runtime_moved_between_sessions():
     if not previous:
         pytest.skip("no earlier measurement session has been recorded yet")
     low, high = _session_low(previous), _session_high(previous)
-    assert f"{low} to {high} seconds" in " ".join(README.split()), (
+    assert f"{low} to {high} seconds" in " ".join(EVIDENCE.split()), (
         f"the README does not say that the previous session measured {low} to {high} s. "
         "A number that is quietly re-rolled is indistinguishable from a number that was chosen."
     )
@@ -794,14 +847,14 @@ def test_a_retired_timing_claim_is_quoted_as_retired_and_never_stated_as_live(st
             f"{path.name} states the retired timing claim {stale!r} as though it were "
             "current. Quote it in backticks inside the retraction instead."
         )
-    assert stale in README, (
+    assert stale in EVIDENCE, (
         f"the README no longer records that it once published {stale!r}. The correction "
         "is part of the evidence, not something to tidy away."
     )
 
 
 def test_the_readme_says_out_loud_that_its_timing_claim_failed_to_reproduce():
-    retraction = README.lower()
+    retraction = EVIDENCE.lower()
     assert "did not reproduce" in retraction, \
         "the README does not admit that its published runtime failed to reproduce"
     assert "contradicted" in retraction, \

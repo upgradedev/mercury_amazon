@@ -246,6 +246,37 @@ test('each focus change is announced to the page with the control label', () => 
   ], 'the key hint bar is fed by the navigator, not by a second key handler');
 });
 
+test('a deferred cursor draws no ring until the next press, which only reveals it', () => {
+  const cells = grid();
+  const { nav, document } = loadNavigator(cells);
+  const announced = [];
+  document.addEventListener('mercury:focuschange', (event) => {
+    announced.push([event.detail.element.id, event.detail.pending]);
+  });
+  const board = makeElement('board', 0, 0, 10, 10);
+  nav.setFocus(at(cells, 0, 0));
+  nav.defer(at(cells, 2, 2), { park: board });
+  assert.strictEqual(nav.current.id, 'r2c2');
+  assert.strictEqual(at(cells, 2, 2).focused, 0, 'keyboard focus does not go to the deferred control');
+  assert.strictEqual(board.focused, 1, 'keyboard focus parks where the page asked');
+  assert.strictEqual(cells.filter((c) => c.hasClass('tv-focused')).length, 0, 'no ring while deferred');
+  // The first press, in any direction, lands on the deferred control, not beyond it.
+  assert.strictEqual(nav.move('UP').id, 'r2c2');
+  assert.ok(at(cells, 2, 2).hasClass('tv-focused'));
+  assert.strictEqual(nav.move('UP').id, 'r1c2', 'after the reveal the next press moves as usual');
+  assert.deepStrictEqual(announced.slice(0, 3), [['r0c0', false], ['r2c2', true], ['r2c2', false]]);
+});
+
+test('SELECT on a deferred cursor reveals it and clicks it once', () => {
+  const cells = grid();
+  const { nav, bridge } = loadNavigator(cells);
+  nav.defer(at(cells, 1, 1));
+  assert.strictEqual(bridge('SELECT'), true);
+  assert.strictEqual(at(cells, 1, 1).clicked, 1);
+  assert.ok(at(cells, 1, 1).hasClass('tv-focused'));
+  assert.strictEqual(nav.pending, false);
+});
+
 test('only one element carries the focus class at a time', () => {
   const cells = grid();
   const { nav } = loadNavigator(cells);
@@ -254,6 +285,205 @@ test('only one element carries the focus class at a time', () => {
   const focused = cells.filter((c) => c.hasClass('tv-focused'));
   assert.strictEqual(focused.length, 1);
   assert.strictEqual(focused[0].id, 'r0c1');
+});
+
+/**
+ * The board at 1920x1080, from the positions measured in the page: the narrow
+ * primary button, Stage beside it, five full-width departure rows 21px below, and
+ * the next narrow button on the page 1400px further down. Centre to centre, DOWN
+ * from Ask scored the full-width row as 680px off to the side and jumped to the
+ * far button, skipping the whole board.
+ */
+function board() {
+  const ask = makeElement('ask', 80, 470, 400, 78);
+  const stage = makeElement('stage', 495, 470, 326, 78);
+  const rows = [0, 1, 2, 3, 4].map((i) => makeElement(`row${i}`, 86, 569 + i * 61, 1748, 58));
+  const handoff = makeElement('handoff', 86, 1891, 210, 50);
+  const spend = makeElement('spend', 1250, 2400, 580, 160);
+  return { ask, stage, rows, handoff, spend, all: [ask, stage, ...rows, handoff, spend] };
+}
+
+test('DOWN from a narrow button lands on the full-width row directly under it', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.ask);
+  assert.strictEqual(nav.move('DOWN').id, 'row0', 'the board is not skipped');
+  assert.strictEqual(nav.move('DOWN').id, 'row1');
+});
+
+test('UP from a full-width row returns to the button whose edge lines up with it', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[0]);
+  // Ask and Stage are the same distance above the row; Ask shares its left edge.
+  assert.strictEqual(nav.move('UP').id, 'ask');
+});
+
+test('RIGHT from a full-width row holds instead of jumping down the page', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[2]);
+  assert.strictEqual(nav.move('RIGHT').id, 'row2');
+  assert.strictEqual(nav.move('LEFT').id, 'row2');
+});
+
+test('the remote smoke path still reaches Stage from Ask, and DOWN from Stage enters the board', () => {
+  const b = board();
+  const { nav, bridge } = loadNavigator(b.all);
+  nav.setFocus(b.ask);
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'stage');
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'row0');
+});
+
+test('DOWN from the last row moves on to the next control below the board', () => {
+  const b = board();
+  const { nav } = loadNavigator(b.all);
+  nav.setFocus(b.rows[4]);
+  assert.strictEqual(nav.move('DOWN').id, 'handoff');
+});
+
+test('setFocus can place the cursor without moving keyboard focus', () => {
+  const cells = grid();
+  const { nav } = loadNavigator(cells);
+  nav.setFocus(at(cells, 0, 0), { domFocus: false });
+  assert.strictEqual(nav.current.id, 'r0c0');
+  assert.ok(nav.current.hasClass('tv-focused'), 'the ring is drawn');
+  assert.strictEqual(at(cells, 0, 0).focused, 0, 'keyboard focus is left where it was');
+  nav.move('RIGHT');
+  assert.strictEqual(at(cells, 0, 1).focused, 1, 'a remote press moves keyboard focus with it');
+});
+
+/**
+ * An open panel between the board and Connection, as the page lays it out: the
+ * last board row above it, Connection > Check below it, a control off to its
+ * right, and three buttons in one row inside it. Before containment, DOWN from
+ * any panel button walked out to Check while the legend still said BACK returns
+ * to the wall.
+ */
+function panelLayout(panelHeight) {
+  const row = makeElement('row4', 86, 400, 1748, 58);
+  const load = makeElement('load', 86, 700, 300, 60);
+  const scan = makeElement('scan', 400, 700, 300, 60);
+  const back = makeElement('back', 714, 700, 200, 60);
+  const outside = makeElement('outside', 1500, 700, 200, 60);
+  const check = makeElement('check', 86, 700 + panelHeight + 40, 150, 60);
+  const members = new Set([load, scan, back]);
+  const top = 600;
+  const panel = {
+    contains: (element) => members.has(element),
+    getBoundingClientRect: () => ({ left: 80, top, width: 1000, height: panelHeight,
+      right: 1080, bottom: top + panelHeight })
+  };
+  return { row, load, scan, back, outside, check, panel, all: [row, load, scan, back, outside, check] };
+}
+
+test('an open panel holds the remote in every direction until it is released', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.contain(p.panel);
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load', 'DOWN does not walk out to Connection > Check');
+  bridge('UP');
+  assert.strictEqual(nav.current.id, 'load', 'UP does not walk out to the board');
+  bridge('LEFT');
+  assert.strictEqual(nav.current.id, 'load');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'scan', 'movement inside the panel is unchanged');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'back');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'back', 'RIGHT does not jump to a control beside the panel');
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'back');
+  nav.release();
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'check', 'once released, DOWN reaches the rest of the page again');
+});
+
+test('a cursor put outside the open panel by Tab or a mouse comes back in on the next press', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.contain(p.panel);
+  nav.setFocus(p.check, { domFocus: false });
+  bridge('UP');
+  assert.strictEqual(nav.current.id, 'load', 'the first control of the panel, in reading order');
+});
+
+test('a deferred cursor outside the open panel is not revealed while the panel is open', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  nav.defer(p.row);
+  nav.contain(p.panel);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load');
+  assert.strictEqual(p.row.hasClass('tv-focused'), false);
+});
+
+test('UP and DOWN at the edge of a long panel scroll the rest of it into view, clear of the key bar', () => {
+  const p = panelLayout(2000); // runs from 600 to 2600 in a 1080 viewport
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  nav.contain(p.panel, { bottomInset: () => 62 });
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.strictEqual(nav.current.id, 'load', 'the cursor stays in the panel');
+  // 60% of the 1018px left above the key bar, and never past the panel's bottom.
+  assert.deepStrictEqual(scrolled, [611]);
+  bridge('UP');
+  // The panel's top is still 600px down in this static shim, so there is nothing above to show.
+  assert.deepStrictEqual(scrolled, [611], 'UP does not scroll when the panel top is in view');
+});
+
+test('UP at the top of a panel scrolled past its heading brings the heading back, a step at a time', () => {
+  const p = panelLayout(2000);
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  // The same panel after the viewer has read 900px down it.
+  p.panel.getBoundingClientRect = () => ({ left: 80, top: -900, width: 1000, height: 2000, right: 1080, bottom: 1100 });
+  nav.contain(p.panel, { bottomInset: 62 });
+  nav.setFocus(p.load, { domFocus: false });
+  nav.move('UP');
+  nav.move('DOWN');
+  assert.deepStrictEqual(scrolled, [-611, 82], 'up one step; down only the 82px still under the key bar');
+  assert.strictEqual(nav.current.id, 'load');
+});
+
+test('DOWN at the edge of a panel that already fits holds without scrolling', () => {
+  const p = panelLayout(200);
+  const { nav, bridge } = loadNavigator(p.all);
+  const scrolled = [];
+  global.window.innerHeight = 1080;
+  global.window.scrollBy = (x, y) => { scrolled.push(y); };
+  nav.contain(p.panel, { bottomInset: 62 });
+  nav.setFocus(p.load);
+  bridge('DOWN');
+  assert.deepStrictEqual(scrolled, []);
+  assert.strictEqual(nav.current.id, 'load');
+});
+
+test('the Android smoke path, RIGHT then RIGHT from Ask, is unchanged after a panel closes', () => {
+  const ask = makeElement('ask', 80, 470, 400, 78);
+  const stage = makeElement('stage', 495, 470, 326, 78);
+  const confirm = makeElement('confirm', 836, 470, 326, 78);
+  const inside = makeElement('inside', 86, 1500, 300, 60);
+  const panel = { contains: (element) => element === inside,
+    getBoundingClientRect: () => ({ left: 80, top: 1400, width: 1000, height: 200, right: 1080, bottom: 1600 }) };
+  const { nav, bridge } = loadNavigator([ask, stage, confirm, inside]);
+  nav.contain(panel);
+  nav.setFocus(inside);
+  nav.release();
+  nav.setFocus(ask);
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'stage');
+  bridge('RIGHT');
+  assert.strictEqual(nav.current.id, 'confirm');
 });
 
 // ---------------------------------------------------------------------- Runner

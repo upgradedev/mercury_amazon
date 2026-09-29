@@ -3,7 +3,8 @@
 
 WHAT THIS IS. A labelled corpus of incidents, scored against the committed
 :class:`~src.domain.incident_correlation.IncidentCorrelator` with its shipped defaults
-(3.0x anomaly threshold, 60 minute attribution window, 6 point series). Each case carries
+(3.0x anomaly threshold, 75 minute attribution window since 2026-09-27, 60 before it,
+6 point series). Each case carries
 the truth its generator recorded when it built the case: which commit, if any, caused the
 reading. The correlator never sees that truth, and the truth is never derived from what
 the correlator said. Two figures come out of it and both are published whatever they are:
@@ -29,10 +30,15 @@ independence by regenerating those strata against a commit log whose times have 
 shuffled and asserting the reading times do not move.
 
 For a regression the reading time necessarily follows its cause, because that is what
-causing something means. What is not chosen to flatter the correlator is the delay: the
-propagation delay is drawn from a distribution that reaches past the 60 minute attribution
-window, and the operator's look at the screen is drawn from a distribution that reaches
-several polls past the onset. Both draws are made without looking at where the neighbouring
+causing something means. The delay was set at 1 to 75 minutes on 2026-09-08, when it
+reached past the correlator's 60 minute window on purpose. On 2026-09-27 the window was
+widened to 75 minutes on the train split of ``scripts/attribution_split.py``, which uses
+this same ceiling, so the shipped window now equals the delay ceiling: the window was
+fitted to this authored assumption, not the other way round, and a held-out split drawn
+from the same generator cannot show that. ``attribution_split.py`` publishes held-out
+precision at ceilings from 60 to 180 minutes so the reader can see what the assumption is
+worth. The operator's look at the screen is drawn from a distribution that reaches several
+polls past the onset. Both draws are made without looking at where the neighbouring
 commits are.
 
 Two more figures come out of it and they are the ones this product is now built around:
@@ -57,7 +63,7 @@ WHAT THE NUMBERS ARE WORTH, WHICH IS NOT THE SAME THING.
 * Both hit rates are bounded by ``detectability_ceiling``: the pre-onset baseline needs
   readings before the onset, and a look four polls late does not have them. That is a
   property of a six point series, not of the rule.
-* The **false-attribution rate** is a joint property of the correlator's 60 minute window,
+* The **false-attribution rate** is a joint property of the correlator's attribution window,
   its crowding gate and the density of the commit stream it is given, and it is close to
   meaningless without the rest of that sentence. ``--commit-stride`` thins the recorded log
   to every k-th commit, and the report prints the sweep, so a reader can see how much of
@@ -131,12 +137,21 @@ from src.infrastructure.local_git_adapter import LocalGitCommitProvider  # noqa:
 #: Where the recorded deployment stream lives. Real commits, recorded once.
 COMMIT_STREAM_PATH = REPO_ROOT / "src" / "infrastructure" / "fixtures" / "commit_stream_fixture.json"
 
+#: Which files each recorded commit changed, recorded separately by
+#: ``python scripts/record_commit_paths.py`` so the stream above stays byte-identical.
+#: The corpus generator never reads it; only the correlator does.
+COMMIT_PATHS_PATH = REPO_ROOT / "src" / "infrastructure" / "fixtures" / "commit_paths_fixture.json"
+
 #: Where the scored summary is written. The README quotes it and a test compares them.
 SUMMARY_PATH = REPO_ROOT / "correlation_trial_summary.json"
 
 #: Minutes between metric samples. ``CloudWatchMetricAdapter`` asks CloudWatch for
 #: ``window_minutes // SERIES_POINTS`` minute periods over a 60 minute window, so 10.
 POLL_CADENCE_MINUTES = 60 // SERIES_POINTS
+
+#: The window the 2026-09-08 ablation rows were measured at. Kept fixed so that history
+#: is reproducible by running the script rather than remembered.
+ABLATION_WINDOW_MINUTES = 60
 
 #: Fixed so the published figures can be reproduced. ``--seed`` changes the corpus.
 DEFAULT_SEED = 20260908
@@ -241,12 +256,14 @@ def load_commit_stream(path: Path = COMMIT_STREAM_PATH) -> tuple[list[CommitRef]
             "  python scripts/correlation_trial.py --record"
         )
     payload = json.loads(path.read_text(encoding="utf-8"))
+    paths = load_commit_paths()
     commits = [
         CommitRef(
             sha=entry["sha"],
             message=entry.get("message", ""),
             author=entry.get("author", "unknown"),
             committed_at=datetime.fromisoformat(entry["committed_at"]).astimezone(timezone.utc),
+            paths=paths.get(entry["sha"]),
         )
         for entry in payload["commits"]
     ]
@@ -254,11 +271,23 @@ def load_commit_stream(path: Path = COMMIT_STREAM_PATH) -> tuple[list[CommitRef]
     return commits, payload
 
 
+def load_commit_paths(path: Path = COMMIT_PATHS_PATH) -> dict[str, tuple[str, ...]]:
+    """The recorded file list of each commit, or nothing when it was never recorded.
+
+    A commit without a file list stays a candidate for every service, so a missing
+    recording can only make the correlator name less, never more.
+    """
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return {sha: tuple(files) for sha, files in payload.get("paths_by_sha", {}).items()}
+
+
 def thin(commits: list[CommitRef], stride: int) -> list[CommitRef]:
     """Keep every ``stride``-th commit, so commit density can be varied on purpose.
 
     Density is the other half of any false-attribution figure: an anomaly with no cause is
-    attributed exactly when some commit happens to fall in the 60 minute window before the
+    attributed exactly when some commit happens to fall in the attribution window before the
     reading, and how often that happens is a property of the stream, not of the correlator.
     """
     if stride < 1:
@@ -274,7 +303,7 @@ def commit_density_per_hour(commits: list[CommitRef]) -> float:
     return round(len(commits) / span_hours, 3) if span_hours > 0 else 0.0
 
 
-def burstiness(commits: list[CommitRef]) -> dict:
+def burstiness(commits: list[CommitRef], window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES) -> dict:
     """Describe the clustering of the stream, because the rates depend on it.
 
     A rate per hour hides a stream that sits idle for a day and then lands eight commits
@@ -290,7 +319,7 @@ def burstiness(commits: list[CommitRef]) -> dict:
         (b.committed_at - a.committed_at).total_seconds() / 60.0
         for a, b in zip(ordered, ordered[1:])
     ]
-    window = timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+    window = timedelta(minutes=window_minutes)
     in_window = [
         sum(1 for other in ordered if 0 <= (c.committed_at - other.committed_at).total_seconds() <= window.total_seconds())
         for c in ordered
@@ -298,7 +327,7 @@ def burstiness(commits: list[CommitRef]) -> dict:
     return {
         "median_gap_minutes": round(statistics.median(gaps), 2),
         "gaps": len(gaps),
-        "gaps_under_the_attribution_window": sum(1 for gap in gaps if gap < DEFAULT_ATTRIBUTION_WINDOW_MINUTES),
+        "gaps_under_the_attribution_window": sum(1 for gap in gaps if gap < window_minutes),
         "mean_commits_in_a_window_ending_at_a_commit": round(statistics.mean(in_window), 2),
         "max_commits_in_a_window_ending_at_a_commit": max(in_window),
     }
@@ -413,11 +442,15 @@ def _regression_cases(
     stratum: str,
     noise_sigma: float,
     start_index: int,
+    window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+    propagation_delay_minutes: tuple[float, float] = PROPAGATION_DELAY_MINUTES,
 ) -> list[TrialCase]:
     """Cases where one recorded commit really did cause the reading.
 
-    The cause is drawn uniformly from the stream. The propagation delay reaches past the
-    correlator's own 60 minute window on purpose, and on the late-look stratum the operator
+    The cause is drawn uniformly from the stream. The propagation delay's ceiling (75
+    minutes by default) reached past the correlator's 60 minute window when it was set; the
+    shipped window has since been widened to equal it, on a train split that shares it, so
+    precision measured here is conditional on it. On the late-look stratum the operator
     arrives one to four polls after the onset, which is what a person walking into a room
     does. Neither draw looks at where the neighbouring commits are.
     """
@@ -429,7 +462,7 @@ def _regression_cases(
         cause = rng.choice(commits)
         multiplier = _log_uniform(rng, *SPIKE_MULTIPLIER_RANGE)
         baseline_rate = _log_uniform(rng, *BASELINE_RATE_RANGE)
-        propagation = rng.uniform(*PROPAGATION_DELAY_MINUTES)
+        propagation = rng.uniform(*propagation_delay_minutes)
         polls_late = rng.randint(*LATE_LOOK_POLLS) if late else 0
 
         onset = cause.committed_at + timedelta(minutes=propagation)
@@ -438,12 +471,14 @@ def _regression_cases(
         times = _point_times(observed_at)
         elevated_from = next((i for i, at in enumerate(times) if at >= onset), None)
 
-        window_start = observed_at - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+        # Diagnostics only: which window the cause fell in. The truth label is the
+        # causing sha, and no draw above depends on the window.
+        window_start = observed_at - timedelta(minutes=window_minutes)
         # The first poll at or after the onset is the earliest reading that can show the
         # spike, so it is the onset any detector could find. Derived from the generator's
         # own onset, not from where the correlator thought the onset was.
         onset_poll = times[elevated_from] if elevated_from is not None else observed_at
-        onset_window_start = onset_poll - timedelta(minutes=DEFAULT_ATTRIBUTION_WINDOW_MINUTES)
+        onset_window_start = onset_poll - timedelta(minutes=window_minutes)
         between = sum(
             1 for c in commits if cause.committed_at < c.committed_at <= observed_at
         )
@@ -530,15 +565,24 @@ def build_corpus(
     exogenous: int = DEFAULT_EXOGENOUS,
     healthy: int = DEFAULT_HEALTHY,
     sparse: int = DEFAULT_SPARSE,
+    window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+    propagation_delay_minutes: tuple[float, float] = PROPAGATION_DELAY_MINUTES,
 ) -> list[TrialCase]:
-    """Build the whole labelled corpus from one seed, so a run reproduces exactly."""
+    """Build the whole labelled corpus from one seed, so a run reproduces exactly.
+
+    ``propagation_delay_minutes`` exists only so ``scripts/attribution_split.py`` can
+    publish how the figures move when the authored delay ceiling moves. Every published
+    corpus uses the default.
+    """
     if len(commits) < 2:
         raise ValueError("a corpus needs at least two commits in the stream")
     span = (commits[0].committed_at, commits[-1].committed_at)
 
     cases: list[TrialCase] = []
-    cases += _regression_cases(regression_fresh, commits, seed, STRATUM_FRESH, noise_sigma, len(cases))
-    cases += _regression_cases(regression_late, commits, seed, STRATUM_LATE, noise_sigma, len(cases))
+    cases += _regression_cases(regression_fresh, commits, seed, STRATUM_FRESH, noise_sigma, len(cases),
+                               window_minutes, propagation_delay_minutes)
+    cases += _regression_cases(regression_late, commits, seed, STRATUM_LATE, noise_sigma, len(cases),
+                               window_minutes, propagation_delay_minutes)
     cases += _uncaused_cases(exogenous, span, seed, STRATUM_EXOGENOUS, noise_sigma, len(cases))
     cases += _uncaused_cases(healthy, span, seed, STRATUM_HEALTHY, noise_sigma, len(cases))
     cases += _uncaused_cases(sparse, span, seed, STRATUM_SPARSE, noise_sigma, len(cases))
@@ -827,6 +871,7 @@ def correlator_from(args, max_commits_in_window: int | None = "unset") -> Incide
     ``--baseline-mode trailing --window-anchor reading --max-commits-in-window none``.
     """
     return IncidentCorrelator(
+        attribution_window_minutes=args.attribution_window,
         baseline_mode=BaselineMode(args.baseline_mode),
         window_anchor=WindowAnchor(args.window_anchor),
         min_baseline_points=args.min_baseline_points,
@@ -847,12 +892,16 @@ def ablation(
     separately in :func:`gate_sweep` because it is a different kind of decision.
     """
     rows = []
+    # Pinned to the window these rows were first measured at, so the history they carry
+    # does not move when the shipped window does. The window widened from 60 to 75
+    # minutes on 2026-09-27; see scripts/attribution_split.py.
     for label, mode, anchor in (
         ("trailing baseline, window ends at the reading", BaselineMode.TRAILING, WindowAnchor.READING),
         ("pre-onset baseline, window ends at the reading", BaselineMode.PRE_ONSET, WindowAnchor.READING),
         ("pre-onset baseline, window ends at the onset", BaselineMode.PRE_ONSET, WindowAnchor.ONSET),
     ):
         correlator = IncidentCorrelator(
+            attribution_window_minutes=ABLATION_WINDOW_MINUTES,
             baseline_mode=mode, window_anchor=anchor,
             min_baseline_points=args.min_baseline_points, max_commits_in_window=None,
         )
@@ -864,6 +913,7 @@ def ablation(
             "baseline_mode": mode.value,
             "window_anchor": anchor.value,
             "crowding_gate": None,
+            "attribution_window_minutes": ABLATION_WINDOW_MINUTES,
             "hit_rate_fresh_look": head["hit_rate_fresh_look"],
             "hit_rate_late_look": head["hit_rate_late_look"],
             "naming_precision": head["naming_precision"],
@@ -949,6 +999,7 @@ def build_summary(args) -> dict:
         stream, seed=args.seed, noise_sigma=args.noise_sigma,
         regression_fresh=args.regression_fresh, regression_late=args.regression_late,
         exogenous=args.exogenous, healthy=args.healthy, sparse=args.sparse,
+        window_minutes=args.attribution_window,
     )
     correlator = correlator_from(args)
     verdicts = run_corpus(cases, stream, correlator)
@@ -962,7 +1013,7 @@ def build_summary(args) -> dict:
         "noise_sigma": args.noise_sigma,
         "correlator": {
             "anomaly_factor": DEFAULT_ANOMALY_FACTOR,
-            "attribution_window_minutes": DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+            "attribution_window_minutes": correlator.attribution_window_minutes,
             "series_points": SERIES_POINTS,
             "poll_cadence_minutes": POLL_CADENCE_MINUTES,
             "baseline_mode": correlator.baseline_mode.value,
@@ -982,7 +1033,7 @@ def build_summary(args) -> dict:
             "commits_per_hour": commit_density_per_hour(stream),
             "span_start_utc": stream[0].committed_at.isoformat(),
             "span_end_utc": stream[-1].committed_at.isoformat(),
-            "burstiness": burstiness(stream),
+            "burstiness": burstiness(stream, args.attribution_window),
             "source": recording.get("source"),
         },
         "scope": (
@@ -1022,7 +1073,8 @@ def print_report(summary: dict) -> None:
     print(f"  hit rate, all regressions:            {head['hit_rate_all_regressions']}")
     print(f"    on a fresh look:                    {head['hit_rate_fresh_look']}")
     print(f"    on a late look:                     {head['hit_rate_late_look']}")
-    print(f"    cause inside the 60 minute window:  {head['hit_rate_cause_inside_the_attribution_window']}")
+    print(f"    cause inside the {conf['attribution_window_minutes']} minute window:  "
+          f"{head['hit_rate_cause_inside_the_attribution_window']}")
     print(f"  false attribution on uncaused anomalies: {head['false_attribution_rate_on_uncaused_anomalies']}")
     print(f"    on exogenous spikes alone:          {head['false_attribution_rate_on_exogenous_spikes']}")
     print(f"  correct refusal on exogenous spikes:  {head['correct_refusal_rate_on_exogenous_spikes']}")
@@ -1058,7 +1110,8 @@ def print_report(summary: dict) -> None:
         print(f"    {name} ({block['cases']} cases)")
         for outcome, count in block["outcomes"].items():
             print(f"      {count:>5}  {outcome}")
-    print("  what each half of the detector change is worth (no crowding gate in any row):")
+    print(f"  what each half of the 2026-09-08 detector change is worth (no crowding gate, "
+          f"{ABLATION_WINDOW_MINUTES} minute window in every row):")
     for row in summary.get("ablation", []):
         print(f"    {row['detector']:<48} fresh {row['hit_rate_fresh_look']}  "
               f"late {row['hit_rate_late_look']}  precision {row['naming_precision']} "
@@ -1101,6 +1154,9 @@ def main() -> int:
                         default=WindowAnchor.ONSET.value,
                         help="'reading' ends the attribution window when somebody looked rather "
                              "than when the spike started")
+    parser.add_argument("--attribution-window", type=int, default=DEFAULT_ATTRIBUTION_WINDOW_MINUTES,
+                        help="attribution window in minutes; 60 reproduces the engine published "
+                             "before 2026-09-27")
     parser.add_argument("--min-baseline-points", type=int, default=DEFAULT_MIN_BASELINE_POINTS,
                         help="readings that must sit before an onset for their mean to be a baseline")
     parser.add_argument("--max-commits-in-window", type=_gate, default=DEFAULT_MAX_COMMITS_IN_WINDOW,

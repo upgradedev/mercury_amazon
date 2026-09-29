@@ -1,4 +1,4 @@
-package com.amazon.mercury.wallboard
+package io.github.upgradedev.mercury.wallboard
 
 /**
  * Decides which Mercury cockpit the TV should load.

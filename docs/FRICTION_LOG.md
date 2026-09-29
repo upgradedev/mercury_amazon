@@ -18,7 +18,8 @@ is optional.
 ## 1. AGP 8 rejects a manifest that names its own package, and the error is late
 
 **What happened.** The manifest carried `package="com.amazon.mercury.wallboard"`
-alongside `namespace` in `app/build.gradle.kts`. Android Gradle Plugin 8 fails the
+(the id at the time; since 2026-09-27 the app is `io.github.upgradedev.mercury.wallboard`,
+because a third-party app should not ship inside Amazon's own namespace) alongside `namespace` in `app/build.gradle.kts`. Android Gradle Plugin 8 fails the
 build on that combination.
 
 **Why it is friction.** Practically every Fire TV tutorial and sample manifest
@@ -73,7 +74,7 @@ distance along the axis of travel plus a weighted penalty for perpendicular drif
 and take the minimum. It holds focus at an edge rather than wrapping, because
 wrapping loses the viewer's place on a large screen. The geometry is tested by
 executing the real file in Node against a synthetic grid:
-`node tests/e2e/spatial_nav_spec.js`, 17 assertions.
+`node tests/e2e/spatial_nav_spec.js`, 25 assertions.
 
 **Suggestion.** Ship a small, supported spatial navigation JavaScript library for
 Fire TV web apps and WebView hosts, or enable the CSS specification in the Fire OS

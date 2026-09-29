@@ -107,9 +107,13 @@ def test_the_provenance_badge_sits_inside_the_hero_card(html):
     assert "el('heroSource')" in html
     # The badge renders the words, not the machine slug: "offline-fixture" is a value,
     # "OFFLINE FIXTURE" is what somebody across a room reads.
+    # The words come from stampFor, which every badge and provenance block uses since
+    # this repository's own commits got a STAND-IN stamp of their own.
     badge = html.split("function sourceBadge(", 1)[1].split("\n    }", 1)[0]
-    assert "display_label" in badge
-    assert "OFFLINE FIXTURE" in badge
+    assert "stampFor(provenance)" in badge
+    stamp = html.split("function stampFor(", 1)[1].split("\n    }", 1)[0]
+    assert "display_label" in stamp
+    assert "OFFLINE FIXTURE" in stamp
 
 
 def test_the_page_renders_the_crowded_window_refusal(html):
@@ -320,7 +324,9 @@ def test_the_hero_headline_and_figure_are_written_from_the_response(html):
 def test_the_page_asks_what_changed_on_load_rather_than_waiting_for_a_click(html):
     """A wallboard that says nothing until someone clicks cannot be read at all."""
     script = html.split("<script>")[-1]
-    assert "checkConnection().then(loadWhatChanged)" in script
+    # Still asked on load; the flag says nobody pressed anything, so it is painted
+    # and not announced to a screen reader.
+    assert "checkConnection().then(function () { return loadWhatChanged(false); })" in script
     assert "if (apiBase())" in script, "the load-time call must be conditional on there being an API"
 
 
@@ -351,22 +357,59 @@ def test_the_page_has_landmarks_a_skip_link_and_one_h1(html):
         assert landmark in html, f"missing landmark {landmark}"
     assert html.count("<h1") == 1, "a 10-foot page has exactly one headline"
     assert 'aria-labelledby="heroHeadline"' in html
+    # The h1 names the product. It used to be the verdict line, so heading
+    # navigation read "Commit 432bcd2", or scrambled letters mid-flap, as the page.
+    assert '<h1 class="sr-only">Mercury Fire TV incident board</h1>' in html
+    assert '<h2 class="hero-headline" id="heroHeadline">' in html
 
 
 def test_async_regions_announce_themselves_to_assistive_technology(html):
-    """Every region a fetch rewrites must be a live region."""
+    """Results are announced, briefly, and only after somebody asked for them.
+
+    This used to require the whole answer row (#heroLive) to be a live region. It was,
+    and a screen reader read the board out on page load, then read the full answer
+    again when the flap settled, refusal paragraphs included. The answer row is now
+    not live; one visually hidden status line carries a short sentence after a user
+    action. The panel consoles stay live: they are hidden until opened, and only a
+    press inside them rewrites them.
+    """
     assert html.count('aria-live="polite"') >= 4
-    for region in ["heroLive", "incidentOutput", "doraOutput", "costOutput"]:
+    for region in ["boardStatus", "incidentOutput", "rollbackOutput", "doraOutput", "costOutput"]:
         assert region in html
+    hero_live = re.search(r'<div id="heroLive"[^>]*>', html).group(0)
+    assert "aria-live" not in hero_live, "the answer row must not announce itself on load"
+    status = re.search(r'<p id="boardStatus"[^>]*>', html).group(0)
+    assert 'role="status"' in status and "sr-only" in status
+    script = html.split("<script>")[-1]
+    assert "loadWhatChanged(false)" in script, "the answer fetched on load is not announced"
 
 
 def test_reduced_motion_is_honoured(html):
     assert "@media (prefers-reduced-motion: reduce)" in html
 
 
-def test_light_and_dark_are_both_defined(html):
-    assert "@media (prefers-color-scheme: light)" in html
-    assert "color-scheme:" in html
+def test_the_board_commits_to_one_dark_theme_and_paints_it_explicitly(html):
+    """The departures board is dark on purpose, and says so rather than inheriting it.
+
+    This used to assert a light variant. The redesign commits to one dark board: the
+    page's first home is a television in a dim room, most TV browsers report no
+    colour-scheme preference, and a board that turned white on a phone would stop being
+    the same object. What must hold instead is that the choice is declared to the
+    browser and that nothing is left to a user-agent default: the page ground is
+    painted, and the colours come from named tokens.
+    """
+    style = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert "color-scheme: dark;" in style, "the dark commitment is not declared to the browser"
+    assert "@media (prefers-color-scheme: light)" not in style, (
+        "a light variant exists, so the one-theme rationale above is no longer true"
+    )
+    body = re.search(r"\n\s*body\s*\{(.+?)\}", style, re.DOTALL)
+    assert body and "background-color: var(--board)" in body.group(1), (
+        "the body does not paint its own background"
+    )
+    for token in ("--board:", "--flap:", "--ink:", "--amber:",
+                  "--v-attributed:", "--v-cannot:", "--v-nothing:", "--v-insufficient:"):
+        assert token in style, f"the palette token {token} is missing"
 
 
 def test_every_disabled_control_states_its_reason_in_visible_text(html):
@@ -380,13 +423,100 @@ def test_every_disabled_control_states_its_reason_in_visible_text(html):
     assert "Confirming is off until" in html
 
 
+SHIPPED_PAGE_FILES = ("index.html", "firetv_nav.js", "webmcp_bridge.js", "manifest.json")
+
+# Every way a page, a script or a manifest can make the browser load something:
+# attributes that fetch, CSS url() and @import, manifest members, and script calls.
+_LOADING_TARGETS = [
+    re.compile(r"""\b(?:href|src|srcset|poster|action|formaction|data)\s*=\s*["']?\s*([^"'\s>]+)""", re.I),
+    re.compile(r"""url\(\s*["']?([^"')\s]+)""", re.I),
+    re.compile(r"""@import\s+(?:url\()?\s*["']([^"']+)""", re.I),
+    re.compile(r"""["'](?:src|href|start_url|scope|action)["']\s*:\s*["']([^"']+)""", re.I),
+]
+_SCRIPT_REQUEST_TO_A_HOST = re.compile(
+    r"""\b(?:fetch|importScripts|EventSource|WebSocket|sendBeacon|open)\s*\([^)]*?["'`](?:[a-z]+:)?//""", re.I)
+_ANOTHER_ORIGIN = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)?//", re.I)
+
+
+def _external_references(text: str) -> list[str]:
+    found = [
+        match.group(0).strip()
+        for pattern in _LOADING_TARGETS
+        for match in pattern.finditer(text)
+        if _ANOTHER_ORIGIN.match(match.group(1))
+    ]
+    found.extend(match.group(0) for match in _SCRIPT_REQUEST_TO_A_HOST.finditer(text))
+    return found
+
+
+def test_the_page_loads_nothing_from_another_origin():
+    """Fire TV hardware may never reach a font CDN, or any other host.
+
+    This replaces a test that checked only the fallback stack, and only when the page
+    linked fonts.googleapis.com, so it passed whether or not the fonts could load. The
+    page, both scripts and the manifest ship together from one origin; none of them may
+    name another one anywhere the browser would fetch it. The API base the page calls is
+    its own origin, read at runtime, and the example in the Setup field is a placeholder
+    attribute, which is text, not a load.
+    """
+    for name in SHIPPED_PAGE_FILES:
+        text = (DOCS / name).read_text(encoding="utf-8")
+        assert _external_references(text) == [], (
+            f"{name} loads from another origin: {_external_references(text)}"
+        )
+        for host in ("fonts.googleapis.com", "fonts.gstatic.com", "cdn.", "unpkg.com", "cdnjs"):
+            assert host not in text, f"{name} names {host}"
+
+
+def test_the_matcher_above_catches_what_it_is_for():
+    """A forbid-list that matches nothing passes by not looking."""
+    caught = [
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow">',
+        '<link rel="preconnect" href="//fonts.gstatic.com" crossorigin>',
+        "<script src='https://cdn.example/x.js'></script>",
+        "@font-face { src: url(https://fonts.gstatic.com/s/a.woff2) format('woff2'); }",
+        '@import url("https://example.com/a.css");',
+        "fetch('https://api.example.com/x')",
+        '{"src": "https://example.com/icon.png"}',
+    ]
+    for sample in caught:
+        assert _external_references(sample), f"the matcher let through: {sample}"
+    allowed = [
+        '<input placeholder="http://127.0.0.1:8002">',
+        "src: url(barlow-latin-400.woff2) format('woff2');",
+        '<script src="firetv_nav.js"></script>',
+        "fetch(url, options || {})",
+    ]
+    for sample in allowed:
+        assert not _external_references(sample), f"the matcher refused a local reference: {sample}"
+
+
+def test_every_web_font_is_committed_beside_the_page_and_swaps_in(html):
+    """Each @font-face names a file that ships next to the page, with its licence."""
+    style = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    faces = re.findall(r"@font-face\s*\{(.+?)\}", style, re.DOTALL)
+    assert len(faces) >= 3, "the page no longer declares its own font faces"
+    families = set()
+    for face in faces:
+        assert "font-display: swap" in face, f"a face blocks text while it loads: {face[:80]}"
+        family = re.search(r"font-family:\s*'([^']+)'", face).group(1)
+        families.add(family)
+        for source in re.findall(r"url\(\s*([^)\s]+)\s*\)", face):
+            assert "/" not in source and source.endswith(".woff2"), f"{source} is not a sibling woff2"
+            assert (DOCS / source).is_file(), f"{source} is named by the page but not committed"
+    assert families == {"Barlow", "Barlow Condensed", "JetBrains Mono"}
+    for licence in ("OFL-Barlow.txt", "OFL-BarlowCondensed.txt", "OFL-JetBrainsMono.txt"):
+        text = (DOCS / licence).read_text(encoding="utf-8")
+        assert "SIL Open Font License, Version 1.1" in text, f"{licence} is not the OFL"
+
+
 def test_a_web_font_has_a_real_fallback_stack(html):
-    """Fire TV hardware may never reach fonts.googleapis.com."""
-    if "fonts.googleapis.com" not in html:
-        return
+    """The faces are local now, but a first paint with font-display: swap uses these."""
     families = re.search(r"--sans:\s*([^;]+);", html)
     assert families, "no --sans stack is declared"
-    assert families.group(1).count(",") >= 3, "the display font needs real fallbacks behind it"
+    assert families.group(1).count(",") >= 3, "the body font needs real fallbacks behind it"
+    display = re.search(r"--display:\s*([^;]+);", html)
+    assert display and display.group(1).count(",") >= 3, "the display font needs real fallbacks behind it"
     mono = re.search(r"--mono:\s*([^;]+);", html)
     assert mono and "monospace" in mono.group(1)
 

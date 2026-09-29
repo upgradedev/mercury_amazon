@@ -27,7 +27,7 @@ wait_for_event() {
     if adb logcat -d -s MercuryCockpit:I '*:S' 2>/dev/null | grep -Fq "$event"; then
       return 0
     fi
-    if ! adb shell pidof com.amazon.mercury.wallboard >/dev/null 2>&1; then
+    if ! adb shell pidof io.github.upgradedev.mercury.wallboard >/dev/null 2>&1; then
       echo "Mercury process exited before event: $event" >&2
       return 1
     fi
@@ -39,11 +39,11 @@ wait_for_event() {
 
 adb logcat -c
 adb install -r "$apk" | tee "$evidence/adb-install.txt"
-adb shell am force-stop com.amazon.mercury.wallboard
+adb shell am force-stop io.github.upgradedev.mercury.wallboard
 adb shell am start -W \
   -a android.intent.action.MAIN \
   -c android.intent.category.LEANBACK_LAUNCHER \
-  -n com.amazon.mercury.wallboard/.MainActivity \
+  -n io.github.upgradedev.mercury.wallboard/.MainActivity \
   | tee "$evidence/launcher.txt"
 wait_for_event "journey:page_loaded:$endpoint"
 

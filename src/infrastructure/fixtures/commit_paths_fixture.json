@@ -1,0 +1,475 @@
+{
+  "recorded_by_command": "python scripts/record_commit_paths.py",
+  "recorded_at_utc": "2026-09-27T07:22:30.259519+00:00",
+  "source": "git show --no-renames --name-only for each commit in commit_stream_fixture.json. Real file lists of real development commits of this repository; nothing edited.",
+  "stream_recorded_at_head": "dc800ef",
+  "commit_count": 59,
+  "paths_by_sha": {
+    "dc800ef": [
+      "README.md",
+      "tests/ux/test_ten_foot_legibility.py"
+    ],
+    "b485c43": [
+      "README.md",
+      "benchmarks_summary.json",
+      "coverage_summary.json",
+      "tests/e2e/test_documentation_claims.py"
+    ],
+    "da99c6a": [
+      "docs/index.html",
+      "pyproject.toml",
+      "scripts/measure_legibility.py",
+      "tests/ux/test_ten_foot_legibility.py"
+    ],
+    "1f705a9": [
+      "src/infrastructure/cloudwatch_adapter.py",
+      "tests/integration/test_mcp_endpoints.py",
+      "tests/unit/test_aws_adapters.py"
+    ],
+    "0e46a1f": [
+      "docs/UAT_TESTBOOK.md",
+      "scripts/build_video_plan.py",
+      "src/application/governed_rollback_use_case.py",
+      "src/infrastructure/github_actions_dispatcher.py",
+      "src/interfaces/mcp_server.py",
+      "tests/integration/test_rollback_authorization.py",
+      "tests/unit/test_rollback_dispatcher.py",
+      "video/SHOT_LIST.md",
+      "video/cue_sheet.json",
+      "video/narration.json"
+    ],
+    "ecec63a": [
+      "app/build.gradle.kts",
+      "app/src/debug/AndroidManifest.xml",
+      "app/src/main/AndroidManifest.xml",
+      "tests/unit/test_firetv_app_structure.py"
+    ],
+    "5d1b912": [
+      ".github/workflows/ci.yml",
+      "README.md",
+      "coverage_summary.json",
+      "scripts/record_coverage_summary.py",
+      "tests/e2e/test_documentation_claims.py"
+    ],
+    "5390de1": [
+      "README.md",
+      "docs/FIRE_TV_BUILD.md",
+      "docs/FRICTION_LOG.md",
+      "tests/e2e/test_documentation_claims.py"
+    ],
+    "c84ab4e": [
+      "README.md"
+    ],
+    "cc28375": [
+      "README.md",
+      "docs/DEVPOST_SUBMISSION.md",
+      "docs/firetv_nav.js",
+      "docs/index.html",
+      "docs/manifest.json",
+      "docs/sw.js",
+      "scripts/build_video_plan.py",
+      "tests/e2e/spatial_nav_spec.js",
+      "tests/e2e/test_documentation_claims.py",
+      "tests/e2e/test_html_structure.py",
+      "video/SHOT_LIST.md",
+      "video/cue_sheet.json",
+      "video/narration.json"
+    ],
+    "4aadc0d": [
+      "README.md",
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "docs/UAT_TESTBOOK.md",
+      "tests/e2e/test_documentation_claims.py"
+    ],
+    "90945c8": [
+      ".github/workflows/ci.yml",
+      "CONTRIBUTING.md",
+      "README.md",
+      "ci/readiness.py",
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "docs/DEVPOST_SUBMISSION.md",
+      "docs/FIRE_TV_BUILD.md",
+      "docs/UAT_TESTBOOK.md",
+      "scripts/security_audit.py",
+      "src/interfaces/mcp_server.py",
+      "tests/e2e/test_documentation_claims.py"
+    ],
+    "c9b6dc6": [
+      "README.md",
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "docs/UAT_TESTBOOK.md",
+      "scripts/security_audit.py",
+      "scripts/synthesize_video_assets.py",
+      "src/domain/governed_rollback.py",
+      "tests/integration/test_rollback_authorization.py"
+    ],
+    "7a471fb": [
+      ".github/ISSUE_TEMPLATE/bug_report.yml",
+      ".github/ISSUE_TEMPLATE/config.yml",
+      ".github/ISSUE_TEMPLATE/firetv_device_report.yml",
+      ".github/workflows/ci.yml",
+      "CONTRIBUTING.md",
+      "README.md",
+      "benchmarks_summary.json",
+      "ci/readiness.py",
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "docs/DEVPOST_SUBMISSION.md",
+      "docs/E2E_UAT_TESTBOOK.md",
+      "docs/FRICTION_LOG.md",
+      "docs/UAT_TESTBOOK.md",
+      "infra/README.md",
+      "scripts/benchmark_suite.py",
+      "src/domain/incident_correlation.py",
+      "tests/e2e/test_documentation_claims.py",
+      "tests/performance/test_load_and_latency.py",
+      "video/README.md",
+      "video/cue_sheet.json",
+      "video/narration.json",
+      "video/subtitles.srt",
+      "video/subtitles.vtt"
+    ],
+    "20c1b81": [
+      "benchmarks_summary.json",
+      "docs/firetv_nav.js",
+      "scripts/benchmark_suite.py",
+      "src/application/diagnose_incident_use_case.py",
+      "src/domain/provenance.py",
+      "src/infrastructure/aws_cost_adapter.py",
+      "src/infrastructure/cloudwatch_adapter.py",
+      "src/infrastructure/github_adapter.py",
+      "src/infrastructure/local_git_adapter.py",
+      "src/infrastructure/offline_mode.py",
+      "src/interfaces/mcp_server.py",
+      "tests/conftest.py",
+      "tests/integration/test_mcp_endpoints.py",
+      "tests/unit/test_aws_adapters.py",
+      "tests/unit/test_incident_correlation.py"
+    ],
+    "f499ea1": [
+      ".github/workflows/android.yml",
+      ".gitignore",
+      "app/build.gradle.kts",
+      "app/src/main/AndroidManifest.xml",
+      "app/src/main/kotlin/com/amazon/mercury/wallboard/CockpitUrlResolver.kt",
+      "app/src/main/kotlin/com/amazon/mercury/wallboard/DpadBridge.kt",
+      "app/src/main/kotlin/com/amazon/mercury/wallboard/MainActivity.kt",
+      "app/src/test/kotlin/com/amazon/mercury/wallboard/CockpitUrlResolverTest.kt",
+      "app/src/test/kotlin/com/amazon/mercury/wallboard/DpadBridgeTest.kt",
+      "docs/FIRE_TV_BUILD.md",
+      "tests/unit/test_firetv_app_structure.py"
+    ],
+    "7eca26d": [
+      "deploy_teardown_receipt.json",
+      "docs/firetv_nav.js",
+      "docs/index.html",
+      "docs/suite_companion_enhancements.js",
+      "firetv-app/web-app-manifest.json",
+      "scripts/probe_deployment.py",
+      "scripts/record_github_fixture.py",
+      "src/application/diagnose_incident_use_case.py",
+      "src/application/governed_rollback_use_case.py",
+      "src/domain/cloud_cost.py",
+      "src/domain/dora_metrics.py",
+      "src/domain/git_radar.py",
+      "src/domain/governed_rollback.py",
+      "src/domain/incident_correlation.py",
+      "src/domain/post_mortem_rag.py",
+      "src/domain/provenance.py",
+      "src/domain/recommendation_invalidator.py",
+      "src/domain/telemetry_completeness.py",
+      "src/infrastructure/agentcore_adapter.py",
+      "src/infrastructure/aws_cost_adapter.py",
+      "src/infrastructure/cloudwatch_adapter.py",
+      "src/infrastructure/cloudwatch_github_ingest.py",
+      "src/infrastructure/cqrs_opensearch_adapter.py",
+      "src/infrastructure/fixtures/aws_cost_fixture.json",
+      "src/infrastructure/fixtures/github_telemetry_fixture.json",
+      "src/infrastructure/github_adapter.py",
+      "src/infrastructure/observability_harness.py",
+      "src/infrastructure/post_mortem_opensearch_adapter.py",
+      "src/infrastructure/sagemaker_inference_adapter.py",
+      "src/interfaces/mcp_server.py",
+      "src/interfaces/web/firetv_nav.js",
+      "src/interfaces/web/index.html",
+      "src/interfaces/web/manifest.json",
+      "src/interfaces/web/suite_companion_enhancements.js",
+      "src/interfaces/web/sw.js",
+      "src/interfaces/web/webmcp_bridge.js",
+      "src/interfaces/web_companion.py",
+      "tests/conftest.py",
+      "tests/e2e/spatial_nav_spec.js",
+      "tests/e2e/test_html_structure.py",
+      "tests/integration/test_mcp_endpoints.py",
+      "tests/integration/test_rollback_authorization.py",
+      "tests/integration/test_security_and_offset.py",
+      "tests/performance/test_load_and_latency.py",
+      "tests/unit/test_agentcore_adapter.py",
+      "tests/unit/test_aws_adapters.py",
+      "tests/unit/test_cqrs_opensearch.py",
+      "tests/unit/test_devops_ingest.py",
+      "tests/unit/test_firetv_app_structure.py",
+      "tests/unit/test_github_adapter.py",
+      "tests/unit/test_governed_rollback.py",
+      "tests/unit/test_incident_commander.py",
+      "tests/unit/test_incident_correlation.py",
+      "tests/unit/test_observability_harness.py",
+      "tests/unit/test_post_mortem_rag.py",
+      "tests/unit/test_recommendation_invalidator.py",
+      "tests/unit/test_sagemaker_adapter.py",
+      "tests/unit/test_telemetry_completeness.py"
+    ],
+    "7b99905": [
+      "README.md",
+      "docs/firetv_nav.js",
+      "docs/index.html",
+      "src/interfaces/mcp_server.py",
+      "src/interfaces/web/firetv_nav.js",
+      "tests/unit/test_incident_commander.py"
+    ],
+    "c6ed5d0": [
+      "docs/DEVPOST_SUBMISSION.md"
+    ],
+    "3f0098f": [
+      "gradle/wrapper/gradle-wrapper.jar",
+      "gradlew",
+      "gradlew.bat",
+      "src/infrastructure/agentcore_adapter.py",
+      "video_sync_receipt.json"
+    ],
+    "6d6d954": [
+      "README.md",
+      "ci/readiness.py",
+      "src/infrastructure/github_adapter.py"
+    ],
+    "d2d4a5c": [
+      "README.md",
+      "app/build.gradle.kts",
+      "app/src/main/kotlin/com/amazon/mercury/wallboard/MainActivity.kt",
+      "app/src/main/res/drawable/firetv_banner.xml",
+      "app/src/main/res/drawable/ic_launcher.xml",
+      "app/src/main/res/values/strings.xml",
+      "app/src/main/res/values/styles.xml",
+      "build.gradle.kts",
+      "gradle/wrapper/gradle-wrapper.properties",
+      "settings.gradle.kts",
+      "tests/unit/test_firetv_app_structure.py"
+    ],
+    "b99b8b5": [
+      "src/domain/recommendation_invalidator.py",
+      "tests/unit/test_recommendation_invalidator.py"
+    ],
+    "55dbd08": [
+      "docs/firetv_nav.js",
+      "docs/manifest.json",
+      "docs/sw.js",
+      "docs/webmcp_bridge.js"
+    ],
+    "96bed40": [
+      "docs/index.html",
+      "docs/suite_companion_enhancements.js",
+      "src/interfaces/web/index.html",
+      "src/interfaces/web/suite_companion_enhancements.js"
+    ],
+    "c75f982": [
+      "docs/index.html",
+      "src/infrastructure/agentcore_adapter.py"
+    ],
+    "76647ca": [
+      "src/infrastructure/agentcore_adapter.py"
+    ],
+    "ae16f21": [
+      "docs/index.html",
+      "src/interfaces/web/firetv_nav.js",
+      "src/interfaces/web/index.html",
+      "src/interfaces/web/manifest.json",
+      "src/interfaces/web/sw.js",
+      "src/interfaces/web/webmcp_bridge.js"
+    ],
+    "fbc1d6b": [
+      "src/domain/telemetry_completeness.py",
+      "tests/unit/test_telemetry_completeness.py"
+    ],
+    "d367a26": [
+      "src/domain/post_mortem_rag.py",
+      "src/infrastructure/agentcore_adapter.py",
+      "src/infrastructure/post_mortem_opensearch_adapter.py",
+      "tests/unit/test_agentcore_adapter.py",
+      "tests/unit/test_post_mortem_rag.py"
+    ],
+    "16017bd": [
+      "src/infrastructure/agentcore_adapter.py",
+      "src/infrastructure/sagemaker_inference_adapter.py",
+      "tests/unit/test_agentcore_adapter.py",
+      "tests/unit/test_sagemaker_adapter.py"
+    ],
+    "b6fadd4": [
+      "src/interfaces/web/index.html"
+    ],
+    "ce03586": [
+      "src/infrastructure/observability_harness.py",
+      "tests/unit/test_observability_harness.py"
+    ],
+    "8db43d8": [
+      "src/interfaces/web/index.html"
+    ],
+    "a644b4d": [
+      "src/infrastructure/cqrs_opensearch_adapter.py",
+      "tests/unit/test_cqrs_opensearch.py"
+    ],
+    "34e74b4": [
+      ".github/workflows/ci.yml",
+      "docs/E2E_UAT_TESTBOOK.md"
+    ],
+    "6fb4477": [
+      "README.md",
+      "ci/readiness.py",
+      "deploy_teardown_receipt.json"
+    ],
+    "5d501f0": [
+      "app/src/main/AndroidManifest.xml",
+      "firetv-app/web-app-manifest.json"
+    ],
+    "238928c": [
+      "src/interfaces/mcp_server.py",
+      "src/interfaces/web/index.html"
+    ],
+    "9fb42b0": [
+      "src/infrastructure/cloudwatch_github_ingest.py",
+      "tests/performance/test_load_and_latency.py",
+      "tests/unit/test_devops_ingest.py"
+    ],
+    "614ce8e": [
+      "docs/E2E_UAT_TESTBOOK.md",
+      "tests/performance/__init__.py",
+      "tests/performance/test_load_and_latency.py"
+    ],
+    "52a97ef": [
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "infra/main.tf"
+    ],
+    "c6af9a4": [
+      "infra/README.md",
+      "infra/main.tf"
+    ],
+    "cffc485": [
+      "README.md",
+      "ci/readiness.py",
+      "docs/index.html",
+      "tests/e2e/test_html_structure.py"
+    ],
+    "10c1a5e": [
+      "ci/readiness.py",
+      "docs/DEVPOST_SUBMISSION.md",
+      "docs/UAT_TESTBOOK.md",
+      "scripts/deploy_and_teardown.py",
+      "tests/e2e/test_html_structure.py"
+    ],
+    "dbe8e07": [
+      "README.md",
+      "ci/readiness.py",
+      "deploy_teardown_receipt.json",
+      "scripts/load_test_suite.py",
+      "tests/e2e/test_html_structure.py",
+      "tests/e2e/test_playwright_e2e.py"
+    ],
+    "fb452af": [
+      "docs/UAT_TESTBOOK.md",
+      "scripts/load_test_suite.py",
+      "scripts/security_audit.py",
+      "tests/e2e/test_playwright_e2e.py",
+      "tests/load/test_load_concurrency.py",
+      "tests/security/test_security_audit.py"
+    ],
+    "bb60973": [
+      "Dockerfile",
+      "docker-compose.yml",
+      "docs/FRICTION_LOG.md",
+      "docs/index.html"
+    ],
+    "2e62e47": [
+      "ci/readiness.py",
+      "scripts/synthesize_video_assets.py",
+      "video/cue_sheet.json",
+      "video/subtitles.srt",
+      "video/subtitles.vtt",
+      "video_sync_receipt.json"
+    ],
+    "95fc16b": [
+      "ci/readiness.py",
+      "deploy_teardown_receipt.json",
+      "docs/index.html",
+      "scripts/deploy_and_teardown.py"
+    ],
+    "12443b5": [
+      "scripts/benchmark_suite.py"
+    ],
+    "8cc2ce7": [
+      "benchmarks_summary.json",
+      "scripts/benchmark_suite.py"
+    ],
+    "681e651": [
+      "ci/readiness.py"
+    ],
+    "8b84a35": [
+      ".github/workflows/ci.yml",
+      "pyproject.toml"
+    ],
+    "d991af0": [
+      "ci/readiness.py",
+      "pyproject.toml",
+      "src/application/calculate_dora_use_case.py",
+      "src/application/detect_cost_anomalies_use_case.py",
+      "src/application/governed_rollback_use_case.py",
+      "src/application/inspect_pr_bottlenecks_use_case.py",
+      "src/domain/cloud_cost.py",
+      "src/domain/git_radar.py",
+      "src/domain/governed_rollback.py",
+      "src/interfaces/mcp_server.py",
+      "tests/integration/test_mcp_endpoints.py",
+      "tests/integration/test_security_and_offset.py",
+      "tests/unit/test_governed_rollback.py"
+    ],
+    "8c77ad5": [
+      "pyproject.toml"
+    ],
+    "717621c": [
+      ".github/workflows/ci.yml"
+    ],
+    "df7939e": [
+      "src/interfaces/web_companion.py",
+      "tests/integration/test_mcp_endpoints.py"
+    ],
+    "d237622": [
+      ".github/workflows/ci.yml",
+      ".gitignore",
+      "LICENSE",
+      "README.md",
+      "ci/readiness.py",
+      "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+      "docs/DEVPOST_SUBMISSION.md",
+      "docs/FRICTION_LOG.md",
+      "infra/README.md",
+      "infra/main.tf",
+      "pyproject.toml",
+      "src/application/calculate_dora_use_case.py",
+      "src/application/detect_cost_anomalies_use_case.py",
+      "src/application/governed_rollback_use_case.py",
+      "src/application/inspect_pr_bottlenecks_use_case.py",
+      "src/domain/cloud_cost.py",
+      "src/domain/dora_metrics.py",
+      "src/domain/git_radar.py",
+      "src/domain/governed_rollback.py",
+      "src/infrastructure/aws_cost_adapter.py",
+      "src/infrastructure/github_adapter.py",
+      "src/interfaces/mcp_server.py",
+      "src/interfaces/web_companion.py",
+      "tests/integration/test_mcp_endpoints.py",
+      "tests/integration/test_security_and_offset.py",
+      "tests/unit/test_cost_radar.py",
+      "tests/unit/test_dora_metrics.py",
+      "tests/unit/test_governed_rollback.py",
+      "video/README.md",
+      "video/narration.json"
+    ]
+  }
+}

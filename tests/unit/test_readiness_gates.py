@@ -321,9 +321,9 @@ def test_the_readme_publishes_the_score_the_auditor_prints():
 
     printed = re.search(r"SUMMARY: (\d+)/(\d+) PASSED", result.stdout)
     assert printed, f"the auditor printed no summary line:\n{result.stdout[-2000:]}"
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
     quoted = re.search(r"(\d+)\s*/\s*53 readiness gates", readme)
-    assert quoted, "the README no longer quotes a readiness score"
+    assert quoted, "docs/EVIDENCE.md no longer quotes a readiness score"
     assert int(quoted.group(1)) == int(printed.group(1)), (
         f"the README claims {quoted.group(1)}/53, the auditor printed {printed.group(1)}/53"
     )

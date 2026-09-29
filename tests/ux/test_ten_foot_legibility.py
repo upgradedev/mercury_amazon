@@ -149,7 +149,7 @@ def test_the_readme_legibility_numbers_match_this_measurement(measurement):
     """
     import re
 
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
     readings = re.search(r"Measured (\d+) visible text readings across (\d+) views", readme)
     assert readings, "the README no longer quotes the legibility measurement"
     smallest = re.search(r"smallest rendered text anywhere: ([\d.]+)px", readme)
@@ -190,7 +190,7 @@ def test_the_readme_fold_positions_match_this_measurement(measurement):
     """
     import re
 
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
     fold = measurement["provenance_above_the_fold"]
 
     quoted = re.search(
@@ -233,7 +233,7 @@ def test_the_readme_publishes_the_before_state_of_the_fold_fix(measurement):
     import re
     import subprocess
 
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "docs" / "EVIDENCE.md").read_text(encoding="utf-8")
     block = readme.split("**The provenance stamp was below the fold.**")[1].split("```")[1]
     sha = re.search(r"git show ([0-9a-f]{7,40}):docs/index\.html", block)
     assert sha, "the README no longer names a commit to reproduce the before state from"

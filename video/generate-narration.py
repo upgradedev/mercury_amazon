@@ -1,0 +1,349 @@
+#!/usr/bin/env python3
+"""Synthesize each narration beat, measure it, and write timing and captions.
+
+Adapted from the submission kit's video/generate-narration.py. The timing model is
+the kit's and is unchanged: every beat is synthesized on its own, its real length
+is measured with ffprobe, and the beat is held for that length plus a fixed 0.65 s
+tail. Nothing downstream invents a timestamp. What changed for this repository:
+
+  1. It reads this repository's narration format, ``mercury.video_narration/1``,
+     written by ``scripts/build_video_plan.py``: ``beats`` with ``beat_id``,
+     ``narration_text`` (spoken) and ``caption_text`` (burned on screen), and the
+     voice under ``tts``.
+  2. Environment names are ``MERCURY_VIDEO_ROOT`` for the media folder, which lives
+     outside the repository.
+  3. Every text to speech call is appended to ``narration/synthesis-log.jsonl`` with
+     the beat and the number of characters sent, so the billed total is counted,
+     including re-rolls.
+  4. Caption lines are wrapped at 84 characters, because the composition puts them
+     in a band under the picture instead of over it, and a sentence longer than two
+     lines is split after a colon or semicolon.
+  5. Cue boundaries start from the kit's character share of the measured length and
+     then move to the measured pause in the voice within 1.2 s, found with ffmpeg's
+     silencedetect. ``timing.json`` records each cue's start as
+     ``sentenceStartsSeconds``, which the capture uses to time key presses.
+
+Kept from the kit: per-beat caching keyed on the speech text and voice settings, so
+changing one beat costs one call; the 3 to 40 s per beat and 90 to 174 s total
+limits; the refusal of an unfilled ``<PLACEHOLDER>``.
+
+Run from the repository root:
+
+    MERCURY_VIDEO_ROOT=/path/outside/git FFPROBE=ffprobe ELEVENLABS_API_KEY=... \\
+        python video/generate-narration.py
+
+``NARRATION_FORCE=beat_07_confirm`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
+The key is read from the environment and never printed or written anywhere.
+"""
+
+from __future__ import annotations
+
+import datetime
+import hashlib
+import json
+import os
+import pathlib
+import re
+import subprocess
+import time
+import urllib.request
+
+ROOT = pathlib.Path(os.environ["MERCURY_VIDEO_ROOT"])
+SPEC = pathlib.Path(__file__).with_name("narration.json")
+OUT = ROOT / "narration"
+TAIL_SECONDS = 0.65
+CAPTION_WIDTH = 84
+
+# Whichever is set is used. The value is never printed and never written to a receipt.
+ELEVENLABS_KEY_ENV_NAMES = ("ELEVENLABS_API_KEY", "XI_API_KEY", "ELEVEN_LABS_KEY")
+
+
+def run(args: list[str]) -> str:
+    result = subprocess.run(args, check=True, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def duration(path: pathlib.Path) -> float:
+    return float(
+        run(
+            [
+                os.environ.get("FFPROBE", "ffprobe"),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ]
+        )
+    )
+
+
+def timestamp(value: float) -> str:
+    millis = round(max(0.0, value) * 1000)
+    hours, millis = divmod(millis, 3_600_000)
+    minutes, millis = divmod(millis, 60_000)
+    seconds, millis = divmod(millis, 1_000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+
+
+def wrapped(text: str, width: int = CAPTION_WIDTH) -> str:
+    words = text.split()
+    lines: list[str] = []
+    line = ""
+    for word in words:
+        candidate = f"{line} {word}".strip()
+        if line and len(candidate) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    if len(lines) <= 2:
+        return "\n".join(lines)
+    midpoint = max(1, len(words) // 2)
+    return " ".join(words[:midpoint]) + "\n" + " ".join(words[midpoint:])
+
+
+def sentences(caption: str) -> list[str]:
+    """Caption cues: one per sentence, and a sentence too long for two caption lines
+    is split once more after a colon or semicolon, so no cue needs a third line."""
+    cues: list[str] = []
+    for part in (p.strip() for p in re.split(r"(?<=[.!?])\s+", caption)):
+        if not part:
+            continue
+        if len(part) > 2 * CAPTION_WIDTH:
+            pieces = [piece.strip() for piece in re.split(r"(?<=[:;])\s+", part) if piece.strip()]
+            cues.extend(pieces)
+        else:
+            cues.append(part)
+    return cues
+
+
+def pauses(path: pathlib.Path) -> list[tuple[float, float]]:
+    """Measured pauses in one beat's audio: (start, end) of every stretch quieter than
+    -45 dB for at least 0.3 s. Used to put caption cue boundaries where the voice
+    actually pauses, instead of where a share of the characters says it should."""
+    result = subprocess.run(
+        [os.environ.get("FFMPEG", "ffmpeg"), "-hide_banner", "-nostats", "-i", str(path),
+         "-af", "silencedetect=noise=-45dB:d=0.3", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    starts = [float(v) for v in re.findall(r"silence_start:\s*([0-9.]+)", result.stderr)]
+    ends = [float(v) for v in re.findall(r"silence_end:\s*([0-9.]+)", result.stderr)]
+    return list(zip(starts, ends))
+
+
+def cue_bounds(parts: list[str], seconds: float, quiet: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Each cue's (start, end) inside the beat. The first estimate is the kit's: a
+    share of the measured length by characters. A boundary is then moved to the
+    measured pause within 1.2 s of it, if there is one."""
+    weight = sum(len(part) for part in parts) or 1
+    edges = [0.0]
+    for part in parts:
+        edges.append(edges[-1] + seconds * len(part) / weight)
+    bounds = [(edges[i], edges[i + 1]) for i in range(len(parts))]
+    for i in range(1, len(parts)):
+        estimate = edges[i]
+        near = [(abs((a + b) / 2 - estimate), a, b) for a, b in quiet if a < estimate + 1.2 and b > estimate - 1.2 and b < seconds - 0.05]
+        if near:
+            _, pause_start, pause_end = min(near)
+            if bounds[i - 1][0] < pause_start and pause_end < bounds[i][1]:
+                bounds[i - 1] = (bounds[i - 1][0], pause_start)
+                bounds[i] = (pause_end, bounds[i][1])
+    return bounds
+
+
+def elevenlabs_key() -> str:
+    for name in ELEVENLABS_KEY_ENV_NAMES:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    raise SystemExit("no ElevenLabs key: set one of " + ", ".join(ELEVENLABS_KEY_ENV_NAMES))
+
+
+def synthesize_elevenlabs(text: str, config: dict[str, object], retries: int = 3) -> bytes:
+    """The request body and retry loop are the kit's, unchanged."""
+    voice_id = str(config.get("voiceId", ""))
+    model_id = str(config.get("modelId", "eleven_multilingual_v2"))
+    output_format = str(config.get("outputFormat", "mp3_44100_128"))
+    if not re.fullmatch(r"[A-Za-z0-9]{16,40}", voice_id):
+        raise SystemExit("tts.elevenLabs.voiceId is missing or malformed")
+    if not re.fullmatch(r"[a-z0-9_]{4,40}", model_id):
+        raise SystemExit("tts.elevenLabs.modelId is malformed")
+    if not re.fullmatch(r"[a-z0-9_]{4,32}", output_format):
+        raise SystemExit("tts.elevenLabs.outputFormat is malformed")
+    key = elevenlabs_key()
+    url = (
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        f"?output_format={output_format}"
+    )
+    body = json.dumps(
+        {
+            "text": text,
+            "model_id": model_id,
+            "voice_settings": {
+                "stability": 0.45,
+                "similarity_boost": 0.8,
+                "use_speaker_boost": True,
+            },
+        }
+    ).encode("utf-8")
+    last: Exception | None = None
+    for attempt in range(retries):
+        try:
+            request = urllib.request.Request(
+                url,
+                data=body,
+                headers={
+                    "xi-api-key": key,
+                    "Content-Type": "application/json",
+                    "Accept": "audio/mpeg",
+                },
+            )
+            with urllib.request.urlopen(request, timeout=90) as response:
+                data = response.read()
+            if len(data) < 3000:
+                raise RuntimeError(f"tiny audio ({len(data)} bytes)")
+            return data
+        except Exception as error:  # noqa: BLE001
+            # Only the exception type and HTTP status reach the log, never headers.
+            last = error
+            time.sleep(2 * (attempt + 1))
+    raise SystemExit(f"ElevenLabs failed after {retries} tries: {type(last).__name__}: {getattr(last, 'code', '')}")
+
+
+def voice_signature(tts: dict[str, object]) -> str:
+    """Everything except the text that changes how a beat sounds. Part of the cache
+    key, so changing the voice re-synthesizes every beat rather than mixing voices."""
+    config = dict(tts.get("elevenLabs") or {})
+    config.pop("voiceName", None)  # a label for readers, not a synthesis setting
+    return json.dumps({"elevenLabs": config}, sort_keys=True, separators=(",", ":"))
+
+
+def cache_key(speech: str, tts: dict[str, object]) -> str:
+    payload = json.dumps(
+        {"provider": "elevenlabs", "speech": speech, "voice": voice_signature(tts)},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def cached_key(sidecar: pathlib.Path) -> str | None:
+    try:
+        recorded = json.loads(sidecar.read_text(encoding="utf-8")).get("cacheKey")
+    except (OSError, ValueError):
+        return None
+    return recorded if isinstance(recorded, str) else None
+
+
+def main() -> None:
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    beats = spec.get("beats")
+    tts = spec.get("tts")
+    if spec.get("schema") != "mercury.video_narration/1" or not isinstance(beats, list):
+        raise SystemExit("narration contract is invalid")
+    if not isinstance(tts, dict) or tts.get("provider") != "elevenlabs":
+        raise SystemExit("narration.json must name tts.provider elevenlabs")
+    forced = {
+        item.strip()
+        for item in os.environ.get("NARRATION_FORCE", "").split(",")
+        if item.strip()
+    }
+    OUT.mkdir(parents=True, exist_ok=True)
+    log = OUT / "synthesis-log.jsonl"
+    timing: list[dict[str, object]] = []
+    cues: list[tuple[float, float, str]] = []
+    offset = 0.0
+    for index, beat in enumerate(beats, start=1):
+        identifier = beat.get("beat_id")
+        speech = beat.get("narration_text")
+        caption = beat.get("caption_text") or speech
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z][a-z0-9_]{1,40}", identifier):
+            raise SystemExit("beat identifier is invalid")
+        if not all(isinstance(value, str) and 20 <= len(value) <= 800 for value in (speech, caption)):
+            raise SystemExit(f"beat text is invalid: {identifier}")
+        if "<" in f"{speech}{caption}" or ">" in f"{speech}{caption}":
+            raise SystemExit(f"beat {identifier} still contains a <PLACEHOLDER>; fill it in first")
+        audio = OUT / f"{index:02d}-{identifier}.mp3"
+        sidecar = OUT / f"{index:02d}-{identifier}.cache.json"
+        key = cache_key(speech, tts)
+        reuse = (
+            identifier not in forced
+            and "all" not in forced
+            and audio.is_file()
+            and cached_key(sidecar) == key
+        )
+        if reuse:
+            print(f"reused {audio.name}")
+        else:
+            audio.write_bytes(synthesize_elevenlabs(speech, tts["elevenLabs"]))
+            sidecar.write_text(
+                json.dumps({"cacheKey": key, "provider": "elevenlabs"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            with log.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "beat": identifier,
+                    "characters": len(speech),
+                    "voiceId": tts["elevenLabs"].get("voiceId"),
+                    "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                }) + "\n")
+            print(f"synthesized {audio.name} ({len(speech)} characters)")
+        seconds = duration(audio)
+        if seconds < 3 or seconds > 40:
+            raise SystemExit(f"beat audio duration is unsafe: {identifier} {seconds:.3f}s")
+        hold = seconds + TAIL_SECONDS
+        parts = sentences(caption)
+        sentence_starts = []
+        for sentence, (begin, finish) in zip(parts, cue_bounds(parts, seconds, pauses(audio))):
+            cues.append((offset + begin, offset + finish, wrapped(sentence)))
+            sentence_starts.append(round(begin, 3))
+        timing.append(
+            {
+                "id": identifier,
+                "audio": audio.name,
+                "durationSeconds": round(seconds, 3),
+                "holdSeconds": round(hold, 3),
+                "startSeconds": round(offset, 3),
+                "speechCharacters": len(speech),
+                "sentenceStartsSeconds": sentence_starts,
+            }
+        )
+        offset += hold
+    if not 90 <= offset < 175:
+        raise SystemExit(f"narration must be 90-174 seconds, observed {offset:.3f}")
+    billed = 0
+    if log.is_file():
+        for line in log.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                billed += int(json.loads(line)["characters"])
+    (OUT / "timing.json").write_text(
+        json.dumps(
+            {
+                "schemaVersion": "mercury.video-timing/1",
+                "totalSeconds": round(offset, 3),
+                "tailSeconds": TAIL_SECONDS,
+                "voiceId": tts["elevenLabs"].get("voiceId"),
+                "modelId": tts["elevenLabs"].get("modelId"),
+                "charactersInNarration": sum(int(item["speechCharacters"]) for item in timing),
+                "charactersSentAllCalls": billed,
+                "scenes": timing,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    srt: list[str] = []
+    for number, (start, end, text) in enumerate(cues, start=1):
+        srt.extend([str(number), f"{timestamp(start)} --> {timestamp(end)}", text, ""])
+    (OUT / "captions.en.srt").write_text("\n".join(srt), encoding="utf-8")
+    print(f"Generated {len(timing)} scenes across {offset:.3f} seconds")
+
+
+if __name__ == "__main__":
+    main()

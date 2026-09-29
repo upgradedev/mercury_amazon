@@ -54,7 +54,7 @@ def build_receipt(
     launch_text = launch_log.read_text(encoding="utf-8", errors="replace") if launch_log.is_file() else ""
     if "Success" not in install_text:
         raise ValueError("install log does not record a successful adb install")
-    if "Status: ok" not in launch_text or "com.amazon.mercury.wallboard/.MainActivity" not in launch_text:
+    if "Status: ok" not in launch_text or "io.github.upgradedev.mercury.wallboard/.MainActivity" not in launch_text:
         raise ValueError("launch log does not record the normal Mercury activity")
     if "COCKPIT_URL" in launch_text:
         raise ValueError("launch log contains an ADB URL override")

@@ -32,7 +32,7 @@ def test_root_serves_the_cockpit_page(client):
     res = client.get("/")
     assert res.status_code == 200
     assert "Mercury" in res.text
-    assert "Fire TV Incident Commander" in res.text
+    assert "<title>Mercury Fire TV incident board</title>" in res.text
 
 
 def test_cockpit_scripts_are_served_next_to_the_page(client):
@@ -44,6 +44,39 @@ def test_cockpit_scripts_are_served_next_to_the_page(client):
 def test_cockpit_script_route_refuses_path_traversal(client):
     res = client.get("/..%2f..%2fREADME.js")
     assert res.status_code in (404, 400)
+
+
+def _committed_fonts():
+    from src.interfaces.mcp_server import WEB_DIR
+
+    return sorted(WEB_DIR.glob("*.woff2"))
+
+
+def test_the_board_fonts_are_served_from_this_origin_as_woff2(client):
+    """The page names its fonts relatively, so this server has to hand them out."""
+    fonts = _committed_fonts()
+    assert len(fonts) == 6
+    for font in fonts:
+        res = client.get(f"/{font.name}")
+        assert res.status_code == 200, font.name
+        assert res.headers["content-type"] == "font/woff2"
+        assert res.content == font.read_bytes()
+        assert res.content[:4] == b"wOF2"
+        # No explicit max-age: a TV revalidates against the validator instead.
+        assert res.headers.get("etag") and res.headers.get("last-modified")
+
+
+def test_the_font_route_refuses_anything_that_is_not_a_committed_font(client):
+    for probe in [
+        "/..%2f..%2fREADME.woff2",
+        "/%2e%2e%2fdocs%2fbarlow-latin-400.woff2",
+        "/..%5cREADME.woff2",
+        "/fonts/barlow-latin-400.woff2",
+        "/not-a-font.woff2",
+        "/OFL-Barlow.txt",
+        "/FIRE_TV_BUILD.md",
+    ]:
+        assert client.get(probe).status_code == 404, probe
 
 
 def test_dora_endpoint_returns_metrics_and_provenance(client):
@@ -125,7 +158,8 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
     # Which commit the reading is placed after is itself a choice, so the sentence
     # has to name the rule that chose it, not merely admit that something moved.
     assert "placed" in detail
-    assert "alone in its 60 minute attribution window" in detail
+    # The window is the correlator's own, 75 minutes since 2026-09-27.
+    assert "alone in its 75 minute attribution window" in detail
     assert "the commits are real, this metric is not" in detail
 
 
@@ -223,6 +257,44 @@ def test_demo_handoff_is_fixed_and_disabled_when_effectful_dispatch_is_selected(
     assert refused.status_code == 403
 
 
+def test_a_second_screen_can_read_the_demo_handoff_revision_before_it_writes(client):
+    """The shared handoff refuses a stale revision, so a writer has to be able to read it.
+
+    Before this route existed the page sent revision 0 on every load, so once anyone had
+    published, every later screen that pressed Publish was refused with a 409. Nothing
+    having been published is revision 0 and answers 200, not 404, so the read is not an
+    error in the browser console.
+    """
+    from src.infrastructure.demo_evidence import seed_recorded_demo_evidence
+    from src.interfaces import mcp_server
+
+    seed_recorded_demo_evidence(mcp_server.incident_use_case, mcp_server.deployment_evidence)
+    before = client.get("/mcp/demo-handoff/revision")
+    assert before.json()["revision"] == 0, "nothing published yet reads as revision 0"
+    assert before.status_code == 200
+    revision = before.json()["revision"]
+    assert revision >= 0
+
+    first = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": revision})
+    assert first.status_code == 200
+    after = client.get("/mcp/demo-handoff/revision").json()["revision"]
+    assert after == revision + 1
+
+    stale = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": revision})
+    assert stale.status_code == 409, "a stale revision is still refused; the read does not weaken it"
+    second = client.post("/mcp/tools/demo_update_handoff", json={"expected_revision": after})
+    assert second.status_code == 200
+    assert second.json()["revision"] == after + 1
+
+
+def test_the_operator_handoff_revision_read_needs_the_secret_and_starts_at_zero(client, auth_headers):
+    refused = client.get("/mcp/handoffs/never-published-incident/revision")
+    assert refused.status_code in (401, 403)
+    empty = client.get("/mcp/handoffs/never-published-incident/revision", headers=auth_headers)
+    assert empty.status_code == 200
+    assert empty.json()["revision"] == 0
+
+
 def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client):
     """The demo that shows the refusal has to disclose its own staging too."""
     data = client.post("/mcp/tools/what_changed", json={"service_name": "release-train"}).json()
@@ -241,18 +313,21 @@ def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client
 def test_every_answer_carries_the_measured_worth_of_naming_a_commit(client):
     """An attribution ships the precision it was measured at, next to the name.
 
-    The figure comes from correlation_trial_summary.json, which
-    ``python scripts/correlation_trial.py`` writes, so the number on the wire is the
-    number in the README rather than one recomputed per request.
+    The figure comes from attribution_holdout_summary.json, which
+    ``python scripts/attribution_split.py`` writes: the shipped engine's precision on
+    the held-out split, so the number on the wire is the number in the README rather
+    than one recomputed per request, and not the in-sample figure it replaced.
     """
     data = client.post("/mcp/tools/what_changed", json={"service_name": "checkout-api"}).json()
     accuracy = data["attribution"]["measured_accuracy"]
-    assert accuracy["measured_by_command"] == "python scripts/correlation_trial.py"
+    assert accuracy["measured_by_command"] == "python scripts/attribution_split.py"
     if accuracy["measured"]:
-        summary = json.loads((REPO_ROOT / "correlation_trial_summary.json").read_text(encoding="utf-8"))
-        assert accuracy["precision_when_it_names_a_commit"] == summary["headline"]["naming_precision"]
-        assert accuracy["namings_measured"] == summary["headline"]["times_a_commit_was_named"]
-        assert accuracy["corpus_cases"] == summary["cases"]
+        summary = json.loads((REPO_ROOT / "attribution_holdout_summary.json").read_text(encoding="utf-8"))
+        held = next(r for r in summary["engines"] if r["engine"] == summary["shipped_engine"])["held_out"]
+        assert accuracy["split"] == "held-out"
+        assert accuracy["precision_when_it_names_a_commit"] == held["naming_precision"]
+        assert accuracy["namings_measured"] == held["times_a_commit_was_named"]
+        assert accuracy["corpus_cases"] == held["cases"]
     else:
         assert accuracy["precision_when_it_names_a_commit"] is None
         assert "no measured accuracy" in accuracy["note"]

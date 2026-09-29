@@ -22,6 +22,6 @@
 # and commented out rather than active, because an active rule in a build that
 # never runs is an untested claim, and this repository does not make those.
 #
-# -keepclassmembers class com.amazon.mercury.wallboard.DpadBridge {
+# -keepclassmembers class io.github.upgradedev.mercury.wallboard.DpadBridge {
 #     @android.webkit.JavascriptInterface <methods>;
 # }

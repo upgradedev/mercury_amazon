@@ -1,6 +1,6 @@
 {
   "schema": "mercury.aws_cost_fixture/1",
-  "note": "these figures are SYNTHETIC. They were written by hand to exercise the anomaly path and were never read from an AWS account. No AWS credentials were available when this repository was built, so no Cost Explorer response was recorded. Set AWS credentials and the adapter calls ce:GetCostAndUsage for real.",
+  "note": "these figures are SYNTHETIC. They were written by hand to exercise the anomaly path and were never read from an AWS account. No Cost Explorer response is committed to this repository. Set AWS credentials and the adapter calls ce:GetCostAndUsage for real.",
   "recorded_at_utc": "",
   "shape_source": "Field names and units mirror the ce:GetCostAndUsage UnblendedCost response documented by AWS.",
   "total_month_to_date_usd": 412.55,
