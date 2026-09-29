@@ -252,7 +252,10 @@ Stated here rather than left for a judge to find:
 
 * **Candidate runtime receipt pending.** `.github/workflows/android-tv-emulator.yml`
   is the allowed-target path: it retains the exact APK, logs, screenshot and receipt.
-  `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis.
+  `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis. A local
+  dry run of that journey on 2026-09-29 reached 4 of 5 receipt events on an Android TV
+  emulator against the deployed build; the fifth, the handoff publish, needs the redeploy
+  this section already names, because the deployed page predates the revision retry.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
@@ -316,3 +319,37 @@ MERCURY_ROLLBACK_SECRET=demo python -m src.interfaces.mcp_server
 
 Open `http://127.0.0.1:8002/`. No credentials needed: the commits are read from
 your own checkout and every panel labels its data source on screen.
+
+---
+
+## Track declaration
+
+* **Primary track:** Fire TV.
+* **Mini challenges:** none. Single-track entry.
+
+---
+
+## Product feedback
+
+* **Fire TV surfaces used:** no Fire TV hardware and no Vega device. The wallboard APK
+  was exercised on the Android SDK emulator (37.1.11) with the Android TV API-30 x86
+  system image on Windows, hardware-accelerated through WHPX, driven over adb
+  (install, Leanback launch, D-pad key events, screencap) with the page reporting
+  journey events to logcat over a WebView JavaScript bridge. The FAQ's explicit
+  allowance of the Android TV emulator as an evidence target is what makes this entry
+  possible without hardware.
+* **What worked well.** The emulator booted headless in about a minute and adb needed
+  no authentication; the APK installed and launched first try, and every D-pad press
+  reached the page. The logcat bridge proved reliable: page load, anomaly
+  attribution, rollback staging and the record-only confirmation all arrived as
+  journey events in one run.
+* **What needs work.** The emulator ignores `ANDROID_USER_HOME`, which every other
+  SDK tool honours, and wants `ANDROID_AVD_HOME` or `ANDROID_SDK_HOME` instead; the
+  mismatch costs a debugging cycle and is documented nowhere near the error. With
+  remote debugging off, a WebView on the emulator offers no DOM introspection over
+  adb, so diagnosing a missing page event meant probing the server rather than
+  looking at the page.
+* **Would we build with these tools again:** yes for the emulator path, which carried
+  a D-pad and WebView wallboard end to end. The final receipt still wants hardware
+  for what the emulator cannot show (remote auto-repeat, Leanback focus behaviour on
+  a real TV), and that run is pending.
