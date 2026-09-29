@@ -1,0 +1,64 @@
+name: Disposable deploy and teardown proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mercury-disposable-terraform-cycle
+  cancel-in-progress: false
+
+jobs:
+  deploy-probe-destroy:
+    # Standard cancellation re-evaluates the job condition before step-level
+    # cleanup. Keep the job alive long enough for the guarded teardown step.
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    # Leave a separate cleanup window after the bounded primary cycle step.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+      - name: Build content-addressed Lambda package
+        run: python scripts/build_lambda_package.py --output dist/mercury_lambda.zip
+      - name: Deploy, probe, destroy and verify absence
+        timeout-minutes: 22
+        run: >-
+          python scripts/terraform_cycle.py
+          --terraform-dir infra
+          --package dist/mercury_lambda.zip
+          --environment ci-${{ github.run_id }}-${{ github.run_attempt }}
+          --source-revision ${{ github.sha }}
+          --workflow-run-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          --output build/terraform-cycle/receipt.json
+      - name: Fail-safe teardown after an interrupted cycle
+        if: ${{ always() }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra init -input=false -no-color
+          terraform -chdir=infra destroy -auto-approve -input=false -no-color -lock-timeout=60s \
+            -var="environment=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            -var="source_revision=${{ github.sha }}" \
+            -var="lambda_package_path=${{ github.workspace }}/dist/mercury_lambda.zip"
+      - name: Upload exact cycle evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mercury-terraform-cycle-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/terraform-cycle/
+          if-no-files-found: error

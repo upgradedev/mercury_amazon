@@ -22,6 +22,23 @@ RUNTIME_FILES = (
     Path("docs/webmcp_bridge.js"),
     Path("docs/manifest.json"),
 )
+RUNTIME_REQUIREMENTS = (
+    "fastapi==0.141.1",
+    "starlette==1.7.0",
+    "pydantic==2.13.5",
+    "pydantic-core==2.46.5",
+    "annotated-types==0.8.0",
+    "annotated-doc==0.0.5",
+    "typing-extensions==4.16.0",
+    "typing-inspection==0.4.4",
+    "httpx==0.28.1",
+    "httpcore==1.0.9",
+    "h11==0.16.0",
+    "anyio==4.15.1",
+    "idna==3.20",
+    "certifi==2026.7.22",
+)
+ZIP_DATE_TIME = (1980, 1, 1, 0, 0, 0)
 
 
 def package_manifest() -> tuple[str, ...]:
@@ -41,6 +58,32 @@ def _copy_runtime(staging: Path) -> None:
         shutil.copy2(source, target)
 
 
+def _write_deterministic_zip(staging: Path, output: Path) -> None:
+    """Write stable member order, timestamps and permissions into the archive."""
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(staging.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts:
+                continue
+            relative = path.relative_to(staging)
+            # pip's Windows console launchers embed the temporary --target path,
+            # and their RECORD hashes therefore change on every build. Lambda
+            # imports the libraries directly, so neither artifact is runtime data.
+            if relative.parts[0] == "bin" or (
+                relative.name == "RECORD" and relative.parent.name.endswith(".dist-info")
+            ):
+                continue
+            info = zipfile.ZipInfo(relative.as_posix(), ZIP_DATE_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(
+                info,
+                path.read_bytes(),
+                compress_type=zipfile.ZIP_DEFLATED,
+                compresslevel=9,
+            )
+
+
 def build(output: Path) -> Path:
     staging = output.parent / "mercury_lambda_staging"
     if staging.exists():
@@ -48,7 +91,7 @@ def build(output: Path) -> Path:
     staging.mkdir(parents=True)
     subprocess.run([
         sys.executable, "-m", "pip", "install",
-        "fastapi>=0.111.0", "pydantic>=2.7.0", "httpx>=0.27.0",
+        *RUNTIME_REQUIREMENTS,
         "--target", str(staging), "--platform", "manylinux2014_x86_64",
         "--implementation", "cp", "--python-version", "3.11",
         "--only-binary=:all:", "--upgrade",
@@ -57,10 +100,7 @@ def build(output: Path) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         output.unlink()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(staging.rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts:
-                archive.write(path, path.relative_to(staging).as_posix())
+    _write_deterministic_zip(staging, output)
     with zipfile.ZipFile(output) as archive:
         names = set(archive.namelist())
         missing = sorted(set(package_manifest()) - names)
