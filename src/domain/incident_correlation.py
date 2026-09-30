@@ -58,6 +58,7 @@ by :attr:`IncidentCorrelation.nothing_to_revert`, worded by
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -470,6 +471,7 @@ class IncidentCorrelator:
         series: MetricSeries,
         commits: list[CommitRef],
         commit_provenance: Provenance = UNKNOWN_PROVENANCE,
+        parent_resolver: Callable[[str], CommitRef | None] | None = None,
     ) -> IncidentCorrelation:
         latest = series.latest
         if latest is None or len(series.points) < 2:
@@ -623,7 +625,16 @@ class IncidentCorrelator:
         offending = candidates[-1]
         ordered_all = sorted(commits, key=lambda c: c.committed_at)
         offending_index = ordered_all.index(offending)
-        rollback_target = ordered_all[offending_index - 1] if offending_index > 0 else None
+        # The fetch depth is a display budget, not domain truth: when the
+        # offending commit is the oldest one fetched, its parent still exists
+        # in history (9885eac pushed 6082f05 out of the 20 and the demo lost
+        # its rollback target). Ask the resolver instead of reporting none.
+        if offending_index > 0:
+            rollback_target = ordered_all[offending_index - 1]
+        elif parent_resolver is not None:
+            rollback_target = parent_resolver(offending.sha)
+        else:
+            rollback_target = None
 
         explanation = (
             f"{series.metric_name} is {factor:.2f} times the baseline mean of {baseline:.2f}, taken over "

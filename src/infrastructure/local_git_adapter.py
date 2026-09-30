@@ -17,6 +17,7 @@ correlator treats as unknown and keeps as a candidate.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -78,3 +79,43 @@ class LocalGitCommitProvider:
                 "paths": list(paths) if paths else None,
             })
         return commits
+
+    def parent_of(self, sha: str) -> dict[str, Any] | None:
+        """Return the parent of one commit in the same dict shape, or None.
+
+        The correlator's rollback target is the commit before the offending
+        one; when the offending commit is the oldest one fetched, the list
+        cannot name it, but history still holds it. None also covers the
+        root commit, shallow clones and anything git cannot answer.
+        """
+        if not self.is_available or not re.fullmatch(r"[0-9a-fA-F]+", sha or ""):
+            return None
+        try:
+            result = subprocess.run(
+                ["git", "-c", "core.quotePath=false", "log", "-1",
+                 "--name-only", "--no-renames", f"--pretty=format:{LOG_FORMAT}",
+                 f"{sha}^"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                cwd=str(self.repo_root), timeout=self.timeout,
+            )
+        except Exception:
+            return None
+        if result.returncode != 0:
+            return None
+        lines = [line for line in result.stdout.replace("\x1e", "").splitlines()
+                 if line.strip()]
+        if not lines:
+            return None
+        parts = lines[0].split("\x1f")
+        if len(parts) != 4:
+            return None
+        short_sha, author, committed_at, subject = parts
+        paths = tuple(line.strip() for line in lines[1:])
+        return {
+            "sha": short_sha,
+            "full_sha": short_sha,
+            "message": subject,
+            "author": author,
+            "committed_at": committed_at,
+            "paths": list(paths) if paths else None,
+        }

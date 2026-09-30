@@ -68,6 +68,22 @@ def _parse_commit_time(value: str) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _commit_ref_from_entry(entry: dict) -> CommitRef | None:
+    """One provider dict into a CommitRef, or None when its time is unreadable."""
+    stamp = _parse_commit_time(entry.get("committed_at", ""))
+    if stamp is None:
+        return None
+    listed = entry.get("paths")
+    paths = tuple(str(p) for p in listed) if isinstance(listed, (list, tuple)) and listed else None
+    return CommitRef(
+        sha=entry.get("sha", ""),
+        message=entry.get("message", ""),
+        author=entry.get("author", "unknown"),
+        committed_at=stamp,
+        paths=paths,
+    )
+
+
 class DiagnoseIncidentUseCase:
     """Correlates an error metric anomaly with the deployment that preceded it."""
 
@@ -114,20 +130,9 @@ class DiagnoseIncidentUseCase:
 
         commits: list[CommitRef] = []
         for entry in raw:
-            stamp = _parse_commit_time(entry.get("committed_at", ""))
-            if stamp is None:
-                continue
-            listed = entry.get("paths")
-            paths = tuple(str(p) for p in listed) if isinstance(listed, (list, tuple)) and listed else None
-            commits.append(
-                CommitRef(
-                    sha=entry.get("sha", ""),
-                    message=entry.get("message", ""),
-                    author=entry.get("author", "unknown"),
-                    committed_at=stamp,
-                    paths=paths,
-                )
-            )
+            ref = _commit_ref_from_entry(entry)
+            if ref is not None:
+                commits.append(ref)
 
         if not commits:
             return [], Provenance(
@@ -147,6 +152,18 @@ class DiagnoseIncidentUseCase:
 
     def execute(self, service_name: str, window_minutes: int = 60) -> IncidentCorrelation:
         commits, commit_provenance = self._gather_commits()
+
+        # The local checkout can name a parent the fetch window cannot see
+        # (9885eac: the offending commit's parent fell out of the 20). Offer
+        # that lookup to the correlator; providers without parent_of simply
+        # leave the fallback off.
+        def _resolve_parent(sha: str, _local=self._local_commits):
+            entry = _local.parent_of(sha)
+            return _commit_ref_from_entry(entry) if entry else None
+
+        local = self._local_commits
+        parent_resolver = _resolve_parent if (
+            local is not None and hasattr(local, "parent_of")) else None
 
         # Anchor a simulated series just after a real commit, so the demo path produces
         # a coherent correlation instead of an anomaly with nothing near it. The whole
@@ -168,4 +185,5 @@ class DiagnoseIncidentUseCase:
             commit_times=[c.committed_at for c in candidates],
         )
 
-        return self._correlator.correlate(service_name, series, commits, commit_provenance)
+        return self._correlator.correlate(service_name, series, commits, commit_provenance,
+                                            parent_resolver=parent_resolver)

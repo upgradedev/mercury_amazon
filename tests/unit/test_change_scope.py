@@ -240,3 +240,21 @@ def test_local_git_and_the_recording_carry_file_lists():
     assert commits
     for entry in commits:
         assert entry["paths"] is None or all(isinstance(p, str) and p for p in entry["paths"])
+
+
+def test_local_git_parent_of_names_the_commit_before():
+    from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+
+    local = LocalGitCommitProvider()
+    if not local.is_available:
+        pytest.skip("not a git checkout")
+    head = local.list_recent_commits(limit=1)
+    assert head
+    parent = local.parent_of(head[0]["sha"])
+    if parent is None:
+        pytest.skip("checkout root has no parent")
+    assert parent["sha"] != head[0]["sha"]
+    assert parent["sha"] and all(c in "0123456789abcdef" for c in parent["sha"])
+    assert parent["committed_at"]
+    assert local.parent_of("not-a-sha!!!") is None
+    assert local.parent_of("") is None

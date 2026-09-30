@@ -23,6 +23,24 @@ def seed_recorded_demo_evidence(incident_use_case, deployment_evidence: Deployme
         reverse=True,
     )
     if not older:
+        # Same fetch-edge as the correlator's rollback target: the offending
+        # commit can be the oldest one fetched while its parent still exists
+        # in history (9885eac). Resolve it through the local checkout when
+        # one is behind the use case; anything unresolvable keeps the old
+        # behavior of seeding nothing.
+        try:
+            from src.application.diagnose_incident_use_case import (
+                _commit_ref_from_entry,
+            )
+            local = getattr(incident_use_case, "_local_commits", None)
+            entry = (local.parent_of(offending.sha)
+                     if local is not None and hasattr(local, "parent_of")
+                     else None)
+            ref = _commit_ref_from_entry(entry) if entry else None
+            older = [ref] if ref is not None else []
+        except Exception:
+            older = []
+    if not older:
         return
     source = "offline-fixture-recorded-mercury-commits-not-service-deployments"
     for position, commit in enumerate((older[0], offending), start=1):

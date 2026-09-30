@@ -599,7 +599,17 @@ def test_keyboard_focus_moves_on_load_only_on_a_television(browser, base_url, ho
             assert page.evaluate("document.querySelectorAll('.tv-focused').length") == 0, (
                 "the D-pad ring steps aside while keyboard focus is outside it")
             page.keyboard.press("ArrowRight")
-            assert page.evaluate("window.mercuryNav.current.id") == "btnStage"
+            # Which tile is nearest the skip link depends on the board's
+            # geometry, and the board renders genuine `git log` history, so a
+            # new commit can move the ring's landing tile (9885eac proved it:
+            # same tree as the green run, ring lands on an id-less tile, not
+            # btnStage). Pin the behavior, not the coordinate: ArrowRight must
+            # re-engage the ring on a control.
+            current = page.evaluate(
+                "() => { const c = window.mercuryNav.current;"
+                " return c ? c.tagName + '.' + c.className : 'none'; }")
+            assert current.startswith("BUTTON."), current
+            assert "tv-focused" in current, current
         assert errors == [], errors
     finally:
         context.close()
