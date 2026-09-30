@@ -98,6 +98,36 @@ def test_only_commit_available_offers_no_rollback_target():
     assert result.offending_commit.sha == "only11"
     assert result.rollback_target is None
     assert result.rollback_is_available is False
+
+
+def test_offending_commit_at_fetch_edge_resolves_its_parent():
+    correlator = IncidentCorrelator()
+    parent = commit("pare99", 200)
+
+    def resolve(sha):
+        return parent if sha == "only11" else None
+
+    result = correlator.correlate(
+        "checkout-api", series([2, 2, 2, 2, 70]), [commit("only11", 10)],
+        COMMITS_LIVE, parent_resolver=resolve)
+    assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert result.offending_commit.sha == "only11"
+    assert result.rollback_target.sha == "pare99"
+    assert result.rollback_is_available is True
+
+
+def test_offending_commit_at_fetch_edge_without_a_parent_stays_unavailable():
+    correlator = IncidentCorrelator()
+
+    def resolve(sha):
+        return None
+
+    result = correlator.correlate(
+        "checkout-api", series([2, 2, 2, 2, 70]), [commit("only11", 10)],
+        COMMITS_LIVE, parent_resolver=resolve)
+    assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    assert result.rollback_target is None
+    assert result.rollback_is_available is False
     assert "Git order is not deployment evidence" in result.explanation
 
 
