@@ -27,12 +27,12 @@ from src.application.detect_cost_anomalies_use_case import DetectCostAnomaliesUs
 from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
 from src.application.governed_rollback_use_case import GovernedRollbackUseCase
 from src.application.inspect_pr_bottlenecks_use_case import InspectPRBottlenecksUseCase
+from src.domain.change_scope import MERCURY_SERVICE_SCOPE
 from src.domain.deployment_evidence import (
     DeploymentEvidenceError,
     DeploymentEvidenceLedger,
     DeploymentMarker,
 )
-from src.domain.change_scope import MERCURY_SERVICE_SCOPE
 from src.domain.governed_rollback import GovernanceTokenError, RollbackDenialReason
 from src.domain.incident_correlation import IncidentCorrelator
 from src.domain.incident_handoff import HandoffConflict, IncidentHandoffStore
