@@ -198,7 +198,7 @@ def test_documents_follow_the_official_android_tv_emulator_allowance():
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = EVIDENCE.split("## Known limitations")[-1]
-    for required in ["No rollback dispatch has ever been fired", "One green emulator run",
+    for required in ["No rollback dispatch has ever been fired", "Two green emulator runs",
                      "Cost Explorer lags", "browser speech synthesis", "Local quickstart state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 
