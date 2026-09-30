@@ -193,7 +193,9 @@ jobs:
           userdata.useQcow2 = no
           vm.heapSize = 228M
           EOF
-          sed -i 's/\r$//' ~/.android/avd/test.ini ~/.android/avd/test.avd/config.ini
+          # perl, not sed -i: BSD sed on macOS needs a backup arg and
+          # fails (run 36657960710). perl -pi is a no-op on LF files.
+          perl -pi -e 's/\r$//' ~/.android/avd/test.ini ~/.android/avd/test.avd/config.ini
 
       - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
