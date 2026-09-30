@@ -188,7 +188,7 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     """The landed receipt, asserted by contents against the real checkout.
 
-    Actions run 36661614006 built the APK from this history and drove the
+    Actions run 36669903334 built the APK from this history and drove the
     D-pad journey on an Android TV emulator. The receipt below is that run's
     artifact bytes, downloaded and hash-verified, not written by hand: the
     gate must pass on it, and the receipt must still prove this checkout
@@ -205,7 +205,7 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
     assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
     assert receipt["build_sha"] in receipt["artifact_name"]
-    assert "actions/runs/36661614006" in receipt["workflow_run_url"]
+    assert "actions/runs/36669903334" in receipt["workflow_run_url"]
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
@@ -317,7 +317,7 @@ def test_the_audit_reports_j4_as_passing_in_this_checkout():
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
     assert results["J4"].passed is True
-    assert "actions/runs/36661614006" in results["J4"].message
+    assert "actions/runs/36669903334" in results["J4"].message
 
 
 def test_the_readme_publishes_the_score_the_auditor_prints():

@@ -1033,8 +1033,8 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Runtime evidence landed.** Actions run [36661614006](https://github.com/upgradedev/mercury_amazon/actions/runs/36661614006)
-built APK `95fbf64f53f05e73` (9,261,223 B) from `177e8f9`, installed it on AOSP TV
+**Runtime evidence landed.** Actions run [36669903334](https://github.com/upgradedev/mercury_amazon/actions/runs/36669903334)
+built APK `dcb29f7e0c3f3cb6` (9,261,223 B) from `69aa972`, installed it on AOSP TV
 (Android 14 / API 34), launched through the normal Leanback path with no URL
 override, and drove page load, attribution, record-only approval and handoff by
 D-pad. The receipt is checked in as `android_tv_runtime_receipt.json`; the run's
@@ -1106,7 +1106,7 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file exists at the repository root since run 36661614006, so **J4 passes**.
+The file exists at the repository root since run 36669903334, so **J4 passes**.
 `docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
 `tests/unit/test_readiness_gates.py` asserts the checked-in receipt's contents and
 drives every refusal through the predicate.
@@ -1187,7 +1187,7 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **One green emulator run.** Run 36661614006 compiled the public endpoint, installed
+* **One green emulator run.** Run 36669903334 compiled the public endpoint, installed
   the exact APK, launched without an ADB URL override and drove the record-only path
   by D-pad; its receipt is checked in as `android_tv_runtime_receipt.json`. One run
   proves the path works, not that it is flake-free, so re-dispatch the workflow to
@@ -1202,7 +1202,7 @@ given a substitute number.
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
   record-only journey, but the J4 evidence is the APK completing it in the emulator,
-  which run 36661614006 recorded.
+  which run 36669903334 recorded.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.
