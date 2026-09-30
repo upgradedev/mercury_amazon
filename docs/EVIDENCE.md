@@ -1142,8 +1142,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it runs
-an older build than this branch; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves this branch since the 2026-09-30 code deploy of `e92ca0d` (verified by re-downloading the live zip); see [Known limitations](#known-limitations).
 
 ---
 
@@ -1187,15 +1186,14 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **One green emulator run.** Run 36669903334 compiled the public endpoint, installed
+* **Two green emulator runs.** Runs 36661614006 and 36669903334 each compiled the public endpoint, installed
   the exact APK, launched without an ADB URL override and drove the record-only path
-  by D-pad; its receipt is checked in as `android_tv_runtime_receipt.json`. One run
-  proves the path works, not that it is flake-free, so re-dispatch the workflow to
-  confirm stability. The event FAQ does not require a physical Fire TV.
+  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Two runs
+  prove the path works and repeats, not that it is flake-free. The event FAQ does not require a physical Fire TV.
 * **The public deployment tracks HEAD.** The cockpit at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reports its
-  `build_sha` from `/health`; the deployment is env-bumped to HEAD on every merge
-  and readiness gate G2 pins the equality. It runs in labelled offline-fixture
+  `build_sha` from `/health`; every merge ships a full code deploy (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and grepped for the fix markers after every deploy).
+  Readiness gate G2 pins the equality against the committed receipt, which names the probed build; it passes with a fresh receipt and stays red on the checked-in one by design. It runs in labelled offline-fixture
   mode. The allowed-target receipt above covers the APK.
 * **No published video.** One 170.61 s take, recorded at `df5db06` with the figures this
   build prints, is rendered locally and not yet uploaded (see `video/README.md`).

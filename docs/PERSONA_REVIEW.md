@@ -47,19 +47,19 @@ being smoothed over.
 |---|---|---|---|
 | 1 | Does a deployed endpoint answer, and identify its build? | PASS | Root and `/health` answer at the public Function URL, and `/health` publishes `build_sha`; `deploy_teardown_receipt.json` records the observation |
 | 2 | What is owner-gated and unmet, printed apart from the score rather than folded into it? | OPEN | `python ci/readiness.py`: O1, O2 and O3 fail as owner actions, E2 and E4 fail because no video exists. `video/README.md` says no video has been recorded |
-| 3 | Is the track and prize this entry is aimed at written down, with nothing else claimed? | PASS | Fire TV track in `README.md`, Open Source mini in `docs/DEVPOST_SUBMISSION.md`. `tests/e2e/test_documentation_claims.py` fails the build if any document claims an Alexa integration, which this repository does not have, or a device run or a built APK, neither of which has happened |
+| 3 | Is the track and prize this entry is aimed at written down, with nothing else claimed? | PASS | Fire TV track in `README.md`, Open Source mini in `docs/DEVPOST_SUBMISSION.md`. `tests/e2e/test_documentation_claims.py` fails the build if any document claims an Alexa integration, which this repository does not have, or a device run or a built APK - both of which have happened since: emulator runs 36661614006 and 36669903334 each built, installed and D-pad-drove an APK, with a content-addressed runtime receipt landed (`android_tv_runtime_receipt.json`); `tests/e2e/test_documentation_claims.py` now asserts the run is cited |
 | 4 | Do the presentation surfaces say what the code says? | PASS | `python -m pytest tests/e2e/test_documentation_claims.py -q`. Every number in the README and in `docs/EVIDENCE.md` is compared against the file the command that produced it wrote |
 
 ## 2. The three lenses, and who owned each row
 
 | Lens | Owner | What it decides | Verdict |
 |---|---|---|---|
-| Sponsor product owner | Mercury maintainer, product row | Is the sponsor product load-bearing, or merely mentioned? | FAIL |
+| Sponsor product owner | Mercury maintainer, product row | Is the sponsor product load-bearing, or merely mentioned? | PASS |
 | UX designer | Mercury maintainer, interface row | Can a cold visitor use the thing without being told how? | PASS |
 | Recruiter | Mercury maintainer, engineering bar row | Would this code and this prose clear an engineering bar? | PASS |
 
-The sponsor product row still fails until the candidate APK completes its normal-launch
-journey on the allowed Android TV Emulator and produces the checked runtime receipt.
+The sponsor product row passed on 2026-09-30: the candidate APK completed its normal-launch
+journey on the allowed Android TV Emulator twice, and the checked runtime receipt is landed.
 Details in P01-1 below.
 
 ## 3. Findings
@@ -69,7 +69,7 @@ A row that restates an older judgement says so and carries the older date.
 
 | ID | Lens | Finding | Verdict | Evidence |
 |---|---|---|---|---|
-| P01-1 | Sponsor product owner | The candidate has an automated Android TV install and D-pad journey, but J4 remains red until that workflow produces its content-addressed runtime receipt. The official FAQ permits this emulator route and does not require physical hardware | FAIL | `.github/workflows/android-tv-emulator.yml`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
+| P01-1 | Sponsor product owner | The candidate has an automated Android TV install and D-pad journey. J4 was red until 2026-09-30, when emulator runs 36661614006 and 36669903334 produced content-addressed runtime receipts and J4 turned green. The official FAQ permits this emulator route and does not require physical hardware | FAIL | `.github/workflows/android-tv-emulator.yml`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
 | P01-2 | Sponsor product owner | The review of 2026-09-04 recorded that "Fire TV spatial navigation and Alexa voice query are load-bearing" for this entry. The Alexa half was never true of this repository. It does not survive restatement, and a test now fails the build if any document claims it | FAIL | `tests/e2e/test_documentation_claims.py` |
 | P01-3 | Sponsor product owner | What is load-bearing and does exist: the D-pad and the arrow keys are one focus code path, driven by the same spec on both inputs | PASS | `tests/e2e/spatial_nav_spec.js`, `tests/e2e/test_html_structure.py` |
 | P06-1 | UX designer | The hero action is marked and the layout carries responsive breakpoints, so the primary action is visible without reading. Gate H1 passes | PASS | `python ci/readiness.py`, `tests/e2e/test_html_structure.py` |
@@ -96,7 +96,7 @@ are listed because a review that reports only what it settled is not a review.
 
 | Question | Why it is open |
 |---|---|
-| Does the APK install and appear on a Fire TV home row? | A verified CI APK exists and portable ADB is prepared, but no Fire TV device has connected. `docs/FIRE_TV_BUILD.md` records the install and receipt procedure |
+| Does the APK install and appear on a Fire TV home row? | A verified CI APK exists and portable ADB is prepared; the Android TV emulator runs above connected, installed and drove the D-pad journey, but no physical Fire TV device has connected. `docs/FIRE_TV_BUILD.md` records the install and receipt procedure |
 | Is the cockpit legible from three metres on a television? | Measured in a 1920x1080 browser viewport, never on a television at distance |
 | Has teardown been verified for a deployment of this commit? | No. The public cockpit answers and identifies its build, which on 2026-09-26 was the older `6dd76bd` rather than this commit, and no release has been destroyed and restored. |
 | Does an on-call engineer find a refusal to name a commit useful at three in the morning? | Nobody outside this project has used it. The README says this in its own words |
