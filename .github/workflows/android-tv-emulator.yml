@@ -41,6 +41,13 @@ jobs:
           # 3.06G available, 7.37G needed for the 6G default partition).
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/az /usr/share/swift
           df -h / | tail -1
+          # Claim /dev/kvm: it exists on the fleet but the runner user
+          # is not in the kvm group (run 36659722387: ProbeKVM
+          # permission denied), so the action disables accel and the
+          # guest crawls under TCG (~1000s userspace, 1200s timeout).
+          # chmod on this ephemeral runner lets the action boot with KVM.
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          ls -la /dev/kvm 2>/dev/null || echo 'no /dev/kvm on this host'
           yes | sdkmanager --licenses > /dev/null
           sdkmanager --install 'system-images;android-34;android-tv;x86' > /dev/null
           # Write the AVD by hand: avdmanager without --device exits 0 on the
