@@ -315,8 +315,8 @@ def test_an_android_ci_workflow_builds_and_uploads_the_apk():
     assert "if-no-files-found: error" in workflow, "a run with no APK must fail, not pass quietly"
 
 
-def test_the_build_document_states_what_has_not_been_run():
+def test_the_build_document_states_what_has_been_run():
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "Pending the workflow-dispatch run" in doc
+    assert "actions/runs/36661614006" in doc
     assert "Physical Fire TV" in doc
     assert "Optional and not run" in doc

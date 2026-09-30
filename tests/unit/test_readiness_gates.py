@@ -185,22 +185,31 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
     assert expected in message
 
 
-def test_the_gate_fails_in_this_repository_until_a_runtime_receipt_exists():
-    """The honest FAIL, asserted against the real checkout rather than a fixture."""
-    receipt_paths = [
-        REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT,
-        REPO_ROOT / readiness.FIRETV_BUILD_RECEIPT,
-    ]
-    assert not any(path.exists() for path in receipt_paths), (
-        "A runtime receipt now exists. If a real APK was built and run, this "
-        "test should assert the receipt's contents; it must not be written by hand to turn "
-        "the gate green."
-    )
+def test_the_runtime_receipt_in_this_repository_is_real_evidence():
+    """The landed receipt, asserted by contents against the real checkout.
+
+    Actions run 36661614006 built the APK from this history and drove the
+    D-pad journey on an Android TV emulator. The receipt below is that run's
+    artifact bytes, downloaded and hash-verified, not written by hand: the
+    gate must pass on it, and the receipt must still prove this checkout
+    (ancestry plus no runtime-bearing file changed since the receipt build).
+    """
+    path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
+    assert path.is_file(), "the landed runtime receipt is missing"
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    assert receipt.get("schema") == "mercury.android_tv_runtime_receipt/1"
+    for field in readiness.ANDROID_TV_RECEIPT_FIELDS:
+        assert receipt.get(field) not in (None, "", []), f"receipt {field} missing"
+    events = set(receipt["remote_journey"]["events"])
+    assert readiness.ANDROID_TV_REQUIRED_EVENTS <= events
+    assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
+    assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
+    assert receipt["build_sha"] in receipt["artifact_name"]
+    assert "actions/runs/36661614006" in receipt["workflow_run_url"]
     passed, message = readiness.evaluate_firetv_gate(
-        README_TERMS, LEANBACK_MANIFEST, None, _exists)
-    assert passed is False
-    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in message
-    assert "not a Fire TV app" in message
+        README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
+    assert passed is True, message
+    assert readiness.runtime_receipt_checkout_problem(receipt) is None
 
 
 def test_a_leanback_manifest_alone_no_longer_passes():
@@ -303,12 +312,12 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     assert "official FAQ" in reason and "Android TV" in reason
 
 
-def test_the_audit_reports_j4_as_failing_in_this_checkout():
+def test_the_audit_reports_j4_as_passing_in_this_checkout():
     """End to end: run the auditor and read J4 out of its own results."""
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
-    assert results["J4"].passed is False
-    assert readiness.ANDROID_TV_RUNTIME_RECEIPT in results["J4"].message
+    assert results["J4"].passed is True
+    assert "actions/runs/36661614006" in results["J4"].message
 
 
 def test_the_readme_publishes_the_score_the_auditor_prints():
