@@ -36,12 +36,14 @@ jobs:
           # The runner cannot set disk.dataPartition.size, and the 6G default
           # fails the free-space check on the runner (run 36649294389: 3.06G
           # available, 7.37G needed). 1.5G fits the APK install plus WebView.
+          # No --device flag: the AOSP image ships no tv_1080p profile, and the
+          # journey sends D-pad keyevents only, so 1080p geometry set below is
+          # all it needs (Leanback and WebView come from the image itself).
           yes | sdkmanager --licenses > /dev/null
           sdkmanager --install 'system-images;android-34;android-tv;x86' > /dev/null
           echo no | avdmanager create avd --force -n test \
-            --package 'system-images;android-34;android-tv;x86' \
-            --device 'tv_1080p'
-          printf 'disk.dataPartition.size=1610612736\n' >> ~/.android/avd/test.avd/config.ini
+            --package 'system-images;android-34;android-tv;x86'
+          printf 'disk.dataPartition.size=1610612736\nhw.lcd.width=1920\nhw.lcd.height=1080\nhw.lcd.density=320\n' >> ~/.android/avd/test.avd/config.ini
 
       - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
