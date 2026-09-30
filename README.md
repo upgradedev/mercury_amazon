@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence and public access are still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence landed in run 36661614006; public access is still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -196,15 +196,15 @@ required at any stage of submission or judging".
 
 **Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
 held-out split, all synthetic; commits read from real git history, with their file lists;
-the governed rollback and its refusals, each tested; the Leanback app source.
+the governed rollback and its refusals, each tested; the Leanback app source; an Android
+TV runtime receipt from [run 36661614006](https://github.com/upgradedev/mercury_amazon/actions/runs/36661614006),
+which installed the exact APK on an emulator and drove the record-only path by D-pad
+(receipt: `android_tv_runtime_receipt.json`); and a live cockpit that serves this
+branch at HEAD (env-bumped on every merge, `/health` reports the build SHA, labelled
+offline-fixture mode).
 **Simulated:** every metric series on the board is an offline fixture, and a confirmed
 rollback is recorded, never sent to a pipeline. **Missing:**
 
-- **A Fire TV or Android TV runtime receipt** (runtime evidence pending). An Android TV
-  emulator attempt on 2026-09-27 (API 30 TV image, an APK built from an earlier commit
-  of this branch) reached the TV launcher, but `adb` stayed unauthorized, so the APK was
-  never installed and no D-pad journey ran. Its receipt records the status
-  `BLOCKED_ADB_UNAUTHORIZED` and is not a runtime proof.
 - **A published video.** One take is rendered and not yet uploaded:
   `reviews/videos_20260928/mercury_amazon/output/mercury-demo.mp4` in the workspace,
   outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `df5db06` in desktop Chromium, every key sent
@@ -218,10 +218,6 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   panel until Back; and Center on Publish handoff moves the cursor on to Refresh with
   the handoff's answer below the fold, where this build stays on Publish and brings
   the answer up. Details in [video/README.md](video/README.md).
-- **A public deployment of this build.** The
-  [live cockpit](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
-  serves build `6dd76bd`, probed 2026-09-26: older than this branch and the design
-  above, and it loads Google Fonts. Its `/health` reports the build SHA.
 - **A public repository.** Private until the reviewers are added as collaborators; see
   [Run it locally](#run-it-locally).
 
@@ -232,7 +228,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source and a CI build workflow | **Runtime evidence pending**: no Android TV emulator run has completed; the 2026-09-27 attempt stopped before install. The target proof is an emulator run; the event FAQ does not require a physical Fire TV |
+| Fire TV | App source, a CI build workflow and a runtime receipt | Run 36661614006 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on

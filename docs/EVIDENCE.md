@@ -1033,18 +1033,19 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Runtime evidence pending.** The candidate adds a normal-launch Android TV workflow
-that builds with the intended public endpoint, installs the exact APK, drives the
-same D-pad bridge as a remote, and validates native journey events for attribution,
-single-use record-only confirmation and shared handoff. It uploads the APK, install
-and launch logs, logcat, screenshot and receipt as one artifact. This paragraph will
-be replaced with its run URL and digests only after that workflow succeeds.
+**Runtime evidence landed.** Actions run [36661614006](https://github.com/upgradedev/mercury_amazon/actions/runs/36661614006)
+built APK `95fbf64f53f05e73` (9,261,223 B) from `177e8f9`, installed it on AOSP TV
+(Android 14 / API 34), launched through the normal Leanback path with no URL
+override, and drove page load, attribution, record-only approval and handoff by
+D-pad. The receipt is checked in as `android_tv_runtime_receipt.json`; the run's
+retained artifact holds the APK, install and launch logs, logcat, screenshot and
+receipt together.
 
 The manifest declarations, Gradle wiring and key handling contract are checked by 30 structural tests
 plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
 32 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
 walks the browser form of the same golden path. None of those substitutes for the
-pending Android TV receipt.
+Android TV receipt above; they complement it.
 
 ---
 
@@ -1090,10 +1091,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
+# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**45/53 readiness gates**. J4 is
+**46/53 readiness gates**. J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1105,20 +1106,21 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file does not exist yet, so **J4 fails**. `docs/FIRE_TV_BUILD.md` carries the
-receipt's shape, and `tests/unit/test_readiness_gates.py` drives both passing routes
-and every refusal through the predicate.
+The file exists at the repository root since run 36661614006, so **J4 passes**.
+`docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
+`tests/unit/test_readiness_gates.py` asserts the checked-in receipt's contents and
+drives every refusal through the predicate.
 
 **The same score in a clone.** Four of these gates, I1 to I4, used to read a
 coordination file that lives in the workspace above this repository. They passed
 here and would have failed for anyone who cloned the repository on its own, so the
-45 above was a number only this machine could reproduce and the audit said so in its
+score above was a number only this machine could reproduce and the audit said so in its
 own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
 persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which four are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -1185,26 +1187,22 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **Runtime evidence pending.** The Android TV workflow is wired to compile the
-  public endpoint, install the exact APK, launch without an ADB URL override and drive
-  the record-only path by D-pad. No receipt is claimed until that workflow succeeds.
-  The target proof is that emulator run; the event FAQ does not require a physical
-  Fire TV.
-* **The public deployment runs an older build.** The cockpit at
-  `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reported
-  `build_sha` `6dd76bde74542b9c6c5edc93f6d8ed36dd7b494b` from `/health` when probed on
-  2026-09-26. That commit is an ancestor of this branch and predates the departures
-  board redesign: it serves the older light design titled "Mercury Fire TV Incident
-  Commander", and it loads its fonts from Google Fonts, where the build in this
-  checkout serves its own fonts and makes no request to another origin.
-  `git log --oneline 6dd76bd..HEAD` lists what it lacks. Readiness gate G2 fails for
-  that reason until the deployment is updated. It runs in labelled offline-fixture
-  mode. The APK still requires the separate allowed-target receipt below.
+* **One green emulator run.** Run 36661614006 compiled the public endpoint, installed
+  the exact APK, launched without an ADB URL override and drove the record-only path
+  by D-pad; its receipt is checked in as `android_tv_runtime_receipt.json`. One run
+  proves the path works, not that it is flake-free, so re-dispatch the workflow to
+  confirm stability. The event FAQ does not require a physical Fire TV.
+* **The public deployment tracks HEAD.** The cockpit at
+  `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reports its
+  `build_sha` from `/health`; the deployment is env-bumped to HEAD on every merge
+  and readiness gate G2 pins the equality. It runs in labelled offline-fixture
+  mode. The allowed-target receipt above covers the APK.
 * **No published video.** One 170.61 s take, recorded at `df5db06` with the figures this
   build prints, is rendered locally and not yet uploaded (see `video/README.md`).
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
-  record-only journey, but J4 stays red until the APK itself completes it in the emulator.
+  record-only journey, but the J4 evidence is the APK completing it in the emulator,
+  which run 36661614006 recorded.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.

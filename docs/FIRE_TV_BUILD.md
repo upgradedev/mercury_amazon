@@ -13,7 +13,7 @@ physical device is optional.
 | Compiled default endpoint | Public HTTPS Lambda URL; no ADB override is needed | `app/build.gradle.kts`, `CockpitUrlResolver.kt` |
 | Normal Leanback launch | Automated in a fresh Android TV emulator | `.github/workflows/android-tv-emulator.yml` |
 | D-pad golden path | Attribution → stage → single-use record-only confirm → fixed responder handoff | `scripts/android_tv_smoke.sh` |
-| Runtime receipt | Pending the workflow-dispatch run for this candidate | `android_tv_runtime_receipt.json` will hold the content-addressed pointer |
+| Runtime receipt | Landed in run 36661614006 | `android_tv_runtime_receipt.json` holds the content-addressed pointer; full bundle in [the run artifact](https://github.com/upgradedev/mercury_amazon/actions/runs/36661614006) |
 | Physical Fire TV | Optional and not run | The FAQ does not require it |
 
 The demo path is deliberately effect-free. Its deployment markers are labelled
@@ -81,7 +81,7 @@ writes `firetv_build_receipt.json` with `built_by_command`, `gradle_exit_code`,
   "normal_launcher": "am start MAIN + LEANBACK_LAUNCHER; no COCKPIT_URL intent extra",
   "endpoint_loaded_without_intent_override": "https://.../",
   "endpoint_health_build_sha": "40-character SHA matching build_sha",
-  "runtime": {"device_model": "Google TV", "os_version": "Android 15 / API 35"},
+  "runtime": {"device_model": "AOSP TV on x86", "os_version": "Android 14 / API 34"},
   "remote_journey": {
     "input": "ADB keyevents mapped to the Android TV D-pad",
     "events": ["journey:page_loaded:", "journey:what_changed:ANOMALY_ATTRIBUTED:"],
