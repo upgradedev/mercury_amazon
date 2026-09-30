@@ -1392,7 +1392,7 @@
       if (kind === 'attributed') {
         // Spoken and announced, so the lag is written out: "75m" reads as metres.
         var short = accuracyShort(data).replace(/\u2264(\d+)m\u00a0lag/, 'if it shows within $1 minutes');
-        return data.service + ': attributed to commit ' + data.offending_commit.sha
+        return data.service + ': temporal candidate commit ' + data.offending_commit.sha
           + (short ? ', ' + short : '') + '.';
       }
       return data.service + ': ' + VERDICT_WORDS[kind].toLowerCase() + '.';
@@ -1583,7 +1583,7 @@
     }
 
     var VERDICT_WORDS = {
-      attributed: 'Attributed',
+      attributed: 'Temporal candidate',
       cannot: 'Cannot attribute',
       nothing: 'Nothing to revert',
       insufficient: 'Insufficient data'
@@ -1673,18 +1673,21 @@
         var ambiguous = data.attribution && data.attribution.is_ambiguous;
         answer({
           state: 'alarm',
-          eyebrow: ambiguous ? 'Incident attributed, more than one candidate' : 'Attributed',
+          eyebrow: ambiguous ? 'Temporal candidate, several in window' : 'Temporal candidate',
           figure: factor + '×',
           figureLabel: readingLabel(metric),
           headline: 'Commit ' + data.offending_commit.sha,
           evidence: landedLine(data),
           quote: data.offending_commit.message,
           // The author and the timestamp are in the evidence panel; the board keeps
-          // the change itself.
-          cause: ambiguous
+          // the change itself. The cause line carries the same causality disclosure
+          // the API ships as claim_strength TEMPORAL_CANDIDATE_ONLY: proximity is
+          // not proof, and a rollback needs separate deployment and health evidence.
+          cause: (ambiguous
             ? 'It is not the only one: ' + data.attribution.commits_in_window
-              + ' changes landed inside the attribution window, and this rule names the closest.'
-            : ''
+              + ' changes landed inside the attribution window, and this rule names the closest. '
+            : '')
+            + 'Proximity is not proof of cause.'
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION'
                  && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
@@ -1913,7 +1916,7 @@
         fillRow(data.service, data);
         renderIncidentDetail(data);
         tileHeadline('tileIncidentHeadline', VERDICT_WORDS[verdictKind(data)]
-          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' to ' + data.offending_commit.sha : ''),
+          + (data.offending_commit && verdictKind(data) === 'attributed' ? ' ' + data.offending_commit.sha : ''),
           [data.metric_provenance, data.commit_provenance]);
         el('tileIncidentSub').textContent =
           data.metric.name + ' at ' + data.metric.current + ' against a baseline of ' + data.metric.baseline + '.';

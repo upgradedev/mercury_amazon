@@ -352,6 +352,21 @@ def test_an_attribution_is_neither_a_refusal_nor_a_clean_bill():
     assert not _certainty_violations(result.to_voice_summary())
 
 
+def test_an_attributed_voice_summary_names_a_candidate_not_a_cause():
+    """The spoken answer agrees with claim_strength TEMPORAL_CANDIDATE_ONLY.
+
+    The board hero, the tile, the announcement and this sentence all name a
+    temporal candidate; none of them may read as proven cause against the
+    measured held-out precision.
+    """
+    commits = [commit("old111", 400), commit("prev22", 90), commit("bad333", 12)]
+    result = IncidentCorrelator().correlate("svc", series([2, 2, 2, 2, 70]), commits)
+    assert result.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED
+    spoken = result.to_voice_summary()
+    assert "temporal candidate, not proof of cause" in spoken
+    assert "requires separate" in spoken and "deployment and health evidence" in spoken
+
+
 def test_the_forbidden_certainty_list_catches_the_wording_that_was_retired():
     """Negative control on the list itself: the phrases the finding named must all trip it."""
     for retired in (
