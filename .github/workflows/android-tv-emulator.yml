@@ -34,9 +34,12 @@ jobs:
       - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: 35
+          # API 34 x86 is the newest Google TV image on the stable channel
+          # (sdkmanager --list, 2026-09-30): android-35 ships no TV image and
+          # android-34 ships no x86_64 one. Do not bump without re-listing.
+          api-level: 34
           target: google-tv
-          arch: x86_64
+          arch: x86
           profile: tv_1080p
           ram-size: 3072M
           heap-size: 512M
