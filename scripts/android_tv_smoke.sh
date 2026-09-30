@@ -64,7 +64,7 @@ trap - EXIT
 device_model="$(adb shell getprop ro.product.model | tr -d '\r')"
 os_version="Android $(adb shell getprop ro.build.version.release | tr -d '\r') / API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 
-python scripts/write_android_tv_runtime_receipt.py \
+python3 scripts/write_android_tv_runtime_receipt.py \
   --apk "$apk" \
   --logcat "$evidence/logcat.txt" \
   --screenshot "$evidence/final.png" \
