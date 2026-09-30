@@ -31,18 +31,34 @@ jobs:
             --output build/android-tv-evidence/endpoint-health.json
           python -c 'import json,sys; actual=json.load(open(sys.argv[2], encoding="utf-8")).get("build_sha"); expected=sys.argv[1]; assert actual == expected, f"deployed build {actual!r} != workflow SHA {expected}"' \
             "${GITHUB_SHA}" build/android-tv-evidence/endpoint-health.json
-      - name: Install and drive the Android TV D-pad journey
+      - name: Pre-create the TV AVD with a small data partition
+      run: |
+        # The runner cannot set disk.dataPartition.size, and the 6G default
+        # fails the free-space check on the runner (run 36649294389: 3.06G
+        # available, 7.37G needed). 1.5G fits the APK install plus WebView.
+        yes | sdkmanager --licenses > /dev/null
+        sdkmanager --install 'system-images;android-34;android-tv;x86' > /dev/null
+        echo no | avdmanager create avd --force -n test \
+          --package 'system-images;android-34;android-tv;x86' \
+          --device 'tv_1080p'
+        printf 'disk.dataPartition.size=1610612736\n' >> ~/.android/avd/test.avd/config.ini
+
+    - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          # API 34 x86 is the newest Google TV image on the stable channel
+          # API 34 x86 is the newest TV image on the stable channel
           # (sdkmanager --list, 2026-09-30): android-35 ships no TV image and
-          # android-34 ships no x86_64 one. Do not bump without re-listing.
+          # android-34 ships no x86_64 one. android-tv (AOSP, no Play
+          # Services) boots inside the runner's window where google-tv hangs;
+          # it still ships WebView and the Leanback launcher the APK needs.
+          # Do not bump without re-listing.
           api-level: 34
-          target: google-tv
+          target: android-tv
           arch: x86
           profile: tv_1080p
           ram-size: 3072M
           heap-size: 512M
+          force-avd-creation: false
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash scripts/android_tv_smoke.sh
