@@ -13,7 +13,7 @@ physical device is optional.
 | Compiled default endpoint | Public HTTPS Lambda URL; no ADB override is needed | `app/build.gradle.kts`, `CockpitUrlResolver.kt` |
 | Normal Leanback launch | Automated in a fresh Android TV emulator | `.github/workflows/android-tv-emulator.yml` |
 | D-pad golden path | Attribution → stage → single-use record-only confirm → fixed responder handoff | `scripts/android_tv_smoke.sh` |
-| Runtime receipt | Landed in run 36661614006 | `android_tv_runtime_receipt.json` holds the content-addressed pointer; full bundle in [the run artifact](https://github.com/upgradedev/mercury_amazon/actions/runs/36661614006) |
+| Runtime receipt | Landed in run 36669903334 | `android_tv_runtime_receipt.json` holds the content-addressed pointer; full bundle in [the run artifact](https://github.com/upgradedev/mercury_amazon/actions/runs/36669903334) |
 | Physical Fire TV | Optional and not run | The FAQ does not require it |
 
 The demo path is deliberately effect-free. Its deployment markers are labelled
