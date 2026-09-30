@@ -332,6 +332,26 @@ def test_the_hero_headline_and_figure_are_written_from_the_response(html):
         assert field in script, f"the hero never reads {field} from the response"
 
 
+def test_the_attributed_hero_speaks_candidate_not_cause(html):
+    """The API ships claim_strength TEMPORAL_CANDIDATE_ONLY; the board must agree.
+
+    A bare "Attributed" eyebrow reads as proven cause against a measured 50%%
+    held-out precision, so the hero names a temporal candidate and carries the
+    causality disclosure the API and the voice summary already ship.
+    """
+    script = html.split("<script>")[-1]
+    assert "'Temporal candidate'" in script
+    assert "'Temporal candidate, several in window'" in script
+    assert ": 'Attributed'" not in script, "a bare Attributed eyebrow claims proven cause"
+    assert "Proximity is not proof of cause." in script
+    # The same claim in the board rows, the incident tile and the spoken
+    # announcement: candidate language everywhere, cause nowhere.
+    assert "attributed: 'Temporal candidate'" in script
+    assert "': attributed to commit '" not in script
+    assert "': temporal candidate commit '" in script
+    assert "? ' to ' + data.offending_commit.sha" not in script
+
+
 def test_the_page_asks_what_changed_on_load_rather_than_waiting_for_a_click(html):
     """A wallboard that says nothing until someone clicks cannot be read at all."""
     script = html.split("<script>")[-1]
