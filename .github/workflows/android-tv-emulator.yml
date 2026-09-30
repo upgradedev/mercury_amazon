@@ -33,17 +33,163 @@ jobs:
             "${GITHUB_SHA}" build/android-tv-evidence/endpoint-health.json
       - name: Pre-create the TV AVD with a small data partition
         run: |
-          # The runner cannot set disk.dataPartition.size, and the 6G default
-          # fails the free-space check on the runner (run 36649294389: 3.06G
-          # available, 7.37G needed). 1.5G fits the APK install plus WebView.
-          # No --device flag: the AOSP image ships no tv_1080p profile, and the
-          # journey sends D-pad keyevents only, so 1080p geometry set below is
-          # all it needs (Leanback and WebView come from the image itself).
+          # Free ~15G first: the runner ships toolchains this job never touches
+          # (dotnet, ghc, azure-cli, swift). Both the action's and the
+          # emulator's own free-space checks must pass (run 36649294389:
+          # 3.06G available, 7.37G needed for the 6G default partition).
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/az /usr/share/swift
+          df -h / | tail -1
           yes | sdkmanager --licenses > /dev/null
           sdkmanager --install 'system-images;android-34;android-tv;x86' > /dev/null
-          echo no | avdmanager create avd --force -n test \
-            --package 'system-images;android-34;android-tv;x86'
-          printf 'disk.dataPartition.size=1610612736\nhw.lcd.width=1920\nhw.lcd.height=1080\nhw.lcd.density=320\n' >> ~/.android/avd/test.avd/config.ini
+          # Write the AVD by hand: avdmanager without --device exits 0 on the
+          # runner's new cmdline-tools without creating anything (run
+          # 36652310634), and the AOSP image ships no tv_1080p profile for
+          # --device (run 36651621292). This config is the local mercury_tv
+          # AVD, which the emulator parses and resolves (systemPath found),
+          # minus the device-profile lines, with a 1.5G data partition.
+          mkdir -p ~/.android/avd/test.avd
+          cat > ~/.android/avd/test.ini <<'EOF'
+          avd.ini.encoding=UTF-8
+          path=/home/runner/.android/avd/test.avd
+          path.rel=avd/test.avd
+          target=android-34
+          EOF
+          cat > ~/.android/avd/test.avd/config.ini <<'EOF'
+          PlayStore.enabled = no
+          abi.type = x86
+          avd.id = test
+          avd.ini.encoding = UTF-8
+          avd.name = test
+          disk.cachePartition = yes
+          disk.cachePartition.size = 66MB
+          disk.dataPartition.size = 1610612736
+          disk.systemPartition.size = 0
+          disk.vendorPartition.size = 0
+          environment.height = 0
+          environment.width = 0
+          fastboot.forceChosenSnapshotBoot = no
+          fastboot.forceColdBoot = no
+          fastboot.forceFastBoot = yes
+          firstboot.bootFromDownloadableSnapshot = yes
+          firstboot.bootFromLocalSnapshot = yes
+          firstboot.saveToLocalSnapshot = yes
+          hw.accelerometer = no
+          hw.accelerometer_uncalibrated = yes
+          hw.arc = false
+          hw.audioInput = yes
+          hw.audioOutput = yes
+          hw.battery = no
+          hw.camera.back = emulated
+          hw.camera.back.orientation = 90
+          hw.camera.front = none
+          hw.camera.front.orientation = 90
+          hw.cpu.arch = x86
+          hw.cpu.ncore = 4
+          hw.dPad = yes
+          hw.display1.density = 0
+          hw.display1.flag = 0
+          hw.display1.height = 0
+          hw.display1.width = 0
+          hw.display1.xOffset = -1
+          hw.display1.yOffset = -1
+          hw.display2.density = 0
+          hw.display2.flag = 0
+          hw.display2.height = 0
+          hw.display2.width = 0
+          hw.display2.xOffset = -1
+          hw.display2.yOffset = -1
+          hw.display3.density = 0
+          hw.display3.flag = 0
+          hw.display3.height = 0
+          hw.display3.width = 0
+          hw.display3.xOffset = -1
+          hw.display3.yOffset = -1
+          hw.displayRegion.0.1.height = 0
+          hw.displayRegion.0.1.width = 0
+          hw.displayRegion.0.1.xOffset = -1
+          hw.displayRegion.0.1.yOffset = -1
+          hw.displayRegion.0.2.height = 0
+          hw.displayRegion.0.2.width = 0
+          hw.displayRegion.0.2.xOffset = -1
+          hw.displayRegion.0.2.yOffset = -1
+          hw.displayRegion.0.3.height = 0
+          hw.displayRegion.0.3.width = 0
+          hw.displayRegion.0.3.xOffset = -1
+          hw.displayRegion.0.3.yOffset = -1
+          hw.gltransport = pipe
+          hw.gltransport.asg.dataRingSize = 32768
+          hw.gltransport.asg.writeBufferSize = 1048576
+          hw.gltransport.asg.writeStepSize = 4096
+          hw.gltransport.drawFlushInterval = 800
+          hw.gps = yes
+          hw.gpu.enabled = no
+          hw.gpu.mode = auto
+          hw.gsmModem = yes
+          hw.gyroscope = yes
+          hw.hotplug_multi_display = no
+          hw.initialOrientation = portrait
+          hw.keyboard = no
+          hw.keyboard.charmap = qwerty2
+          hw.keyboard.lid = yes
+          hw.lcd.backlight = yes
+          hw.lcd.circular = false
+          hw.lcd.density = 320
+          hw.lcd.depth = 32
+          hw.lcd.height = 1080
+          hw.lcd.transparent = false
+          hw.lcd.vsync = 60
+          hw.lcd.width = 1920
+          hw.mainKeys = yes
+          hw.multi_display_window = no
+          hw.ramSize = 1536M
+          hw.rotaryInput = no
+          hw.screen = multi-touch
+          hw.sdCard = yes
+          hw.sensor.hinge = no
+          hw.sensor.hinge.count = 0
+          hw.sensor.hinge.fold_to_displayRegion.0.1_at_posture = 1
+          hw.sensor.hinge.resizable.config = 1
+          hw.sensor.hinge.sub_type = 0
+          hw.sensor.hinge.type = 0
+          hw.sensor.roll = no
+          hw.sensor.roll.count = 0
+          hw.sensor.roll.resize_to_displayRegion.0.1_at_posture = 6
+          hw.sensor.roll.resize_to_displayRegion.0.2_at_posture = 6
+          hw.sensor.roll.resize_to_displayRegion.0.3_at_posture = 6
+          hw.sensors.gyroscope_uncalibrated = yes
+          hw.sensors.heading = no
+          hw.sensors.heart_rate = no
+          hw.sensors.humidity = yes
+          hw.sensors.light = yes
+          hw.sensors.magnetic_field = yes
+          hw.sensors.magnetic_field_uncalibrated = yes
+          hw.sensors.orientation = no
+          hw.sensors.pressure = yes
+          hw.sensors.proximity = no
+          hw.sensors.rgbclight = no
+          hw.sensors.temperature = yes
+          hw.sensors.wrist_tilt = no
+          hw.touchpad0 = no
+          hw.touchpad0.height = 400
+          hw.touchpad0.width = 600
+          hw.trackBall = no
+          hw.useext4 = yes
+          image.sysdir.1 = system-images/android-34/android-tv/x86/
+          kernel.newDeviceNaming = autodetect
+          kernel.supportsYaffs2 = autodetect
+          runtime.network.latency = none
+          runtime.network.speed = full
+          sdcard.size = 100 MB
+          showDeviceFrame = yes
+          tag.display = Android TV
+          tag.id = android-tv
+          test.delayAdbTillBootComplete = 0
+          test.monitorAdb = 0
+          test.quitAfterBootTimeOut = -1
+          userdata.useQcow2 = no
+          vm.heapSize = 228M
+          EOF
+          sed -i 's/\r$//' ~/.android/avd/test.ini ~/.android/avd/test.avd/config.ini
 
       - name: Install and drive the Android TV D-pad journey
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
