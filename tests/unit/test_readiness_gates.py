@@ -5,7 +5,7 @@ can fail. J4 is the one that matters most here: Mercury is entered in the Fire T
 so J4 is the gate that decides whether the sponsor product is load-bearing, and until
 2026-09-08 it passed on ``'LEANBACK_LAUNCHER' in manifest`` while the README two screens
 away said no APK had ever been built. It was the one gate in the file that could not fail
-on the axis it exists to test, and it contributed a PASS to a published 45/53.
+on the axis it exists to test, and it contributed a PASS to a published 46/53.
 
 These drive every branch of the predicate with fixtures, including both accepted runtime
 routes: a physical Fire TV receipt and the Android TV Emulator receipt allowed by the
@@ -188,16 +188,17 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     """The landed receipt, asserted by contents against the real checkout.
 
-    Actions run 36798893479 built the APK from this history and drove the
+    Actions run 36922314984 built the APK from this history and drove the
     D-pad journey on an Android TV emulator against the candidate-language
-    page. The receipt below is that run's artifact bytes, downloaded and
-    hash-verified, not written by hand; every field is asserted below. It
-    proved its own checkout, but not THIS one: the hero-cause clamp moved
-    docs/index.html after the receipt build, so J4 fails naming the file
-    until the next emulator receipt lands. History: on 2026-10-01 the
-    2026-09-30 receipt (run 36669903334) went stale the day docs/index.html
-    joined the invalidation set, and J4 failed naming the file until run
-    36798893479 landed.
+    page with the hero-cause clamp, after the smoke journey learned to wait
+    for the opening correlation (run 36915746324 pressed keys while Stage
+    was still disabled and loaded DORA velocity instead of staging). The
+    receipt below is that run's artifact bytes, downloaded and hash-verified,
+    not written by hand; every field is asserted below. History: on
+    2026-10-01 the 2026-09-30 receipt (run 36669903334) went stale the day
+    docs/index.html joined the invalidation set, run 36798893479 restored
+    green, and the hero-cause clamp moved docs/index.html after that build,
+    so J4 failed naming the file until this receipt landed.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -210,18 +211,18 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
     assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
     assert receipt["build_sha"] in receipt["artifact_name"]
-    assert "actions/runs/36798893479" in receipt["workflow_run_url"]
+    assert "actions/runs/36922314984" in receipt["workflow_run_url"]
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
     problem = readiness.runtime_receipt_checkout_problem(receipt)
-    assert problem is not None and "docs/index.html" in problem
+    assert problem is None, f"the fresh receipt already fails its checkout: {problem}"
     audited, audited_message = readiness.evaluate_firetv_receipt_candidates(
         README_TERMS, LEANBACK_MANIFEST,
         [(readiness.ANDROID_TV_RUNTIME_RECEIPT, json.dumps(receipt))],
         _exists,
     )
-    assert audited is False and "docs/index.html" in audited_message
+    assert audited is True, audited_message
 
 
 def test_a_leanback_manifest_alone_no_longer_passes():
@@ -324,23 +325,21 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     assert "official FAQ" in reason and "Android TV" in reason
 
 
-def test_the_audit_reports_j4_as_invalidated_by_the_hero_clamp():
+def test_the_audit_reports_j4_green_on_the_fresh_receipt():
     """End to end: run the auditor and read J4 out of its own results.
 
-    Run 36798893479 drove the D-pad journey against the candidate-language
-    page from build 1bc8cd5, but the hero-cause clamp moved docs/index.html
-    after that build, so J4 fails naming the file instead of passing on a
-    journey the receipt never saw. The next emulator receipt restores the
-    passing assertion; until it lands this failure is the gate working, and
-    J4 stays out of the CI exit code.
+    Run 36922314984 drove the D-pad journey against the clamped page from
+    build e0a857a, and this checkout changes no live runtime path after that
+    build, so J4 passes on a journey the receipt actually saw. The stale
+    path stays pinned by
+    test_a_receipt_from_before_the_page_change_still_fails_naming_the_file.
     """
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
-    assert results["J4"].passed is False
-    assert "docs/index.html" in results["J4"].message
-    assert "36798893479" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
+    assert results["J4"].passed is True, results["J4"].message
+    assert "36922314984" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
         encoding="utf-8"
-    ), "the receipt this failure names is not the run it claims"
+    ), "the receipt this pass names is not the run it claims"
 
 
 def test_a_receipt_from_before_the_page_change_still_fails_naming_the_file():

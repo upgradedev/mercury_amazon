@@ -257,15 +257,16 @@ Stated here rather than left for a judge to find:
   emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
   below, because the deployed page predated the revision retry. Full 5-of-5 journeys
   followed on 2026-09-30 (runs 36661614006 and 36669903334), and run 36798893479 on
-  2026-10-01 re-drove all five events against the candidate-language page.
+  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
   publishes the deployed build SHA. It runs the current build: probed on 2026-10-01,
-  `/health` reported `1bc8cd54accf941be6c4388b7213d4c4c320aa3a`, with the departures board,
-  self-hosted fonts, the candidate headline and the candidate handoff wording. On
-  2026-09-30 it ran `b2f7868`; on 2026-09-26 it ran `6dd76bd`, which
+  `/health` reported `e0a857ae70349bd481140ced097d0791402d347b`, with the departures board,
+  self-hosted fonts, the candidate headline and the candidate handoff wording. Earlier
+  the same day it ran `1bc8cd5`, then `b99b154`; on 2026-09-30 it ran `b2f7868`; on
+  2026-09-26 it ran `6dd76bd`, which
   predates the departures board design and loads Google Fonts. It uses labelled offline fixtures and record-only rollback
   dispatch until real telemetry and pipeline credentials are configured.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
