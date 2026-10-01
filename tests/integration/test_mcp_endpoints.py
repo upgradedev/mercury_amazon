@@ -242,6 +242,37 @@ def test_recorded_demo_markers_create_an_honest_record_only_dpad_path(client):
     assert refreshed.json()["revision"] == handoff.json()["revision"]
 
 
+def test_demo_handoff_confirmed_facts_use_candidate_language(client):
+    """Confirmed facts must not state a cause the product cannot prove.
+
+    The second fact used to read "ANOMALY_ATTRIBUTED: ...", the raw verdict
+    enum, while the hero, tile, rows and announcement all say "Temporal
+    candidate". The fact now carries the same qualifier in the
+    explanation's own "closest change" words. Commit, author and window
+    come from the live diagnosis in this test, so fixture rotation cannot
+    break the pin; the wording around them is exact.
+    """
+    from src.infrastructure.demo_evidence import seed_recorded_demo_evidence
+    from src.interfaces import mcp_server
+
+    seed_recorded_demo_evidence(mcp_server.incident_use_case, mcp_server.deployment_evidence)
+    correlation = mcp_server.incident_use_case.execute("checkout-api", 60)
+    revision = client.get("/mcp/demo-handoff/revision").json()["revision"]
+    handoff = client.post(
+        "/mcp/tools/demo_update_handoff", json={"expected_revision": revision}
+    )
+    assert handoff.status_code == 200
+    facts = handoff.json()["confirmed_facts"]
+    assert len(facts) == 3
+    assert not any("ANOMALY_ATTRIBUTED" in fact for fact in facts)
+    offending = correlation.offending_commit
+    assert facts[1] == (
+        f"Temporal candidate, not proof of cause: commit {offending.sha} by "
+        f"{offending.author} is the closest change inside "
+        f"{correlation.attribution_window_minutes} minute attribution window."
+    )
+
+
 def test_demo_handoff_is_fixed_and_disabled_when_effectful_dispatch_is_selected(client, monkeypatch):
     from src.interfaces import mcp_server
 

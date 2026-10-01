@@ -66,7 +66,7 @@ is still pending, and the video says so in its closing beat.
 | # | Beat | Keys | On screen |
 |---|---|---|---|
 | 1 | `beat_01_question` | none | The loaded board, focus on Ask what changed |
-| 2 | `beat_02_board_on_load` | none | Five rows answered on load: Attributed, Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data |
+| 2 | `beat_02_board_on_load` | none | Five rows answered on load: Temporal candidate, Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data |
 | 3 | `beat_03_crowded_refusal` | Down x4, Center | release-train: Cannot attribute this, N runtime changes landed; Next: No rollback offered; Stage and Confirm disabled |
 | 4 | `beat_04_named_with_odds` | Up x3, Center | checkout-api: the commit named as the only runtime change, its message quoted, 50.0% held-out precision (synthetic, at most 75 minutes of lag) |
 | 5 | `beat_05_provenance` | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |

@@ -30,7 +30,7 @@
       "timestamp_end": 34.877,
       "narration_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody ninety percent of the time. A refusal never calls the deploy innocent.",
       "caption_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody 90.0% of the time. A refusal never calls the deploy innocent.",
-      "visual_action": "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
+      "visual_action": "Hold on the board. The five rows read Temporal candidate, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
     },
     {
       "beat_id": "beat_03_crowded_refusal",
