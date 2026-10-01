@@ -190,9 +190,11 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
 
     Actions run 36669903334 built the APK from this history and drove the
     D-pad journey on an Android TV emulator. The receipt below is that run's
-    artifact bytes, downloaded and hash-verified, not written by hand: the
-    gate must pass on it, and the receipt must still prove this checkout
-    (ancestry plus no runtime-bearing file changed since the receipt build).
+    artifact bytes, downloaded and hash-verified, not written by hand; every
+    field is asserted below. Whether it still proves THIS checkout is
+    asserted separately: since 2026-10-01 it does not, because
+    docs/index.html joined the invalidation set and changed after the
+    receipt build. The fresh emulator receipt restores the passing tail.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -209,7 +211,14 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
-    assert readiness.runtime_receipt_checkout_problem(receipt) is None
+    problem = readiness.runtime_receipt_checkout_problem(receipt)
+    assert problem is not None and "docs/index.html" in problem
+    audited, audited_message = readiness.evaluate_firetv_receipt_candidates(
+        README_TERMS, LEANBACK_MANIFEST,
+        [(readiness.ANDROID_TV_RUNTIME_RECEIPT, json.dumps(receipt))],
+        _exists,
+    )
+    assert audited is False and "docs/index.html" in audited_message
 
 
 def test_a_leanback_manifest_alone_no_longer_passes():
@@ -312,12 +321,23 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     assert "official FAQ" in reason and "Android TV" in reason
 
 
-def test_the_audit_reports_j4_as_passing_in_this_checkout():
-    """End to end: run the auditor and read J4 out of its own results."""
+def test_the_audit_reports_j4_as_invalidated_by_the_page_change():
+    """End to end: run the auditor and read J4 out of its own results.
+
+    The hosted UI files joined the invalidation set on 2026-10-01, so the
+    2026-09-30 receipt (run 36669903334) no longer proves this checkout:
+    docs/index.html changed after the receipt build. J4 must fail naming
+    the file, not pass on a journey the receipt never saw. The fresh
+    emulator receipt restores the passing assertion; until it lands this
+    failure is the gate working, and J4 stays out of the CI exit code.
+    """
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
-    assert results["J4"].passed is True
-    assert "actions/runs/36669903334" in results["J4"].message
+    assert results["J4"].passed is False
+    assert "docs/index.html" in results["J4"].message
+    assert "36669903334" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
+        encoding="utf-8"
+    ), "the receipt this failure names is not the run it claims"
 
 
 def test_the_readme_publishes_the_score_the_auditor_prints():
@@ -552,6 +572,54 @@ def test_the_gates_no_longer_read_anything_above_this_repository():
     section = auditor.split("I: Personas review instrument")[1].split("O: Owner-gated")[0]
     assert ".." not in section, "the I gates read a path outside this repository again"
     assert "STATE.md" not in section
+
+
+# ----------------- G2: a deployed ancestor with no runtime change is live
+
+
+def _git_run(monkeypatch, *, ancestor=True, changed=()):
+    import subprocess as stdlib_subprocess
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return stdlib_subprocess.CompletedProcess(cmd, 0 if ancestor else 1, "", "")
+        if cmd[:2] == ["git", "diff"]:
+            out = "\n".join(changed) + ("\n" if changed else "")
+            return stdlib_subprocess.CompletedProcess(cmd, 0, out, "")
+        if cmd[:2] == ["git", "rev-parse"]:
+            return stdlib_subprocess.CompletedProcess(cmd, 0, "f" * 40 + "\n", "")
+        raise AssertionError(f"unexpected git call in test: {cmd}")
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+
+def test_g2_passes_when_only_non_runtime_files_moved_after_the_deploy(monkeypatch):
+    """The commit-SHA trap: a receipt committed after its deploy must stay green.
+
+    Committing the receipt moves HEAD, so deployed == HEAD can never hold on a
+    committed tree. G2 passes when the deployed SHA is an ancestor whose live
+    runtime files are unchanged since; docs, tests and receipts do not move it.
+    """
+    _git_run(monkeypatch, ancestor=True, changed=())
+
+    assert readiness.deployed_checkout_problem("a" * 40) is None
+
+
+def test_g2_fails_naming_the_runtime_files_that_moved_after_the_deploy(monkeypatch):
+    _git_run(monkeypatch, ancestor=True, changed=("src/domain/x.py", "docs/index.html"))
+
+    problem = readiness.deployed_checkout_problem("a" * 40)
+
+    assert problem is not None
+    assert "src/domain/x.py" in problem and "docs/index.html" in problem
+
+
+def test_g2_fails_when_the_deployed_build_left_history(monkeypatch):
+    _git_run(monkeypatch, ancestor=False)
+
+    problem = readiness.deployed_checkout_problem("a" * 40)
+
+    assert problem is not None and "not an ancestor" in problem
 
 
 # ---------------------------------- G2: a receipt without a deployed build SHA

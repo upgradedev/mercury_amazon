@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-667 tests and a re-measure on an idle machine is pending**.
+671 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 667 passed
+# 671 passed
 ```
 
 #### Step 3: Start the server
@@ -1077,8 +1077,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 667 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2089 statements
+python -m pytest tests/ -q                                    # 671 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2090 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1091,10 +1091,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
+# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates**. J4 is
+**45/53 readiness gates** (46 on 2026-09-30, before the hosted UI files joined the J4 invalidation set; the fresh emulator receipt restores it). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1106,7 +1106,12 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file exists at the repository root since run 36669903334, so **J4 passes**.
+The file exists at the repository root since run 36669903334, and on the deployed
+checkout the receipt verifies, so **J4 passes there**. On a checkout where a live
+runtime path changed after the receipt was written, the same gate fails and names
+the stale file: this branch is that checkout, because `docs/index.html` carries the
+candidate language the receipt predates, so J4 is red here until the fresh emulator
+run lands a new receipt. The red is the fix working, not a regression.
 `docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
 `tests/unit/test_readiness_gates.py` asserts the checked-in receipt's contents and
 drives every refusal through the predicate.
@@ -1120,7 +1125,7 @@ persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which four are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -1142,7 +1147,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves this branch since the 2026-09-30 code deploy of `e92ca0d` (verified by re-downloading the live zip); see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `b2f7868` since the 2026-09-30 code deploy (verified by re-downloading the live zip); `e92ca0d` was the deploy before it, and this branch is not yet deployed; see [Known limitations](#known-limitations).
 
 ---
 

@@ -65,6 +65,16 @@ def recorded_demo_handoff(incident_use_case, deployment_evidence: DeploymentEvid
     if pair is None or not all(marker.source.startswith("offline-fixture") for marker in pair):
         return None
     _, target = pair
+    # The second fact used to read "ANOMALY_ATTRIBUTED: ...", the raw verdict
+    # enum, inside Confirmed facts: a numeric cause claim the hero, tile, rows
+    # and announcement all refuse to make. It now carries the same
+    # claim-strength qualifier the page speaks, in the explanation's own
+    # "closest change" words; the enum stays on the diagnosis payload.
+    candidate = (
+        f"Temporal candidate, not proof of cause: commit {offending.sha} by "
+        f"{offending.author} is the closest change inside "
+        f"{correlation.attribution_window_minutes} minute attribution window."
+    )
     return {
         "incident_id": "checkout-api-active",
         "responder": "D-pad demo responder",
@@ -72,7 +82,7 @@ def recorded_demo_handoff(incident_use_case, deployment_evidence: DeploymentEvid
         "confirmed_facts": [
             f"{correlation.metric_name} is {correlation.current_value} against baseline "
             f"{correlation.baseline_value}",
-            f"{correlation.verdict.value}: {correlation.explanation}",
+            candidate,
             f"Recorded demo marker {target.marker_id} points to {target.revision}",
         ],
         "next_step": (

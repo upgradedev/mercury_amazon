@@ -54,9 +54,9 @@ BEATS = [
         "It answered on load, before any key was pressed. Most answers are refusals: on "
         "generated cases held out from tuning, it saw a real anomaly and named nobody "
         "90.0% of the time. A refusal never calls the deploy innocent.",
-        "Hold on the board. The five rows read Attributed, Nothing to revert, Cannot "
-        "attribute, Cannot attribute and Insufficient data, each from the server's "
-        "answer.",
+        "Hold on the board. The five rows read Temporal candidate, Nothing to revert, "
+        "Cannot attribute, Cannot attribute and Insufficient data, each from the "
+        "server's answer.",
     ),
     (
         "beat_03_crowded_refusal", 17.554,

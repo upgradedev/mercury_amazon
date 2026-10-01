@@ -254,15 +254,18 @@ Stated here rather than left for a judge to find:
   is the allowed-target path: it retains the exact APK, logs, screenshot and receipt.
   `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis. A local
   dry run of that journey on 2026-09-29 reached 4 of 5 receipt events on an Android TV
-  emulator against the deployed build; the fifth, the handoff publish, needs the redeploy
-  this section already names, because the deployed page predates the revision retry.
+  emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
+  below, because the deployed page predated the revision retry. Full 5-of-5 journeys
+  followed on 2026-09-30 (runs 36661614006 and 36669903334); a fresh run is queued for
+  the candidate-language page.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It runs an older build than this repository: probed on
-  2026-09-26, `/health` reported `6dd76bd`, which predates the departures board design and
-  loads Google Fonts, where the current build serves its own fonts. It uses labelled offline fixtures and record-only rollback
+  publishes the deployed build SHA. It runs the current build: probed on 2026-09-30,
+  `/health` reported `b2f7868969ff475a2c10ccc686243d48e7d18692`, with the departures board,
+  self-hosted fonts and the candidate language. On 2026-09-26 it ran `6dd76bd`, which
+  predates the departures board design and loads Google Fonts. It uses labelled offline fixtures and record-only rollback
   dispatch until real telemetry and pipeline credentials are configured.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
   like an anomaly. The baseline now stops at the onset rather than containing the

@@ -141,6 +141,11 @@ ANDROID_TV_REQUIRED_EVENTS = {
     "journey:handoff_published:checkout-api-active:",
 }
 
+# The emulator loads the live cockpit page and the journey events it emits come
+# from that page's scripts, so the hosted UI invalidates the receipt with the
+# APK: a headline change with a green receipt would otherwise claim a journey
+# the receipt never saw. Fonts, the manifest and the written documentation do
+# not drive the journey and stay out.
 ANDROID_TV_RUNTIME_PATHS = (
     "app/",
     "gradle/",
@@ -151,7 +156,56 @@ ANDROID_TV_RUNTIME_PATHS = (
     ".github/workflows/android-tv-emulator.yml",
     "scripts/android_tv_smoke.sh",
     "scripts/write_android_tv_runtime_receipt.py",
+    "docs/index.html",
+    "docs/webmcp_bridge.js",
+    "docs/firetv_nav.js",
 )
+
+
+#: What the live Lambda serves: the API code and the cockpit UI files the TV
+#: WebView loads. Docs, tests, scripts and the Android wrapper do not change
+#: the deployed behavior, so a receipt stays valid across commits that touch
+#: only those. This is what frees G2 from the commit-SHA trap: a receipt
+#: written by scripts/probe_deployment.py right after a deploy stays green
+#: when it is committed, because committing it changes no runtime file.
+LIVE_RUNTIME_PATHS = (
+    "src/",
+    "docs/index.html",
+    "docs/webmcp_bridge.js",
+    "docs/firetv_nav.js",
+)
+
+
+def deployed_checkout_problem(deployed: str) -> str | None:
+    """Return why a deployment receipt cannot prove this checkout is live.
+
+    None when the deployed SHA is HEAD itself or an ancestor whose runtime
+    files are unchanged since: the live endpoint then runs this checkout.
+    """
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", deployed, "HEAD"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if ancestor.returncode != 0:
+        return f"deployed build {deployed[:7]} is not an ancestor of HEAD"
+    if deployed == head_sha():
+        return None
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", f"{deployed}..HEAD", "--", *LIVE_RUNTIME_PATHS],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if changed.returncode != 0:
+        return "could not compare live runtime files with the deployed build"
+    paths = [path for path in changed.stdout.splitlines() if path]
+    if paths:
+        return f"live runtime files changed after the deployed build: {paths}"
+    return None
 
 
 def runtime_receipt_checkout_problem(receipt: dict) -> str | None:
@@ -1082,7 +1136,14 @@ def audit_project() -> list[GateResult]:  # noqa: C901 - one branch per gate, ke
             elif deployed == local_head:
                 g2, g2_msg = True, f"Deployed build SHA equals HEAD ({local_head[:7]})"
             else:
-                g2_msg = f"Deployed {deployed[:7]} does not equal HEAD {local_head[:7]}"
+                problem = deployed_checkout_problem(deployed)
+                if problem is None:
+                    g2, g2_msg = True, (
+                        f"Deployed {deployed[:7]} is an ancestor of HEAD with no live "
+                        "runtime file changed since, so the endpoint runs this checkout"
+                    )
+                else:
+                    g2_msg = f"Deployed {deployed[:7]} does not prove HEAD {local_head[:7]}: {problem}"
         except ValueError:
             g2_msg = "Deployment receipt is not valid JSON"
     gate("G2", "Deployed SHA matches submitted commit", g2, g2_msg)
