@@ -615,6 +615,36 @@ def test_keyboard_focus_moves_on_load_only_on_a_television(browser, base_url, ho
         context.close()
 
 
+def test_a_200_character_commit_message_does_not_grow_the_hero_cause(browser, base_url):
+    """The board renders genuine git history, so the quoted message is unbounded.
+
+    PR #37's CI failed twice on the merge checkout: it attributed the merge
+    commit itself, whose 100-character message grew the hero cause a third line
+    and pushed quiet-service behind the key bar at 960x540, while every checkout
+    with a short message stayed green. The message is set directly here so the
+    test does not depend on which commit the checkout happens to attribute.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=960, height=540, host=True)
+    try:
+        wait_for_board(page)
+        height_of = """() => {
+            const el = document.querySelector('#heroCause');
+            return el.getBoundingClientRect().height;
+        }"""
+        before = page.evaluate(height_of)
+        page.evaluate(
+            """() => { document.querySelector('#heroCause .quote').textContent =
+                             '"' + 'x'.repeat(200) + '"'; }"""
+        )
+        after = page.evaluate(height_of)
+        assert after <= before + 1.0, (
+            f"a 200-character message grew the hero cause {before:.1f}px to {after:.1f}px"
+        )
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
 # ------------------------------------------------------- Every verdict, every row
 
 EXPECTED_VERDICTS = {

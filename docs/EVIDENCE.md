@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-672 tests and a re-measure on an idle machine is pending**.
+673 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 672 passed
+# 673 passed
 ```
 
 #### Step 3: Start the server
@@ -1080,7 +1080,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 672 passed
+python -m pytest tests/ -q                                    # 673 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2090 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
@@ -1094,10 +1094,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
+# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates** (45 on 2026-10-01, while the 2026-09-30 receipt predated the candidate-language page; run 36798893479 restored it). J4 is
+**45/53 readiness gates** (46 on 2026-10-01 with run 36798893479; the hero-cause clamp moved `docs/index.html` after the receipt build, and the next emulator receipt restores it). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1110,12 +1110,13 @@ TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. Th
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
 The file exists at the repository root; run 36798893479 wrote the current one from
-build `1bc8cd5`, and no runtime-bearing file moved after it, so **J4 passes**.
-On a checkout where a live runtime path changed after the receipt was written,
-the same gate fails and names the stale file instead of passing on a journey
-the receipt never saw: on 2026-10-01 that was this repository, because
-`docs/index.html` carried the candidate language the 2026-09-30 receipt
-predated, and J4 was red naming the file until the fresh receipt landed.
+build `1bc8cd5`. On a checkout where a live runtime path changed after the receipt
+was written, the gate fails and names the stale file instead of passing on a
+journey the receipt never saw: this branch is that checkout twice over, first
+because `docs/index.html` carried the candidate language the 2026-09-30 receipt
+predated, and now because the hero-cause clamp moved the same file after run
+36798893479. J4 is red naming the file until the next emulator receipt lands;
+the red is the fix working, not a regression.
 `docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
 `tests/unit/test_readiness_gates.py` asserts the checked-in receipt's contents and
 drives every refusal through the predicate.
@@ -1126,10 +1127,10 @@ here and would have failed for anyone who cloned the repository on its own, so t
 score above was a number only this machine could reproduce and the audit said so in its
 own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
 persona review in this repository's own voice: the procedure that ran first, the
-three lenses, who owned each row, thirteen findings of which three are failures, and
+three lenses, who owned each row, thirteen findings of which four are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
