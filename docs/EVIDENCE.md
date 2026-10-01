@@ -1151,7 +1151,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `b2f7868` since the 2026-09-30 code deploy (verified by re-downloading the live zip); `e92ca0d` was the deploy before it, and this branch is not yet deployed; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `1bc8cd5` since the 2026-10-01 code deploy (PR #34, verified by re-downloading the live zip: byte-identical, candidate wording in the handoff facts); `b2f7868` was the deploy before it. The commits after `1bc8cd5` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD; see [Known limitations](#known-limitations).
 
 ---
 

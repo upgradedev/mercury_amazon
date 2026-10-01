@@ -262,9 +262,10 @@ Stated here rather than left for a judge to find:
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It runs the current build: probed on 2026-09-30,
-  `/health` reported `b2f7868969ff475a2c10ccc686243d48e7d18692`, with the departures board,
-  self-hosted fonts and the candidate language. On 2026-09-26 it ran `6dd76bd`, which
+  publishes the deployed build SHA. It runs the current build: probed on 2026-10-01,
+  `/health` reported `1bc8cd54accf941be6c4388b7213d4c4c320aa3a`, with the departures board,
+  self-hosted fonts, the candidate headline and the candidate handoff wording. On
+  2026-09-30 it ran `b2f7868`; on 2026-09-26 it ran `6dd76bd`, which
   predates the departures board design and loads Google Fonts. It uses labelled offline fixtures and record-only rollback
   dispatch until real telemetry and pipeline credentials are configured.
 * Anomaly detection is a threshold, not a model. A regular nightly batch will look
