@@ -320,3 +320,21 @@ def test_the_build_document_states_what_has_been_run():
     assert "actions/runs/36798893479" in doc
     assert "Physical Fire TV" in doc
     assert "Optional and not run" in doc
+
+
+def test_the_smoke_journey_waits_for_the_answer_before_pressing_any_key():
+    """Stage is disabled until the opening correlation renders.
+
+    Run 36915746324 pressed RIGHT while Stage was still disabled and CENTER
+    loaded DORA velocity instead of staging, so the journey never reached
+    rollback_staged. The first keyevent must come after the what_changed wait.
+    """
+    script = (REPO_ROOT / "scripts" / "android_tv_smoke.sh").read_text(encoding="utf-8")
+    gate = script.find('wait_for_event "journey:what_changed:"')
+    assert gate != -1, "the smoke journey no longer waits for the opening correlation"
+    first_key = script.find("input keyevent")
+    assert first_key != -1, "no keyevent found in the smoke journey, so this proves nothing"
+    assert gate < first_key, (
+        "the smoke journey presses a key before the what_changed gate: with Stage "
+        "still disabled the ring routes RIGHT to the wrong control"
+    )
