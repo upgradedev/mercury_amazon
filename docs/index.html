@@ -273,6 +273,13 @@
       padding-right: max(0px, calc(100% - 70ch));
       margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--rule);
       overflow-wrap: break-word;
+      /* The board renders genuine git history, so the quoted message is
+         unbounded: a merge-checkout attribution grew this block a third line
+         and pushed the last row behind the key bar at 960x540 (PR #37 CI,
+         twice). Two lines keep the short-message look and bound the
+         pathological case; the full message stays one what_changed call away. */
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      line-clamp: 2; overflow: hidden;
     }
     .hero-cause .quote { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
     .hero-cause .quote-label {
