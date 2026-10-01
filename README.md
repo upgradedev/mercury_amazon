@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence landed in run 36669903334; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence landed in run 36798893479; public access is still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -32,7 +32,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-671%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-672%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -153,7 +153,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 671 passed
+# 672 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -197,7 +197,7 @@ required at any stage of submission or judging".
 **Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
 held-out split, all synthetic; commits read from real git history, with their file lists;
 the governed rollback and its refusals, each tested; the Leanback app source; an Android
-TV runtime receipt from [run 36669903334](https://github.com/upgradedev/mercury_amazon/actions/runs/36669903334),
+TV runtime receipt from [run 36798893479](https://github.com/upgradedev/mercury_amazon/actions/runs/36798893479),
 which installed the exact APK on an emulator and drove the record-only path by D-pad
 (receipt: `android_tv_runtime_receipt.json`); and a live cockpit that serves this
 branch at HEAD (env-bumped on every merge, `/health` reports the build SHA, labelled
@@ -228,7 +228,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source, a CI build workflow and a runtime receipt | Run 36669903334 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
+| Fire TV | App source, a CI build workflow and a runtime receipt | Run 36798893479 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on

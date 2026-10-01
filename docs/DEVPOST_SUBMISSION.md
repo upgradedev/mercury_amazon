@@ -256,8 +256,8 @@ Stated here rather than left for a judge to find:
   dry run of that journey on 2026-09-29 reached 4 of 5 receipt events on an Android TV
   emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
   below, because the deployed page predated the revision retry. Full 5-of-5 journeys
-  followed on 2026-09-30 (runs 36661614006 and 36669903334); a fresh run is queued for
-  the candidate-language page.
+  followed on 2026-09-30 (runs 36661614006 and 36669903334), and run 36798893479 on
+  2026-10-01 re-drove all five events against the candidate-language page.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
