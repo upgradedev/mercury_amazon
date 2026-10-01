@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-673 tests and a re-measure on an idle machine is pending**.
+674 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 673 passed
+# 674 passed
 ```
 
 #### Step 3: Start the server
@@ -1044,7 +1044,7 @@ replaced, [36669903334](https://github.com/upgradedev/mercury_amazon/actions/run
 built APK `dcb29f7e0c3f3cb6` from `69aa972` over the same journey; its receipt went
 stale on 2026-10-01 when the hosted UI files joined the invalidation set.
 
-The manifest declarations, Gradle wiring and key handling contract are checked by 30 structural tests
+The manifest declarations, Gradle wiring and key handling contract are checked by 31 structural tests
 plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
 32 assertions in `tests/e2e/spatial_nav_spec.js`, and a Playwright end-to-end test
 walks the browser form of the same golden path. None of those substitutes for the
@@ -1080,7 +1080,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 673 passed
+python -m pytest tests/ -q                                    # 674 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2090 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

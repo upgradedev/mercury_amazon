@@ -47,6 +47,13 @@ adb shell am start -W \
   | tee "$evidence/launcher.txt"
 wait_for_event "journey:page_loaded:$endpoint"
 
+# Stage stays disabled until the opening correlation renders, so keys sent before
+# the answer walk a ring without it: run 36915746324 pressed RIGHT while Stage
+# was still disabled and CENTER loaded DORA velocity instead of staging. The
+# what_changed event fires in the same tick that enables Stage, and the adb
+# round trip dwarfs the remaining synchronous render, so this wait is the gate.
+wait_for_event "journey:what_changed:"
+
 # The page starts focused on Ask what changed. Move right to Stage, select, then
 # move right to Confirm and select. These are the same key codes a TV remote emits.
 adb shell input keyevent KEYCODE_DPAD_RIGHT
