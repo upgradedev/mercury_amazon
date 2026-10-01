@@ -1033,16 +1033,18 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Runtime evidence landed.** Actions run [36798893479](https://github.com/upgradedev/mercury_amazon/actions/runs/36798893479)
-built APK `352f98d7fea0459d` (9,261,223 B) from `1bc8cd5`, installed it on AOSP TV
+**Runtime evidence landed.** Actions run [36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984)
+built APK `ceab28455a239aa2` (9,261,223 B) from `e0a857a`, installed it on AOSP TV
 (Android 14 / API 34), launched through the normal Leanback path with no URL
 override, and drove page load, attribution, record-only approval and handoff by
-D-pad against the candidate-language page. The receipt is checked in as
+D-pad against the clamped candidate-language page. The receipt is checked in as
 `android_tv_runtime_receipt.json`; the run's retained artifact holds the APK,
 install and launch logs, logcat, screenshot and receipt together. The run it
-replaced, [36669903334](https://github.com/upgradedev/mercury_amazon/actions/runs/36669903334),
-built APK `dcb29f7e0c3f3cb6` from `69aa972` over the same journey; its receipt went
-stale on 2026-10-01 when the hosted UI files joined the invalidation set.
+replaced, [36798893479](https://github.com/upgradedev/mercury_amazon/actions/runs/36798893479),
+built APK `352f98d7fea0459d` from `1bc8cd5` over the same journey; its receipt went
+stale on 2026-10-01 when the hero-cause clamp moved `docs/index.html` after the
+receipt build. The run before that, 36669903334, went stale the same day the hosted
+UI files joined the invalidation set.
 
 The manifest declarations, Gradle wiring and key handling contract are checked by 31 structural tests
 plus Kotlin tests. `docs/firetv_nav.js` also runs in Node against a synthetic grid,
@@ -1094,10 +1096,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
+# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**45/53 readiness gates** (46 on 2026-10-01 with run 36798893479; the hero-cause clamp moved `docs/index.html` after the receipt build, and the next emulator receipt restores it). J4 is
+**46/53 readiness gates** (45 at `b99b154`, when the hero-cause clamp had moved `docs/index.html` after the receipt build; run 36922314984 re-drove the journey against the clamped page and restored green). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1109,14 +1111,15 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file exists at the repository root; run 36798893479 wrote the current one from
-build `1bc8cd5`. On a checkout where a live runtime path changed after the receipt
-was written, the gate fails and names the stale file instead of passing on a
-journey the receipt never saw: this branch is that checkout twice over, first
-because `docs/index.html` carried the candidate language the 2026-09-30 receipt
-predated, and now because the hero-cause clamp moved the same file after run
-36798893479. J4 is red naming the file until the next emulator receipt lands;
-the red is the fix working, not a regression.
+The file exists at the repository root; run 36922314984 wrote the current one from
+build `e0a857a`, and this checkout changes no live runtime path after that build,
+so J4 passes on a journey the receipt actually saw. On a checkout where a live
+runtime path changed after the receipt was written, the gate fails and names the
+stale file instead of passing on a journey the receipt never saw: that happened
+twice on 2026-10-01, first because `docs/index.html` carried the candidate language
+the 2026-09-30 receipt predated, and then because the hero-cause clamp moved the
+same file after run 36798893479. Each time the red named the file until the next
+emulator receipt landed; the red was the fix working, not a regression.
 `docs/FIRE_TV_BUILD.md` carries the receipt's shape, and
 `tests/unit/test_readiness_gates.py` asserts the checked-in receipt's contents and
 drives every refusal through the predicate.
@@ -1127,10 +1130,10 @@ here and would have failed for anyone who cloned the repository on its own, so t
 score above was a number only this machine could reproduce and the audit said so in its
 own output. They read `docs/PERSONA_REVIEW.md` now, which is a restatement of the
 persona review in this repository's own voice: the procedure that ran first, the
-three lenses, who owned each row, thirteen findings of which four are failures, and
+three lenses, who owned each row, thirteen findings of which three are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 45/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -1152,7 +1155,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `1bc8cd5` since the 2026-10-01 code deploy (PR #34, verified by re-downloading the live zip: byte-identical, candidate wording in the handoff facts); `b2f7868` was the deploy before it. The commits after `1bc8cd5` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e0a857a` since the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved); `b99b154` was the code deploy before it (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. The commits after `e0a857a` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD; see [Known limitations](#known-limitations).
 
 ---
 
@@ -1196,13 +1199,13 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **Three green emulator runs.** Runs 36661614006, 36669903334 and 36798893479 each compiled the public endpoint, installed
+* **Four green emulator runs.** Runs 36661614006, 36669903334, 36798893479 and 36922314984 each compiled the public endpoint, installed
   the exact APK, launched without an ADB URL override and drove the record-only path
-  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Three runs
+  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Four runs
   prove the path works and repeats, not that it is flake-free. The event FAQ does not require a physical Fire TV.
 * **The public deployment tracks HEAD.** The cockpit at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reports its
-  `build_sha` from `/health`; every merge ships a full code deploy (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and grepped for the fix markers after every deploy).
+  `build_sha` from `/health`; every merge ships a deploy verified byte-identical: a full code deploy, or an env-only SHA move over a proven-identical zip (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and compared after every deploy).
   Readiness gate G2 pins the deployed build against the committed receipt: it passes when the deployed SHA is HEAD or an ancestor with unchanged live runtime files, and fails naming the files that moved after the deploy. It runs in labelled offline-fixture
   mode. The allowed-target receipt above covers the APK.
 * **No published video.** One 170.61 s take, recorded at `df5db06` with the figures this
@@ -1210,7 +1213,7 @@ given a substitute number.
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
   record-only journey, but the J4 evidence is the APK completing it in the emulator,
-  which run 36798893479 recorded.
+  which run 36922314984 recorded.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.

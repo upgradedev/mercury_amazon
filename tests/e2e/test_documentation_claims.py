@@ -146,7 +146,7 @@ def test_no_document_claims_an_alexa_integration_that_does_not_exist():
 
 def test_documents_cite_the_device_run_that_happened():
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "actions/runs/36798893479" in build_doc
+    assert "actions/runs/36922314984" in build_doc
     assert "Physical Fire TV" in build_doc and "Optional and not run" in build_doc
 
 
@@ -167,8 +167,8 @@ def test_documents_distinguish_the_built_apk_from_a_device_run():
 
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
     readme_lower = README.lower()
-    assert "actions/runs/36798893479" in build_doc
-    assert "actions/runs/36798893479" in readme_lower
+    assert "actions/runs/36922314984" in build_doc
+    assert "actions/runs/36922314984" in readme_lower
     assert "physical fire tv" in build_doc and "optional" in build_doc
 
 
@@ -187,7 +187,7 @@ def test_documents_follow_the_official_android_tv_emulator_allowance():
     assert "official faq" in build_doc
     assert "android tv emulator" in build_doc
     assert "physical device is optional" in build_doc
-    # android-tv (AOSP), not google-tv: run 36798893479 proves the AOSP image
+    # android-tv (AOSP), not google-tv: run 36922314984 proves the AOSP image
     # carries the full D-pad journey (Leanback plus WebView), while the pinned
     # Play image never produced a green run.
     assert "target: android-tv" in workflow
@@ -198,7 +198,7 @@ def test_documents_follow_the_official_android_tv_emulator_allowance():
 
 def test_the_readme_states_the_limitation_beside_each_capability():
     limitations = EVIDENCE.split("## Known limitations")[-1]
-    for required in ["No rollback dispatch has ever been fired", "Three green emulator runs",
+    for required in ["No rollback dispatch has ever been fired", "Four green emulator runs",
                      "Cost Explorer lags", "browser speech synthesis", "Local quickstart state"]:
         assert required in limitations, f"the limitations section does not mention {required!r}"
 
