@@ -13,7 +13,8 @@ What changed for this repository, so the kit's pixel-reading sync gate
   1. A silent title card opens the video and a silent closing card ends it, both
      rendered here with Pillow. The title card says what Mercury does first, then in
      one smaller line the commit that was recorded, that the metrics are offline
-     fixtures and the rollback record-only, and that the public deployment is pending.
+     fixtures and the rollback record-only, and that the public cockpit is live with
+an emulator receipt landed.
   2. The capture is scaled to 87.5% and placed at the top of the frame, and the
      captions sit in the band underneath it, so no caption ever covers what the
      board shows. The page itself was captured at 1920x1080.
@@ -138,13 +139,13 @@ def main() -> None:
         ("", "segoeui.ttf", 30, INK_2),
         (f"Local run of commit {short} in desktop Chromium: offline fixtures, record-only rollback.",
          "segoeui.ttf", 34, INK_2),
-        ("Public deployment pending.", "segoeui.ttf", 34, INK_2),
+        ("Public cockpit live; emulator receipt landed.", "segoeui.ttf", 34, INK_2),
     ])
     card(outro_png, [
         ("Mercury", "bahnschrift.ttf", 110, AMBER),
         ("One deploy, or why not.", "segoeui.ttf", 54, INK),
         (f"Recorded from a local run of commit {short}, with offline fixtures.", "segoeui.ttf", 40, INK_2),
-        ("Public deployment and Fire TV runtime receipt pending.", "segoeui.ttf", 40, INK_2),
+        ("Public cockpit live; emulator receipt landed.", "segoeui.ttf", 40, INK_2),
     ])
 
     # In the finished file every caption starts after the title card: shift each window.
@@ -254,7 +255,7 @@ def main() -> None:
         "file": FINAL_NAME,
         "releaseSha": RELEASE_SHA,
         "recordedFrom": "local server, MERCURY_OFFLINE=1, desktop Chromium at 1920x1080, D-pad bridge",
-        "publicDeployment": "pending",
+        "publicDeployment": "live",
         "durationSeconds": round(duration, 3),
         "width": 1920,
         "height": 1080,

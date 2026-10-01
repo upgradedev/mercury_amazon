@@ -1,16 +1,19 @@
 # Demo video
 
-**Status: rendered locally, not uploaded.** The current take is the audit-build take below. It has no public link until the owner uploads it, and nothing in this directory is the video itself.
+**Status: rendered locally, not uploaded.** The current take is the master take below, re-recorded 2026-10-01 after the candidate-language page, the fresh emulator receipt and the live deploy. It has no public link until the owner uploads it, and nothing in this directory is the video itself.
 
 | Item | Value |
 |---|---|
-| Recorded commit | `0aed20ab83ab5af6cb2af41b33b85fd5f1414f3c` (audit branch `muse/audit-mercury-20260928`), reported by the server's own `/health` during the take |
-| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_muse_20260929/mercury_amazon/output/`, outside git |
+| Recorded commit | `9620743b848d041fbfc098ae371177ee5af80937` (master), reported by the server's own `/health` during the take |
+| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_muse_20261001/mercury_amazon/output/`, outside git |
 | Length | 170.61 s (ffprobe), 1920x1080, 25 fps, AAC 48 kHz, -16.3 LUFS integrated |
-| SHA-256 | `8f5f3c34db92a1a8b7fec8225839836e7d40a02fcb9ea397c779f301f7983ca2` |
+| SHA-256 | `792cee861c1789bee7daa63ab94dfe791aad148b8ed597ed1180af0aa53db47c` |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 2249 in the final narration, 0 new: all 11 beats reused from the `reviews/videos_20260928` cache (cache keys match), generated with no ElevenLabs key in the environment, so no synthesis call was possible |
+| Characters synthesized | 2249 in the final narration, 0 new: all 11 beats reused from the `reviews/videos_muse_20260929` cache (cache keys match), generated with no ElevenLabs key in the environment, so no synthesis call was possible |
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
+| Cards | Title and closing cards read "Public cockpit live; emulator receipt landed." (the 2026-09-29 take read "pending") |
+
+Previous take: `0aed20a` (audit branch), 170.61 s, SHA-256 `8f5f3c34db92a1a8b7fec8225839836e7d40a02fcb9ea397c779f301f7983ca2`, in `reviews/videos_muse_20260929/mercury_amazon/output/`. It shows the pre-candidate board ("Attributed" headline), so it must not be uploaded.
 
 Next to the mp4 sit `video-receipt.json` (commit, duration, SHA-256, voice, characters),
 `captions.en.srt` (the sidecar for an upload), `sync-gate.txt` (the gate's output) and
@@ -22,9 +25,9 @@ receipt are in the sibling `narration/` and `capture/` folders.
 * A 4 second title card that says what the product is before where the take came
   from: "Mercury. An incident board for the team's Fire TV. It names the deploy behind
   a spike only when it can." One smaller line under it reads: local run of commit
-  0aed20a in desktop Chromium, offline fixtures, record-only rollback, public
-  deployment pending. A 3 second closing card repeats the commit and says the public
-  deployment and the Fire TV runtime receipt are pending.
+  9620743 in desktop Chromium, offline fixtures, record-only rollback, then "Public
+  cockpit live; emulator receipt landed." A 3 second closing card repeats the commit
+  and the same line.
 * Between them, one continuous take of the page served by
   `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8873`,
   recorded by desktop Chromium at 1920x1080. Every key is sent through
@@ -36,7 +39,8 @@ receipt are in the sibling `narration/` and `capture/` folders.
 * The board's own labels stay in frame: OFFLINE FIXTURE on the metric, STAND-IN on the
   commit, record-only on the rollback, and SYNTHETIC on the spend figures.
 * It is not a Fire TV or Android TV runtime proof. No device or emulator appears, and
-  the narration says so. The candidate Android TV Emulator receipt is still pending.
+  the narration says so. The Android TV Emulator receipt has landed since (run 36798893479);
+  the take still shows no emulator.
 * After Confirm the board stays where it is: the large figure reads RECORDED, no
   pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next
   press: Publish responder handoff (from 99.4 s to 112.8 s). The capture refuses
