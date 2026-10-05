@@ -112,6 +112,28 @@ captions were burned 4 s late, because the subtitles filter runs before the titl
 card is joined, and one beat gave the wrong reason for the spend fixture (the run is
 in offline mode; the machine does have AWS credentials).
 
+## Android TV emulator footage
+
+The take above is a desktop browser. The Fire TV track wants the video to show the project
+running on an allowed target. The official FAQ allows the Android TV Emulator:
+"an emulator (Android TV Emulator or the Fire TV/Vega simulator) is fine".
+
+`.github/workflows/android-tv-footage.yml` films the same D-pad journey on that
+emulator in hosted CI, using `scripts/android_tv_footage.sh`. The journey is the Leanback home screen, the launch, the opening answer,
+then Stage, Confirm (record-only) and Publish, paced so a viewer can follow.
+`screenrecord` is the primary capture. A 1 fps screencap sequence is assembled as a
+fallback, because the emulator's software GPU can break `screenrecord`.
+
+The artifact `mercury-android-tv-footage-<sha>` holds `journey.mp4`,
+`frames-1fps.mp4`, `timeline.tsv` (seconds per key press and per answer) and
+`footage-provenance.json`. The provenance file names the build the public demo served
+while it was recorded.
+
+This is footage, not runtime proof. It writes no receipt and leaves gate J4 untouched;
+J4 still rests on `android-tv-emulator.yml` and `scripts/android_tv_smoke.sh`.
+It lives in its own files because editing those two would invalidate the committed J4
+receipt.
+
 ## Re-rendering one beat
 
 Edit the beat in `scripts/build_video_plan.py` and rerun it. `generate-narration.py`
