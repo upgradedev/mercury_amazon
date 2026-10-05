@@ -32,7 +32,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-674%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-680%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -153,7 +153,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 674 passed
+# 680 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -281,6 +281,9 @@ risky assumptions and their tests, and the first ten conversations are in
 - `python scripts/attribution_split.py` scores the engine on a train and a held-out
   split, 1160 synthetic labelled cases each, and writes the figure the board prints;
   `python scripts/tune_attribution.py` is the train-only sweep the window was chosen from.
+- `python scripts/naive_attribution_baselines.py` scores blame-the-latest-deploy and
+  blame-every-deploy-in-the-window on the same held-out cases: 29 wrong namings for the
+  engine against 482 and 1294, and lower recall, 4.8% against 16.7% and 56.8%.
 - `python scripts/correlation_trial.py` scores the whole-stream corpus and prints the
   ablation, the threshold sweep and the density sweep.
 - `python scripts/benchmark_suite.py` times every endpoint and the governance token.
