@@ -105,7 +105,7 @@ class DiagnoseIncidentUseCase:
         self._correlator = correlator or IncidentCorrelator()
 
     def _gather_commits(self) -> tuple[list[CommitRef], Provenance]:
-        """Try GitHub, local git, then an explicitly labelled recording."""
+        """Try GitHub, local git, then an explicitly labelled offline fixture."""
         raw = self._commits.list_recent_commits(limit=20)
         source = DataSource.GITHUB_API
         detail = "{count} recent default-branch commits read from the GitHub REST API."
@@ -126,8 +126,8 @@ class DiagnoseIncidentUseCase:
                 self._recorded_commits,
                 "detail",
                 (
-                    "{count} commits read from a checked-in recording. They are real recorded "
-                    "repository commits, not live service deployments."
+                    "{count} commits read from a checked-in offline fixture. They are not live "
+                    "service deployments."
                 ),
             )
 

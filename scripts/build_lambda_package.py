@@ -1,7 +1,8 @@
 """Build the reproducible Linux Lambda zip for Mercury.
 
 The source tree alone is insufficient: the public offline journey also needs the
-display-only deploy feed, the recorded commit stream and the published trial summary.  This builder makes those
+display-only deploy feed and the published trial summaries; the recorded commit stream
+ships beside them as the input those summaries were scored on.  This builder makes those
 files explicit and installs Linux wheels even when it is invoked from Windows.
 """
 from __future__ import annotations

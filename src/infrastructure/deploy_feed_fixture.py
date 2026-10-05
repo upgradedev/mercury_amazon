@@ -9,9 +9,10 @@ work, not as an incident.
 This provider serves ``fixtures/deploy_feed_fixture.json`` instead: a handful of
 hand-written deploy records whose messages look like a deploy feed. They are
 invented, the provenance the board renders says so, and nothing that produces a
-published figure reads them. ``commit_stream_fixture.json`` and
-``RecordedCommitProvider`` are unchanged, so the trial, the held-out split and
-every number derived from them stay where they are.
+published figure reads them. ``commit_stream_fixture.json`` is unchanged and the
+trial scripts read it directly, so the trial, the held-out split and every number
+derived from them stay where they are. The server-side adapter that used to read
+the recording had no caller left once this feed replaced it, so it was removed.
 
 The records carry no file lists, so every one stays a deploy candidate, exactly as
 an unknown file list does on the GitHub path.

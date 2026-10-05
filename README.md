@@ -32,7 +32,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-694%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-692%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -153,7 +153,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 694 passed
+# 692 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -195,13 +195,15 @@ required at any stage of submission or judging".
 ## What is real and what is not
 
 **Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
-held-out split, all synthetic; commits read from real git history, with their file lists;
+held-out split, all synthetic; commits read from real git history, with their file lists,
+wherever there is a checkout (the public board has none and shows an invented deploy feed);
 the governed rollback and its refusals, each tested; the Leanback app source; an Android
 TV runtime receipt from [run 36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984),
 which installed the exact APK on an emulator and drove the record-only path by D-pad
-(receipt: `android_tv_runtime_receipt.json`); and a live cockpit that serves this
-branch at HEAD (env-bumped on every merge, `/health` reports the build SHA, labelled
-offline-fixture mode).
+(receipt: `android_tv_runtime_receipt.json`); and a live cockpit in labelled
+offline-fixture mode whose `/health` reports the build SHA. Probed on 2026-10-05
+(`curl -s <url>/health`) it served `e0a857a`, so the runtime changes in PR #42 are not
+live until the next redeploy.
 **Simulated:** every metric series on the board is an offline fixture, and a confirmed
 rollback is recorded, never sent to a pipeline. **Missing:**
 

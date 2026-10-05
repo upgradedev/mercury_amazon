@@ -123,14 +123,19 @@ can never make a fixture look live.
 ### The demo path, and what it does to the data
 
 With no credentials at all, the war room still works end to end: the commits are
-real ones read from your checkout, and the simulated metric series is anchored
-after one of them so the correlation is coherent. The checkout-api response says
-exactly that, in the provenance text the evidence panel shows:
+real ones read from your checkout with `git log` (on the public Lambda, which has no
+checkout, they are the invented deploy feed in
+`src/infrastructure/fixtures/deploy_feed_fixture.json`), and the simulated metric
+series is anchored after one of them so the correlation is coherent. The metric text
+does not vouch for the commits; it defers to the commit stamp beside the answer. The
+checkout-api response says so in the provenance text the evidence panel shows
+(`CloudWatchMetricAdapter._simulated_series` in `src/infrastructure/cloudwatch_adapter.py`):
 
 > The final reading is placed 4 minutes after the newest commit that is alone in its
-> 75 minute attribution window, chosen from the real log so the attribution is
+> 75 minute attribution window, chosen from the commit log so the attribution is
 > demonstrable and does not change with the last hour of somebody's commit history;
-> the commits are real, this metric is not.
+> the commits are whatever the commit stamp beside this answer says they are, and
+> this metric is generated.
 
 ### The refusals are the first thing you can press
 
@@ -307,9 +312,11 @@ that define how that artefact is built and deployed.
 Everything else is not a runtime path for this server: the README and the other
 documents, tests, CI, the video plan and the Fire TV client in `app/`. A commit whose
 file list is unknown stays a candidate, so missing data never makes Mercury more willing
-to name a change. Local git, the checked-in recording and the GitHub path supply file
-lists; the GitHub path reads each commit's files with one extra call per commit, and a
-failed or capped read stays a candidate. A commit set aside is
+to name a change. Local git and the GitHub path supply file lists at run time; the GitHub
+path reads each commit's files with one extra call per commit, and a failed or capped
+read stays a candidate. The public board's invented deploy feed carries no file lists,
+so every one of its records stays a candidate. The trial reads the checked-in
+recording's file lists from `src/infrastructure/fixtures/commit_paths_fixture.json`. A commit set aside is
 counted on the wire (`attribution.commits_set_aside`) and in the refusal wording, which
 says it is a reading of file lists, not a finding that those changes are harmless.
 `tests/unit/test_change_scope.py` parses the Dockerfile and the packager and fails if
@@ -818,7 +825,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-694 tests and a re-measure on an idle machine is pending**.
+692 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +869,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 694 passed
+# 692 passed
 ```
 
 #### Step 3: Start the server
@@ -1082,8 +1089,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 694 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2134 statements
+python -m pytest tests/ -q                                    # 692 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2092 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1155,7 +1162,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e0a857a` since the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved); `b99b154` was the code deploy before it (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. The commits after `e0a857a` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e0a857a` since the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved); `b99b154` was the code deploy before it (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. A re-probe on 2026-10-05 (`curl -s <url>/health`) still reported `e0a857a`. PR #42 changes runtime files (`docs/index.html` and `src/`), so the live behavior lags it: the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause are not live until the next redeploy; see [Known limitations](#known-limitations).
 
 ---
 
