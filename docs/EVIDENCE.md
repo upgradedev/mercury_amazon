@@ -818,7 +818,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-674 tests and a re-measure on an idle machine is pending**.
+694 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -862,7 +862,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 674 passed
+# 694 passed
 ```
 
 #### Step 3: Start the server
@@ -1033,7 +1033,7 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Runtime evidence landed.** Actions run [36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984)
+**Android TV emulator run landed.** Actions run [36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984)
 built APK `ceab28455a239aa2` (9,261,223 B) from `e0a857a`, installed it on AOSP TV
 (Android 14 / API 34), launched through the normal Leanback path with no URL
 override, and drove page load, attribution, record-only approval and handoff by
@@ -1082,8 +1082,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 674 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2090 statements
+python -m pytest tests/ -q                                    # 694 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2134 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1208,7 +1208,7 @@ given a substitute number.
   `build_sha` from `/health`; every merge ships a deploy verified byte-identical: a full code deploy, or an env-only SHA move over a proven-identical zip (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and compared after every deploy).
   Readiness gate G2 pins the deployed build against the committed receipt: it passes when the deployed SHA is HEAD or an ancestor with unchanged live runtime files, and fails naming the files that moved after the deploy. It runs in labelled offline-fixture
   mode. The allowed-target receipt above covers the APK.
-* **No published video.** One 170.61 s take, recorded at `df5db06` with the figures this
+* **No published video.** One 170.61 s take, recorded at `9620743` with the figures this
   build prints, is rendered locally and not yet uploaded (see `video/README.md`).
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole

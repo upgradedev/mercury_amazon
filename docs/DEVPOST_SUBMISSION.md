@@ -250,7 +250,7 @@ stopped being a compromise and started being the design.
 
 Stated here rather than left for a judge to find:
 
-* **Candidate runtime receipt pending.** `.github/workflows/android-tv-emulator.yml`
+* **Android TV emulator receipt landed; no Fire OS device run.** `.github/workflows/android-tv-emulator.yml`
   is the allowed-target path: it retains the exact APK, logs, screenshot and receipt.
   `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis. A local
   dry run of that journey on 2026-09-29 reached 4 of 5 receipt events on an Android TV
