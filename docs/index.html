@@ -1300,12 +1300,13 @@
       return wrap;
     }
 
-    /* Without a GitHub token the commits are Mercury's own history (local git, or the
-       checked-in recording of it), and the offline spike is placed after the newest
-       lone commit in it, so the board quotes one of this repository's commits against
-       checkout-api. The badge says so on the board, with a STAND-IN stamp in place of
-       a green LIVE, and in full to assistive technology and on hover, in the server's
-       own provenance sentence. */
+    /* Without a GitHub token the commits are Mercury's own history from local git, and
+       the offline spike is placed after the newest lone commit in it, so the board
+       quotes one of this repository's commits against checkout-api. Without a git
+       checkout either (the public Lambda) they are the invented, display-only deploy
+       feed, stamped OFFLINE FIXTURE. The badge says which on the board, with a
+       STAND-IN stamp in place of a green LIVE for local git, and in full to assistive
+       technology and on hover, in the server's own provenance sentence. */
     function commitBadge(data) {
       var provenance = data.commit_provenance;
       var source = provenance && provenance.data_source;
@@ -1342,7 +1343,7 @@
         && (mp.display_label || '') === (cp.display_label || '')
         && mp.is_live === cp.is_live;
       if (!sameStamp) { return [metric, commits]; }
-      var said = 'Metric and commits are both ' + (mp.display_label || 'offline fixture').toLowerCase()
+      var said = 'Metric and commits share one stamp, ' + (mp.display_label || 'OFFLINE FIXTURE')
         + '. ' + (commits.getAttribute('aria-description') || cp.detail || '');
       metric.setAttribute('aria-description', said);
       metric.title = said;

@@ -56,5 +56,6 @@ class DeployFeedFixtureProvider:
             "{count} stand-in deploys from the display-only fixture "
             "src/infrastructure/fixtures/deploy_feed_fixture.json. They were written by hand "
             "for this demo: not real commits, not deployments of any service, and not used "
-            "by any published figure."
+            "by any published figure. They carry no file lists, so each one counts as a "
+            "deploy candidate; the runtime filter has nothing to read."
         )

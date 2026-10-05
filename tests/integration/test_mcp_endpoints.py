@@ -160,7 +160,7 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
     assert "placed" in detail
     # The window is the correlator's own, 75 minutes since 2026-09-27.
     assert "alone in its 75 minute attribution window" in detail
-    assert "the commits are real, this metric is not" in detail
+    assert "the commit stamp beside this answer says they are, and this metric is generated" in detail
 
 
 def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(client):
@@ -336,7 +336,7 @@ def test_the_crowded_refusal_says_which_commit_it_was_anchored_to_and_why(client
     assert data["recommended_action"] is None
     detail = data["metric_provenance"]["detail"]
     assert "the commit with the most company" in detail
-    assert "the commits are real, this metric is not" in detail
+    assert "the commit stamp beside this answer says they are, and this metric is generated" in detail
     assert "cannot attribute it to any one of them" in data["voice_summary"]
     assert "rolling back on this answer would be a guess" in data["voice_summary"]
 

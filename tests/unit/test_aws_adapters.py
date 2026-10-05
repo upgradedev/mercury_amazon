@@ -566,7 +566,7 @@ def test_the_crowded_shape_discloses_how_it_was_staged():
     name = next(n for n, s in SIMULATED_SERVICES.items() if s.shape == SHAPE_CROWDED)
     series = offline_adapter().get_error_series(name, anchor_at=max(times), commit_times=times)
     assert "the commit with the most company" in series.provenance.detail
-    assert "the commits are real, this metric is not" in series.provenance.detail
+    assert "the commit stamp beside this answer says they are, and this metric is generated" in series.provenance.detail
 
 
 def test_every_verdict_the_correlator_can_reach_is_reachable_from_the_fixture():

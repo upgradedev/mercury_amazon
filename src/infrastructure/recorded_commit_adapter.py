@@ -1,11 +1,11 @@
-"""Read-only commit evidence bundled with the offline demonstration.
+"""Read-only access to the commit recording the published trial is scored on.
 
-Lambda zip deployments do not contain a ``.git`` directory.  Without a GitHub
-token that used to leave the public cockpit with no commit evidence at all, even
-though the repository already ships the exact recorded commit stream used by the
-published correlation trial.  This adapter reads that recording.  Its caller
-labels the provenance ``offline-fixture`` so a recorded repository commit is
-never presented as a live deployment of the service being monitored.
+This adapter reads ``commit_stream_fixture.json``, the real ``git log`` recording
+behind the published correlation figures. The public cockpit used to fall back to
+it when a Lambda zip had no ``.git`` directory and no GitHub token, which put the
+repository's own commit messages on the board. The server now falls back to the
+invented, display-only deploy feed in ``deploy_feed_fixture.py`` instead; this
+adapter and the recording are unchanged, so no published figure moves.
 """
 from __future__ import annotations
 

@@ -6,13 +6,16 @@ returns the verdict unchanged. It never substitutes a result when a provider
 returns nothing.
 
 Commits come from the GitHub API when a token is present. When they do not, it
-falls back to the local git checkout and finally to the checked-in recording used
-by the published trial. The provenance distinguishes all three paths.
+falls back to the local git checkout and finally to a labelled offline fixture (the
+server wires the invented, display-only deploy feed in
+``src/infrastructure/deploy_feed_fixture.py``). The provenance distinguishes all
+three paths.
 
 When the metric series is simulated (no CloudWatch), the simulation is anchored
 to the newest known commit so the correlation is demonstrable end to end without
 an AWS account. That anchoring is stated in the provenance the cockpit renders:
-the commits are real, the metric is not, and the screen says so.
+the metric is generated, the commits are what their own stamp says, and the screen
+says so.
 
 Each commit carries its file list when the source has one (local git and the recording
 do; the GitHub commits API used here does not). With a runtime filter on the correlator,
@@ -138,7 +141,7 @@ class DiagnoseIncidentUseCase:
             return [], Provenance(
                 source=DataSource.OFFLINE_FIXTURE,
                 detail=(
-                    "No commits are available from GitHub, local git or the checked-in recording, "
+                    "No commits are available from GitHub, local git or the offline fixture, "
                     "and this use case does not invent commits. Attribution is unavailable."
                 ),
                 observed_at_utc=_iso_now(),

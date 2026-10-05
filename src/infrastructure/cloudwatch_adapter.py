@@ -352,28 +352,30 @@ class CloudWatchMetricAdapter:
                 f" The final reading is placed {offset} minutes after the newest known commit, "
                 f"which is deliberately outside the {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute "
                 "attribution window, so the correlator has an anomaly and an empty window, which it "
-                "reports as cannot-attribute rather than as no-deploy; the commits are real, this "
-                "metric is not."
+                "reports as cannot-attribute rather than as no-deploy; the commits are whatever the "
+                "commit stamp beside this answer says they are, and this metric is generated."
             )
         elif shape == SHAPE_CROWDED:
             anchoring = (
                 f" The final reading is placed {offset} minutes after the commit with the most "
                 f"company inside the {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute attribution "
-                "window, chosen from the real log so the crowded-window refusal is reachable from "
-                "this screen; the commits are real, this metric is not."
+                "window, chosen from the commit log so the crowded-window refusal is reachable from "
+                "this screen; the commits are whatever the commit stamp beside this answer says "
+                "they are, and this metric is generated."
             )
         elif shape == SHAPE_ATTRIBUTED:
             anchoring = (
                 f" The final reading is placed {offset} minutes after the newest commit that is "
                 f"alone in its {DEFAULT_ATTRIBUTION_WINDOW_MINUTES} minute attribution window, "
-                "chosen from the real log so the attribution is demonstrable and does not change "
-                "with the last hour of somebody's commit history; the commits are real, this "
-                "metric is not."
+                "chosen from the commit log so the attribution is demonstrable and does not change "
+                "with the last hour of somebody's commit history; the commits are whatever the "
+                "commit stamp beside this answer says they are, and this metric is generated."
             )
         else:
             anchoring = (
                 f" The final reading is placed {offset} minutes after the newest known commit so "
-                "the correlation is demonstrable; the commits are real, this metric is not."
+                "the correlation is demonstrable; the commits are whatever the commit stamp beside "
+                "this answer says they are, and this metric is generated."
             )
 
         return MetricSeries(
