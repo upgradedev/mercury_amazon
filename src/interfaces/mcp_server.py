@@ -41,6 +41,7 @@ from src.infrastructure.aws_cost_adapter import AWSCostAdapter
 from src.infrastructure.cloudwatch_adapter import CloudWatchMetricAdapter
 from src.infrastructure.cloudwatch_github_ingest import DevOpsTelemetryIngestAdapter
 from src.infrastructure.demo_evidence import recorded_demo_handoff, seed_recorded_demo_evidence
+from src.infrastructure.deploy_feed_fixture import DeployFeedFixtureProvider
 from src.infrastructure.dynamodb_state import DynamoStateStore
 from src.infrastructure.github_actions_dispatcher import (
     GitHubActionsRollbackDispatcher,
@@ -49,7 +50,6 @@ from src.infrastructure.github_actions_dispatcher import (
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
-from src.infrastructure.deploy_feed_fixture import DeployFeedFixtureProvider
 from src.infrastructure.trial_summary import naming_accuracy
 from src.interfaces.handoff_routes import register_handoff_routes
 
