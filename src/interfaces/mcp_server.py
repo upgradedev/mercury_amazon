@@ -49,7 +49,7 @@ from src.infrastructure.github_actions_dispatcher import (
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_adapter import LocalGitCommitProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
-from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
+from src.infrastructure.deploy_feed_fixture import DeployFeedFixtureProvider
 from src.infrastructure.trial_summary import naming_accuracy
 from src.interfaces.handoff_routes import register_handoff_routes
 
@@ -130,7 +130,11 @@ dora_use_case = CalculateDORAUseCase(github_adapter)
 cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
 local_git_provider = LocalGitCommitProvider()
-recorded_commit_provider = RecordedCommitProvider()
+# The last fallback, used where there is neither a GitHub token nor a git checkout
+# (the public Lambda): an invented deploy feed, labelled as one, for display only. The
+# trial's commit recording is not used here, so the board never quotes the
+# repository's own commit messages and no published figure depends on the demo.
+recorded_commit_provider = DeployFeedFixtureProvider()
 # The shipped engine: the domain defaults plus the runtime filter, so a commit that
 # changed no file the server is built from (src/domain/change_scope.py) is never named
 # as the deploy behind a spike. Scored as v3_2026_09_27_runtime by

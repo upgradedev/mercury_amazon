@@ -42,7 +42,7 @@ def seed_recorded_demo_evidence(incident_use_case, deployment_evidence: Deployme
             older = []
     if not older:
         return
-    source = "offline-fixture-recorded-mercury-commits-not-service-deployments"
+    source = "offline-fixture-demo-markers-not-service-deployments"
     for position, commit in enumerate((older[0], offending), start=1):
         artifact = hashlib.sha256(f"mercury-recorded-demo:{commit.sha}".encode()).hexdigest()
         deployment_evidence.record(DeploymentMarker.from_values(

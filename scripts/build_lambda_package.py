@@ -19,6 +19,7 @@ RUNTIME_FILES = (
     # The held-out figure the answer carries beside a named commit (trial_summary.py).
     Path("attribution_holdout_summary.json"),
     Path("src/infrastructure/fixtures/commit_stream_fixture.json"),
+    Path("src/infrastructure/fixtures/deploy_feed_fixture.json"),
     Path("docs/index.html"),
     Path("docs/firetv_nav.js"),
     Path("docs/webmcp_bridge.js"),

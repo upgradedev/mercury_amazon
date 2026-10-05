@@ -1,0 +1,55 @@
+{
+  "schema": "mercury.deploy-feed-fixture/1",
+  "note": "DISPLAY-ONLY STAND-IN, INVENTED. These deploy records were written by hand for the public demo board. They are not commits from this or any repository, not deployments of any service, and the authors are team names, not people. Mercury serves them only when it has neither a GitHub token nor a local git checkout, which is the public Lambda, and stamps them OFFLINE FIXTURE. No script reads them: scripts/correlation_trial.py, scripts/attribution_split.py and every published figure use commit_stream_fixture.json, which this file does not change. The timestamps are laid out so each demo row reaches its verdict: one lone deploy for checkout-api, the deploy before it as the rollback target, and a burst of five for release-train.",
+  "written_at_utc": "2026-10-05T00:00:00Z",
+  "deploys": [
+    {
+      "sha": "4f1c2ab",
+      "message": "checkout-api: lower payment-client pool max from 50 to 10",
+      "author": "payments-team",
+      "committed_at": "2026-10-04T14:00:00+00:00"
+    },
+    {
+      "sha": "9b07e3d",
+      "message": "checkout-api: add retry-budget metrics to the payment client",
+      "author": "payments-team",
+      "committed_at": "2026-10-04T11:30:00+00:00"
+    },
+    {
+      "sha": "e21d6f0",
+      "message": "release-train: bump base image to the October security patch",
+      "author": "platform-release",
+      "committed_at": "2026-10-04T09:38:00+00:00"
+    },
+    {
+      "sha": "7c3a915",
+      "message": "release-train: enable gzip on the internal API gateway",
+      "author": "platform-release",
+      "committed_at": "2026-10-04T09:25:00+00:00"
+    },
+    {
+      "sha": "b58e0c4",
+      "message": "release-train: move session cache TTL from 15 to 30 minutes",
+      "author": "platform-release",
+      "committed_at": "2026-10-04T09:15:00+00:00"
+    },
+    {
+      "sha": "0d9f27a",
+      "message": "release-train: upgrade the HTTP client library to 2.4",
+      "author": "platform-release",
+      "committed_at": "2026-10-04T09:08:00+00:00"
+    },
+    {
+      "sha": "3a6be18",
+      "message": "release-train: rotate the read-replica connection string",
+      "author": "platform-release",
+      "committed_at": "2026-10-04T09:00:00+00:00"
+    },
+    {
+      "sha": "c4e8d72",
+      "message": "search-indexer: raise the batch size from 200 to 500 documents",
+      "author": "search-team",
+      "committed_at": "2026-10-04T06:10:00+00:00"
+    }
+  ]
+}

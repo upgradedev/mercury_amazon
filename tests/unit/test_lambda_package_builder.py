@@ -14,6 +14,8 @@ def test_lambda_package_manifest_includes_golden_path_evidence(tmp_path):
     required = set(package_manifest())
     assert "correlation_trial_summary.json" in required
     assert "src/infrastructure/fixtures/commit_stream_fixture.json" in required
+    # The public board's commit fallback; without it the Lambda would name nothing.
+    assert "src/infrastructure/fixtures/deploy_feed_fixture.json" in required
     assert "docs/index.html" in required
     # The page's self-hosted fonts and their licences ship with it: the Fire TV app
     # loads the page from this Lambda and may never reach a font CDN.
