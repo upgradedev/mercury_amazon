@@ -358,3 +358,8 @@ your own checkout and every panel labels its data source on screen.
   a D-pad and WebView wallboard end to end. The final receipt still wants hardware
   for what the emulator cannot show (remote auto-repeat, Leanback focus behaviour on
   a real TV), and that run is pending.
+* **Friction log.** Nine entries, each with the task attempted, the steps taken, the
+  expected and actual result, a severity rating, the workaround used and a
+  suggestion, are in the repository at
+  [docs/FRICTION_LOG.md](https://github.com/upgradedev/mercury_amazon/blob/master/docs/FRICTION_LOG.md)
+  (collaborator access is needed while the repository is private).

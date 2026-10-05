@@ -30,6 +30,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [Run it locally](#run-it-locally) | The build in the picture, with no credentials |
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
+| [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-674%20collected-brightgreen.svg)](tests/)
