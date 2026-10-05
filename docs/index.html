@@ -2297,9 +2297,15 @@
         return;
       }
       var data = state.lastCorrelation;
+      /* The verdict goes over as the server's handoff_fact, the same words the demo
+         handoff uses: a named change is "Temporal candidate, not proof of cause", a
+         refusal is its refusal statement. It used to be the raw verdict code and the
+         explanation, so the operator path handed a second responder
+         "ANOMALY_ATTRIBUTED: ..." as a confirmed fact. */
+      var attribution = data.attribution || {};
       var facts = [
         data.metric.name + ' is ' + data.metric.current + ' against baseline ' + data.metric.baseline,
-        data.verdict + ': ' + data.explanation
+        attribution.handoff_fact || attribution.refusal_statement || data.voice_summary
       ];
       if (data.deployment_evidence && data.deployment_evidence.target_marker) {
         facts.push('Verified target marker ' + data.deployment_evidence.target_marker.marker_id

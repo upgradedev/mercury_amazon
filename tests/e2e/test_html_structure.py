@@ -352,6 +352,23 @@ def test_the_attributed_hero_speaks_candidate_not_cause(html):
     assert "? ' to ' + data.offending_commit.sha" not in script
 
 
+def test_no_handoff_the_page_publishes_states_the_verdict_code_as_a_fact(html):
+    """The operator handoff used to send "ANOMALY_ATTRIBUTED: <explanation>".
+
+    Both handoff paths now carry the server's handoff_fact, the same "Temporal
+    candidate, not proof of cause" words the demo handoff writes. The page may not
+    build a confirmed fact from the verdict code again, on any path.
+    """
+    script = html.split("<script>")[-1]
+    start = script.index("async function publishHandoff")
+    body = script[start:script.index("async function", start + 1)]
+    assert "attribution.handoff_fact" in body
+    assert "data.verdict +" not in body, "a handoff fact is built from the raw verdict code"
+    assert "data.verdict+" not in body.replace(" ", ""), "a handoff fact is built from the raw verdict code"
+    assert "data.explanation" not in body, "the explanation without its qualifier is a cause claim"
+    assert "confirmed_facts: facts" in body
+
+
 def test_the_page_asks_what_changed_on_load_rather_than_waiting_for_a_click(html):
     """A wallboard that says nothing until someone clicks cannot be read at all."""
     script = html.split("<script>")[-1]

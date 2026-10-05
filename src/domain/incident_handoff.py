@@ -6,6 +6,12 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
+from src.domain.incident_correlation import CorrelationVerdict
+
+#: A confirmed fact may not carry this code. Naming a change is a temporal candidate,
+#: not proof of cause, and the handoff says so in words (IncidentCorrelation.handoff_fact).
+CAUSE_CODE = CorrelationVerdict.ANOMALY_ATTRIBUTED.value
+
 
 class HandoffConflict(ValueError):
     """Raised for stale revisions or malformed handoff updates."""
@@ -82,6 +88,11 @@ class IncidentHandoffStore:
             raise HandoffConflict("at least one confirmed fact is required")
         if len(facts) > 10:
             raise HandoffConflict("at most 10 confirmed facts may be shared")
+        if any(CAUSE_CODE in fact for fact in facts):
+            raise HandoffConflict(
+                f"a confirmed fact may not state {CAUSE_CODE}: a named change is a temporal "
+                "candidate, not proof of cause"
+            )
         with self._lock:
             current = self.get(incident_id)
             actual_revision = current.revision if current else 0

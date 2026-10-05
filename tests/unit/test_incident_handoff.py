@@ -34,3 +34,14 @@ def test_stale_responder_cannot_overwrite_newer_handoff_state():
             incident_id="inc-17", responder="Noah", current_action="Rolling back",
             confirmed_facts=["target verified"], next_step="Confirm", expected_revision=0,
         )
+
+
+def test_a_confirmed_fact_may_not_state_the_cause_code():
+    store = IncidentHandoffStore()
+    with pytest.raises(HandoffConflict, match="temporal candidate, not proof of cause"):
+        store.update(
+            incident_id="inc-18", responder="Maya", current_action="Investigating",
+            confirmed_facts=["ANOMALY_ATTRIBUTED: commit abc landed 4 minutes before"],
+            next_step="Check deploy", expected_revision=0,
+        )
+    assert store.get("inc-18") is None

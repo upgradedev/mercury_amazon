@@ -3,7 +3,9 @@
 Calls ``cloudwatch:GetMetricStatistics`` through boto3 when AWS credentials are
 resolvable. When they are not, it returns a deterministic simulated series whose
 provenance says, in the payload the cockpit renders, that the numbers were
-generated locally and were never read from CloudWatch.
+generated locally and were never read from CloudWatch. When a live read is
+attempted and comes back empty or fails, it returns no points and the label
+NO LIVE DATA; it never substitutes the simulated series for a live read.
 
 The simulated series is not a disguise for a live reading. It exists so the
 correlator, the rollback governance path and the Fire TV interaction can be
@@ -271,6 +273,34 @@ class CloudWatchMetricAdapter:
             ),
         )
 
+    def _no_live_data(
+        self, service_name: str, reason: str, namespace: str, metric_name: str
+    ) -> MetricSeries:
+        """Fail closed after a live read that produced nothing usable.
+
+        A CloudWatch call was made and came back empty or failed. This used to fall
+        back to the simulated series, placed just after a real commit, so a
+        misconfigured alarm during a real incident could show a generated spike lined
+        up behind a real change. Now the answer is no points at all, stamped NO LIVE
+        DATA with the reason, which the correlator reports as INSUFFICIENT_DATA and
+        never as a candidate. The simulated series is only for the paths where no live
+        read was attempted (MERCURY_OFFLINE, or no credentials), and it says so.
+        """
+        return MetricSeries(
+            metric_name=metric_name,
+            namespace=namespace,
+            points=[],
+            provenance=Provenance(
+                source=DataSource.NO_LIVE_DATA,
+                detail=(
+                    f"{reason} No metric series is shown for {service_name}: a failed or empty "
+                    "live read is not replaced with generated data, so nothing can be "
+                    "attributed from it."
+                ),
+                observed_at_utc=_iso_now(),
+            ),
+        )
+
     def _simulated_series(
         self,
         service_name: str,
@@ -414,15 +444,14 @@ class CloudWatchMetricAdapter:
                 for entry in datapoints
             ]
             if not points:
-                return self._simulated_series(
+                return self._no_live_data(
                     service_name,
                     (
                         f"CloudWatch returned no datapoints for {metric_name} on {service_name} "
                         f"in the last {window_minutes} minutes."
                     ),
-                    window_minutes,
-                    anchor_at,
-                    commit_times,
+                    namespace,
+                    metric_name,
                 )
             return MetricSeries(
                 metric_name=metric_name,
@@ -439,10 +468,9 @@ class CloudWatchMetricAdapter:
                 ),
             )
         except Exception as exc:
-            return self._simulated_series(
+            return self._no_live_data(
                 service_name,
                 f"CloudWatch call failed ({type(exc).__name__}: {exc}).",
-                window_minutes,
-                anchor_at,
-                commit_times,
+                namespace,
+                metric_name,
             )

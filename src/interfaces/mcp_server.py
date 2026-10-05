@@ -439,6 +439,9 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "baseline_points": correlation.baseline_points,
             "measured_accuracy": naming_accuracy(),
             "claim_strength": "TEMPORAL_CANDIDATE_ONLY",
+            # The verdict as a handoff fact, so the operator handoff the cockpit
+            # publishes says what the demo handoff says and never the raw verdict code.
+            "handoff_fact": correlation.handoff_fact,
             "causality_statement": (
                 "The named change is the sole deploy candidate in the configured time window. "
                 "Temporal proximity does not prove it caused the anomaly."

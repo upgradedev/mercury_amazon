@@ -16,10 +16,13 @@ class DataSource(str, Enum):
     AWS_COST_EXPLORER = "aws-cost-explorer"
     AWS_CLOUDWATCH = "aws-cloudwatch"
     OFFLINE_FIXTURE = "offline-fixture"
+    #: A live read was attempted and produced nothing usable: CloudWatch returned no
+    #: datapoints, or the call failed. Nothing was substituted for it.
+    NO_LIVE_DATA = "no-live-data"
 
     @property
     def is_live(self) -> bool:
-        return self is not DataSource.OFFLINE_FIXTURE
+        return self not in (DataSource.OFFLINE_FIXTURE, DataSource.NO_LIVE_DATA)
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,8 @@ class Provenance:
     @property
     def display_label(self) -> str:
         """Short label rendered on the 10-foot wallboard."""
+        if self.source is DataSource.NO_LIVE_DATA:
+            return "NO LIVE DATA"
         return "LIVE" if self.is_live else "OFFLINE FIXTURE"
 
     def to_dict(self) -> dict[str, str | bool]:
