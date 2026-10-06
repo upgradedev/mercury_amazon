@@ -1,18 +1,18 @@
 # Demo video
 
 **Status: rendered locally, not uploaded.** The last render is the second 2026-10-06
-take, at `6ef9d75`. It opens on the Android TV emulator footage from CI, and it fixes
+take, at `a85056b`. It opens on the Android TV emulator footage from CI, and it fixes
 the problems a judge review found in the take at `81d6144`. Nothing has a public link
 until the owner uploads it, and nothing in this directory is the video itself.
 
-## The take at 6ef9d75: emulator footage first, every source labelled
+## The take at a85056b: emulator footage first, every source labelled
 
 | Item | Value |
 |---|---|
-| Recorded commit | `6ef9d753983d696b7b7317f907b9b7d6660a614c`, reported by the local server's own `/health` during the take; the board's Check line reads Build 6ef9d75 |
+| Recorded commit | `a85056b8469435ca473d95fe6285a04dbfc82534`, reported by the local server's own `/health` during the take; the board's Check line reads Build a85056b |
 | File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_20261006/mercury_amazon/output/`, outside git |
 | Length | 163.09 s (ffprobe format duration), 1920x1080, 25 fps (4077 frames), AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
-| SHA-256 | `18def7991fb28d3748fb1a9c016cbc32f1abbe80a76846804c46ad3bd12f825e` (15041651 bytes) |
+| SHA-256 | `feef1e70d9da947f006921096cfb1d52f364316feb0bc0edccab67fe101c0e09` (15032768 bytes) |
 | Sync gate | `scripts/verify_video_sync.py`, unchanged: "verify_video_sync: ALL SYNC GATES PASSED", 11 of 11 checks PASS, exit 0 (`sync-gate.txt` beside the mp4) |
 | Capture | desktop Chromium at 1920x1080 CSS, every press on plan, no page errors (`capture/capture-receipt.json`); the raw `production.webm` was deleted after the build |
 | Receipt | `video-receipt.json` beside the mp4: ffprobe duration, SHA-256, the recorded commit, the gate's inputs, ElevenLabs characters, the footage provenance and both labels |
@@ -27,47 +27,57 @@ until the owner uploads it, and nothing in this directory is the video itself.
 
 ### What the judge review of the take at 81d6144 found, and what changed
 
-Every frame claim below was read by index (`select=eq(n\,I)`), never by seeking.
+Every frame below is a frame of the take at a85056b, read by index
+(`select=eq(n\,I)`), never by seeking. "First" means the frames before it were looked
+at and do not show it yet.
 
 * **The launch.** The take showed 3.9 s of an unchanged home screen and implied the app
   was opened from it. CI started it with an `am start` of its LEANBACK_LAUNCHER intent
   (`launcher.txt`), and no frame shows focus on a tile. A re-record that presses Center
   on the tile would also confirm a rollback and publish a handoff on the live public
-  demo, so it was not made. The take now starts at 8.88 s of `journey.mp4`, the first
-  25 fps frame that shows the board (source frame 19 at 8.856 s; frame 100 of the
-  take), and no caption claims a launch.
+  demo, so it was not made, and the take still never shows a D-pad launch. It now
+  starts at 8.88 s of `journey.mp4`, the first 25 fps frame that shows the board
+  (source frame 19 at 8.856 s; frame 100 of the take), and no caption claims a launch.
 * **The black screen.** The 4.6 s of black cold start (source frames 11 to 18) is no
   longer shown. Nothing is cut from the middle of the footage.
 * **The unlabelled commits on the emulator board.** The board stamps the 12.9x reading
   OFFLINE FIXTURE, not Commit 4f1c2ab or the rollback target 9b07e3d, which are invented
   records in `src/infrastructure/fixtures/deploy_feed_fixture.json`, not commits of any
   repository. A second label line under the footage says so on every emulator frame
-  (frames 100 to 682). The provenance beat now says "On this board, the reading and the
-  commit each carry a stamp", over the desktop board, where both are stamped.
-* **The change at the cut.** The first desktop caption (frame 683 on) says the local
+  (100 to 682). The provenance beat now says "On this board, the reading and the commit
+  each carry a stamp", over the desktop board, where both are stamped.
+* **The change at the cut.** The first desktop caption (from frame 683) says the local
   board has its own fixtures, so the commits differ, and its handoff starts again at
   revision 1. On screen the commit goes from 4f1c2ab to f423ba5, the target from 9b07e3d
   to 5891007, and the handoff from SHARED REVISION 13 to SHARED REVISION 1.
 * **No desktop label.** A label under the desktop picture, on every desktop frame (683 to
-  4001), reads "Desktop browser at 1920x1080, local run of 6ef9d75, offline fixtures.
+  4001), reads "Desktop browser at 1920x1080, local run of a85056b, offline fixtures.
   Not the TV." and "The key legend is the Fire TV build's; each key goes through the
-  same D-pad bridge." The mean luma of the label band is constant across all 583
-  emulator frames and all 3317 desktop frames checked by index, so neither label is
-  ever missing or covered.
+  same D-pad bridge." The mean luma of the label band is the same on all 583 emulator
+  frames and on all 3319 desktop frames, so neither label is ever missing or covered.
 * **58 named before it showed.** The odds caption no longer says "over 58 namings". 58
-  is said once, on "Down shows the evidence behind the odds", and the evidence sentence
-  is on screen from frame 2868, before that caption starts on frame 2873.
+  is said once, on "Down shows the evidence behind the odds". The evidence sentence,
+  which reads "over 58 namings in 1160 synthetic labelled cases" at full resolution,
+  first shows on frame 2870; that caption starts on frame 2873.
 * **90.0% never shown.** The board never prints the held-out refusal rate, so the take
-  no longer speaks it. It says "Four of the five rows name no commit", over the board
+  no longer speaks it. It says "Four of the five rows name no commit" over the board
   that shows four rows naming none (frame 1230).
-* **Sub-second order.** Up, up, up and Center on checkout-api are now spoken and pressed
-  first, so focus is on checkout-api (frame 1868) before "On checkout-api," (frame
-  1875). Center on Delivery velocity goes 0.35 s before its caption: the panel and
-  Back to the wall are up on frame 3219, the caption on frame 3223. The release-train
-  verdict is on screen by frame 1436, before its caption on frame 1439. The handoff
-  answer is pressed 0.45 s before "Center publishes the handoff." and was on screen
-  from frame 2808, before that caption on frame 2817; the handoff section still shows
-  03 RECORDED ONLY for the last 0.36 s of the RECORDED caption.
+* **Sub-second order.** "Up, up, up, center" is now spoken and pressed first: focus is
+  first on checkout-api on frame 1847 and its verdict first shows on 1855, before "On
+  checkout-api," on 1875. Center on Delivery velocity goes 0.35 s before its caption:
+  the panel and Back to the wall first show on frame 3211, the caption on 3223. The
+  release-train verdict first shows on frame 1423, before its caption on 1439.
+* **Publish against its caption.** The judge noted the handoff showing 0.1 s before
+  "Center publishes the handoff.". That order is the take's rule, a result before the
+  caption that names it, so it is kept: the page scrolls on frame 2810 and the handoff
+  first shows on frame 2812, 5 frames before the caption on frame 2817. The RECORDED
+  board is up to frame 2809, so its caption's last 7 frames are over the handoff
+  section, which still reads 03 RECORDED ONLY.
+
+Speech onsets from silencedetect match the caption starts that follow a pause, within
+0.18 s. Cues inside continuous speech start on their aligned words: "Four of the five
+rows" 0.09 s after the word, "A refusal" 0.19 s before it, and every other new cue within
+0.06 s.
 
 Checked and unchanged: the emulator presses, the 12.9x, RECORDED and SHARED REVISION 13
 cues (the footage from 14.40 s on is cut and worded as before), the title and closing
@@ -117,7 +127,9 @@ start on spoken words read off the voice's character alignment (`marks` in the p
 and `tests/video/test_emulator_open_cut.py` checks every such cue and press against the
 frame table. The closest calls: "center" in the confirm beat is spoken 0.42 s before
 Confirm is drawn pressed, and the publish caption names the handoff 0.39 s before it
-shows. In the desktop take, `video/capture-local.py` presses each such key on its spoken
+shows. In the desktop take every named result shows before its caption: by 3 frames for
+the evidence sentence, 5 for the handoff, and 12 or more for the rest.
+`video/capture-local.py` presses each such key on its spoken
 word (the odds, stage-to-evidence and build-check beats) or before the caption that
 names its result (the release-train, Delivery velocity and cloud spend presses).
 
@@ -239,7 +251,7 @@ Its desktop journey is the one the 2026-10-06 take keeps:
   change, and release-train reads 5 runtime changes landed.
 * The held-out figures are the ones the board and the README print: 90.0% refusals, and
   50.0% precision over 58 namings if a fault shows within 75 minutes. They are unchanged
-  at the current master. The take at 6ef9d75 speaks 50.0% where the board prints it and
+  at the current master. The take at a85056b speaks 50.0% where the board prints it and
   58 over the evidence sentence, and does not speak 90.0%, which the board never prints.
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture was shown at 87.5% so the captions sit in a band under it and never
@@ -251,8 +263,11 @@ Earlier takes, all superseded:
   `e4a79672bec92ffbf188bfa8cdeedf7917ed177e07f628a203e3aefad337066c`, kept as
   `reviews/videos_20261006/mercury_amazon/superseded_81d6144/`. It showed the home
   screen and 4.6 s of black, and the problems listed above.
-* `f862edb`, composed and verified on 2026-10-06 but not kept: its publish and evidence
-  captions came up 0.4 s and 0.2 s before the picture, so the presses were moved.
+* `f862edb` and `6ef9d75`, composed and verified on 2026-10-06 but not kept. In the
+  first the handoff and the evidence sentence came up 0.4 s and 0.2 s after their
+  captions; in the second 0.48 s and 0.40 s before them, with 14 frames of the RECORDED
+  caption over the handoff section. The publish and Down presses were moved to 0.15 s
+  before their words.
 * `48010c9`, the first 2026-10-06 take with the same plan and narration, 170.852 s,
   SHA-256 `6d8c0d457fa77dd49160e7c65cf52dc9ba630f5a2718a1c7bcf55b17b51690da`, kept as
   `reviews/videos_20261006/mercury_amazon/superseded_48010c9/`.
