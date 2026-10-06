@@ -39,7 +39,7 @@ receipt are in the sibling `narration/` and `capture/` folders.
 * The board's own labels stay in frame: OFFLINE FIXTURE on the metric, STAND-IN on the
   commit, record-only on the rollback, and SYNTHETIC on the spend figures.
 * It is not a Fire TV or Android TV runtime proof. No device or emulator appears, and
-  the narration says so. The Android TV Emulator receipt has landed since (run 36922314984);
+  the narration says so. The Android TV Emulator receipt has landed since (latest: run 37464864870);
   the take still shows no emulator.
 * After Confirm the board stays where it is: the large figure reads RECORDED, no
   pipeline contacted, under Rollback recorded, not sent, and the key legend reads Next

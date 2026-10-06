@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 36922314984; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 37464864870; public access is still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -199,12 +199,13 @@ required at any stage of submission or judging".
 held-out split, all synthetic; commits read from real git history, with their file lists,
 wherever there is a checkout (the public board has none and shows an invented deploy feed);
 the governed rollback and its refusals, each tested; the Leanback app source; an Android
-TV runtime receipt from [run 36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984),
+TV runtime receipt from [run 37464864870](https://github.com/upgradedev/mercury_amazon/actions/runs/37464864870),
 which installed the exact APK on an emulator and drove the record-only path by D-pad
 (receipt: `android_tv_runtime_receipt.json`); and a live cockpit in labelled
-offline-fixture mode whose `/health` reports the build SHA. Probed on 2026-10-05
-(`curl -s <url>/health`) it served `e0a857a`, so the runtime changes in PR #42 are not
-live until the next redeploy.
+offline-fixture mode whose `/health` reports the build SHA. Redeployed on 2026-10-06 at
+`ea2cff5`, the PR #42 head, and probed the same day (`curl -s <url>/health`), it serves
+the PR #42 runtime changes, record-only; the runtime receipt's
+`endpoint_health_build_sha` names the same build. It served `e0a857a` before that.
 **Simulated:** every metric series on the board is an offline fixture, and a confirmed
 rollback is recorded, never sent to a pipeline. **Missing:**
 
@@ -228,7 +229,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source, a CI build workflow and a runtime receipt | Run 36922314984 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
+| Fire TV | App source, a CI build workflow and a runtime receipt | Run 37464864870 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on
