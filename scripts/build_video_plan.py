@@ -405,8 +405,8 @@ BEATS = [
 ]
 
 STATUS = (
-    "NOT YET RENDERED, NOT UPLOADED. This plan is the second 2026-10-06 take, cut after the judge "
-    "review of the take at 81d6144. Its content opens on Android TV emulator footage from CI run "
+    "RENDERED LOCALLY, NOT UPLOADED. This plan is the second 2026-10-06 take, rendered at "
+    "6ef9d75, cut after the judge review of the take at 81d6144. Its content opens on Android TV emulator footage from CI run "
     "37475795991: the debug APK built at f423ba5 on an AOSP Android TV emulator, Android 14 / API "
     "34, loading the public demo (build ea2cff5, record-only). The footage plays from 8.88 s, "
     "the board as it first shows, at 1x, with two holds of a static frame; the home screen and "

@@ -37,19 +37,27 @@ filmed by `.github/workflows/android-tv-footage.yml` in CI run
 * the debug APK built at `f423ba5`;
 * on an AOSP Android TV emulator (x86), Android 14 / API 34;
 * loading the public demo, build `ea2cff5`, which is record-only;
-* launched with its Leanback launcher intent over the home screen, then driven with
-  D-pad key codes sent by the CI script. The launch itself shows nothing on the home
-  screen; the first visible change is the black of the cold start at 4.228 s.
+* started by CI with an `am start` of its LEANBACK_LAUNCHER intent (`launcher.txt` in
+  the artifact), not with a D-pad press on a tile, then driven with D-pad key codes sent
+  by the CI script.
 
-It plays at 1x. The screenrecord writes a frame only when the screen changes, so it is
-converted to 25 fps by holding each frame until the next one. Nothing is sped up or
-slowed. Two frames are held longer, both where the source itself is still: the answered
-board, held 1.52 s at 12.00 s (it is on screen from 11.630 s to 14.439 s in the source),
-and the last frame, the shared handoff, held 2.52 s at the end. The first 0.32 s of the
-idle home screen is trimmed. The home screen, the cold start (4.6 s of black while the
-WebView loads the demo) and every answer stay in. A small label under the picture reads
-"Android TV emulator (API 34), debug APK, public demo build ea2cff5, CI run
-37475795991" for as long as the footage plays.
+The take plays it from 8.88 s, the first 25 fps frame that shows the board (frame 19 at
+8.856 s). The home screen (to 4.169 s) and the black cold start (4.228 s to 8.856 s)
+are not shown: no frame of this footage shows the app being opened from the launcher,
+so the take does not imply that it was, and it shows no black screen. A re-record that
+moves focus to the tile and presses Center would also confirm a rollback and publish a
+handoff on the live public demo, so it was not made.
+
+From 8.88 s it plays at 1x. The screenrecord writes a frame only when the screen
+changes, so it is converted to 25 fps by holding each frame until the next one. Nothing
+is sped up or slowed, and nothing is cut out of the middle. Two frames are held longer,
+both where the source itself is still: the answered board, held 2.04 s at 12.00 s (it
+is on screen from 11.630 s to 14.439 s in the source), and the last frame, the shared
+handoff, held 2.52 s at the end. A label of two lines under the picture reads "Android
+TV emulator (API 34), debug APK, public demo build ea2cff5, CI run 37475795991" and
+"Commits 4f1c2ab and 9b07e3d are invented records from the demo's fixture feed, not
+real deploys." for as long as the footage plays. The board stamps the reading OFFLINE
+FIXTURE but not the commit, so the label stamps the commits.
 
 This is emulator footage from CI, not a Fire TV device, and it is not a runtime
 receipt. Gate J4 rests on the separate runtime receipt, `android_tv_runtime_receipt.json`,
@@ -59,11 +67,14 @@ written by `.github/workflows/android-tv-emulator.yml` and `scripts/android_tv_s
 server started with `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app
 --port 8875`. It is driven by calling `window.navigateDpad` with `UP`, `DOWN`, `LEFT`,
 `RIGHT`, `SELECT` and `BACK`, the bridge the Leanback `MainActivity` calls for each
-remote key. No mouse is used. The narration says once that this is the same board in a
-desktop browser at 1080p, and the title card says it is not the TV layout. Its data
-differs from the public demo's in one place: the local board names one of Mercury's own
-commits (stamped STAND-IN), while the public demo names a deploy from an invented,
-display-only feed.
+remote key. No mouse is used. A label of two lines under the picture, on every
+desktop frame, reads "Desktop browser at 1920x1080, local run of `<sha7>`, offline
+fixtures. Not the TV." and "The key legend is the Fire TV build's; each key goes
+through the same D-pad bridge.", because the page's footer still names the Fire TV
+remote. At the cut the first desktop caption says why three things change: the local
+board has its own fixtures, so it names one of Mercury's own commits (stamped STAND-IN)
+and another rollback target where the public demo names invented records, and its
+handoff starts again at revision 1 where the public demo's was at 13.
 
 **Why the desktop take is not at the TV viewport.** The Fire TV WebView lays the page
 out at 960x540 CSS pixels at a device scale factor of 2, with `MercuryHost` injected,
@@ -90,7 +101,8 @@ and each frame was looked at after extracting it by index with
 `ffmpeg -i journey.mp4 -vf "select=eq(n\,I)" -fps_mode passthrough -frames:v 1 fI.png`.
 Never seek this file with `-ss`: it returns a neighbouring frame, which produced a false
 defect and off-by-one claims on 2026-10-06. Each frame stays on screen until the next.
-The same table is `FOOTAGE_FRAMES` in `scripts/build_video_plan.py`.
+The same table is `FOOTAGE_FRAMES` in `scripts/build_video_plan.py`. The take starts at
+8.88 s, so frames 0 to 18 (the home screen and the black) are listed but not shown.
 
 | Frame | pts (s) | Visible |
 |---|---|---|
@@ -181,24 +193,23 @@ Seconds are content time; the 4 s title card comes before beat 1. Footage times 
 
 | # | Beat | Source | Seconds | Keys | On screen |
 |---|---|---|---|---|---|
-| 1 | `beat_01_tv_launch` | emulator 0.32 to 9.96 s | 9.64 | none (launch intent) | The Leanback home screen to 4.169 s, black from 4.228 s while the app cold-starts, the board from 8.856 s |
-| 2 | `beat_02_tv_board` | emulator 9.96 to 14.40 s, 12.00 s held 1.52 s | 5.96 | none | CHECKING, checkout-api ASKING, then checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab (invented feed), then all five rows |
-| 3 | `beat_03_tv_stage` | emulator 14.40 to 20.28 s | 5.88 | Right, Center | Focus on Stage rollback, Rollback staged, the lease counting down from 300 s |
-| 4 | `beat_04_tv_confirm` | emulator 20.28 to 26.20 s | 5.92 | Right, Center | Focus on Confirm, RECORDED, no pipeline contacted, static on the board |
-| 5 | `beat_05_tv_publish` | emulator 26.20 to 27.64 s, last frame held 2.52 s | 3.96 | Center | Publish handoff, the shared handoff, SHARED REVISION 13, HTTP 200 |
-| 6 | `beat_06_desktop_board` | desktop | 12.028 | none | The same board in desktop Chromium at 1920x1080 CSS, focus on Ask what changed |
-| 7 | `beat_07_board_on_load` | desktop | 18.019 | none | Five rows answered on load: Temporal candidate, Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data |
-| 8 | `beat_08_crowded_refusal` | desktop | 17.554 | Down x4, Center | release-train: Cannot attribute this, N runtime changes landed; Next: No rollback offered; Stage and Confirm disabled |
-| 9 | `beat_09_named_with_odds` | desktop | 19.783 | Up x3, Center | checkout-api: the commit named as the only runtime change, its message quoted, 50.0% held-out precision (synthetic, at most 75 minutes of lag) |
-| 10 | `beat_10_provenance` | desktop | 10.635 | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
-| 11 | `beat_11_stage_to_evidence` | desktop | 16.904 | Up, Right, Center, Right, Center, Center, Down | Rollback staged; RECORDED, no pipeline contacted, board not scrolled; the handoff's answer; Incident evidence: 50.0% over 58 namings in 1160 synthetic labelled cases |
-| 12 | `beat_12_dpad` | desktop | 12.167 | Right, Center | Delivery velocity opens; the BACK legend changes to Back to the wall |
-| 13 | `beat_13_fixtures` | desktop | 12.585 | Down, Back, Right, Center, Back | DORA answer with OFFLINE FIXTURE, scrolled within the panel; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures; Back to the wall |
-| 14 | `beat_14_build_check` | desktop | 12.817 | Down, Down, Center on Check | GET /health returned 200, the build's short SHA, GitHub live: no, fixture mode |
+| 1 | `beat_01_tv_board` | emulator 8.88 to 14.40 s, 12.00 s held 2.04 s | 7.56 | none | The board as it first shows, CHECKING, checkout-api ASKING, then checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab (invented feed, stamped by the label), then all five rows |
+| 2 | `beat_02_tv_stage` | emulator 14.40 to 20.28 s | 5.88 | Right, Center | Focus on Stage rollback, Rollback staged to 9b07e3d, the lease counting down from 300 s |
+| 3 | `beat_03_tv_confirm` | emulator 20.28 to 26.20 s | 5.92 | Right, Center | Focus on Confirm, RECORDED, no pipeline contacted, static on the board |
+| 4 | `beat_04_tv_publish` | emulator 26.20 to 27.64 s, last frame held 2.52 s | 3.96 | Center | Publish handoff, the shared handoff, SHARED REVISION 13, HTTP 200 |
+| 5 | `beat_05_desktop_board` | desktop | 18.158 | none | The same board in desktop Chromium at 1920x1080 CSS, focus on Ask what changed, the desktop label under it |
+| 6 | `beat_06_board_on_load` | desktop | 10.31 | none | Five rows answered on load: Temporal candidate with a commit, then Nothing to revert, Cannot attribute, Cannot attribute, Insufficient data, none naming a commit |
+| 7 | `beat_07_crowded_refusal` | desktop | 17.554 | Down x4, Center | release-train: Cannot attribute this, N runtime changes landed; Next: No rollback offered; Stage and Confirm disabled |
+| 8 | `beat_08_named_with_odds` | desktop | 19.551 | Up x3, Center, each on its word | checkout-api: the commit named as the only runtime change, its message quoted, 50.0% held-out precision (synthetic, at most 75 minutes of lag) |
+| 9 | `beat_09_provenance` | desktop | 12.724 | none | OFFLINE FIXTURE stamp under the reading, dashed STAND-IN against Mercury's commits |
+| 10 | `beat_10_stage_to_evidence` | desktop | 16.904 | Up, Right, Center, Right, Center, Center, Down | Rollback staged; RECORDED, no pipeline contacted, board not scrolled; the handoff's answer; Incident evidence: 50.0% over 58 namings in 1160 synthetic labelled cases |
+| 11 | `beat_11_dpad` | desktop | 12.167 | Right, Center | Delivery velocity opens; the BACK legend changes to Back to the wall |
+| 12 | `beat_12_fixtures` | desktop | 12.585 | Down, Back, Right, Center, Back | DORA answer with OFFLINE FIXTURE, scrolled within the panel; Back to the wall; Cloud spend answer with OFFLINE FIXTURE and SYNTHETIC figures; Back to the wall |
+| 13 | `beat_13_build_check` | desktop | 12.817 | Down, Down, Center on Check | GET /health returned 200, the build's short SHA, GitHub live: no, fixture mode |
 
-Content: 163.852 s, 31.36 s of it emulator footage (27.32 s played at 1x and 4.04 s of
-held static frames). With the 4 s title card and the 3 s closing card the planned video
-is 170.852 s, under the 175 s the sync gate allows.
+Content: 156.09 s. 23.32 s of it is emulator footage: 18.76 s played at 1x and 4.56 s
+of held static frames. With the 4 s title card and the 3 s closing card the planned
+video is 163.09 s, under the 175 s the sync gate allows.
 
 ## Words on the footage
 
@@ -208,10 +219,9 @@ value starts on the word that names it.
 
 | Words | Caption from | Spoken from | The frame |
 |---|---|---|---|
-| "From the home screen" | 0.32 s | 0.32 s | the home screen, to 4.169 s (frame 10) |
-| "The screen stays black while it loads" | 6.52 s | 6.52 s, ends 8.82 s | black from 4.228 s (frame 11); the board first shows at 8.856 s (frame 19) |
-| "The board asks on its own" | 9.96 s | "asks" 10.46 s | CHECKING at 10.074 s (frame 21), ASKING at 10.428 s (frame 23) |
-| "checkout-api, 12.9x baseline" | 11.91 s | 11.91 s | 12.9x at 11.160 s (frame 24), all rows at 11.630 s (frame 28) |
+| "On an Android TV emulator" | 8.88 s | 8.88 s | the board as it first shows, since 8.856 s (frame 19) |
+| "the public demo asks on its own" | 10.59 s | 10.59 s | CHECKING at 10.074 s (frame 21), ASKING at 10.428 s (frame 23) |
+| "checkout-api, 12.9x baseline" | in the hold at 12.00 s | in the hold | 12.9x at 11.160 s (frame 24), all rows at 11.630 s (frame 28) |
 | "Right" | 14.40 s | 14.40 s | focus on Stage rollback at 14.439 s (frame 29) |
 | "then Center" | 14.40 s | "center" 15.53 s | Stage rollback drawn pressed at 15.296 s (frame 30) |
 | "A rollback is staged" | 16.41 s | 16.41 s | ROLLBACK STAGED, 300 s lease at 15.847 s (frame 31) |
@@ -237,20 +247,21 @@ number of changes in the release-train window, the lease, the latency and the SH
 The spend figures are synthetic and are not read aloud. The emulator beats read two
 figures off the footage: the 12.9x reading and SHARED REVISION 13.
 
-Two figures are spoken from the script, because they describe the labelled corpus, not
-this run. Both are on the held-out split of the synthetic corpus, with the runtime
-filter shipped on 2026-09-27:
+One figure is spoken from the script, because it describes the labelled corpus, not
+this run: 50.0% precision on the held-out split of the synthetic corpus, with the runtime
+filter shipped on 2026-09-27 (beat 8). Beat 8 also says the precision holds only if a
+fault shows within 75 minutes, the generator's delay ceiling, which the window equals.
+The board prints the same 50.0% next to the named commit when it is spoken. It is
+written by `python scripts/attribution_split.py` into `attribution_holdout_summary.json`,
+and the README quotes it.
 
-* 90.0% named nobody on a real anomaly (beat 7);
-* 50.0% precision over 58 namings (beat 9). Beat 9 also says the precision holds only
-  if a fault shows within 75 minutes, the generator's delay ceiling, which the window
-  equals.
-
-Both are written by `python scripts/attribution_split.py` into
-`attribution_holdout_summary.json`. The board prints the same two at the current
-master, and the README quotes them. Beat 11 reads the 58 namings and the 1160
-synthetic cases off the evidence sentence on screen, which prints the same summary.
-`tests/video/test_emulator_open_cut.py` compares the captions with the summary.
+A figure is named only over the frames that show it. Beat 10 reads the 58 namings and
+the 1160 synthetic cases off the evidence sentence on screen, which prints the same
+summary; it is the only place 58 is said. Beat 6 says four of the five rows name no
+commit, which the board shows. The held-out refusal rate, 90.0% (524 of 582 in
+`docs/EVIDENCE.md`), is in the summary and the README but never on the board, so the
+take does not speak it. `tests/video/test_emulator_open_cut.py` compares the captions
+with the summary and checks both rules.
 
 Earlier takes quoted the in-sample 81.1% and 52.2% over 113 namings, and then the
 pre-filter held-out 93.1% and 62.5% over 40. Neither is current, and the takes that
