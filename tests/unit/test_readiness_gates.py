@@ -202,7 +202,9 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     correlation (run 36915746324 pressed keys while Stage was still disabled
     and loaded DORA velocity instead of staging). PR #42 then moved
     docs/index.html from 024a4d6 on, so J4 failed naming the file until
-    this receipt landed.
+    this receipt landed. The TV payoff hold then moved docs/firetv_nav.js
+    after ea2cff5, so this receipt proves its own checkout but not this one,
+    and J4 fails naming the file until the next emulator receipt lands.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -220,13 +222,13 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
     problem = readiness.runtime_receipt_checkout_problem(receipt)
-    assert problem is None, f"the fresh receipt already fails its checkout: {problem}"
+    assert problem is not None and "docs/firetv_nav.js" in problem, problem
     audited, audited_message = readiness.evaluate_firetv_receipt_candidates(
         README_TERMS, LEANBACK_MANIFEST,
         [(readiness.ANDROID_TV_RUNTIME_RECEIPT, json.dumps(receipt))],
         _exists,
     )
-    assert audited is True, audited_message
+    assert audited is False and "docs/firetv_nav.js" in audited_message, audited_message
 
 
 def test_a_leanback_manifest_alone_no_longer_passes():
@@ -329,22 +331,23 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     assert "official FAQ" in reason and "Android TV" in reason
 
 
-def test_the_audit_reports_j4_green_on_the_fresh_receipt():
+def test_the_audit_reports_j4_as_invalidated_by_the_tv_payoff_hold():
     """End to end: run the auditor and read J4 out of its own results.
 
     Run 37464864870 drove the D-pad journey against the PR #42 page from
-    build ea2cff5, and this checkout changes no live runtime path after that
-    build, so J4 passes on a journey the receipt actually saw. Run
-    36922314984 (build e0a857a) held that pass before PR #42 moved
-    docs/index.html. The stale path stays pinned by
-    test_a_receipt_from_before_the_page_change_still_fails_naming_the_file.
+    build ea2cff5, but the TV payoff hold moved docs/firetv_nav.js after
+    that build, so J4 fails naming the file instead of passing on a journey
+    the receipt never saw. The next emulator receipt restores the passing
+    assertion; until it lands this failure is the gate working, and J4
+    stays out of the CI exit code.
     """
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
-    assert results["J4"].passed is True, results["J4"].message
+    assert results["J4"].passed is False
+    assert "docs/firetv_nav.js" in results["J4"].message, results["J4"].message
     assert "37464864870" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
         encoding="utf-8"
-    ), "the receipt this pass names is not the run it claims"
+    ), "the receipt this failure names is not the run it claims"
 
 
 def test_a_receipt_from_before_the_page_change_still_fails_naming_the_file():
