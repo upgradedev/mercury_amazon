@@ -225,13 +225,10 @@ def test_the_server_names_no_prose_only_commit_and_says_how_many_it_set_aside(mo
     assert rule["runtime_paths"] == list(MERCURY_SERVICE_SCOPE.patterns)
 
 
-def test_local_git_and_the_recording_carry_file_lists():
+def test_local_git_carries_file_lists():
+    # The trial reads the recording's file lists itself (scripts/correlation_trial.py,
+    # load_commit_paths); the server no longer has a recording adapter to check here.
     from src.infrastructure.local_git_adapter import LocalGitCommitProvider
-    from src.infrastructure.recorded_commit_adapter import RecordedCommitProvider
-
-    recorded = RecordedCommitProvider().list_recent_commits(limit=100)
-    fixture = json.loads(PATHS_FIXTURE.read_text(encoding="utf-8"))["paths_by_sha"]
-    assert recorded and all(entry["paths"] == (fixture.get(entry["sha"]) or None) for entry in recorded)
 
     local = LocalGitCommitProvider()
     if not local.is_available:

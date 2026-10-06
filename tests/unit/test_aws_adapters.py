@@ -193,18 +193,72 @@ def test_cloudwatch_datapoints_are_sorted_oldest_first():
     assert [p.value for p in series.points] == [1.0, 9.0]
 
 
-def test_empty_cloudwatch_response_falls_back_and_says_why():
+def test_empty_cloudwatch_response_fails_closed_and_says_why():
+    """An empty live read shows NO LIVE DATA, never the simulated spike."""
     stub = StubCloudWatch([])
-    series = CloudWatchMetricAdapter(client=stub).get_error_series("checkout-api")
+    anchor = datetime.now(timezone.utc) - timedelta(minutes=30)
+    series = CloudWatchMetricAdapter(client=stub).get_error_series(
+        "checkout-api", anchor_at=anchor, commit_times=[anchor])
+    assert series.points == [], "an empty live read must not be replaced with generated points"
+    assert series.provenance.source is DataSource.NO_LIVE_DATA
     assert series.provenance.is_live is False
+    assert series.provenance.display_label == "NO LIVE DATA"
     assert "returned no datapoints" in series.provenance.detail
+    assert "shape '" not in series.provenance.detail, "the simulated series leaked into a live read"
 
 
-def test_cloudwatch_failure_falls_back_and_names_the_error():
+def test_cloudwatch_failure_fails_closed_and_names_the_error():
     stub = StubCloudWatch(None, error=RuntimeError("ThrottlingException"))
-    series = CloudWatchMetricAdapter(client=stub).get_error_series("checkout-api")
-    assert series.provenance.is_live is False
+    anchor = datetime.now(timezone.utc) - timedelta(minutes=30)
+    series = CloudWatchMetricAdapter(client=stub).get_error_series(
+        "checkout-api", anchor_at=anchor, commit_times=[anchor])
+    assert series.points == [], "a failed live read must not be replaced with generated points"
+    assert series.provenance.source is DataSource.NO_LIVE_DATA
+    assert series.provenance.display_label == "NO LIVE DATA"
     assert "ThrottlingException" in series.provenance.detail
+
+
+@pytest.mark.parametrize("stub", [
+    StubCloudWatch([]),
+    StubCloudWatch(None, error=RuntimeError("AccessDenied")),
+], ids=["empty", "error"])
+def test_a_failed_live_read_can_never_yield_a_candidate_commit(stub):
+    """The trust-breaker this replaces: a real commit and a generated spike behind it.
+
+    Real commits sit right before the reading. Before the fix, the empty and the failed
+    read both returned the simulated series anchored to those commits, so the use case
+    named one of them as the change behind an incident nobody measured. Now the answer
+    is INSUFFICIENT_DATA, no commit is named, and the metric stamp reads NO LIVE DATA.
+    """
+    from src.application.diagnose_incident_use_case import DiagnoseIncidentUseCase
+    from src.domain.incident_correlation import CorrelationVerdict, IncidentCorrelator
+
+    now = datetime.now(timezone.utc)
+
+    class Commits:
+        def list_recent_commits(self, limit=10):
+            return [{"sha": f"abc{i}", "message": "real change", "author": "dev",
+                     "committed_at": (now - timedelta(minutes=minutes)).isoformat()}
+                    for i, minutes in enumerate((8, 240))]
+
+    use_case = DiagnoseIncidentUseCase(CloudWatchMetricAdapter(client=stub), Commits(),
+                                       correlator=IncidentCorrelator())
+    answer = use_case.execute("checkout-api", 60)
+
+    assert stub.calls, "the live read must have been attempted"
+    assert answer.verdict is CorrelationVerdict.INSUFFICIENT_DATA
+    assert answer.offending_commit is None
+    assert answer.can_attribute is False
+    assert answer.metric_provenance.display_label == "NO LIVE DATA"
+
+
+def test_no_live_data_is_never_rendered_as_live():
+    from src.domain.provenance import Provenance
+
+    stamp = Provenance(source=DataSource.NO_LIVE_DATA, detail="d", observed_at_utc="")
+    assert DataSource.NO_LIVE_DATA.is_live is False
+    assert stamp.to_dict()["is_live"] is False
+    assert stamp.to_dict()["display_label"] == "NO LIVE DATA"
 
 
 def test_simulated_series_says_it_was_generated_not_read():
@@ -412,12 +466,17 @@ def test_an_unknown_service_is_still_refused_with_the_incident_switch_off():
 
 
 def test_an_unknown_service_is_refused_when_cloudwatch_returns_nothing():
-    """The live path's empty fallback must not invent a series either."""
+    """The live path's empty read must not invent a series either.
+
+    It used to fall through to the fixture's refusal for an unknown name; an empty
+    live read now fails closed for every name, known or not, so the stamp is NO LIVE
+    DATA rather than the fixture's wording.
+    """
     stub = StubCloudWatch([])
     series = CloudWatchMetricAdapter(client=stub).get_error_series("quiet-service")
     assert series.points == []
     assert "returned no datapoints" in series.provenance.detail
-    assert "does not invent a reading" in series.provenance.detail
+    assert series.provenance.source is DataSource.NO_LIVE_DATA
 
 
 def test_a_live_reading_for_an_unknown_service_is_returned_unchanged():
@@ -507,7 +566,7 @@ def test_the_crowded_shape_discloses_how_it_was_staged():
     name = next(n for n, s in SIMULATED_SERVICES.items() if s.shape == SHAPE_CROWDED)
     series = offline_adapter().get_error_series(name, anchor_at=max(times), commit_times=times)
     assert "the commit with the most company" in series.provenance.detail
-    assert "the commits are real, this metric is not" in series.provenance.detail
+    assert "the commit stamp beside this answer says they are, and this metric is generated" in series.provenance.detail
 
 
 def test_every_verdict_the_correlator_can_reach_is_reachable_from_the_fixture():

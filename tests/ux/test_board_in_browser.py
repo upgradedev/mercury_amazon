@@ -116,8 +116,13 @@ def browser(sync_playwright):
 
 
 def open_board(browser, base_url, *, width=1920, height=1080, host=False, reduced_motion=None,
-               offline=False, init_script=None):
-    """Open the board and return (context, page, console_errors, refused_requests)."""
+               offline=False, init_script=None, routes=()):
+    """Open the board and return (context, page, console_errors, refused_requests).
+
+    ``routes`` is a sequence of (url pattern, handler) pairs registered before the
+    page loads, for a test that needs to show the board an answer this checkout's
+    server does not give (the public Lambda's, which has no git checkout).
+    """
     options = {"viewport": {"width": width, "height": height}, "device_scale_factor": 1,
                "color_scheme": "dark"}
     if reduced_motion:
@@ -140,6 +145,8 @@ def open_board(browser, base_url, *, width=1920, height=1080, host=False, reduce
                 route.abort()
 
         context.route("**/*", only_this_origin)
+    for pattern, handler in routes:
+        context.route(pattern, handler)
     page = context.new_page()
     errors: list[str] = []
     page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
@@ -313,18 +320,74 @@ def test_the_quoted_commit_is_described_as_this_repositorys_history_standing_in_
     context, page, errors, _ = open_board(browser, base_url)
     try:
         wait_for_board(page)
+        if provenance["data_source"] != "local-git":
+            pytest.skip("without a git checkout the stamps merge into one stripe; "
+                        "test_matching_stamps_merge_into_one_stripe covers that path")
         badge = page.evaluate(COMMIT_BADGE)
         expected = "Standing in for deploys of checkout-api: " + provenance["detail"]
         assert badge["description"] == expected
         assert badge["title"] == expected
-        if provenance["data_source"] == "local-git":
-            assert badge["visible"] == "STAND-IN" + "Mercury’s commits"
-        else:
-            slug = provenance["data_source"]
-            repeats = slug.replace("-", " ").lower() == provenance["display_label"].lower()
-            assert badge["visible"] == provenance["display_label"] + "commits" + ("" if repeats else ": " + slug)
+        assert badge["visible"] == "STAND-IN" + "Mercury’s commits"
         assert badge["note"] == ("Without a GitHub token, the commit named under a spike is the newest "
                                  "lone commit in Mercury's own git history, standing in for a deploy.")
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+def _as_the_public_lambda_answers(route):
+    """Rewrite one what_changed answer the way the public Lambda gives it.
+
+    The Lambda has no git checkout, so its commits come from the display-only deploy
+    feed, stamped OFFLINE FIXTURE like the metric. This checkout's server reads local
+    git instead, so the stamp is rewritten here and nothing else is.
+    """
+    from src.infrastructure.deploy_feed_fixture import DeployFeedFixtureProvider
+
+    response = route.fetch()
+    body = response.json()
+    if body.get("commit_provenance"):
+        body["commit_provenance"] = {
+            "data_source": "offline-fixture", "is_live": False, "display_label": "OFFLINE FIXTURE",
+            "detail": DeployFeedFixtureProvider().detail.format(count=8),
+            "observed_at_utc": body["commit_provenance"].get("observed_at_utc", ""),
+        }
+    route.fulfill(response=response, json=body)
+
+
+HERO_STAMPS = """() => {
+  const source = document.querySelector('#heroSource');
+  const badges = [...source.querySelectorAll('.src-badge')];
+  const note = document.querySelector('#standInNote');
+  return { badges: badges.length, tags: source.querySelectorAll('.tag').length,
+           text: source.textContent,
+           description: badges[0] && badges[0].getAttribute('aria-description'),
+           title: badges[0] && badges[0].title,
+           note: note && note.textContent.replace(/\\s+/g, ' ').trim() };
+}"""
+
+
+def test_matching_stamps_merge_into_one_stripe(browser, base_url):
+    """The public board stacked two OFFLINE FIXTURE stripes and a stray "commits".
+
+    With no git checkout the metric and the commits are both offline fixtures. The
+    hero now prints that stamp once, with no caption, and keeps where the commits came
+    from as the stripe's accessible description and hover text.
+    """
+    context, page, errors, _ = open_board(
+        browser, base_url, routes=[("**/mcp/tools/what_changed", _as_the_public_lambda_answers)])
+    try:
+        wait_for_board(page)
+        stamps = page.evaluate(HERO_STAMPS)
+        assert stamps["badges"] == 1, stamps
+        assert stamps["tags"] == 1, stamps
+        assert stamps["text"] == "OFFLINE FIXTURE", stamps
+        assert "commits" not in stamps["text"]
+        assert "Standing in for deploys of checkout-api: " in stamps["description"]
+        assert "written by hand" in stamps["description"]
+        assert stamps["title"] == stamps["description"]
+        assert stamps["note"].startswith("Without a GitHub token or a git checkout, the deploy named")
+        assert "invented, display-only deploy feed" in stamps["note"]
         assert errors == [], errors
     finally:
         context.close()
@@ -640,6 +703,60 @@ def test_a_200_character_commit_message_does_not_grow_the_hero_cause(browser, ba
         assert after <= before + 1.0, (
             f"a 200-character message grew the hero cause {before:.1f}px to {after:.1f}px"
         )
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+QUALIFIER = "Proximity is not proof of cause."
+
+QUALIFIER_SHOWN = """q => {
+  const cause = document.querySelector('#heroCause');
+  cause.scrollIntoView({ block: 'center' });
+  const box = cause.getBoundingClientRect();
+  const walker = document.createTreeWalker(cause, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const at = node.textContent.indexOf(q);
+    if (at < 0) continue;
+    const range = document.createRange();
+    range.setStart(node, at); range.setEnd(node, at + q.length);
+    const rects = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+    if (!rects.length) return { found: true, painted: false };
+    const inside = rects.every(r => r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5
+                                    && r.left >= box.left - 0.5 && r.right <= box.right + 0.5);
+    const last = rects[rects.length - 1];
+    const hit = document.elementFromPoint(last.left + last.width / 2, last.top + last.height / 2);
+    return { found: true, painted: true, inside, hit: !!hit && cause.contains(hit),
+             display: getComputedStyle(cause).display, rects: rects.length,
+             box: [box.top, box.bottom], last: [last.top, last.bottom] };
+  }
+  return { found: false };
+}"""
+
+
+def test_the_causality_qualifier_stays_visible_at_phone_width(browser, base_url):
+    """The two-line clamp on the hero cause must never clip the qualifier.
+
+    The clamp bounds an unbounded commit message. If it wraps the message and the
+    qualifier together, a long message at 375 px pushes "Proximity is not proof of
+    cause." below the clamp and the board names a commit with no caveat. This checks
+    that the qualifier's own painted box sits inside the clamped block, with the
+    message the server sends and with a 200-character one.
+    """
+    context, page, errors, _ = open_board(browser, base_url, width=375, height=812)
+    try:
+        wait_for_board(page)
+        assert page.evaluate("document.querySelector('#hero').dataset.verdict") == "attributed"
+        shown = page.evaluate(QUALIFIER_SHOWN, QUALIFIER)
+        assert shown.get("painted") and shown["inside"] and shown["hit"], shown
+        page.evaluate(
+            """() => { document.querySelector('#heroCause .quote').textContent =
+                             '"' + 'x'.repeat(200) + '"'; }"""
+        )
+        shown = page.evaluate(QUALIFIER_SHOWN, QUALIFIER)
+        assert shown.get("painted") and shown["inside"] and shown["hit"], (
+            f"a 200-character message clipped the qualifier at 375 px: {shown}")
         assert errors == [], errors
     finally:
         context.close()

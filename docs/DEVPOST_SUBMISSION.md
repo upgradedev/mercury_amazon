@@ -198,10 +198,10 @@ Stated plainly, because the cockpit shows it anyway.
 | Part | Status |
 |---|---|
 | Correlation, DORA, cost and governance endpoints | **Live.** Real HTTP, called by the page on load and on every press |
-| Commits used for attribution | **Live.** Read from the local checkout with `git log` when no GitHub token is set |
+| Commits used for attribution | **Real where there is a checkout, invented on the public board.** With a `GITHUB_TOKEN`, the GitHub REST API. Without one, real commits from the local checkout's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed. The public Lambda has no checkout, so it shows an invented, display-only deploy feed (`src/infrastructure/fixtures/deploy_feed_fixture.json`), stamped OFFLINE FIXTURE; no published figure is computed from it |
 | AWS spend | **Live** when credentials exist, and the badge says `aws-cost-explorer`. Otherwise a synthetic fixture that says so |
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
-| Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`, and the response text says the commits are real but the metric is not |
+| Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`. The response text says the metric is generated and defers to the commit stamp beside the answer for what the commits are. With CloudWatch credentials, an empty or failed read shows NO LIVE DATA and names nothing; it is never replaced with the generated series |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 50.0% over 58 namings (95% interval 37.5% to 62.5%) under the corpus's assumption that a regression shows within 75 minutes (41.5% at 90, 27.3% at 180), recall 4.8% over 600 regressions, refusal on 90.0% of detected anomalies, with only commits that changed a runtime file counted as deploys, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
 | Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. That emulator run is the target proof. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
@@ -250,22 +250,25 @@ stopped being a compromise and started being the design.
 
 Stated here rather than left for a judge to find:
 
-* **Candidate runtime receipt pending.** `.github/workflows/android-tv-emulator.yml`
+* **Android TV emulator receipt landed; no Fire OS device run.** `.github/workflows/android-tv-emulator.yml`
   is the allowed-target path: it retains the exact APK, logs, screenshot and receipt.
   `docs/FIRE_TV_BUILD.md` documents the evidence contract and official FAQ basis. A local
   dry run of that journey on 2026-09-29 reached 4 of 5 receipt events on an Android TV
   emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
   below, because the deployed page predated the revision retry. Full 5-of-5 journeys
   followed on 2026-09-30 (runs 36661614006 and 36669903334), and run 36798893479 on
-  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation.
+  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation. Run 37464864870 on 2026-10-06 re-drove all five against the PR #42 page, served by the Lambda redeployed at `ea2cff5`, and wrote the receipt checked in now.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It runs the current build: probed on 2026-10-01,
-  `/health` reported `e0a857ae70349bd481140ced097d0791402d347b`, with the departures board,
-  self-hosted fonts, the candidate headline and the candidate handoff wording. Earlier
-  the same day it ran `1bc8cd5`, then `b99b154`; on 2026-09-30 it ran `b2f7868`; on
+  publishes the deployed build SHA. It runs the PR #42 build: redeployed on 2026-10-06
+  and probed the same day (`curl -s <url>/health`), `/health` reported
+  `ea2cff580962f408b17973c0e0b349ada9b6062c`, record-only. That puts the PR #42 runtime
+  changes live (the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause). Before that deploy it ran
+  `e0a857ae70349bd481140ced097d0791402d347b` (probed on 2026-10-01 and again on 2026-10-05),
+  with the departures board, self-hosted fonts, the candidate headline and the candidate
+  wording on the demo handoff. Earlier on 2026-10-01 it ran `1bc8cd5`, then `b99b154`; on 2026-09-30 it ran `b2f7868`; on
   2026-09-26 it ran `6dd76bd`, which
   predates the departures board design and loads Google Fonts. It uses labelled offline fixtures and record-only rollback
   dispatch until real telemetry and pipeline credentials are configured.

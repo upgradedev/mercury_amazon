@@ -1,7 +1,8 @@
 """Build the reproducible Linux Lambda zip for Mercury.
 
 The source tree alone is insufficient: the public offline journey also needs the
-recorded commit stream and the published trial summary.  This builder makes those
+display-only deploy feed and the published trial summaries; the recorded commit stream
+ships beside them as the input those summaries were scored on.  This builder makes those
 files explicit and installs Linux wheels even when it is invoked from Windows.
 """
 from __future__ import annotations
@@ -19,6 +20,7 @@ RUNTIME_FILES = (
     # The held-out figure the answer carries beside a named commit (trial_summary.py).
     Path("attribution_holdout_summary.json"),
     Path("src/infrastructure/fixtures/commit_stream_fixture.json"),
+    Path("src/infrastructure/fixtures/deploy_feed_fixture.json"),
     Path("docs/index.html"),
     Path("docs/firetv_nav.js"),
     Path("docs/webmcp_bridge.js"),

@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. Fire TV runtime evidence landed in run 36922314984; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 37464864870; public access is still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -33,7 +33,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-680%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-698%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -154,7 +154,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 680 passed
+# 698 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -196,40 +196,40 @@ required at any stage of submission or judging".
 ## What is real and what is not
 
 **Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
-held-out split, all synthetic; commits read from real git history, with their file lists;
+held-out split, all synthetic; commits read from real git history, with their file lists,
+wherever there is a checkout (the public board has none and shows an invented deploy feed);
 the governed rollback and its refusals, each tested; the Leanback app source; an Android
-TV runtime receipt from [run 36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984),
+TV runtime receipt from [run 37464864870](https://github.com/upgradedev/mercury_amazon/actions/runs/37464864870),
 which installed the exact APK on an emulator and drove the record-only path by D-pad
-(receipt: `android_tv_runtime_receipt.json`); and a live cockpit that serves this
-branch at HEAD (env-bumped on every merge, `/health` reports the build SHA, labelled
-offline-fixture mode).
+(receipt: `android_tv_runtime_receipt.json`); and a live cockpit in labelled
+offline-fixture mode whose `/health` reports the build SHA. Redeployed on 2026-10-06 at
+`ea2cff5`, the PR #42 head, and probed the same day (`curl -s <url>/health`), it serves
+the PR #42 runtime changes, record-only; the runtime receipt's
+`endpoint_health_build_sha` names the same build. It served `e0a857a` before that.
 **Simulated:** every metric series on the board is an offline fixture, and a confirmed
 rollback is recorded, never sent to a pipeline. **Missing:**
 
 - **A published video.** One take is rendered and not yet uploaded:
-  `reviews/videos_20260928/mercury_amazon/output/mercury-demo.mp4` in the workspace,
-  outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `df5db06` in desktop Chromium, every key sent
-  through the D-pad bridge the Leanback app calls, with burned-in captions. It shows
-  the figures this page prints, 50.0% held-out precision over 58 namings and 90.0%
-  refusals, with commit `7bd8b41` named as the only runtime change (the stand-in is
-  the newest lone runtime commit, so a later build names a later one), and after Confirm the
+  `reviews/videos_muse_20261001/mercury_amazon/output/mercury-demo.mp4` in the workspace,
+  outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `9620743` in desktop
+  Chromium (its `video-receipt.json`), every key sent through the D-pad bridge the
+  Leanback app calls, with burned-in captions. It shows the figures this page prints,
+  50.0% held-out precision over 58 namings and 90.0% refusals, and after Confirm the
   board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
-  and it says so. Two presses differ from this build. In the take, Down from an open
-  panel walks out to Connection > Check, where this build keeps the remote in the
-  panel until Back; and Center on Publish handoff moves the cursor on to Refresh with
-  the handoff's answer below the fold, where this build stays on Publish and brings
-  the answer up. Details in [video/README.md](video/README.md).
+  and it says so. It predates this build's board: the take quotes one of this
+  repository's commits, while the public board now names a stand-in from an invented,
+  labelled deploy feed. Details in [video/README.md](video/README.md).
 - **A public repository.** Private until the reviewers are added as collaborators; see
   [Run it locally](#run-it-locally).
 
 | Part | On the board today | Live path |
 |---|---|---|
-| Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists |
-| Commits | Real commits from this repository's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
+| Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists. An empty or failed read now shows NO LIVE DATA and names nothing; it is never replaced with the generated series |
+| Commits | Real commits from this repository's `git log` with their file lists, stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy. The public cockpit has no git checkout, so it shows an invented, display-only deploy feed (`src/infrastructure/fixtures/deploy_feed_fixture.json`), stamped OFFLINE FIXTURE; no published figure is computed from it | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
 | Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source, a CI build workflow and a runtime receipt | Run 36922314984 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
+| Fire TV | App source, a CI build workflow and a runtime receipt | Run 37464864870 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every adapter into fixture mode. It can suppress a live
 call; it cannot make a fixture look live. Nothing on the page speaks or announces on

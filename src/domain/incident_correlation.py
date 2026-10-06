@@ -395,6 +395,25 @@ class IncidentCorrelation:
     def rollback_is_available(self) -> bool:
         return self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and self.rollback_target is not None
 
+    @property
+    def handoff_fact(self) -> str:
+        """The verdict as one confirmed fact a second responder may be handed.
+
+        Every handoff path writes this, never the raw verdict code: the demo handoff in
+        ``src/infrastructure/demo_evidence.py`` and the operator handoff the cockpit
+        publishes, which reads it from ``attribution.handoff_fact``. A named change is a
+        temporal candidate, not a proven cause, and the fact says so in the same words the
+        board uses. A refusal hands over its own refusal statement.
+        """
+        commit = self.offending_commit
+        if self.verdict is CorrelationVerdict.ANOMALY_ATTRIBUTED and commit is not None:
+            return (
+                f"Temporal candidate, not proof of cause: commit {commit.sha} by "
+                f"{commit.author} is the closest change inside "
+                f"{self.attribution_window_minutes} minute attribution window."
+            )
+        return self.refusal_statement or self.to_voice_summary()
+
     def to_voice_summary(self) -> str:
         """One sentence short enough to be read aloud in a room.
 

@@ -1300,12 +1300,13 @@
       return wrap;
     }
 
-    /* Without a GitHub token the commits are Mercury's own history (local git, or the
-       checked-in recording of it), and the offline spike is placed after the newest
-       lone commit in it, so the board quotes one of this repository's commits against
-       checkout-api. The badge says so on the board, with a STAND-IN stamp in place of
-       a green LIVE, and in full to assistive technology and on hover, in the server's
-       own provenance sentence. */
+    /* Without a GitHub token the commits are Mercury's own history from local git, and
+       the offline spike is placed after the newest lone commit in it, so the board
+       quotes one of this repository's commits against checkout-api. Without a git
+       checkout either (the public Lambda) they are the invented, display-only deploy
+       feed, stamped OFFLINE FIXTURE. The badge says which on the board, with a
+       STAND-IN stamp in place of a green LIVE for local git, and in full to assistive
+       technology and on hover, in the server's own provenance sentence. */
     function commitBadge(data) {
       var provenance = data.commit_provenance;
       var source = provenance && provenance.data_source;
@@ -1325,6 +1326,45 @@
         badge.title = said;
       }
       return badge;
+    }
+
+    /* The hero's stamps. When the metric and the commits carry the same stamp, as on
+       the public board where both are offline fixtures, they used to stack as two
+       OFFLINE FIXTURE stripes, the second with a dangling "commits" caption. One
+       stripe says it once; the commit provenance stays its accessible description and
+       hover text. Different stamps (STAND-IN, LIVE) still get one stripe each. */
+    function heroBadges(data, usedCommits) {
+      var metric = sourceBadge(data.metric_provenance, '');
+      if (!usedCommits) { return [metric]; }
+      var commits = commitBadge(data);
+      var mp = data.metric_provenance || {};
+      var cp = data.commit_provenance || {};
+      var sameStamp = cp.data_source !== 'local-git'
+        && (mp.display_label || '') === (cp.display_label || '')
+        && mp.is_live === cp.is_live;
+      if (!sameStamp) { return [metric, commits]; }
+      var said = 'Metric and commits share one stamp, ' + (mp.display_label || 'OFFLINE FIXTURE')
+        + '. ' + (commits.getAttribute('aria-description') || cp.detail || '');
+      metric.setAttribute('aria-description', said);
+      metric.title = said;
+      return [metric];
+    }
+
+    /* The evidence note says where the named commit came from, in the words that fit
+       the source: this repository's own history, or the invented deploy feed the
+       public board falls back to when it has no git checkout. */
+    var STAND_IN_NOTES = {
+      'local-git': 'Without a GitHub token, the commit named under a spike is the newest '
+        + "lone commit in Mercury's own git history, standing in for a deploy.",
+      'offline-fixture': 'Without a GitHub token or a git checkout, the deploy named under a '
+        + 'spike comes from an invented, display-only deploy feed, stamped OFFLINE FIXTURE. '
+        + 'No published figure is computed from it.'
+    };
+
+    function noteStandIn(data) {
+      var note = el('standInNote');
+      var source = data.commit_provenance && data.commit_provenance.data_source;
+      if (note && STAND_IN_NOTES[source]) { note.textContent = STAND_IN_NOTES[source]; }
     }
 
     /**
@@ -1517,13 +1557,18 @@
 
       var cause = el('heroCause');
       clear(cause);
+      /* The qualifier comes first. The block is clamped to two lines because the
+         quoted message is unbounded, and when the message led, a long one at 375 px
+         clamped "Proximity is not proof of cause." out of sight, so the board named a
+         commit with no caveat. Leading with it means the clamp only ever cuts the
+         message (tests/ux/test_board_in_browser.py). */
+      cause.appendChild(document.createTextNode(config.cause));
       if (config.quote) {
+        if (config.cause) { cause.appendChild(document.createTextNode(' ')); }
         // Labelled, so the message reads as data about the change, not an instruction.
         cause.appendChild(h('span', 'quote-label', 'Commit message'));
         cause.appendChild(h('span', 'quote', '“' + config.quote + '”'));
-        cause.appendChild(document.createTextNode(' '));
       }
-      cause.appendChild(document.createTextNode(config.cause));
       cause.setAttribute('data-quote-only', config.quote && !config.cause ? 'true' : 'false');
 
       /* Provenance renders inside the hero card, beside the figure, so it is on the
@@ -1647,8 +1692,8 @@
       // involved, so no commit stamp is shown.
       var usedCommits = data.verdict === 'ANOMALY_ATTRIBUTED'
         || data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION';
-      var badges = [sourceBadge(data.metric_provenance, '')];
-      if (usedCommits) { badges.push(commitBadge(data)); }
+      var badges = heroBadges(data, usedCommits);
+      noteStandIn(data);
 
       var accuracy = accuracyLine(data);
       // The short precision sits under a named commit only. Under a refusal it would
@@ -1690,11 +1735,11 @@
           // the change itself. The cause line carries the same causality disclosure
           // the API ships as claim_strength TEMPORAL_CANDIDATE_ONLY: proximity is
           // not proof, and a rollback needs separate deployment and health evidence.
-          cause: (ambiguous
-            ? 'It is not the only one: ' + data.attribution.commits_in_window
-              + ' changes landed inside the attribution window, and this rule names the closest. '
-            : '')
-            + 'Proximity is not proof of cause.'
+          cause: 'Proximity is not proof of cause.'
+            + (ambiguous
+              ? ' It is not the only one: ' + data.attribution.commits_in_window
+                + ' changes landed inside the attribution window, and this rule names the closest.'
+              : '')
         });
       } else if (data.verdict === 'ANOMALY_WITHOUT_ATTRIBUTION'
                  && data.attribution && data.attribution.refusal_reason === 'WINDOW_TOO_CROWDED') {
@@ -2297,9 +2342,15 @@
         return;
       }
       var data = state.lastCorrelation;
+      /* The verdict goes over as the server's handoff_fact, the same words the demo
+         handoff uses: a named change is "Temporal candidate, not proof of cause", a
+         refusal is its refusal statement. It used to be the raw verdict code and the
+         explanation, so the operator path handed a second responder
+         "ANOMALY_ATTRIBUTED: ..." as a confirmed fact. */
+      var attribution = data.attribution || {};
       var facts = [
         data.metric.name + ' is ' + data.metric.current + ' against baseline ' + data.metric.baseline,
-        data.verdict + ': ' + data.explanation
+        attribution.handoff_fact || attribution.refusal_statement || data.voice_summary
       ];
       if (data.deployment_evidence && data.deployment_evidence.target_marker) {
         facts.push('Verified target marker ' + data.deployment_evidence.target_marker.marker_id

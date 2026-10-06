@@ -42,7 +42,7 @@ def seed_recorded_demo_evidence(incident_use_case, deployment_evidence: Deployme
             older = []
     if not older:
         return
-    source = "offline-fixture-recorded-mercury-commits-not-service-deployments"
+    source = "offline-fixture-demo-markers-not-service-deployments"
     for position, commit in enumerate((older[0], offending), start=1):
         artifact = hashlib.sha256(f"mercury-recorded-demo:{commit.sha}".encode()).hexdigest()
         deployment_evidence.record(DeploymentMarker.from_values(
@@ -69,12 +69,9 @@ def recorded_demo_handoff(incident_use_case, deployment_evidence: DeploymentEvid
     # enum, inside Confirmed facts: a numeric cause claim the hero, tile, rows
     # and announcement all refuse to make. It now carries the same
     # claim-strength qualifier the page speaks, in the explanation's own
-    # "closest change" words; the enum stays on the diagnosis payload.
-    candidate = (
-        f"Temporal candidate, not proof of cause: commit {offending.sha} by "
-        f"{offending.author} is the closest change inside "
-        f"{correlation.attribution_window_minutes} minute attribution window."
-    )
+    # "closest change" words; the enum stays on the diagnosis payload. The
+    # wording lives on the correlation so the operator handoff uses it too.
+    candidate = correlation.handoff_fact
     return {
         "incident_id": "checkout-api-active",
         "responder": "D-pad demo responder",

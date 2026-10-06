@@ -188,17 +188,21 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     """The landed receipt, asserted by contents against the real checkout.
 
-    Actions run 36922314984 built the APK from this history and drove the
-    D-pad journey on an Android TV emulator against the candidate-language
-    page with the hero-cause clamp, after the smoke journey learned to wait
-    for the opening correlation (run 36915746324 pressed keys while Stage
-    was still disabled and loaded DORA velocity instead of staging). The
-    receipt below is that run's artifact bytes, downloaded and hash-verified,
-    not written by hand; every field is asserted below. History: on
-    2026-10-01 the 2026-09-30 receipt (run 36669903334) went stale the day
-    docs/index.html joined the invalidation set, run 36798893479 restored
-    green, and the hero-cause clamp moved docs/index.html after that build,
-    so J4 failed naming the file until this receipt landed.
+    Actions run 37464864870 built the APK from ea2cff5, the PR #42 head, and
+    drove the D-pad journey on an Android TV emulator against the PR #42
+    page (candidate wording on every handoff, one fixture stripe, the
+    qualifier-first hero cause), served by the Lambda redeployed at ea2cff5
+    on 2026-10-06. The receipt below is that run's artifact bytes, downloaded
+    and hash-verified, not written by hand; every field is asserted below.
+    History: on 2026-10-01 the 2026-09-30 receipt (run 36669903334) went
+    stale the day docs/index.html joined the invalidation set, run
+    36798893479 restored green, the hero-cause clamp moved docs/index.html
+    after that build, and run 36922314984 (build e0a857a) restored green
+    again after the smoke journey learned to wait for the opening
+    correlation (run 36915746324 pressed keys while Stage was still disabled
+    and loaded DORA velocity instead of staging). PR #42 then moved
+    docs/index.html from 024a4d6 on, so J4 failed naming the file until
+    this receipt landed.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -211,7 +215,7 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
     assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
     assert receipt["build_sha"] in receipt["artifact_name"]
-    assert "actions/runs/36922314984" in receipt["workflow_run_url"]
+    assert "actions/runs/37464864870" in receipt["workflow_run_url"]
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
@@ -328,16 +332,17 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
 def test_the_audit_reports_j4_green_on_the_fresh_receipt():
     """End to end: run the auditor and read J4 out of its own results.
 
-    Run 36922314984 drove the D-pad journey against the clamped page from
-    build e0a857a, and this checkout changes no live runtime path after that
-    build, so J4 passes on a journey the receipt actually saw. The stale
-    path stays pinned by
+    Run 37464864870 drove the D-pad journey against the PR #42 page from
+    build ea2cff5, and this checkout changes no live runtime path after that
+    build, so J4 passes on a journey the receipt actually saw. Run
+    36922314984 (build e0a857a) held that pass before PR #42 moved
+    docs/index.html. The stale path stays pinned by
     test_a_receipt_from_before_the_page_change_still_fails_naming_the_file.
     """
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
     assert results["J4"].passed is True, results["J4"].message
-    assert "36922314984" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
+    assert "37464864870" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
         encoding="utf-8"
     ), "the receipt this pass names is not the run it claims"
 
