@@ -216,7 +216,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   loading the public demo (`ea2cff5`, record-only), from the board's first frame, at 1x
   with two static frames held longer. That is emulator footage, not a Fire TV device, and
   it does not show the app being opened from the launcher. A label names each source on
-  every frame. The rest is a local run of commit `a85056b` in a desktop browser at
+  every frame. The rest is a local run of commit `f7512bf` in a desktop browser at
   1920x1080, not the TV layout, every key sent through the D-pad bridge the Leanback app
   calls, with burned-in captions. It speaks the 50.0% held-out precision where the board
   prints it and the 58 namings over the evidence sentence, and after Confirm shows the

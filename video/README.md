@@ -1,16 +1,54 @@
 # Demo video
 
-**Status: rendered locally, not uploaded.** The last render is the second 2026-10-06
-take, at `a85056b`. It opens on the Android TV emulator footage from CI, and it fixes
-the problems a judge review found in the take at `81d6144`. Nothing has a public link
-until the owner uploads it, and nothing in this directory is the video itself.
+**Status: rendered locally, not uploaded.** The last render is the take at `f7512bf`,
+recorded on 2026-10-07. It is the cut first rendered at `a85056b` (below), with the
+desktop part recorded again at the branch head. It opens on the Android TV emulator
+footage from CI, and it fixes the problems a judge review found in the take at
+`81d6144`. Nothing has a public link until the owner uploads it, and nothing in this
+directory is the video itself.
 
-## The take at a85056b: emulator footage first, every source labelled
+## The take at f7512bf
+
+| Item | Value |
+|---|---|
+| Recorded commit | `f7512bffaadd231079bfa8c0da540ff5fe7bfc94`, reported by the local server's own `/health` (port 8875, `MERCURY_OFFLINE=1`) before the take and in the capture receipt; the board's Check line reads Build f7512bf |
+| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_20261006/mercury_amazon/output/`, outside git |
+| Length | 163.09 s (ffprobe format duration), 1920x1080, 25 fps (4077 frames, ffprobe `-count_frames`), AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
+| SHA-256 | `3ef0cc63d998ffd96d701289821b386fe504db7d4dfe5728c61b6574c6c8dafb` (15289926 bytes) |
+| Sync gate | `scripts/verify_video_sync.py`, unchanged (git blob `83779fd`), run in the output folder: "verify_video_sync: ALL SYNC GATES PASSED", 11 of 11 checks PASS, exit 0 (`sync-gate.txt` beside the mp4) |
+| Gate selftest | `tests/video/verify_gate_selftest.py`, exit 0: the gate passes the good file and fails the mis-ordered, caption-bleeding and out-of-sync ones |
+| Capture | desktop Chromium at 1920x1080 CSS, 9 desktop beats, every press consumed and on plan, no page errors, trim lead 2.0 s (`capture/capture-receipt.json`); the raw `production.webm` was deleted after the build |
+| Receipt | `video-receipt.json` beside the mp4: ffprobe duration, SHA-256, the recorded commit, the gate output, the selftest result, ElevenLabs characters, the footage provenance and both labels |
+| Characters synthesized | 0 for this take. The words of all 13 beats are unchanged since `a85056b`, so every beat reused its audio by cache key; `synthesis-log.jsonl` still has 25 lines and 3398 characters |
+| Unchanged from a85056b | the plan, the narration and captions, the footage cut and holds, and the wording of the cards and labels; the cards and the desktop label now name f7512bf |
+| Previous take | the take at `a85056b` is kept as `reviews/videos_20261006/mercury_amazon/superseded_a85056b/` |
+
+Checked in this take by frame index (`select=eq(n\,I)`, or `between(n\,A\,B)` for a
+run), never by seeking. Frames were extracted at 1, 3, 5, 8, 12, 20 and 28 s, at the
+start of each of the 40 caption cues and over the last 5 s, and looked at.
+
+* The title card runs to frame 99 and the closing card from frame 4002 to the last
+  frame, 4076. The mean luma of the label band is the same on all 583 emulator frames
+  (100 to 682) and on all 3319 desktop frames (683 to 4001), so neither label is ever
+  missing or covered. The desktop label reads "Desktop browser at 1920x1080, local run
+  of f7512bf, offline fixtures. Not the TV."
+* The RECORDED board holds to frame 2810 and the page scrolls on 2811. The handoff,
+  SHARED REVISION 1, first shows on frame 2813, 4 frames before "Center publishes the
+  handoff." on 2817.
+* The evidence sentence first shows on frame 2867, 6 frames before its caption on 2873.
+* The release-train verdict first shows on frame 1423 (its caption on 1439), the
+  checkout-api verdict on 1857 ("On checkout-api," on 1875), and the Delivery velocity
+  panel with Back to the wall on 3212 (its caption on 3223).
+
+## The cut, first rendered at a85056b: emulator footage first, every source labelled
+
+The table and the frame numbers in this section are of the take at `a85056b`, which the
+take at f7512bf supersedes.
 
 | Item | Value |
 |---|---|
 | Recorded commit | `a85056b8469435ca473d95fe6285a04dbfc82534`, reported by the local server's own `/health` during the take; the board's Check line reads Build a85056b |
-| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_20261006/mercury_amazon/output/`, outside git |
+| File | `mercury-demo.mp4`, now in the workspace folder `reviews/videos_20261006/mercury_amazon/superseded_a85056b/`, outside git |
 | Length | 163.09 s (ffprobe format duration), 1920x1080, 25 fps (4077 frames), AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
 | SHA-256 | `feef1e70d9da947f006921096cfb1d52f364316feb0bc0edccab67fe101c0e09` (15032768 bytes) |
 | Sync gate | `scripts/verify_video_sync.py`, unchanged: "verify_video_sync: ALL SYNC GATES PASSED", 11 of 11 checks PASS, exit 0 (`sync-gate.txt` beside the mp4) |
@@ -127,8 +165,9 @@ start on spoken words read off the voice's character alignment (`marks` in the p
 and `tests/video/test_emulator_open_cut.py` checks every such cue and press against the
 frame table. The closest calls: "center" in the confirm beat is spoken 0.42 s before
 Confirm is drawn pressed, and the publish caption names the handoff 0.39 s before it
-shows. In the desktop take every named result shows before its caption: by 3 frames for
-the evidence sentence, 5 for the handoff, and 12 or more for the rest.
+shows. In the desktop take every named result shows before its caption. At f7512bf that
+is by 6 frames for the evidence sentence, 4 for the handoff, 11 for the Delivery
+velocity panel and 16 or more for the verdicts; at a85056b it was 3, 5 and 12 or more.
 `video/capture-local.py` presses each such key on its spoken
 word (the odds, stage-to-evidence and build-check beats) or before the caption that
 names its result (the release-train, Delivery velocity and cloud spend presses).
