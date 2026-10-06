@@ -154,9 +154,10 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
     ],
     "beat_09_provenance": [],
     # The stage, confirm and handoff presses of the 2026-10-01 take, in the same order
-    # with the same checks, each on the word that names it. Publish is pressed 0.45 s
-    # before "Center publishes" and Down 0.3 s before "Down shows", because their
-    # answers take that long to come up (the handoff took 0.69 s on 2026-10-06).
+    # with the same checks, each on the word that names it. Publish and Down are
+    # pressed 0.15 s before "Center publishes" and "Down shows": the handoff's answer
+    # took from 0.25 s to 0.69 s on 2026-10-06, so the answer lands within a few
+    # frames of its caption either way, and the RECORDED board stays up for its own.
     "beat_10_stage_to_evidence": [
         (("mark", "up", 0.0), "UP", "Ask what changed", None),
         (("mark", "stage_right", 0.0), "RIGHT", "Stage governed rollback", None),
@@ -167,9 +168,9 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
         # not scrolled, and Publish handoff is only the next stop (no ring yet).
         (("mark", "confirm_center", 0.0), "SELECT", "Publish responder handoff", BOARD_RECORDED),
         # The cursor stays on Publish and the handoff's answer comes up above the key bar.
-        (("mark", "publish", -0.45), "SELECT", "Publish responder handoff",
+        (("mark", "publish", -0.15), "SELECT", "Publish responder handoff",
          text_appears("#handoffOutput", "Next step")),
-        (("mark", "down", -0.3), "DOWN", "Incident evidence panel", None),
+        (("mark", "down", -0.15), "DOWN", "Incident evidence panel", None),
     ],
     # Center goes a third of a second before the caption that names it, so the panel
     # and the new BACK legend are up when the caption says so.
