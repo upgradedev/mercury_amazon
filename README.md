@@ -215,8 +215,9 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   Chromium (its `video-receipt.json`), every key sent through the D-pad bridge the
   Leanback app calls, with burned-in captions. It shows the figures this page prints,
   50.0% held-out precision over 58 namings and 90.0% refusals, and after Confirm the
-  board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
-  and it says so. It predates this build's board: the take quotes one of this
+  board holding RECORDED, no pipeline contacted. It predates the Android TV emulator
+  footage from CI run 37475795991; the next take, planned in video/README.md, opens on
+  that footage. It also predates this build's board: the take quotes one of this
   repository's commits, while the public board now names a stand-in from an invented,
   labelled deploy feed. Details in [video/README.md](video/README.md).
 - **A public repository.** Private until the reviewers are added as collaborators; see
