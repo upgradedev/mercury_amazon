@@ -73,23 +73,22 @@ EMULATOR_SOURCE = "android_tv_emulator"
 #: The beats that play over emulator footage. They open the take; nothing is recorded
 #: for them here.
 EMULATOR_SCENES = [
-    "beat_01_tv_launch",
-    "beat_02_tv_board",
-    "beat_03_tv_stage",
-    "beat_04_tv_confirm",
-    "beat_05_tv_publish",
+    "beat_01_tv_board",
+    "beat_02_tv_stage",
+    "beat_03_tv_confirm",
+    "beat_04_tv_publish",
 ]
 #: The beats this script records, in order.
 EXPECTED_SCENES = [
-    "beat_06_desktop_board",
-    "beat_07_board_on_load",
-    "beat_08_crowded_refusal",
-    "beat_09_named_with_odds",
-    "beat_10_provenance",
-    "beat_11_stage_to_evidence",
-    "beat_12_dpad",
-    "beat_13_fixtures",
-    "beat_14_build_check",
+    "beat_05_desktop_board",
+    "beat_06_board_on_load",
+    "beat_07_crowded_refusal",
+    "beat_08_named_with_odds",
+    "beat_09_provenance",
+    "beat_10_stage_to_evidence",
+    "beat_11_dpad",
+    "beat_12_fixtures",
+    "beat_13_build_check",
 ]
 
 FOCUSED = """() => { const c = window.mercuryNav && window.mercuryNav.current;
@@ -132,31 +131,32 @@ def text_appears(selector: str, needle: str) -> str:
 # ``when`` is seconds into the beat; ("sentence", n, extra) for the n-th caption cue's
 # start plus ``extra``; or ("mark", name, extra) for a spoken mark from timing.json.
 JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
-    "beat_06_desktop_board": [],
-    "beat_07_board_on_load": [],
+    "beat_05_desktop_board": [],
+    "beat_06_board_on_load": [],
     # The four Downs and Center land while "Down walks the rows" is spoken, so the
     # verdict is on screen before the caption that describes it.
-    "beat_08_crowded_refusal": [
+    "beat_07_crowded_refusal": [
         (0.2, "DOWN", "Ask about checkout-api", None),
         (0.5, "DOWN", "Ask about payments worker", None),
         (0.8, "DOWN", "Ask about search indexer", None),
         (1.1, "DOWN", "Ask about release train", None),
         (1.4, "SELECT", "Ask about release train", text_appears("#heroHeadline", "Cannot attribute")),
     ],
-    # The Ups and Center land under "On checkout-api", before the caption that says
+    # The Ups and Center land on "Up, up, up, center", so focus is on checkout-api
+    # before the caption that names it, and its verdict before the caption that says
     # exactly one runtime change landed.
-    "beat_09_named_with_odds": [
-        (0.0, "UP", "Ask about search indexer", None),
-        (0.2, "UP", "Ask about payments worker", None),
-        (0.4, "UP", "Ask about checkout-api", None),
-        (0.6, "SELECT", "Ask about checkout-api", text_appears("#heroHeadline", "Commit")),
+    "beat_08_named_with_odds": [
+        (("mark", "up", 0.0), "UP", "Ask about search indexer", None),
+        (("mark", "up_again", 0.0), "UP", "Ask about payments worker", None),
+        (("mark", "up_third", 0.0), "UP", "Ask about checkout-api", None),
+        (("mark", "center", 0.0), "SELECT", "Ask about checkout-api", text_appears("#heroHeadline", "Commit")),
     ],
-    "beat_10_provenance": [],
+    "beat_09_provenance": [],
     # The stage, confirm and handoff presses of the 2026-10-01 take, in the same order
     # with the same checks, each on the word that names it. Publish is pressed a
     # quarter second before "Center publishes", because its answer takes that long to
     # come up.
-    "beat_11_stage_to_evidence": [
+    "beat_10_stage_to_evidence": [
         (("mark", "up", 0.0), "UP", "Ask what changed", None),
         (("mark", "stage_right", 0.0), "RIGHT", "Stage governed rollback", None),
         (("mark", "stage_center", 0.0), "SELECT", "Stage governed rollback",
@@ -170,21 +170,23 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
          text_appears("#handoffOutput", "Next step")),
         (("mark", "down", 0.0), "DOWN", "Incident evidence panel", None),
     ],
-    "beat_12_dpad": [
+    # Center goes a third of a second before the caption that names it, so the panel
+    # and the new BACK legend are up when the caption says so.
+    "beat_11_dpad": [
         (0.8, "RIGHT", "Delivery velocity panel", None),
-        (("sentence", 1, 0.0), "SELECT", "Load DORA velocity", text_appears("#doraOutput", "offline-fixture")),
+        (("sentence", 1, -0.35), "SELECT", "Load DORA velocity", text_appears("#doraOutput", "offline-fixture")),
     ],
     # An open panel holds the remote until BACK: DOWN at its foot scrolls the rest of
     # the answer into view and the cursor stays on the panel's button. Cloud spend is
     # opened before the caption that calls it synthetic.
-    "beat_13_fixtures": [
+    "beat_12_fixtures": [
         (0.0, "DOWN", "Load DORA velocity", None),
         (("sentence", 1, 0.0), "BACK", "Delivery velocity panel", None),
         (("sentence", 2, -0.8), "RIGHT", "Cloud spend panel", None),
         (("sentence", 2, -0.4), "SELECT", "Scan AWS spend", text_appears("#costOutput", "offline-fixture")),
         (("sentence", 2, 2.0), "BACK", "Cloud spend panel", None),
     ],
-    "beat_14_build_check": [
+    "beat_13_build_check": [
         (("mark", "down", 0.0), "DOWN", "How it answers panel", None),
         (("mark", "down_again", 0.0), "DOWN", "Check connection", None),
         (("mark", "center", 0.0), "SELECT", "Check connection",

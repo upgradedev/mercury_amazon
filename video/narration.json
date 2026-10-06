@@ -1,6 +1,6 @@
 {
   "schema": "mercury.video_narration/1",
-  "status": "RENDERED LOCALLY, NOT UPLOADED. This plan is the 2026-10-06 take, rendered at 48010c9. Its content opens on Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on an AOSP Android TV emulator, Android 14 / API 34, loading the public demo (build ea2cff5, record-only), at 1x, with two holds of a static frame. That is footage, not a Fire TV device and not a runtime receipt; the Android TV emulator runtime receipt is a separate file, android_tv_runtime_receipt.json. The rest is a local run of this repository in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540 CSS) with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. An emulator beat's seconds are its footage window plus its holds; a desktop beat's seconds are its measured hold, the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. The event FAQ permits the Android TV Emulator and does not require physical hardware.",
+  "status": "NOT YET RENDERED, NOT UPLOADED. This plan is the second 2026-10-06 take, cut after the judge review of the take at 81d6144. Its content opens on Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on an AOSP Android TV emulator, Android 14 / API 34, loading the public demo (build ea2cff5, record-only). The footage plays from 8.88 s, the board as it first shows, at 1x, with two holds of a static frame; the home screen and the black cold start before it are not shown, because CI launched the app by intent, not with a D-pad press on a tile. That is footage, not a Fire TV device and not a runtime receipt; the Android TV emulator runtime receipt is a separate file, android_tv_runtime_receipt.json. The rest is a local run of this repository in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540 CSS) with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. A label under each picture names its source. An emulator beat's seconds are its footage window plus its holds; a desktop beat's seconds are its measured hold, the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. The event FAQ permits the Android TV Emulator and does not require physical hardware.",
   "project": "mercury_amazon",
   "title": "Mercury: Fire TV incident board",
   "source_of_truth": "scripts/build_video_plan.py",
@@ -22,58 +22,31 @@
     "device_model": "AOSP TV on x86",
     "rollback_dispatch": "record-only",
     "file": "journey.mp4",
-    "frames_at_25_fps": 691
+    "frames_at_25_fps": 691,
+    "fixture_commits": {
+      "named": "4f1c2ab",
+      "rollback_target": "9b07e3d"
+    }
   },
-  "target_duration_seconds": 163.852,
+  "target_duration_seconds": 156.09,
   "max_allowed_seconds": 180.0,
   "beats": [
     {
-      "beat_id": "beat_01_tv_launch",
+      "beat_id": "beat_01_tv_board",
       "source": "android_tv_emulator",
       "timestamp_start": 0.0,
-      "timestamp_end": 9.64,
-      "narration_text": "From the home screen, the debug A P K opens the public demo on an Android TV emulator. The screen stays black while it loads.",
-      "caption_text": "From the home screen, the debug APK opens the public demo on an Android TV emulator. The screen stays black while it loads.",
+      "timestamp_end": 7.56,
+      "narration_text": "On an Android TV emulator, the public demo asks on its own: checkout A P I, twelve point nine times baseline.",
+      "caption_text": "On an Android TV emulator, the public demo asks on its own: checkout-api, 12.9x baseline.",
       "caption_cues": [
         [
-          "From the home screen, the debug APK opens the public demo on an Android TV emulator.",
+          "On an Android TV emulator,",
           null,
-          0
+          19
         ],
         [
-          "The screen stays black while it loads.",
-          "black",
-          11
-        ]
-      ],
-      "visual_action": "Emulator footage from 0.32 s of journey.mp4 at 1x: the Leanback home screen to 4.169 s (frame 10), then black from 4.228 s (frame 11) while the app cold-starts; the board first shows at 8.856 s (frame 19).",
-      "marks": {
-        "black": "The screen stays"
-      },
-      "measured": {
-        "audio_seconds": 8.499,
-        "marks_seconds": {
-          "black": 6.2
-        }
-      },
-      "fixed_hold_seconds": 9.64,
-      "footage_window_seconds": [
-        0.32,
-        9.96
-      ],
-      "footage_holds_seconds": []
-    },
-    {
-      "beat_id": "beat_02_tv_board",
-      "source": "android_tv_emulator",
-      "timestamp_start": 9.64,
-      "timestamp_end": 15.6,
-      "narration_text": "The board asks on its own: checkout A P I, twelve point nine times baseline.",
-      "caption_text": "The board asks on its own: checkout-api, 12.9x baseline.",
-      "caption_cues": [
-        [
-          "The board asks on its own:",
-          null,
+          "the public demo asks on its own:",
+          "asks",
           23
         ],
         [
@@ -82,35 +55,35 @@
           24
         ]
       ],
-      "visual_action": "Emulator footage from 9.96 s: CHECKING at 10.074 s (frame 21), checkout-api ASKING at 10.428 s (frame 23), checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab from the demo's invented deploy feed at 11.160 s (frame 24), all five rows at 11.630 s (frame 28). That static board is held 1.52 s at 12.00 s.",
+      "visual_action": "Emulator footage from 8.88 s of journey.mp4 at 1x: the board as it first shows (frame 19, 8.856 s), Not asked; CHECKING at 10.074 s (frame 21), checkout-api ASKING at 10.428 s (frame 23), checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab from the demo's invented deploy feed at 11.160 s (frame 24), all five rows at 11.630 s (frame 28). That static board is held at 12.00 s. The home screen and the black cold start before 8.856 s are not shown.",
       "marks": {
-        "asks": "asks",
+        "asks": "the public demo",
         "value": "checkout A P I"
       },
       "measured": {
-        "audio_seconds": 5.619,
+        "audio_seconds": 7.245,
         "marks_seconds": {
-          "asks": 0.499,
-          "value": 1.95
+          "asks": 1.707,
+          "value": 3.866
         }
       },
-      "fixed_hold_seconds": 5.96,
+      "fixed_hold_seconds": 7.56,
       "footage_window_seconds": [
-        9.96,
+        8.88,
         14.4
       ],
       "footage_holds_seconds": [
         [
           12.0,
-          1.52
+          2.04
         ]
       ]
     },
     {
-      "beat_id": "beat_03_tv_stage",
+      "beat_id": "beat_02_tv_stage",
       "source": "android_tv_emulator",
-      "timestamp_start": 15.6,
-      "timestamp_end": 21.48,
+      "timestamp_start": 7.56,
+      "timestamp_end": 13.44,
       "narration_text": "Right, then center. A rollback is staged, and its lease counts down.",
       "caption_text": "Right, then Center. A rollback is staged, and its lease counts down.",
       "caption_cues": [
@@ -151,10 +124,10 @@
       "footage_holds_seconds": []
     },
     {
-      "beat_id": "beat_04_tv_confirm",
+      "beat_id": "beat_03_tv_confirm",
       "source": "android_tv_emulator",
-      "timestamp_start": 21.48,
-      "timestamp_end": 27.4,
+      "timestamp_start": 13.44,
+      "timestamp_end": 19.36,
       "narration_text": "Right, then center confirms. Recorded, no pipeline contacted: this demo is record only.",
       "caption_text": "Right, then Center confirms. RECORDED, no pipeline contacted: this demo is record-only.",
       "caption_cues": [
@@ -195,10 +168,10 @@
       "footage_holds_seconds": []
     },
     {
-      "beat_id": "beat_05_tv_publish",
+      "beat_id": "beat_04_tv_publish",
       "source": "android_tv_emulator",
-      "timestamp_start": 27.4,
-      "timestamp_end": 31.36,
+      "timestamp_start": 19.36,
+      "timestamp_end": 23.32,
       "narration_text": "Center publishes the handoff: shared revision thirteen.",
       "caption_text": "Center publishes the handoff: SHARED REVISION 13.",
       "caption_cues": [
@@ -241,15 +214,19 @@
       ]
     },
     {
-      "beat_id": "beat_06_desktop_board",
+      "beat_id": "beat_05_desktop_board",
       "source": "desktop_capture",
-      "timestamp_start": 31.36,
-      "timestamp_end": 43.388,
-      "narration_text": "The rest is the same board, run locally from this commit in a desktop browser at ten eighty p. Mercury names a commit only when exactly one runtime change landed before the spike.",
-      "caption_text": "The rest is the same board, run locally from this commit in a desktop browser at 1080p. Mercury names a commit only when exactly one runtime change landed before the spike.",
+      "timestamp_start": 23.32,
+      "timestamp_end": 41.478,
+      "narration_text": "The rest is the same board in a desktop browser, run locally from this commit. It has its own fixtures, so the commits differ, and its handoff starts again at revision one. Mercury names a commit only when exactly one runtime change landed before the spike.",
+      "caption_text": "The rest is the same board in a desktop browser, run locally from this commit. It has its own fixtures, so the commits differ, and its handoff starts again at revision 1. Mercury names a commit only when exactly one runtime change landed before the spike.",
       "caption_cues": [
         [
-          "The rest is the same board, run locally from this commit in a desktop browser at 1080p.",
+          "The rest is the same board in a desktop browser, run locally from this commit.",
+          null
+        ],
+        [
+          "It has its own fixtures, so the commits differ, and its handoff starts again at revision 1.",
           null
         ],
         [
@@ -257,22 +234,22 @@
           null
         ]
       ],
-      "visual_action": "The desktop take begins: the loaded board in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540), focus on Ask what changed. No key pressed."
+      "visual_action": "The desktop take begins: the loaded board in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540), focus on Ask what changed, and the desktop label under the picture. No key pressed."
     },
     {
-      "beat_id": "beat_07_board_on_load",
+      "beat_id": "beat_06_board_on_load",
       "source": "desktop_capture",
-      "timestamp_start": 43.388,
-      "timestamp_end": 61.407,
-      "narration_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody ninety percent of the time. A refusal never calls the deploy innocent.",
-      "caption_text": "It answered on load, before any key was pressed. Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody 90.0% of the time. A refusal never calls the deploy innocent.",
+      "timestamp_start": 41.478,
+      "timestamp_end": 51.788,
+      "narration_text": "It answered on load, before any key was pressed. Four of the five rows name no commit. A refusal never calls the deploy innocent.",
+      "caption_text": "It answered on load, before any key was pressed. Four of the five rows name no commit. A refusal never calls the deploy innocent.",
       "caption_cues": [
         [
           "It answered on load, before any key was pressed.",
           null
         ],
         [
-          "Most answers are refusals: on generated cases held out from tuning, it saw a real anomaly and named nobody 90.0% of the time.",
+          "Four of the five rows name no commit.",
           null
         ],
         [
@@ -280,13 +257,13 @@
           null
         ]
       ],
-      "visual_action": "Hold on the board. The five rows read Temporal candidate, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
+      "visual_action": "Hold on the board. The five rows read Temporal candidate (with a commit), Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
     },
     {
-      "beat_id": "beat_08_crowded_refusal",
+      "beat_id": "beat_07_crowded_refusal",
       "source": "desktop_capture",
-      "timestamp_start": 61.407,
-      "timestamp_end": 78.961,
+      "timestamp_start": 51.788,
+      "timestamp_end": 69.342,
       "narration_text": "Down walks the rows. Release train shows a spike well above its baseline, but several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
       "caption_text": "Down walks the rows. release-train shows a spike well above its baseline, but several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
       "caption_cues": [
@@ -310,38 +287,51 @@
       "visual_action": "D-pad Down four times to release-train, then Center, all before the second caption. The verdict reads Cannot attribute this with the number of changes that landed, Next reads No rollback offered, and Stage rollback and Confirm are disabled."
     },
     {
-      "beat_id": "beat_09_named_with_odds",
+      "beat_id": "beat_08_named_with_odds",
       "source": "desktop_capture",
-      "timestamp_start": 78.961,
-      "timestamp_end": 98.744,
-      "narration_text": "On checkout A P I, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause fifty percent of the time, over fifty eight namings, if a fault shows within seventy five minutes.",
-      "caption_text": "On checkout-api, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause 50.0% of the time, over 58 namings, if a fault shows within 75 minutes.",
+      "timestamp_start": 69.342,
+      "timestamp_end": 88.893,
+      "narration_text": "Up, up, up, center. On checkout A P I, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause fifty percent of the time, if a fault shows within seventy five minutes.",
+      "caption_text": "Up, Up, Up, Center. On checkout-api, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause 50.0% of the time, if a fault shows within 75 minutes.",
       "caption_cues": [
         [
-          "On checkout-api,",
+          "Up, Up, Up, Center.",
           null
+        ],
+        [
+          "On checkout-api,",
+          "checkout"
         ],
         [
           "exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds:",
-          null
+          "exactly"
         ],
         [
-          "on held-out generated cases a named commit is the cause 50.0% of the time, over 58 namings, if a fault shows within 75 minutes.",
-          null
+          "on held-out generated cases a named commit is the cause 50.0% of the time, if a fault shows within 75 minutes.",
+          "odds"
         ]
       ],
-      "visual_action": "D-pad Up three times to checkout-api, then Center, inside the first caption. The verdict names the commit as the only runtime change, quotes its message, and reads 50.0% held-out precision (synthetic, \u226475m lag)."
+      "visual_action": "D-pad Up three times to checkout-api and Center, each on its spoken word, before the caption that names checkout-api. The verdict names the commit as the only runtime change, quotes its message, and reads 50.0% held-out precision (synthetic, \u226475m lag).",
+      "marks": {
+        "up": "Up, up",
+        "up_again": "up, up, center",
+        "up_third": "up, center",
+        "center": "center.",
+        "checkout": "On checkout",
+        "exactly": "exactly one",
+        "odds": "on held-out"
+      }
     },
     {
-      "beat_id": "beat_10_provenance",
+      "beat_id": "beat_09_provenance",
       "source": "desktop_capture",
-      "timestamp_start": 98.744,
-      "timestamp_end": 109.379,
-      "narration_text": "The reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
-      "caption_text": "The reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
+      "timestamp_start": 88.893,
+      "timestamp_end": 101.617,
+      "narration_text": "On this board, the reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
+      "caption_text": "On this board, the reading and the commit each carry a stamp. The metric is an offline fixture, generated locally. The commit is one of Mercury's own, standing in for a deploy feed.",
       "caption_cues": [
         [
-          "The reading and the commit each carry a stamp.",
+          "On this board, the reading and the commit each carry a stamp.",
           null
         ],
         [
@@ -353,13 +343,13 @@
           null
         ]
       ],
-      "visual_action": "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN stamp against Mercury's commits. No key pressed. (The public demo in the emulator footage names a deploy from an invented feed instead.)"
+      "visual_action": "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN stamp against Mercury's commits. No key pressed. (The public demo in the emulator footage names records from an invented fixture feed instead; the label under the footage says so.)"
     },
     {
-      "beat_id": "beat_11_stage_to_evidence",
+      "beat_id": "beat_10_stage_to_evidence",
       "source": "desktop_capture",
-      "timestamp_start": 109.379,
-      "timestamp_end": 126.283,
+      "timestamp_start": 101.617,
+      "timestamp_end": 118.521,
       "narration_text": "Up, right, center: the rollback is staged. Right, center confirms it, and the board holds recorded, not sent. Center publishes the handoff. Down shows the evidence behind the odds: fifty eight namings, in eleven hundred sixty synthetic cases.",
       "caption_text": "Up, Right, Center: the rollback is staged. Right, Center confirms it, and the board holds RECORDED, not sent. Center publishes the handoff. Down shows the evidence behind the odds: 58 namings, in 1160 synthetic cases.",
       "caption_cues": [
@@ -402,10 +392,10 @@
       }
     },
     {
-      "beat_id": "beat_12_dpad",
+      "beat_id": "beat_11_dpad",
       "source": "desktop_capture",
-      "timestamp_start": 126.283,
-      "timestamp_end": 138.45,
+      "timestamp_start": 118.521,
+      "timestamp_end": 130.688,
       "narration_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens delivery velocity, and Back now reads: back to the wall.",
       "caption_text": "The ring jumps to the nearest control in the direction pressed, and the label at the bottom right names it. Center opens Delivery velocity, and BACK now reads: Back to the wall.",
       "caption_cues": [
@@ -421,10 +411,10 @@
       "visual_action": "D-pad Right to Delivery velocity, Center. The panel opens and the BACK legend changes from Exit to the Fire TV launcher to Back to the wall."
     },
     {
-      "beat_id": "beat_13_fixtures",
+      "beat_id": "beat_12_fixtures",
       "source": "desktop_capture",
-      "timestamp_start": 138.45,
-      "timestamp_end": 151.035,
+      "timestamp_start": 130.688,
+      "timestamp_end": 143.273,
       "narration_text": "Its answer is a recording, stamped offline fixture, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic.",
       "caption_text": "Its answer is a recording, stamped OFFLINE FIXTURE, because no GitHub token is set. BACK returns to the wall, not out of the app. Cloud spend is a fixture too, marked SYNTHETIC.",
       "caption_cues": [
@@ -444,10 +434,10 @@
       "visual_action": "D-pad Down scrolls the rest of the DORA answer into view with its OFFLINE FIXTURE stamp; the cursor stays in the panel. Back returns to the wall and the legend changes back. Right to Cloud spend and Center before the third caption: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC. Back to the wall."
     },
     {
-      "beat_id": "beat_14_build_check",
+      "beat_id": "beat_13_build_check",
       "source": "desktop_capture",
-      "timestamp_start": 151.035,
-      "timestamp_end": 163.852,
+      "timestamp_start": 143.273,
+      "timestamp_end": 156.09,
       "narration_text": "Down, down, center: the server reports its build, the commit on the opening card, in fixture mode. The emulator footage came from C I, not a Fire TV device.",
       "caption_text": "Down, Down, Center: the server reports its build, the commit on the opening card, in fixture mode. The emulator footage came from CI, not a Fire TV device.",
       "caption_cues": [

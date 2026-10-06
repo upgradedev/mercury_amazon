@@ -48,7 +48,7 @@ Run from the repository root:
     MERCURY_VIDEO_ROOT=/path/outside/git FFPROBE=ffprobe ELEVENLABS_API_KEY=... \\
         python video/generate-narration.py
 
-``NARRATION_FORCE=beat_11_stage_to_evidence`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
+``NARRATION_FORCE=beat_10_stage_to_evidence`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
 The key is read from the environment and never printed or written anywhere.
 """
 

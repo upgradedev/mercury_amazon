@@ -23,13 +23,16 @@ What changed for this repository, so the kit's pixel-reading sync gate
      beats marked ``android_tv_emulator`` in ``timing.json`` say which window of it
      plays and where a static frame is held longer (``footageHoldsSeconds``, chosen in
      ``scripts/build_video_plan.py`` only where the source shows the same frame for a
-     second or more, or its last frame). A small label under it names the emulator,
-     the APK, the public demo build and the CI run for as long as it plays.
-  3. The desktop capture follows, scaled to 87.5% and placed at the top of the frame.
-     The emulator picture is scaled a little smaller (1600x900) to leave room for its
-     label. The captions sit in the band underneath both, so no caption ever covers
-     what the board shows. Both pictures were captured at 1920x1080 pixels: the
-     emulator's screen, and desktop Chromium at 1920x1080 CSS pixels.
+     second or more, or its last frame). A label under it names the emulator, the
+     APK, the public demo build and the CI run for as long as it plays, and says the
+     commits the demo names are invented records from its fixture feed.
+  3. The desktop capture follows. Both pictures are scaled to 1568x882 and placed at
+     the top of the frame, with a label of up to two lines under each and the
+     captions in the band under that, so no label or caption covers what the board
+     shows. The desktop label names the browser, the commit and the offline fixtures
+     on every desktop frame, and says it is not the TV. Both pictures were captured
+     at 1920x1080 pixels: the emulator's screen, and desktop Chromium at 1920x1080
+     CSS pixels.
   4. The captions are burned once, on the joined content (footage then capture), so
      they run on the narration's own clock. The shifted copy is the upload sidecar.
   5. It writes ``video_manifest.json`` and ``caption_windows.json`` for the gate.
@@ -61,12 +64,14 @@ FPS = 25
 FRAME_SECONDS = 1 / FPS
 TITLE_SECONDS = 4.0
 OUTRO_SECONDS = 3.0
-# The capture is shown at 1680x945, top-centred; captions live in the band below.
-PIC_W, PIC_H, PIC_X, PIC_Y = 1680, 945, 120, 8
-# The emulator footage is shown at 1600x900, top-centred, with its label under it and
-# the captions in the band below that.
-EMU_W, EMU_H, EMU_X, EMU_Y = 1600, 900, 160, 8
-EMU_LABEL_Y = EMU_Y + EMU_H + 6
+# Both pictures, the emulator footage and the desktop capture, are shown at 1568x882,
+# top-centred. Under each sit up to two lines naming its source, and under those the
+# captions, so neither a label nor a caption covers what the board shows.
+PIC_W, PIC_H, PIC_X, PIC_Y = 1568, 882, 176, 8
+EMU_W, EMU_H, EMU_X, EMU_Y = PIC_W, PIC_H, PIC_X, PIC_Y
+LABEL_Y = PIC_Y + PIC_H + 6
+LABEL_LINE_SPACING = 32
+LABEL_SIZE = 24
 EMULATOR_SOURCE = "android_tv_emulator"
 FOOTAGE_KIND = "footage, not a runtime receipt"
 BACKGROUND = (14, 15, 17)
@@ -143,6 +148,30 @@ def emulator_label(facts: dict[str, str]) -> str:
     )
 
 
+def emulator_label_lines(facts: dict[str, str], fixture_commits: dict[str, str]) -> list[str]:
+    """The label under the footage: its source, then what the commits it shows are.
+
+    The public demo names deploy records from an invented, display-only fixture feed
+    (src/infrastructure/fixtures/deploy_feed_fixture.json), and the board stamps only
+    the reading, not the commit, so the label stamps the commits for as long as the
+    footage plays.
+    """
+    named, target = fixture_commits["named"], fixture_commits["rollback_target"]
+    return [
+        emulator_label(facts),
+        f"Commits {named} and {target} are invented records from the demo's fixture feed, not real deploys.",
+    ]
+
+
+def desktop_label_lines(short: str) -> list[str]:
+    """The label under the desktop capture, on every frame of it. The page's footer
+    still names the Fire TV remote, so the label says the picture is not the TV."""
+    return [
+        f"Desktop browser at 1920x1080, local run of {short}, offline fixtures. Not the TV.",
+        "The key legend is the Fire TV build's; each key goes through the same D-pad bridge.",
+    ]
+
+
 def title_lines(short: str, facts: dict[str, str]) -> list[tuple[str, str, int, tuple[int, int, int]]]:
     # The product first: a judge reads what Mercury does before where the take came
     # from. The two sources of the picture follow in smaller lines, in the order they
@@ -172,15 +201,19 @@ def outro_lines(short: str, facts: dict[str, str]) -> list[tuple[str, str, int, 
     ]
 
 
-def label_plate(path: pathlib.Path, text: str) -> None:
-    """A transparent 1920x1080 plate with the footage label centred under the picture."""
+def label_plate(path: pathlib.Path, lines: list[str]) -> None:
+    """A transparent 1920x1080 plate with a source label centred under the picture."""
     from PIL import Image, ImageDraw
 
     image = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    face = font("segoeui.ttf", 26)
-    width = draw.textlength(text, font=face)
-    draw.text(((1920 - width) / 2, EMU_LABEL_Y), text, font=face, fill=INK_2 + (255,))
+    face = font("segoeui.ttf", LABEL_SIZE)
+    for row, text in enumerate(lines):
+        width = draw.textlength(text, font=face)
+        if width > 1840:
+            raise SystemExit(f"label line is wider than the frame: {text!r}")
+        draw.text(((1920 - width) / 2, LABEL_Y + row * LABEL_LINE_SPACING), text, font=face,
+                  fill=INK_2 + (255,))
     image.save(path)
 
 
@@ -252,6 +285,7 @@ def content_filters(
     capture_input: int = 0,
     footage_input: int = 3,
     label_input: int = 4,
+    desktop_label_input: int = 5,
 ) -> list[str]:
     """The video graph for the content: the footage, then the capture, then captions.
 
@@ -291,7 +325,9 @@ def content_filters(
         f"[{capture_input}:v]trim=start={trim_lead}:end={trim_lead + desktop_seconds + 1},"
         f"setpts=PTS-STARTPTS,fps={FPS},trim=end_frame={desktop_frames},setpts=PTS-STARTPTS,"
         f"scale={PIC_W}:{PIC_H}:flags=lanczos,pad=1920:1080:{PIC_X}:{PIC_Y}:color={bg},"
-        f"format=yuv420p,setsar=1[desk]",
+        f"format=yuv420p,setsar=1[deskbase]",
+        f"[{desktop_label_input}:v]format=rgba[desklabel]",
+        "[deskbase][desklabel]overlay=0:0:shortest=1:format=auto,format=yuv420p,setsar=1[desk]",
         f"[emu][desk]concat=n=2:v=1:a=0,"
         f"subtitles='{subtitle_path}':force_style='{style}',format=yuv420p,setsar=1[body]",
     ])
@@ -371,14 +407,21 @@ def main() -> None:
     title_png = cards / "title.png"
     outro_png = cards / "outro.png"
     label_png = cards / "emulator-label.png"
+    desktop_label_png = cards / "desktop-label.png"
     card(title_png, title_lines(short, facts))
     card(outro_png, outro_lines(short, facts))
     for path in (title_png, outro_png):
         edge = card_edge_density(path)
         if edge >= CARD_EDGE_CEILING:
             raise SystemExit(f"{path.name} edge density {edge:.2f} is too close to the gate's 4.5")
-    label = emulator_label(facts)
-    label_plate(label_png, label)
+    fixture_commits = plan["emulator_footage"].get("fixture_commits")
+    if not fixture_commits:
+        raise SystemExit("video/narration.json does not name the footage's fixture commits")
+    label_lines = emulator_label_lines(facts, fixture_commits)
+    label = " ".join(label_lines)
+    label_plate(label_png, label_lines)
+    desktop_lines = desktop_label_lines(short)
+    label_plate(desktop_label_png, desktop_lines)
 
     # In the finished file every caption starts after the title card: shift each window.
     source = srt_windows((narration_dir / "captions.en.srt").read_text(encoding="utf-8"))
@@ -397,10 +440,12 @@ def main() -> None:
         "-loop", "1", "-framerate", str(FPS), "-t", str(OUTRO_SECONDS), "-i", str(outro_png),
         "-i", str(footage),
         "-loop", "1", "-framerate", str(FPS), "-t", str(emulator_seconds), "-i", str(label_png),
+        "-loop", "1", "-framerate", str(FPS), "-t", f"{narration_total - emulator_seconds + 1:.3f}",
+        "-i", str(desktop_label_png),
     ]
     filters: list[str] = []
     labels: list[str] = []
-    first_audio_input = 5
+    first_audio_input = 6
     for index, scene in enumerate(scenes):
         args.extend(["-i", str(narration_dir / str(scene["audio"]))])
         delay = round((TITLE_SECONDS + float(scene["startSeconds"])) * 1000)
@@ -529,6 +574,7 @@ def main() -> None:
             ),
             "label": label,
         },
+        "desktopLabel": " ".join(desktop_lines),
         "capture": {
             "sha256": capture_receipt.get("sha256"),
             "trimLeadSeconds": trim_lead,

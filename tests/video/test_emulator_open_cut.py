@@ -6,6 +6,10 @@ browser, a server, a key or a render:
 * the emulator beats open the content, cover one unbroken window of the CI footage
   on 25 fps frames at 1x, and are held for exactly that window plus holds of frames
   that are static in the source;
+* the footage starts on the board: the home screen and the black cold start are not
+  shown, because CI launched the app by intent, not with a D-pad press on a tile;
+* a label stamps the footage's invented commits, and another names the desktop
+  browser on every desktop frame;
 * the frame table the cuts were read from lists all 52 frames by index, and no
   caption or spoken press runs ahead of the frame it names by more than half a second;
 * the planned video stays under 172 s, inside the gate's 175 s budget;
@@ -107,8 +111,8 @@ def test_the_emulator_beats_cover_one_window_of_the_footage_on_frames():
         for at, _ in holds:
             assert start < at <= end
     assert windows[-1][1] * 25 <= PLAN["emulator_footage"]["frames_at_25_fps"]
-    # The idle lead-in is trimmed, but the home screen stays in for the launch beat.
-    assert 0 < windows[0][0] <= 1.5
+    # The footage opens on the board as it first shows (frame 19), never before it.
+    assert FRAMES[19][0] <= windows[0][0] < FRAMES[20][0]
 
 
 # --------------------------------------------------------- Frame truth
@@ -169,11 +173,16 @@ def test_every_spoken_press_lands_with_its_effect():
     assert pressed == 5
 
 
-def test_the_launch_words_end_before_the_board_shows():
-    launch = _emulator_beats()[0]
-    ends = _footage_time(launch, launch["measured"]["audio_seconds"])
-    assert FRAMES[11][0] <= _footage_time(launch, launch["measured"]["marks_seconds"]["black"])
-    assert ends < FRAMES[19][0], "the black caption must not stay up over the board"
+def test_the_take_shows_no_launch_and_no_black_screen():
+    # CI started the app with an am start of its LEANBACK_LAUNCHER intent, so no
+    # frame shows a D-pad press on a tile. The take shows neither the home screen nor
+    # the cold start's black, and no caption claims a launch.
+    assert plan_builder.first_frame_shown() == plan_builder.FIRST_SHOWN_FRAME == 19
+    assert "first shows" in FRAMES[19][1]
+    assert all(not FRAMES[i][1].startswith("black") for i in range(19, 52))
+    spoken = " ".join(beat["caption_text"] for beat in _emulator_beats()).lower()
+    for phrase in ("home screen", "black", "launch", "opens the"):
+        assert phrase not in spoken, phrase
 
 
 def test_each_emulator_beat_fits_its_measured_words():
@@ -197,16 +206,53 @@ def test_the_planned_video_stays_under_172_seconds():
 
 def test_the_emulator_narration_says_what_the_tv_shows():
     spoken = " ".join(beat["caption_text"] for beat in _emulator_beats()).lower()
-    for phrase in ["android tv emulator", "home screen", "public demo", "black", "right", "center",
+    for phrase in ["android tv emulator", "public demo", "right", "center",
                    "recorded, no pipeline contacted", "record-only", "handoff"]:
         assert phrase in spoken, phrase
 
 
-def test_the_desktop_part_is_introduced_once_as_the_same_board_at_1080p():
+def test_the_cut_to_the_desktop_says_what_changes():
+    # At the cut the named commit, the rollback target and the handoff revision all
+    # change; the first desktop caption says why.
     desktop = [beat for beat in PLAN["beats"] if beat["source"] == "desktop_capture"]
     first = desktop[0]["caption_text"]
-    assert "same board" in first and "desktop browser at 1080p" in first
+    assert "same board in a desktop browser" in first and "run locally from this commit" in first
+    assert "own fixtures, so the commits differ" in first and "revision 1" in first
     assert sum("desktop browser" in beat["caption_text"] for beat in PLAN["beats"]) == 1
+    provenance = [beat for beat in desktop if beat["beat_id"] == "beat_09_provenance"][0]
+    assert provenance["caption_text"].startswith("On this board, the reading and the commit")
+
+
+def test_the_footage_label_stamps_the_invented_commits():
+    commits = PLAN["emulator_footage"]["fixture_commits"]
+    feed_path = REPO / "src" / "infrastructure" / "fixtures" / "deploy_feed_fixture.json"
+    feed = json.loads(feed_path.read_text(encoding="utf-8"))
+    assert "INVENTED" in feed["note"]
+    assert set(commits.values()) <= {deploy["sha"] for deploy in feed["deploys"]}
+    assert commits == {"named": "4f1c2ab", "rollback_target": "9b07e3d"}
+    facts = compose.footage_facts({
+        "workflow_run_url": PLAN["emulator_footage"]["workflow_run_url"],
+        "os_version": PLAN["emulator_footage"]["os_version"],
+        "public_demo_build_sha": PLAN["emulator_footage"]["public_demo_build_sha"],
+    })
+    lines = compose.emulator_label_lines(facts, commits)
+    assert lines[0] == compose.emulator_label(facts)
+    assert lines[1] == ("Commits 4f1c2ab and 9b07e3d are invented records from the demo's fixture feed, "
+                        "not real deploys.")
+
+
+def test_every_desktop_frame_carries_the_desktop_label():
+    lines = compose.desktop_label_lines("9620743")
+    assert lines[0].startswith("Desktop browser at 1920x1080, local run of 9620743")
+    assert "Not the TV." in lines[0] and "Fire TV build's" in lines[1]
+    graph = ";".join(compose.content_filters(
+        trim_lead=3.2, narration_total=CUES["total_duration_sec"],
+        emulator=compose.emulator_plan(_timing_scenes()), subtitle_path="C\\:/x/captions.en.srt"))
+    assert "[deskbase][desklabel]overlay=0:0:shortest=1" in graph
+    assert "[emubase][emulabel]overlay=0:0:shortest=1" in graph
+    # The labels sit between the picture and the two-line caption band (from y=975).
+    assert compose.LABEL_Y >= compose.PIC_Y + compose.PIC_H
+    assert compose.LABEL_Y + 2 * compose.LABEL_LINE_SPACING <= 970
 
 
 def test_the_held_out_figures_are_the_ones_the_board_prints():
@@ -214,12 +260,21 @@ def test_the_held_out_figures_are_the_ones_the_board_prints():
 
     accuracy = naming_accuracy()
     captions = " ".join(beat["caption_text"] for beat in PLAN["beats"])
-    refused = f"{accuracy['refused_to_name_rate_on_anomalies'] * 100:.1f}%"
     precision = f"{accuracy['precision_when_it_names_a_commit'] * 100:.1f}%"
-    assert f"named nobody {refused} of the time" in captions
-    assert f"the cause {precision} of the time, over {accuracy['namings_measured']} namings" in captions
+    namings = f"{accuracy['namings_measured']} namings"
+    assert f"the cause {precision} of the time, if a fault shows" in captions
     assert f"within {int(accuracy['assumed_delay_ceiling_minutes'])} minutes" in captions
-    assert f"{accuracy['namings_measured']} namings, in {accuracy['corpus_cases']} synthetic cases" in captions
+    assert f"{namings}, in {accuracy['corpus_cases']} synthetic cases" in captions
+    # A figure is named only over the frames that show it: the refusal rate never
+    # appears on the board, and the namings count only on the evidence panel, which
+    # the Down press in the stage-to-evidence beat opens.
+    refused = f"{accuracy['refused_to_name_rate_on_anomalies'] * 100:.1f}%"
+    assert refused not in captions and "named nobody" not in captions
+    assert captions.count(namings) == 1
+    evidence = [beat for beat in PLAN["beats"] if namings in beat["caption_text"]]
+    assert [beat["beat_id"] for beat in evidence] == ["beat_10_stage_to_evidence"]
+    cue = [c for c in evidence[0]["caption_cues"] if namings in c[0]][0]
+    assert cue[1] == "down"
 
 
 # ------------------------------------------------------- No retired claim
