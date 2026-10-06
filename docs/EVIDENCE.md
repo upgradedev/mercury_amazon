@@ -431,6 +431,78 @@ release boundaries would be stronger signals than either change above, and neith
 can be measured here. Closeness to the onset is not used to rank candidates: the
 generator's delay is uniform, so any gain from it would be fitted to that choice.
 
+#### Against two naive rules
+
+The tables above compare Mercury's engines with each other. A responder without Mercury
+does not refuse; they blame a change. Two such rules are scored on exactly the held-out
+cases above (same split, seed 20260927, commits and labels; the corpus fingerprint is in
+the summary), and the corpus and the engine are unchanged:
+
+```bash
+python scripts/naive_attribution_baselines.py           # writes attribution_baselines_summary.json
+python scripts/naive_attribution_baselines.py --check   # what CI runs
+```
+
+- **Baseline A, blame the latest deploy:** the newest commit at or before the onset,
+  however long before it.
+- **Baseline B, blame every deploy in the window:** every commit in the 75 minutes ending
+  at the onset (the shipped window), with no file filter and no crowding gate.
+
+Each rule sees the anomalies the shipped detector sees and is asked to name a change only
+where that detector found an onset, so the rows differ only in the attribution rule.
+Every commit counts as a deploy, as in the corpus. A naming is one commit named as the
+cause, so B can make several for one anomaly. Recall is the share of the 600 regressions
+whose causing commit was among those named. Synthetic, self-authored corpus:
+
+| Held-out, 582 anomalies seen | Mercury v3 (shipped) | A: latest deploy | B: every deploy in the window |
+|---|---|---|---|
+| Namings attempted | 58 | 582 | 1635 (over 375 anomalies) |
+| Correct namings | 29 | 100 | 341 |
+| Wrong namings (an innocent change named) | **29** | 482 | 1294 |
+| Of them, on exogenous spikes no commit caused | 13 | 215 | 52 |
+| Naming precision | **50.0%** (95% CI 37.5% to 62.5%) | 17.2% (95% CI 14.3% to 20.5%) | 20.9% (95% CI 19.0% to 22.9%) |
+| Naming recall on regressions | 4.8% (29 of 600) | 16.7% (100 of 600) | **56.8%** (341 of 600) |
+| Refusals | 524 | 0 | 207 |
+
+**What it means.** Against A, the shipped engine names 453 fewer innocent changes and
+gives up 71 correct namings. Against B, it names 1265 fewer and gives up 312. Per naming
+it is right about three times as often as A, and the 95% intervals do not overlap. Over
+the 20 other held-out seeds of `held_out_seed_spread` it makes fewer wrong namings than
+each baseline on 20 of 20 (mean 17.65, against 467.65 for A and 1280.9 for B). The
+published 50.0% is the same figure as above; nothing here moves it.
+
+**Where the baselines are better, plainly.** Both find more causes. A names the cause of
+100 regressions, 3.4 times the engine's 29. B has the cause among its names for 341
+regressions, which is 341 of the 375 anomalies it named anything for (90.9%), but
+beside 4.36 commits on average, so a responder still has to choose among them. If the
+goal is a short list that usually contains the cause, B does that and Mercury does not.
+Mercury's claim is the other one: when it names a single commit as the thing to roll
+back, that name is wrong half the time on this corpus, against 482 of 582 (82.8%) for
+A. The baselines also carry no runtime filter, which costs Mercury precision on these
+labels (see [the runtime filter (v3)](#the-runtime-filter-v3)); they still come out lower.
+
+On the train side of the same split the order holds and the gap is smaller: precision
+44.0% for the engine, 27.7% for A and 26.8% for B, recall 16.7%, 27.2% and 55.8%, with
+299 and 789 wrong namings avoided. On the held-out corpora of the delay-ceiling table,
+same seed and commits, B keeping the 75 minute window:
+
+| Delay ceiling (minutes) | Mercury v3 precision, wrong namings | A precision, wrong namings | B precision, wrong namings |
+|---|---|---|---|
+| 60 | 54.0% (27 of 50), 23 | 18.2% (106 of 582), 476 | 21.1% (366 of 1735), 1369 |
+| **75 (published)** | **50.0% (29 of 58), 29** | **17.2% (100 of 582), 482** | **20.9% (341 of 1635), 1294** |
+| 90 | 41.5% (22 of 53), 31 | 16.7% (97 of 582), 485 | 19.5% (279 of 1431), 1152 |
+| 120 | 38.6% (17 of 44), 27 | 16.0% (93 of 582), 489 | 18.9% (213 of 1124), 911 |
+| 180 | 27.3% (9 of 33), 24 | 14.6% (85 of 582), 497 | 18.1% (137 of 756), 619 |
+
+The lead narrows as the assumed delay grows. At a 180 minute ceiling the engine is 9.2
+points above B on 33 namings, a gap the sample cannot pin down, and its recall there is
+1.5% against B's 22.8%.
+
+What this does not show: the corpus is synthetic, the generator draws a cause uniformly
+from the commits and a delay uniformly up to its ceiling, and no responder was asked
+whether 29 wrong names and 29 right ones beat 482 and 100. It measures the trade, not
+its value to a team.
+
 ### The whole-stream trial
 
 ```bash
@@ -825,7 +897,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-692 tests and a re-measure on an idle machine is pending**.
+698 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -869,7 +941,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 692 passed
+# 698 passed
 ```
 
 #### Step 3: Start the server
@@ -1089,11 +1161,12 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 692 passed
+python -m pytest tests/ -q                                    # 698 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2092 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
+python scripts/naive_attribution_baselines.py                 # two naive rules on the same held-out cases
 python scripts/tune_attribution.py                            # the train-only sweep
 python scripts/measure_legibility.py                          # needs the ux extra
 python ci/readiness.py                                        # standards gate audit

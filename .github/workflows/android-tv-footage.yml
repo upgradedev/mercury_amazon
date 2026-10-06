@@ -1,0 +1,262 @@
+name: Android TV journey footage
+
+# Records the D-pad journey on the Android TV emulator as footage for the demo
+# video. It is NOT runtime proof: it writes no android_tv_runtime_receipt.json and
+# does not touch gate J4, which still rests on android-tv-emulator.yml. It lives in
+# its own file because editing that workflow or its smoke script invalidates the
+# committed J4 receipt (ci/readiness.py). The provenance file names the build the
+# public demo served while it was recorded.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/android-tv-footage.yml
+      - scripts/android_tv_footage.sh
+
+jobs:
+  emulator-footage:
+    runs-on: ubuntu-24.04
+    # 45 min: TCG software emulation (no KVM on the fleet) boots slowly;
+    # the 1200s boot timeout below must fit inside the job budget.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: platform-tools
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Build the exact public-candidate APK
+        run: >-
+          ./gradlew :app:assembleDebug --stacktrace
+          -PmercuryCockpitUrl=https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/
+      - name: Record which build the public demo serves
+        shell: bash
+        run: |
+          mkdir -p build/android-tv-footage
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health \
+            --output build/android-tv-footage/endpoint-health.json
+          # The journey confirms a rollback, so refuse unless the public demo only records it.
+          python -c 'import json,sys; h=json.load(open(sys.argv[1], encoding="utf-8")); d=h.get("rollback_dispatch"); assert d == "record-only", "public demo is not record-only: %r" % d; print("public demo build", h.get("build_sha"))' \
+            build/android-tv-footage/endpoint-health.json
+      - name: Pre-create the TV AVD with a small data partition
+        run: |
+          # Free ~15G first: the runner ships toolchains this job never touches
+          # (dotnet, ghc, azure-cli, swift). Both the action's and the
+          # emulator's own free-space checks must pass (run 36649294389:
+          # 3.06G available, 7.37G needed for the 6G default partition).
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/az /usr/share/swift
+          df -h / | tail -1
+          # Claim /dev/kvm: it exists on the fleet but the runner user
+          # is not in the kvm group (run 36659722387: ProbeKVM
+          # permission denied), so the action disables accel and the
+          # guest crawls under TCG (~1000s userspace, 1200s timeout).
+          # chmod on this ephemeral runner lets the action boot with KVM.
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          ls -la /dev/kvm 2>/dev/null || echo 'no /dev/kvm on this host'
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install 'system-images;android-34;android-tv;x86' > /dev/null
+          # Write the AVD by hand: avdmanager without --device exits 0 on the
+          # runner's new cmdline-tools without creating anything (run
+          # 36652310634), and the AOSP image ships no tv_1080p profile for
+          # --device (run 36651621292). This config is the local mercury_tv
+          # AVD, which the emulator parses and resolves (systemPath found),
+          # minus the device-profile lines, with a 1.5G data partition.
+          mkdir -p ~/.android/avd/test.avd
+          cat > ~/.android/avd/test.ini <<'EOF'
+          avd.ini.encoding=UTF-8
+          path=/home/runner/.android/avd/test.avd
+          path.rel=avd/test.avd
+          target=android-34
+          EOF
+          cat > ~/.android/avd/test.avd/config.ini <<'EOF'
+          PlayStore.enabled = no
+          abi.type = x86
+          avd.id = test
+          avd.ini.encoding = UTF-8
+          avd.name = test
+          disk.cachePartition = yes
+          disk.cachePartition.size = 66MB
+          disk.dataPartition.size = 1610612736
+          disk.systemPartition.size = 0
+          disk.vendorPartition.size = 0
+          environment.height = 0
+          environment.width = 0
+          fastboot.forceChosenSnapshotBoot = no
+          fastboot.forceColdBoot = no
+          fastboot.forceFastBoot = yes
+          firstboot.bootFromDownloadableSnapshot = yes
+          firstboot.bootFromLocalSnapshot = yes
+          firstboot.saveToLocalSnapshot = yes
+          hw.accelerometer = no
+          hw.accelerometer_uncalibrated = yes
+          hw.arc = false
+          hw.audioInput = yes
+          hw.audioOutput = yes
+          hw.battery = no
+          hw.camera.back = emulated
+          hw.camera.back.orientation = 90
+          hw.camera.front = none
+          hw.camera.front.orientation = 90
+          hw.cpu.arch = x86
+          hw.cpu.ncore = 4
+          hw.dPad = yes
+          hw.display1.density = 0
+          hw.display1.flag = 0
+          hw.display1.height = 0
+          hw.display1.width = 0
+          hw.display1.xOffset = -1
+          hw.display1.yOffset = -1
+          hw.display2.density = 0
+          hw.display2.flag = 0
+          hw.display2.height = 0
+          hw.display2.width = 0
+          hw.display2.xOffset = -1
+          hw.display2.yOffset = -1
+          hw.display3.density = 0
+          hw.display3.flag = 0
+          hw.display3.height = 0
+          hw.display3.width = 0
+          hw.display3.xOffset = -1
+          hw.display3.yOffset = -1
+          hw.displayRegion.0.1.height = 0
+          hw.displayRegion.0.1.width = 0
+          hw.displayRegion.0.1.xOffset = -1
+          hw.displayRegion.0.1.yOffset = -1
+          hw.displayRegion.0.2.height = 0
+          hw.displayRegion.0.2.width = 0
+          hw.displayRegion.0.2.xOffset = -1
+          hw.displayRegion.0.2.yOffset = -1
+          hw.displayRegion.0.3.height = 0
+          hw.displayRegion.0.3.width = 0
+          hw.displayRegion.0.3.xOffset = -1
+          hw.displayRegion.0.3.yOffset = -1
+          hw.gltransport = pipe
+          hw.gltransport.asg.dataRingSize = 32768
+          hw.gltransport.asg.writeBufferSize = 1048576
+          hw.gltransport.asg.writeStepSize = 4096
+          hw.gltransport.drawFlushInterval = 800
+          hw.gps = yes
+          hw.gpu.enabled = no
+          hw.gpu.mode = auto
+          hw.gsmModem = yes
+          hw.gyroscope = yes
+          hw.hotplug_multi_display = no
+          hw.initialOrientation = portrait
+          hw.keyboard = no
+          hw.keyboard.charmap = qwerty2
+          hw.keyboard.lid = yes
+          hw.lcd.backlight = yes
+          hw.lcd.circular = false
+          hw.lcd.density = 320
+          hw.lcd.depth = 32
+          hw.lcd.height = 1080
+          hw.lcd.transparent = false
+          hw.lcd.vsync = 60
+          hw.lcd.width = 1920
+          hw.mainKeys = yes
+          hw.multi_display_window = no
+          hw.ramSize = 1536M
+          hw.rotaryInput = no
+          hw.screen = multi-touch
+          hw.sdCard = yes
+          hw.sensor.hinge = no
+          hw.sensor.hinge.count = 0
+          hw.sensor.hinge.fold_to_displayRegion.0.1_at_posture = 1
+          hw.sensor.hinge.resizable.config = 1
+          hw.sensor.hinge.sub_type = 0
+          hw.sensor.hinge.type = 0
+          hw.sensor.roll = no
+          hw.sensor.roll.count = 0
+          hw.sensor.roll.resize_to_displayRegion.0.1_at_posture = 6
+          hw.sensor.roll.resize_to_displayRegion.0.2_at_posture = 6
+          hw.sensor.roll.resize_to_displayRegion.0.3_at_posture = 6
+          hw.sensors.gyroscope_uncalibrated = yes
+          hw.sensors.heading = no
+          hw.sensors.heart_rate = no
+          hw.sensors.humidity = yes
+          hw.sensors.light = yes
+          hw.sensors.magnetic_field = yes
+          hw.sensors.magnetic_field_uncalibrated = yes
+          hw.sensors.orientation = no
+          hw.sensors.pressure = yes
+          hw.sensors.proximity = no
+          hw.sensors.rgbclight = no
+          hw.sensors.temperature = yes
+          hw.sensors.wrist_tilt = no
+          hw.touchpad0 = no
+          hw.touchpad0.height = 400
+          hw.touchpad0.width = 600
+          hw.trackBall = no
+          hw.useext4 = yes
+          image.sysdir.1 = system-images/android-34/android-tv/x86/
+          kernel.newDeviceNaming = autodetect
+          kernel.supportsYaffs2 = autodetect
+          runtime.network.latency = none
+          runtime.network.speed = full
+          sdcard.size = 100 MB
+          showDeviceFrame = yes
+          tag.display = Android TV
+          tag.id = android-tv
+          test.delayAdbTillBootComplete = 0
+          test.monitorAdb = 0
+          test.quitAfterBootTimeOut = -1
+          userdata.useQcow2 = no
+          vm.heapSize = 228M
+          EOF
+          # perl, not sed -i: BSD sed on macOS needs a backup arg and
+          # fails (run 36657960710). perl -pi is a no-op on LF files.
+          perl -pi -e 's/\r$//' ~/.android/avd/test.ini ~/.android/avd/test.avd/config.ini
+
+      - name: Record the Android TV D-pad journey
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          # API 34 x86 is the newest TV image on the stable channel
+          # (sdkmanager --list, 2026-09-30): android-35 ships no TV image and
+          # android-34 ships no x86_64 one. android-tv (AOSP, no Play
+          # Services) boots inside the runner's window where google-tv hangs;
+          # it still ships WebView and the Leanback launcher the APK needs.
+          # Do not bump without re-listing.
+          api-level: 34
+          target: android-tv
+          arch: x86
+          profile: tv_1080p
+          ram-size: 3072M
+          heap-size: 512M
+          force-avd-creation: false
+          disable-animations: true
+          # -show-kernel: the diagnostic signal. Under TCG the guest may be
+          # slow (kernel lines keep flowing) or stuck (lines stop); without
+          # the kernel log the two are indistinguishable (runs 36654741354,
+          # 36656280079). Keep until the boot path is proven, then drop.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -show-kernel
+          # 1200s: the 600s default cannot fit a TCG cold boot; 1200
+          # distinguishes slow-but-alive from stuck when read with -show-kernel.
+          emulator-boot-timeout: 1200
+          script: bash scripts/android_tv_footage.sh
+      - name: Assemble the screencap fallback into a video
+        if: always()
+        shell: bash
+        run: |
+          cd build/android-tv-footage 2>/dev/null || exit 0
+          count=$(find frames -name '*.png' 2>/dev/null | wc -l)
+          echo "fallback frames: $count"
+          if [ "$count" -gt 0 ]; then
+            command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+            ffmpeg -loglevel error -framerate 1 -pattern_type glob -i 'frames/*.png' \
+              -vf "scale=1920:-2,format=yuv420p" -c:v libx264 -r 25 frames-1fps.mp4
+          fi
+          ls -la
+      - name: Upload the footage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mercury-android-tv-footage-${{ github.sha }}
+          path: build/android-tv-footage/
+          if-no-files-found: error
+          retention-days: 30
