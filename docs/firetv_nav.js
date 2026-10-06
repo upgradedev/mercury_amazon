@@ -25,6 +25,12 @@
      fraction of a pixel into each other. This much overlap still counts as beside. */
   var EDGE_SLACK = 2;
   var DIRECTIONS = { UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT' };
+  /* On a television, a direction that reaches a deferred cursor this soon after the
+     answer that deferred it is not the viewer's next press: nobody has read the
+     answer yet. The Android TV emulator footage for f423ba5 showed one arriving about
+     half a second after RECORDED, with no key pressed, and the board scrolled away
+     from its payoff. CENTER is never held, so the next Center always acts. */
+  var DEFER_SETTLE_MS = 1500;
 
   var KEY_TO_DIRECTION = {
     ArrowUp: DIRECTIONS.UP,
@@ -140,9 +146,23 @@
     }));
   }
 
+  function now() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now() : Date.now();
+  }
+
+  /** Bounded journey note for the Android TV logcat; a no-op outside the app. */
+  function reportHost(event, detail) {
+    try {
+      var host = typeof window !== 'undefined' ? window.MercuryHost : null;
+      if (host && typeof host.reportJourney === 'function') host.reportJourney(event, detail);
+    } catch (ignored) { /* a browser has no native host */ }
+  }
+
   function SpatialNavigator() {
     this.current = null;
     this.pending = false;
+    this.deferredAt = 0;
     this.enabled = true;
     this.scope = null;
     this.scopeInset = null;
@@ -257,6 +277,7 @@
     if (previous) previous.classList.remove(FOCUS_CLASS);
     this.current = element;
     this.pending = true;
+    this.deferredAt = now();
     var park = options && options.park;
     if (park && typeof park.focus === 'function') park.focus({ preventScroll: true });
     // After focus(): the page's focusin listener names whatever took focus, and
@@ -309,6 +330,12 @@
     // The first press after a deferred cursor only shows where it is, unless a
     // panel has opened since and the deferred control is outside it.
     if (this.pending && this.current && isVisible(this.current) && this.inScope(this.current)) {
+      var waited = Math.round(now() - this.deferredAt);
+      var held = onTelevision() && waited < DEFER_SETTLE_MS;
+      // Named in logcat, so the next emulator run says where the press came from.
+      reportHost('deferred_press', direction + ':' + lastInput + ':' + waited + 'ms:'
+        + (held ? 'held' : 'revealed'));
+      if (held) return this.current;
       this.reveal();
       return this.current;
     }
@@ -354,6 +381,8 @@
   };
 
   var navigator_ = new SpatialNavigator();
+  /* Which path the last key came in by, for the journey note above. */
+  var lastInput = 'none';
 
   function onKeyDown(event) {
     if (event.defaultPrevented) return;
@@ -364,6 +393,7 @@
     }
 
     var direction = KEY_TO_DIRECTION[event.key];
+    lastInput = event.repeat ? 'key-repeat' : 'key';
     if (direction) {
       event.preventDefault();
       navigator_.move(direction);
@@ -425,6 +455,7 @@
    */
   window.mercuryNav = navigator_;
   window.navigateDpad = function (direction) {
+    lastInput = 'bridge';
     if (direction === 'SELECT') { navigator_.select(); return true; }
     if (direction === 'BACK') { return navigator_.back(); }
     if (DIRECTIONS[direction]) { navigator_.move(direction); return true; }
@@ -437,6 +468,7 @@
     FOCUSABLE_SELECTOR: FOCUSABLE_SELECTOR,
     FOCUS_CLASS: FOCUS_CLASS,
     FOCUS_EVENT: FOCUS_EVENT,
-    PERPENDICULAR_PENALTY: PERPENDICULAR_PENALTY
+    PERPENDICULAR_PENALTY: PERPENDICULAR_PENALTY,
+    DEFER_SETTLE_MS: DEFER_SETTLE_MS
   };
 })();
