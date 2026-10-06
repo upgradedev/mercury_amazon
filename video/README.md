@@ -1,19 +1,20 @@
 # Demo video
 
 **Status: rendered locally, not uploaded.** The last render is the 2026-10-06 take at
-`48010c9`, which opens on the Android TV emulator footage from CI. Nothing has a public
+`81d6144`, which opens on the Android TV emulator footage from CI. Nothing has a public
 link until the owner uploads it, and nothing in this directory is the video itself.
 
 ## The 2026-10-06 take: emulator footage first
 
 | Item | Value |
 |---|---|
-| Recorded commit | `48010c9e4014d2cbe9124113e589a0736bd98584`, reported by the local server's own `/health` during the take; the board's Check line reads Build 48010c9 |
+| Recorded commit | `81d61446f6100a82e3d0e7c23e16e8992178c4ac`, reported by the local server's own `/health` during the take; the board's Check line reads Build 81d6144 |
 | File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_20261006/mercury_amazon/output/`, outside git |
-| Length | 170.852 s (ffprobe format duration), 1920x1080, 25 fps, AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
-| SHA-256 | `6d8c0d457fa77dd49160e7c65cf52dc9ba630f5a2718a1c7bcf55b17b51690da` |
-| Sync gate | `scripts/verify_video_sync.py`, unchanged: all checks passed (`sync-gate.txt` beside the mp4) |
-| Capture | desktop Chromium at 1920x1080 CSS, every press on plan, no page errors (`capture/capture-receipt.json`) |
+| Length | 170.852 s (ffprobe format duration), 1920x1080, 25 fps (4271 frames), AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
+| SHA-256 | `e4a79672bec92ffbf188bfa8cdeedf7917ed177e07f628a203e3aefad337066c` (16915138 bytes) |
+| Sync gate | `scripts/verify_video_sync.py`, unchanged: "verify_video_sync: ALL SYNC GATES PASSED", 11 of 11 checks PASS, exit 0 (`sync-gate.txt` beside the mp4). `tests/video/verify_gate_selftest.py` passed, exit 0 |
+| Capture | desktop Chromium at 1920x1080 CSS, every press on plan, no page errors (`capture/capture-receipt.json`); the raw `production.webm` was deleted after the build |
+| Receipt | `video-receipt.json` beside the mp4: ffprobe duration, SHA-256, the recorded commit, the gate output, ElevenLabs characters and the footage provenance |
 | Plan | `scripts/build_video_plan.py`, which writes `narration.json` and `cue_sheet.json`; `SHOT_LIST.md` lists the beats and every frame of the footage |
 | Content | 163.852 s in 14 beats: 31.36 s of emulator footage in 5 beats (27.32 s played at 1x, 4.04 s of held static frames), then 132.492 s of desktop take in 9 beats |
 | Planned length | 170.852 s with the 4 s title card and the 3 s closing card; the gate allows under 175 s |
@@ -21,7 +22,7 @@ link until the owner uploads it, and nothing in this directory is the video itse
 | Desktop picture | Desktop Chromium at 1920x1080 CSS pixels, the desktop layout, not the Fire TV WebView's 960x540 CSS layout (see below) |
 | Narration | Synthesized 2026-10-06 into the workspace folder `reviews/videos_20261006/mercury_amazon/narration/`, outside git |
 | Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2`, through the `with-timestamps` endpoint for the beats synthesized since the first 2026-10-06 run |
-| Characters synthesized | 2378 sent to ElevenLabs in all calls on 2026-10-06 (`synthesis-log.jsonl`). The 8 beats whose words changed were synthesized with their alignment; the 6 unchanged beats reuse earlier audio under their new beat numbers, with matching cache keys |
+| Characters synthesized | 0 for this take: all 14 beats reused by cache key. 2378 were sent to ElevenLabs in all calls on 2026-10-06 (`synthesis-log.jsonl`): the 8 beats whose words changed were synthesized with their alignment; the 6 unchanged beats reuse earlier audio under their new beat numbers, with matching cache keys |
 
 ### What it shows
 
@@ -204,6 +205,9 @@ Its desktop journey is the one the 2026-10-06 take keeps:
 
 Earlier takes, all superseded:
 
+* `48010c9`, the first 2026-10-06 take with the same plan and narration, 170.852 s,
+  SHA-256 `6d8c0d457fa77dd49160e7c65cf52dc9ba630f5a2718a1c7bcf55b17b51690da`, kept as
+  `reviews/videos_20261006/mercury_amazon/superseded_48010c9/`.
 * `0aed20a` (audit branch), 170.61 s, SHA-256
   `8f5f3c34db92a1a8b7fec8225839836e7d40a02fcb9ea397c779f301f7983ca2`, in
   `reviews/videos_muse_20260929/mercury_amazon/output/`. It shows the pre-candidate

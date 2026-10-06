@@ -215,7 +215,7 @@ rollback is recorded, never sent to a pipeline. **Missing:**
   emulator footage from CI run 37475795991: the debug APK on an AOSP emulator, API 34,
   loading the public demo (`ea2cff5`, record-only), at 1x with two static frames held
   longer. That is emulator footage, not a Fire TV device. The rest is a local run of
-  commit `48010c9` in a desktop browser at 1920x1080, not the TV layout, every key sent
+  commit `81d6144` in a desktop browser at 1920x1080, not the TV layout, every key sent
   through the D-pad bridge the Leanback app calls, with burned-in captions. It shows the
   figures this page prints, 50.0% held-out precision over 58 namings and 90.0%
   refusals, and after Confirm the board holding RECORDED, no pipeline contacted. The
