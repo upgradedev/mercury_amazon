@@ -22,6 +22,13 @@ tail. Nothing downstream invents a timestamp. What changed for this repository:
      then move to the measured pause in the voice within 1.2 s, found with ffmpeg's
      silencedetect. ``timing.json`` records each cue's start as
      ``sentenceStartsSeconds``, which the capture uses to time key presses.
+  6. A beat may carry ``fixed_hold_seconds``. The emulator beats do: they play over
+     a window of footage filmed in CI, so the footage, not the voice, sets how long
+     they last. Such a beat is held for exactly that window, and the generator
+     refuses it when its measured audio plus ``FIXED_HOLD_MARGIN_SECONDS`` does not
+     fit, rather than stretch or cut the footage. Every other beat keeps the kit's
+     measured hold. Each scene in ``timing.json`` also carries the beat's
+     ``source``, so the capture and the compose know which beats are footage.
 
 Kept from the kit: per-beat caching keyed on the speech text and voice settings, so
 changing one beat costs one call; the 3 to 40 s per beat and 90 to 174 s total
@@ -32,7 +39,7 @@ Run from the repository root:
     MERCURY_VIDEO_ROOT=/path/outside/git FFPROBE=ffprobe ELEVENLABS_API_KEY=... \\
         python video/generate-narration.py
 
-``NARRATION_FORCE=beat_07_confirm`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
+``NARRATION_FORCE=beat_10_stage_to_evidence`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
 The key is read from the environment and never printed or written anywhere.
 """
 
@@ -48,10 +55,11 @@ import subprocess
 import time
 import urllib.request
 
-ROOT = pathlib.Path(os.environ["MERCURY_VIDEO_ROOT"])
 SPEC = pathlib.Path(__file__).with_name("narration.json")
-OUT = ROOT / "narration"
 TAIL_SECONDS = 0.65
+#: The least silence a fixed-hold beat keeps after its last word.
+FIXED_HOLD_MARGIN_SECONDS = 0.3
+SOURCES = ("android_tv_emulator", "desktop_capture")
 CAPTION_WIDTH = 84
 
 # Whichever is set is used. The value is never printed and never written to a receipt.
@@ -240,7 +248,24 @@ def cached_key(sidecar: pathlib.Path) -> str | None:
     return recorded if isinstance(recorded, str) else None
 
 
+def beat_hold(identifier: str, seconds: float, fixed: object) -> float:
+    """How long a beat is held: its measured audio plus the kit's tail, or, for a
+    beat that plays over footage, exactly its footage window if the audio fits."""
+    if fixed is None:
+        return seconds + TAIL_SECONDS
+    if not isinstance(fixed, (int, float)) or isinstance(fixed, bool) or fixed <= 0:
+        raise SystemExit(f"beat {identifier} has an invalid fixed_hold_seconds")
+    if seconds + FIXED_HOLD_MARGIN_SECONDS > float(fixed):
+        raise SystemExit(
+            f"beat {identifier} speaks for {seconds:.3f}s but its footage window is "
+            f"{float(fixed):.3f}s; shorten the words, do not stretch the footage"
+        )
+    return float(fixed)
+
+
 def main() -> None:
+    root = pathlib.Path(os.environ["MERCURY_VIDEO_ROOT"])
+    out = root / "narration"
     spec = json.loads(SPEC.read_text(encoding="utf-8"))
     beats = spec.get("beats")
     tts = spec.get("tts")
@@ -253,8 +278,8 @@ def main() -> None:
         for item in os.environ.get("NARRATION_FORCE", "").split(",")
         if item.strip()
     }
-    OUT.mkdir(parents=True, exist_ok=True)
-    log = OUT / "synthesis-log.jsonl"
+    out.mkdir(parents=True, exist_ok=True)
+    log = out / "synthesis-log.jsonl"
     timing: list[dict[str, object]] = []
     cues: list[tuple[float, float, str]] = []
     offset = 0.0
@@ -264,12 +289,15 @@ def main() -> None:
         caption = beat.get("caption_text") or speech
         if not isinstance(identifier, str) or not re.fullmatch(r"[a-z][a-z0-9_]{1,40}", identifier):
             raise SystemExit("beat identifier is invalid")
+        source = beat.get("source", "desktop_capture")
+        if source not in SOURCES:
+            raise SystemExit(f"beat {identifier} names an unknown source: {source!r}")
         if not all(isinstance(value, str) and 20 <= len(value) <= 800 for value in (speech, caption)):
             raise SystemExit(f"beat text is invalid: {identifier}")
         if "<" in f"{speech}{caption}" or ">" in f"{speech}{caption}":
             raise SystemExit(f"beat {identifier} still contains a <PLACEHOLDER>; fill it in first")
-        audio = OUT / f"{index:02d}-{identifier}.mp3"
-        sidecar = OUT / f"{index:02d}-{identifier}.cache.json"
+        audio = out / f"{index:02d}-{identifier}.mp3"
+        sidecar = out / f"{index:02d}-{identifier}.cache.json"
         key = cache_key(speech, tts)
         reuse = (
             identifier not in forced
@@ -296,7 +324,7 @@ def main() -> None:
         seconds = duration(audio)
         if seconds < 3 or seconds > 40:
             raise SystemExit(f"beat audio duration is unsafe: {identifier} {seconds:.3f}s")
-        hold = seconds + TAIL_SECONDS
+        hold = beat_hold(identifier, seconds, beat.get("fixed_hold_seconds"))
         parts = sentences(caption)
         sentence_starts = []
         for sentence, (begin, finish) in zip(parts, cue_bounds(parts, seconds, pauses(audio))):
@@ -305,6 +333,7 @@ def main() -> None:
         timing.append(
             {
                 "id": identifier,
+                "source": source,
                 "audio": audio.name,
                 "durationSeconds": round(seconds, 3),
                 "holdSeconds": round(hold, 3),
@@ -313,6 +342,10 @@ def main() -> None:
                 "sentenceStartsSeconds": sentence_starts,
             }
         )
+        window = beat.get("footage_window_seconds")
+        if window is not None:
+            # Where in the footage this beat plays; the compose cuts the clip from it.
+            timing[-1]["footageWindowSeconds"] = [float(window[0]), float(window[1])]
         offset += hold
     if not 90 <= offset < 175:
         raise SystemExit(f"narration must be 90-174 seconds, observed {offset:.3f}")
@@ -321,7 +354,7 @@ def main() -> None:
         for line in log.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 billed += int(json.loads(line)["characters"])
-    (OUT / "timing.json").write_text(
+    (out / "timing.json").write_text(
         json.dumps(
             {
                 "schemaVersion": "mercury.video-timing/1",
@@ -341,7 +374,7 @@ def main() -> None:
     srt: list[str] = []
     for number, (start, end, text) in enumerate(cues, start=1):
         srt.extend([str(number), f"{timestamp(start)} --> {timestamp(end)}", text, ""])
-    (OUT / "captions.en.srt").write_text("\n".join(srt), encoding="utf-8")
+    (out / "captions.en.srt").write_text("\n".join(srt), encoding="utf-8")
     print(f"Generated {len(timing)} scenes across {offset:.3f} seconds")
 
 

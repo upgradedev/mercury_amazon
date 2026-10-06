@@ -18,6 +18,11 @@ is the same journey logic in Python against a local server:
     addition is a 1x1 px repaint marker (see ``REPAINT``), which only makes sure
     the recorder is sent the frame the page is already showing.
 
+The take opens on Android TV emulator footage filmed in CI, not by this script. The
+narration's first beats (``source`` ``android_tv_emulator`` in ``timing.json``) play
+over that footage, so this script skips them: its timeline starts at the first desktop
+beat, and ``video/build-video.py`` puts the footage in front of the desktop capture.
+
 Run from the repository root, with the server already running:
 
     MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8803
@@ -38,25 +43,27 @@ import subprocess
 import time
 import urllib.request
 
-from playwright.sync_api import sync_playwright
-
-ROOT = pathlib.Path(os.environ["MERCURY_VIDEO_ROOT"])
-RELEASE_SHA = os.environ["MERCURY_RELEASE_SHA"]
-BASE_URL = os.environ.get("MERCURY_CAPTURE_URL", "http://127.0.0.1:8803/")
-CAPTURE = ROOT / "capture"
 TRAILING_HOLD_SECONDS = 2.5
+EMULATOR_SOURCE = "android_tv_emulator"
+#: The beats that play over emulator footage. They open the take; nothing is recorded
+#: for them here.
+EMULATOR_SCENES = [
+    "beat_01_tv_launch",
+    "beat_02_tv_board",
+    "beat_03_tv_stage",
+    "beat_04_tv_confirm_publish",
+]
+#: The beats this script records, in order.
 EXPECTED_SCENES = [
-    "beat_01_question",
-    "beat_02_board_on_load",
-    "beat_03_crowded_refusal",
-    "beat_04_named_with_odds",
-    "beat_05_provenance",
-    "beat_06_stage",
-    "beat_07_confirm",
-    "beat_08_handoff",
-    "beat_09_dpad",
-    "beat_10_fixtures",
-    "beat_11_build_check",
+    "beat_05_desktop_board",
+    "beat_06_board_on_load",
+    "beat_07_crowded_refusal",
+    "beat_08_named_with_odds",
+    "beat_09_provenance",
+    "beat_10_stage_to_evidence",
+    "beat_11_dpad",
+    "beat_12_fixtures",
+    "beat_13_build_check",
 ]
 
 FOCUSED = """() => { const c = window.mercuryNav && window.mercuryNav.current;
@@ -98,52 +105,53 @@ def text_appears(selector: str, needle: str) -> str:
 # Each beat: a list of (when, key, expected focus label or None, condition to await or None).
 # ``when`` is seconds into the beat, or ("sentence", n, extra) for n-th caption sentence start.
 JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
-    "beat_01_question": [],
-    "beat_02_board_on_load": [],
-    "beat_03_crowded_refusal": [
+    "beat_05_desktop_board": [],
+    "beat_06_board_on_load": [],
+    "beat_07_crowded_refusal": [
         (0.3, "DOWN", "Ask about checkout-api", None),
         (0.9, "DOWN", "Ask about payments worker", None),
         (1.5, "DOWN", "Ask about search indexer", None),
         (2.1, "DOWN", "Ask about release train", None),
         (2.9, "SELECT", "Ask about release train", text_appears("#heroHeadline", "Cannot attribute")),
     ],
-    "beat_04_named_with_odds": [
+    "beat_08_named_with_odds": [
         (0.3, "UP", "Ask about search indexer", None),
         (0.9, "UP", "Ask about payments worker", None),
         (1.5, "UP", "Ask about checkout-api", None),
         (2.2, "SELECT", "Ask about checkout-api", text_appears("#heroHeadline", "Commit")),
     ],
-    "beat_05_provenance": [],
-    "beat_06_stage": [
-        (("sentence", 1, 0.0), "UP", "Ask what changed", None),
-        (("sentence", 1, 0.6), "RIGHT", "Stage governed rollback", None),
-        (("sentence", 1, 1.2), "SELECT", "Stage governed rollback", text_appears("#heroEyebrow", "Rollback staged")),
-    ],
-    "beat_07_confirm": [
-        (0.2, "RIGHT", "Confirm rollback", None),
+    "beat_09_provenance": [],
+    # The stage, confirm and handoff presses of the 2026-10-01 take, in the same order
+    # with the same checks, now in one beat: the emulator footage has already shown
+    # them at a viewer's pace. The offsets follow the measured words: "right, center
+    # confirms" from 3.08 s, "Center publishes" at the second sentence, "Down" at the
+    # third.
+    "beat_10_stage_to_evidence": [
+        (0.0, "UP", "Ask what changed", None),
+        (0.6, "RIGHT", "Stage governed rollback", None),
+        (1.2, "SELECT", "Stage governed rollback", text_appears("#heroEyebrow", "Rollback staged")),
+        (3.1, "RIGHT", "Confirm rollback", None),
         # The payoff stays on the board: the large figure reads RECORDED, the page has
         # not scrolled, and Publish handoff is only the next stop (no ring yet).
-        (1.0, "SELECT", "Publish responder handoff", BOARD_RECORDED),
-    ],
-    "beat_08_handoff": [
+        (3.6, "SELECT", "Publish responder handoff", BOARD_RECORDED),
         # The cursor stays on Publish and the handoff's answer comes up above the key bar.
-        (0.3, "SELECT", "Publish responder handoff", text_appears("#handoffOutput", "Next step")),
-        (("sentence", 1, 0.0), "DOWN", "Incident evidence panel", None),
+        (("sentence", 1, 0.0), "SELECT", "Publish responder handoff", text_appears("#handoffOutput", "Next step")),
+        (("sentence", 2, 0.0), "DOWN", "Incident evidence panel", None),
     ],
-    "beat_09_dpad": [
+    "beat_11_dpad": [
         (0.8, "RIGHT", "Delivery velocity panel", None),
         (("sentence", 1, 0.0), "SELECT", "Load DORA velocity", text_appears("#doraOutput", "offline-fixture")),
     ],
     # An open panel holds the remote until BACK: DOWN at its foot scrolls the rest of
     # the answer into view and the cursor stays on the panel's button.
-    "beat_10_fixtures": [
+    "beat_12_fixtures": [
         (0.2, "DOWN", "Load DORA velocity", None),
         (("sentence", 1, 0.0), "BACK", "Delivery velocity panel", None),
         (("sentence", 2, 0.0), "RIGHT", "Cloud spend panel", None),
         (("sentence", 2, 0.8), "SELECT", "Scan AWS spend", text_appears("#costOutput", "offline-fixture")),
         (("sentence", 2, 2.0), "BACK", "Cloud spend panel", None),
     ],
-    "beat_11_build_check": [
+    "beat_13_build_check": [
         (0.2, "DOWN", "How it answers panel", None),
         (0.6, "DOWN", "Check connection", None),
         (1.0, "SELECT", "Check connection",
@@ -152,28 +160,51 @@ JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
 }
 
 
-def health() -> dict[str, object]:
-    with urllib.request.urlopen(BASE_URL.rstrip("/") + "/health", timeout=10) as response:
+def desktop_scenes(scenes: list[dict[str, object]]) -> tuple[list[dict[str, object]], float]:
+    """The scenes this script records, and the narration time its timeline starts at.
+
+    The emulator scenes must all come first and be exactly ``EMULATOR_SCENES``; the
+    rest must be exactly ``EXPECTED_SCENES``. The desktop timeline starts at the first
+    desktop scene, so the capture is not left idling through the footage's length.
+    """
+    emulator = [scene for scene in scenes if scene.get("source") == EMULATOR_SOURCE]
+    desktop = [scene for scene in scenes if scene.get("source") != EMULATOR_SOURCE]
+    if scenes[: len(emulator)] != emulator:
+        raise SystemExit("the emulator beats must open the narration, before any desktop beat")
+    if [scene["id"] for scene in emulator] != EMULATOR_SCENES:
+        raise SystemExit("the narration's emulator beats are not the ones this journey expects")
+    if [scene["id"] for scene in desktop] != EXPECTED_SCENES:
+        raise SystemExit("the narration and the capture journey name different beats")
+    return desktop, float(desktop[0]["startSeconds"])
+
+
+def health(base_url: str) -> dict[str, object]:
+    with urllib.request.urlopen(base_url.rstrip("/") + "/health", timeout=10) as response:
         return json.load(response)
 
 
 def main() -> None:
-    timing = json.loads((ROOT / "narration" / "timing.json").read_text(encoding="utf-8"))
-    scenes = timing["scenes"]
-    if [scene["id"] for scene in scenes] != EXPECTED_SCENES:
-        raise SystemExit("the narration and the capture journey name different beats")
-    served = health()
+    # Imported here so the journey can be read (and tested) without a browser.
+    from playwright.sync_api import sync_playwright
+
+    root = pathlib.Path(os.environ["MERCURY_VIDEO_ROOT"])
+    release_sha = os.environ["MERCURY_RELEASE_SHA"]
+    base_url = os.environ.get("MERCURY_CAPTURE_URL", "http://127.0.0.1:8803/")
+    capture = root / "capture"
+    timing = json.loads((root / "narration" / "timing.json").read_text(encoding="utf-8"))
+    scenes, desktop_start = desktop_scenes(timing["scenes"])
+    served = health(base_url)
     head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-    if served.get("build_sha") != RELEASE_SHA or head != RELEASE_SHA:
+    if served.get("build_sha") != release_sha or head != release_sha:
         raise SystemExit(
             f"refusing to record: server reports {served.get('build_sha')}, HEAD is {head}, "
-            f"MERCURY_RELEASE_SHA is {RELEASE_SHA}"
+            f"MERCURY_RELEASE_SHA is {release_sha}"
         )
     if served.get("rollback_dispatch") != "record-only" or served.get("github_live"):
         raise SystemExit("refusing to record: the server is not in record-only fixture mode")
-    if CAPTURE.exists():
-        shutil.rmtree(CAPTURE)
-    (CAPTURE / "raw").mkdir(parents=True)
+    if capture.exists():
+        shutil.rmtree(capture)
+    (capture / "raw").mkdir(parents=True)
 
     errors: list[str] = []
     log: list[dict[str, object]] = []
@@ -184,7 +215,7 @@ def main() -> None:
         context = browser.new_context(
             viewport={"width": 1920, "height": 1080},
             device_scale_factor=1,
-            record_video_dir=str(CAPTURE / "raw"),
+            record_video_dir=str(capture / "raw"),
             record_video_size={"width": 1920, "height": 1080},
             reduced_motion="reduce",
         )
@@ -192,7 +223,7 @@ def main() -> None:
         created = time.monotonic()
         page.on("pageerror", lambda error: errors.append(f"page:{error}"))
         page.on("console", lambda message: errors.append(f"console:{message.text}") if message.type == "error" else None)
-        page.goto(BASE_URL, wait_until="networkidle", timeout=60_000)
+        page.goto(base_url, wait_until="networkidle", timeout=60_000)
         page.wait_for_function(ROWS_ANSWERED, timeout=30_000)
         if page.evaluate(FOCUSED) != "Ask what changed":
             raise SystemExit("the page did not start with focus on Ask what changed")
@@ -211,7 +242,7 @@ def main() -> None:
             return {"key": key, "consumed": consumed, "focused": focused, "legend": page.evaluate(LEGEND)}
 
         for scene in scenes:
-            start = timeline + float(scene["startSeconds"])
+            start = timeline + float(scene["startSeconds"]) - desktop_start
             end = start + float(scene["holdSeconds"])
             starts = scene.get("sentenceStartsSeconds") or [0.0]
             entry: dict[str, object] = {"id": scene["id"], "lateStartSeconds": round(time.monotonic() - start, 3), "actions": []}
@@ -237,7 +268,7 @@ def main() -> None:
             log.append(entry)
 
         build_line = page.evaluate("() => document.body.innerText.match(/GET \\/health returned[^\\n]*/)?.[0] || ''")
-        if f"Build {RELEASE_SHA[:7]}" not in build_line:
+        if f"Build {release_sha[:7]}" not in build_line:
             raise SystemExit(f"the connection line does not name the recorded build: {build_line!r}")
         page.wait_for_timeout(TRAILING_HOLD_SECONDS * 1000)
         video = page.video
@@ -246,9 +277,9 @@ def main() -> None:
         browser.close()
         raw = pathlib.Path(video.path())
 
-    final = CAPTURE / "production.webm"
+    final = capture / "production.webm"
     raw.replace(final)
-    shutil.rmtree(CAPTURE / "raw", ignore_errors=True)
+    shutil.rmtree(capture / "raw", ignore_errors=True)
     probe = subprocess.run(
         [os.environ.get("FFPROBE", "ffprobe"), "-v", "error", "-show_entries", "format=duration",
          "-of", "default=nw=1:nk=1", str(final)],
@@ -257,14 +288,15 @@ def main() -> None:
     data = final.read_bytes()
     receipt = {
         "schemaVersion": "mercury.video-capture/1",
-        "releaseSha": RELEASE_SHA,
+        "releaseSha": release_sha,
         "server": {key: served.get(key) for key in ("build_sha", "rollback_dispatch", "github_live", "dpad_demo_approval")},
-        "url": BASE_URL,
+        "url": base_url,
         "viewport": "1920x1080",
         "input": "window.navigateDpad",
         "sceneCount": len(scenes),
         "trimLeadSeconds": round(timeline - created, 3),
-        "timelineSeconds": float(timing["totalSeconds"]),
+        "timelineSeconds": round(float(timing["totalSeconds"]) - desktop_start, 3),
+        "narrationStartSeconds": desktop_start,
         "wallSecondsFromPageToClose": round(closed - created, 3),
         "webmDurationSeconds": float(probe) if probe and probe != "N/A" else None,
         "beats": log,
@@ -273,7 +305,7 @@ def main() -> None:
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
     }
-    (CAPTURE / "capture-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    (capture / "capture-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     if errors:
         raise SystemExit(f"the journey emitted {len(errors)} browser errors: {errors[:3]}")
     print(json.dumps({key: receipt[key] for key in ("trimLeadSeconds", "timelineSeconds",
