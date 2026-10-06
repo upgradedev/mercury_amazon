@@ -4,13 +4,18 @@ These tests read the plan, the capture journey and the compose graph without a
 browser, a server, a key or a render:
 
 * the emulator beats open the content, cover one unbroken window of the CI footage
-  on 25 fps frames, and are held for exactly that window;
+  on 25 fps frames at 1x, and are held for exactly that window plus holds of frames
+  that are static in the source;
+* the frame table the cuts were read from lists all 52 frames by index, and no
+  caption or spoken press runs ahead of the frame it names by more than half a second;
 * the planned video stays under 172 s, inside the gate's 175 s budget;
 * the desktop journey presses the same keys, expects the same focus and awaits the
   same answers as the 2026-10-01 take, only regrouped into fewer beats, because no
   browser could be run to probe a different route;
 * the compose splices the footage at the start of the content and burns the captions
   on the joined content, so they run on the narration's clock;
+* the compose imports Pillow only where it draws a card, so this module loads where
+  Pillow is not installed;
 * no plan or document claims the video shows no device or emulator.
 """
 from __future__ import annotations
@@ -38,6 +43,7 @@ def _load(name: str, relative: str):
 capture = _load("mercury_capture_local", "video/capture-local.py")
 compose = _load("mercury_build_video", "video/build-video.py")
 narration_generator = _load("mercury_generate_narration", "video/generate-narration.py")
+plan_builder = _load("mercury_build_video_plan", "scripts/build_video_plan.py")
 
 PLAN = json.loads((VIDEO / "narration.json").read_text(encoding="utf-8"))
 CUES = json.loads((VIDEO / "cue_sheet.json").read_text(encoding="utf-8"))
@@ -94,12 +100,85 @@ def test_the_emulator_beats_cover_one_window_of_the_footage_on_frames():
     for before, after in zip(windows, windows[1:]):
         assert before[1] == after[0], "the footage must play once, in order, without a cut"
     for beat, (start, end) in zip(beats, windows):
-        assert beat["fixed_hold_seconds"] == pytest.approx(end - start, abs=1e-6)
-        for edge in (start, end):
-            assert edge * 25 == pytest.approx(round(edge * 25), abs=1e-6), "cuts sit on 25 fps frames"
+        holds = beat["footage_holds_seconds"]
+        assert beat["fixed_hold_seconds"] == pytest.approx(end - start + sum(h for _, h in holds), abs=1e-6)
+        for edge in (start, end) + tuple(value for hold in holds for value in hold):
+            assert edge * 25 == pytest.approx(round(edge * 25), abs=1e-6), "cuts and holds sit on 25 fps frames"
+        for at, _ in holds:
+            assert start < at <= end
     assert windows[-1][1] * 25 <= PLAN["emulator_footage"]["frames_at_25_fps"]
-    # The idle lead-in is trimmed, but the launch from the home screen stays in.
+    # The idle lead-in is trimmed, but the home screen stays in for the launch beat.
     assert 0 < windows[0][0] <= 1.5
+
+
+# --------------------------------------------------------- Frame truth
+
+FRAMES = {index: (pts, seen) for index, pts, seen in plan_builder.FOOTAGE_FRAMES}
+
+
+def test_the_frame_table_lists_every_frame_by_index():
+    assert sorted(FRAMES) == list(range(52))
+    times = [FRAMES[index][0] for index in range(52)]
+    assert times == sorted(times) and len(set(times)) == 52
+    # Verified by index on 2026-10-06; seeking with -ss returns a neighbouring frame.
+    assert FRAMES[39][0] == 21.250 and "still ROLLBACK STAGED" in FRAMES[39][1]
+    assert FRAMES[40][0] == 21.691 and FRAMES[40][1].startswith("RECORDED")
+    assert FRAMES[41][0] == 21.812 and FRAMES[41][1].startswith("the same")
+    assert FRAMES[42][0] == 26.290 and "focus on Publish handoff" in FRAMES[42][1]
+    assert FRAMES[43][0] == 26.588 and "SHARED REVISION 13" in FRAMES[43][1]
+    assert FRAMES[11][0] == 4.228 and FRAMES[11][1].startswith("black")
+    assert FRAMES[19][0] == 8.856 and "first shows" in FRAMES[19][1]
+
+
+def test_every_hold_repeats_a_frame_the_source_shows_still():
+    for at, _ in plan_builder.FOOTAGE_HOLDS:
+        assert plan_builder.static_hold(at), at
+    assert not plan_builder.static_hold(21.70), "a frame the source replaces within a second"
+
+
+def _footage_time(beat: dict, seconds: float) -> float:
+    """The footage second on screen ``seconds`` into an emulator beat."""
+    first, _ = beat["footage_window_seconds"]
+    at = first + seconds
+    for hold_at, held in beat["footage_holds_seconds"]:
+        if at <= hold_at:
+            break
+        at = max(hold_at, at - held)
+    return at
+
+
+def test_no_caption_names_a_value_before_its_frame():
+    for beat in _emulator_beats():
+        marks = beat["measured"]["marks_seconds"]
+        for text, mark, shows in beat["caption_cues"]:
+            if shows is None:
+                continue
+            start = _footage_time(beat, marks[mark] if mark else 0.0)
+            lead = FRAMES[shows][0] - start
+            assert lead <= 0.5, f"{text!r} appears {lead:.2f} s before frame {shows}"
+
+
+def test_every_spoken_press_lands_with_its_effect():
+    pressed = 0
+    for beat in _emulator_beats():
+        marks = beat["measured"]["marks_seconds"]
+        for mark, frame in beat.get("press_marks", {}).items():
+            spoken = _footage_time(beat, marks[mark])
+            assert abs(spoken - FRAMES[frame][0]) <= 0.5, f"{beat['beat_id']} {mark}"
+            pressed += 1
+    assert pressed == 5
+
+
+def test_the_launch_words_end_before_the_board_shows():
+    launch = _emulator_beats()[0]
+    ends = _footage_time(launch, launch["measured"]["audio_seconds"])
+    assert FRAMES[11][0] <= _footage_time(launch, launch["measured"]["marks_seconds"]["black"])
+    assert ends < FRAMES[19][0], "the black caption must not stay up over the board"
+
+
+def test_each_emulator_beat_fits_its_measured_words():
+    for beat in _emulator_beats():
+        assert beat["measured"]["audio_seconds"] + 0.3 <= beat["fixed_hold_seconds"] + 1e-9
 
 
 def test_the_plan_names_the_footage_it_was_cut_for():
@@ -118,7 +197,7 @@ def test_the_planned_video_stays_under_172_seconds():
 
 def test_the_emulator_narration_says_what_the_tv_shows():
     spoken = " ".join(beat["caption_text"] for beat in _emulator_beats()).lower()
-    for phrase in ["android tv emulator", "home screen", "public demo", "right", "center",
+    for phrase in ["android tv emulator", "home screen", "public demo", "black", "right", "center",
                    "recorded, no pipeline contacted", "record-only", "handoff"]:
         assert phrase in spoken, phrase
 
@@ -197,19 +276,39 @@ def test_the_capture_journey_matches_the_plan():
 
 def test_the_capture_skips_the_footage_and_starts_at_the_first_desktop_beat():
     scenes = [
-        {"id": "beat_01_tv_launch", "source": EMULATOR, "startSeconds": 0.0},
-        {"id": "beat_02_tv_board", "source": EMULATOR, "startSeconds": 7.6},
-        {"id": "beat_03_tv_stage", "source": EMULATOR, "startSeconds": 13.32},
-        {"id": "beat_04_tv_confirm_publish", "source": EMULATOR, "startSeconds": 18.32},
+        {"id": beat, "source": EMULATOR, "startSeconds": float(i)}
+        for i, beat in enumerate(capture.EMULATOR_SCENES)
     ] + [
-        {"id": beat, "source": "desktop_capture", "startSeconds": 26.64 + i}
+        {"id": beat, "source": "desktop_capture", "startSeconds": 31.36 + i}
         for i, beat in enumerate(capture.EXPECTED_SCENES)
     ]
+    count = len(capture.EMULATOR_SCENES)
     desktop, start = capture.desktop_scenes(scenes)
     assert [scene["id"] for scene in desktop] == capture.EXPECTED_SCENES
-    assert start == 26.64
+    assert start == 31.36
     with pytest.raises(SystemExit):
-        capture.desktop_scenes(scenes[4:5] + scenes[:4] + scenes[5:])
+        capture.desktop_scenes(scenes[count:count + 1] + scenes[:count] + scenes[count + 1:])
+
+
+def test_a_press_on_a_spoken_mark_lands_on_that_word():
+    scene = {"id": "beat_x", "sentenceStartsSeconds": [0.0, 2.5], "marksSeconds": {"center": 1.25}}
+    assert capture.planned_offset(scene, 0.4) == 0.4
+    assert capture.planned_offset(scene, ("sentence", 1, -0.4)) == pytest.approx(2.1)
+    assert capture.planned_offset(scene, ("mark", "center", -0.25)) == pytest.approx(1.0)
+    with pytest.raises(SystemExit):
+        capture.planned_offset(scene, ("mark", "right", 0.0))
+    marked = {beat["beat_id"]: set(beat.get("marks", {})) for beat in PLAN["beats"]}
+    for beat_id, steps in capture.JOURNEY.items():
+        for when, *_ in steps:
+            if isinstance(when, tuple) and when[0] == "mark":
+                assert when[1] in marked[beat_id], (beat_id, when)
+
+
+def test_the_take_is_the_desktop_layout_and_the_tv_layout_is_described():
+    assert capture.DEFAULT_VIEWPORT == "desktop"
+    assert capture.VIEWPORTS["desktop"] == {"width": 1920, "height": 1080, "scale": 1, "host": False}
+    assert capture.VIEWPORTS["tv"] == {"width": 960, "height": 540, "scale": 2, "host": True}
+    assert "MercuryHost" in capture.HOST_STUB
 
 
 # ----------------------------------------------------------- The narration
@@ -231,6 +330,7 @@ def _timing_scenes() -> list[dict]:
                  "holdSeconds": round(hold, 3)}
         if "footage_window_seconds" in beat:
             scene["footageWindowSeconds"] = beat["footage_window_seconds"]
+            scene["footageHoldsSeconds"] = beat["footage_holds_seconds"]
         scenes.append(scene)
         offset += hold
     return scenes
@@ -242,11 +342,22 @@ def test_the_compose_plays_the_planned_frames_of_the_footage():
     assert plan["start_frame"] == round(first["footage_window_seconds"][0] * 25)
     assert plan["end_frame"] == round(last["footage_window_seconds"][1] * 25)
     assert plan["seconds"] == pytest.approx(sum(b["fixed_hold_seconds"] for b in _emulator_beats()), abs=0.002)
+    pieces = plan["pieces"]
+    assert pieces[0]["start_frame"] == plan["start_frame"] and pieces[-1]["end_frame"] == plan["end_frame"]
+    for before, after in zip(pieces, pieces[1:]):
+        assert before["end_frame"] == after["start_frame"], "every frame plays once, in order"
+    held = [(piece["end_frame"] / 25, piece["hold_frames"] / 25) for piece in pieces if piece["hold_frames"]]
+    assert held == [pytest.approx(hold) for hold in plan_builder.FOOTAGE_HOLDS]
 
 
 def test_the_compose_refuses_a_footage_beat_held_off_its_window():
     scenes = _timing_scenes()
     scenes[0]["holdSeconds"] += 0.5
+    with pytest.raises(SystemExit):
+        compose.emulator_plan(scenes)
+    scenes = _timing_scenes()
+    scenes[0]["footageHoldsSeconds"] = [[scenes[0]["footageWindowSeconds"][1] + 1.0, 0.4]]
+    scenes[0]["holdSeconds"] += 0.4
     with pytest.raises(SystemExit):
         compose.emulator_plan(scenes)
 
@@ -257,14 +368,23 @@ def test_the_footage_is_spliced_first_and_the_captions_burned_on_the_joined_cont
     graph = compose.content_filters(trim_lead=3.2, narration_total=total, emulator=emulator,
                                     subtitle_path="C\\:/x/captions.en.srt")
     joined = ";".join(graph)
-    concat = next(part for part in graph if "concat=n=2" in part)
+    concat = next(part for part in graph if "[emu]" in part and "[desk]" in part and "concat=n=2" in part)
     assert concat.startswith("[emu][desk]concat=n=2"), "the footage comes before the desktop capture"
     assert joined.count("subtitles=") == 1 and "subtitles=" in concat, \
         "captions are burned once, after the footage and the capture are joined"
-    footage = next(part for part in graph if part.startswith("[3:v]"))
-    assert footage.startswith("[3:v]fps=25,trim=start_frame="), "converted to 25 fps before it is cut"
-    for forbidden in ("setpts=0.", "setpts=2", "tpad", "minterpolate", "atempo"):
-        assert forbidden not in footage, "the footage plays at 1x and is never frozen or retimed"
+    footage = [part for part in graph if part.startswith(("[3:v]", "[fp"))]
+    assert footage[0].startswith("[3:v]fps=25,split="), "converted to 25 fps before it is cut"
+    for part in footage:
+        for forbidden in ("setpts=0.", "setpts=2", "minterpolate", "atempo", "setpts=PTS*", "setpts=PTS/"):
+            assert forbidden not in part, "the footage plays at 1x and is never retimed"
+    pieces = [part for part in footage if part.startswith("[fp")]
+    assert len(pieces) == len(emulator["pieces"])
+    for part, piece in zip(pieces, emulator["pieces"]):
+        assert f"trim=start_frame={piece['start_frame']}:end_frame={piece['end_frame']}" in part
+        if piece["hold_frames"]:
+            assert part.endswith(f"tpad=stop_mode=clone:stop={piece['hold_frames']}[fq{pieces.index(part)}]")
+        else:
+            assert "tpad" not in part
     desktop = next(part for part in graph if part.startswith("[0:v]"))
     assert f"trim=end_frame={round(total * 25) - emulator['frames']}" in desktop
 
@@ -280,20 +400,15 @@ def test_the_label_and_the_cards_name_both_sources():
         "Android TV emulator (API 34), debug APK, public demo build ea2cff5, CI run 37475795991"
     )
     title = " ".join(text for text, *_ in compose.title_lines("9620743", facts))
-    assert "Android TV emulator, API 34, CI run 37475795991" in title
-    assert "local desktop run of 9620743" in title
+    assert "Android TV emulator footage, API 34, CI run 37475795991" in title
+    assert "local run of 9620743 in a desktop browser at 1920x1080, not the TV layout" in title
+    outro = " ".join(text for text, *_ in compose.outro_lines("9620743", facts))
+    assert "Desktop browser at 1920x1080" in outro
 
 
-def test_the_cards_still_read_as_cards_to_the_gate(tmp_path):
-    from PIL import Image, ImageFilter, ImageStat
-
-    if not (compose.FONT_DIR / "segoeui.ttf").exists():
-        pytest.skip("the card fonts are Windows fonts")
-    facts = {"run_id": "37475795991", "api": "34", "demo_short": "ea2cff5"}
-    for name, lines in (("title", compose.title_lines("9620743", facts)),
-                        ("outro", compose.outro_lines("9620743", facts))):
-        path = tmp_path / f"{name}.png"
-        compose.card(path, lines)
-        image = Image.open(path).convert("L")
-        edge = ImageStat.Stat(image.filter(ImageFilter.FIND_EDGES)).mean[0]
-        assert edge < 4.0, f"{name} card edge density {edge:.2f} is too close to the gate's 4.5"
+def test_the_compose_loads_without_pillow_and_checks_its_cards_when_it_draws_them():
+    source = (VIDEO / "build-video.py").read_text(encoding="utf-8")
+    top = source.split("\ndef ", 1)[0]
+    assert "from PIL" not in top and "import PIL" not in top, "Pillow is imported where a card is drawn"
+    assert compose.CARD_EDGE_CEILING < 4.5
+    assert "card_edge_density(path)" in source and "CARD_EDGE_CEILING" in source.split("def main()", 1)[1]

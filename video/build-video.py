@@ -14,19 +14,22 @@ What changed for this repository, so the kit's pixel-reading sync gate
   1. A silent title card opens the video and a silent closing card ends it, both
      rendered here with Pillow. The title card says what Mercury does first, then in
      smaller lines the two sources of the picture: the Android TV emulator footage
-     from CI, and the local desktop run of the recorded commit.
+     from CI, and the local run of the recorded commit in a desktop browser at 1920x1080.
   2. The content opens on the Android TV emulator footage: ``journey.mp4`` from the
      ``android-tv-footage.yml`` artifact, the debug APK on an AOSP Android TV
      emulator loading the public demo. The screenrecord is variable frame rate (it
      writes a frame only when the screen changes), so it is converted to 25 fps by
-     holding each frame until the next one, at 1x: nothing is sped up, slowed or
-     frozen past its own recorded length. The beats marked ``android_tv_emulator`` in
-     ``timing.json`` say which window of it plays. A small label under it names the
-     emulator, the APK, the public demo build and the CI run for as long as it plays.
+     holding each frame until the next one, at 1x: nothing is sped up or slowed. The
+     beats marked ``android_tv_emulator`` in ``timing.json`` say which window of it
+     plays and where a static frame is held longer (``footageHoldsSeconds``, chosen in
+     ``scripts/build_video_plan.py`` only where the source shows the same frame for a
+     second or more, or its last frame). A small label under it names the emulator,
+     the APK, the public demo build and the CI run for as long as it plays.
   3. The desktop capture follows, scaled to 87.5% and placed at the top of the frame.
      The emulator picture is scaled a little smaller (1600x900) to leave room for its
      label. The captions sit in the band underneath both, so no caption ever covers
-     what the board shows. Both pictures were captured at 1920x1080.
+     what the board shows. Both pictures were captured at 1920x1080 pixels: the
+     emulator's screen, and desktop Chromium at 1920x1080 CSS pixels.
   4. The captions are burned once, on the joined content (footage then capture), so
      they run on the narration's own clock. The shifted copy is the upload sidecar.
   5. It writes ``video_manifest.json`` and ``caption_windows.json`` for the gate.
@@ -52,8 +55,6 @@ import pathlib
 import re
 import subprocess
 
-from PIL import Image, ImageDraw, ImageFont
-
 REPO = pathlib.Path(__file__).resolve().parent.parent
 PLAN = REPO / "video" / "narration.json"
 FPS = 25
@@ -74,6 +75,9 @@ INK = (238, 231, 216)
 INK_2 = (171, 165, 151)
 FONT_DIR = pathlib.Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
 FINAL_NAME = "mercury-demo.mp4"
+#: The gate tells a card from content by edge density (scripts/verify_video_sync.py
+#: calls a frame a card below 4.5). A card above this ceiling is refused here.
+CARD_EDGE_CEILING = 4.0
 
 
 def run(args: list[str]) -> str:
@@ -89,12 +93,19 @@ def probe(path: pathlib.Path) -> dict[str, object]:
     )
 
 
-def font(name: str, size: int) -> ImageFont.FreeTypeFont:
+# Pillow is imported where the cards are drawn, not at module top, so the tests can
+# read the plan, the graph and the label from this module where Pillow is not
+# installed (the CI test job installs only the dev and ux extras).
+def font(name: str, size: int):
+    from PIL import ImageFont
+
     return ImageFont.truetype(str(FONT_DIR / name), size)
 
 
 def card(path: pathlib.Path, lines: list[tuple[str, str, int, tuple[int, int, int]]]) -> None:
     """A solid card with left-aligned lines: (text, font file, size, colour)."""
+    from PIL import Image, ImageDraw
+
     image = Image.new("RGB", (1920, 1080), BACKGROUND)
     draw = ImageDraw.Draw(image)
     heights = [size * 1.45 for _, _, size, _ in lines]
@@ -104,6 +115,14 @@ def card(path: pathlib.Path, lines: list[tuple[str, str, int, tuple[int, int, in
         draw.text((210, y), text, font=font(face, size), fill=colour)
         y += height
     image.save(path)
+
+
+def card_edge_density(path: pathlib.Path) -> float:
+    """The mean of an edge filter over the card, the measure the sync gate reads."""
+    from PIL import Image, ImageFilter, ImageStat
+
+    image = Image.open(path).convert("L")
+    return ImageStat.Stat(image.filter(ImageFilter.FIND_EDGES)).mean[0]
 
 
 def footage_facts(provenance: dict[str, object]) -> dict[str, str]:
@@ -133,8 +152,10 @@ def title_lines(short: str, facts: dict[str, str]) -> list[tuple[str, str, int, 
         ("An incident board for the team's Fire TV.", "segoeui.ttf", 58, INK),
         ("It names the deploy behind a spike only when it can.", "segoeui.ttf", 58, INK),
         ("", "segoeui.ttf", 30, INK_2),
-        (f"Android TV emulator, API {facts['api']}, CI run {facts['run_id']}; "
-         f"local desktop run of {short}.", "segoeui.ttf", 34, INK_2),
+        (f"Android TV emulator footage, API {facts['api']}, CI run {facts['run_id']}.",
+         "segoeui.ttf", 34, INK_2),
+        (f"Then a local run of {short} in a desktop browser at 1920x1080, not the TV layout.",
+         "segoeui.ttf", 34, INK_2),
         ("Offline fixtures, record-only rollback.", "segoeui.ttf", 34, INK_2),
     ]
 
@@ -145,13 +166,16 @@ def outro_lines(short: str, facts: dict[str, str]) -> list[tuple[str, str, int, 
         ("One deploy, or why not.", "segoeui.ttf", 54, INK),
         (f"Emulator footage: CI run {facts['run_id']}, public demo build {facts['demo_short']}.",
          "segoeui.ttf", 40, INK_2),
-        (f"Desktop: local run of commit {short}, offline fixtures.", "segoeui.ttf", 40, INK_2),
+        (f"Desktop browser at 1920x1080: local run of {short}, offline fixtures.",
+         "segoeui.ttf", 40, INK_2),
         ("The emulator runtime receipt is a separate record.", "segoeui.ttf", 40, INK_2),
     ]
 
 
 def label_plate(path: pathlib.Path, text: str) -> None:
     """A transparent 1920x1080 plate with the footage label centred under the picture."""
+    from PIL import Image, ImageDraw
+
     image = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     face = font("segoeui.ttf", 26)
@@ -161,11 +185,13 @@ def label_plate(path: pathlib.Path, text: str) -> None:
 
 
 def emulator_plan(scenes: list[dict[str, object]]) -> dict[str, object]:
-    """Which frames of the footage play, from the emulator scenes in ``timing.json``.
+    """Which frames of the footage play, and which are held, from ``timing.json``.
 
-    The emulator scenes must open the narration, cover one unbroken window of the
-    footage, and each be held for exactly its window, so the footage plays once, in
-    order, at 1x.
+    The emulator scenes must open the narration and cover one unbroken window of the
+    footage, in order, at 1x. A scene may hold a static frame (``footageHoldsSeconds``,
+    each ``[footage second, seconds held]`` inside its window); it is then held for
+    exactly its window plus its holds. The footage is played as pieces split at the
+    hold points, each piece's last frame repeated for its hold.
     """
     emulator = [scene for scene in scenes if scene.get("source") == EMULATOR_SOURCE]
     if not emulator:
@@ -175,22 +201,45 @@ def emulator_plan(scenes: list[dict[str, object]]) -> dict[str, object]:
     windows = [scene.get("footageWindowSeconds") for scene in emulator]
     if any(not isinstance(window, list) or len(window) != 2 for window in windows):
         raise SystemExit("every emulator beat needs its footage window in timing.json")
+    holds: list[tuple[float, float]] = []
     for scene, window in zip(emulator, windows):
-        if abs(float(scene["holdSeconds"]) - (window[1] - window[0])) > 0.0015:
-            raise SystemExit(f"{scene['id']} is not held for exactly its footage window")
+        own = [(float(at), float(held)) for at, held in scene.get("footageHoldsSeconds") or []]
+        if any(not window[0] < at <= window[1] or held <= 0 for at, held in own):
+            raise SystemExit(f"{scene['id']} holds a frame outside its footage window")
+        expected = window[1] - window[0] + sum(held for _, held in own)
+        if abs(float(scene["holdSeconds"]) - expected) > 0.0015:
+            raise SystemExit(f"{scene['id']} is not held for exactly its footage window and holds")
+        holds.extend(own)
     for before, after in zip(windows, windows[1:]):
         if abs(before[1] - after[0]) > 1e-9:
             raise SystemExit("the emulator beats do not cover one unbroken window of the footage")
-    start_frame = round(windows[0][0] * FPS)
-    end_frame = round(windows[-1][1] * FPS)
-    if abs(start_frame / FPS - windows[0][0]) > 1e-6 or abs(end_frame / FPS - windows[-1][1]) > 1e-6:
-        raise SystemExit("the footage cuts must sit on 25 fps frames")
+
+    def frame(seconds: float, what: str) -> int:
+        index = round(seconds * FPS)
+        if abs(index / FPS - seconds) > 1e-6:
+            raise SystemExit(f"the footage {what} must sit on 25 fps frames")
+        return index
+
+    start_frame = frame(windows[0][0], "cuts")
+    end_frame = frame(windows[-1][1], "cuts")
+    pieces, first = [], start_frame
+    for at, held in sorted(holds):
+        cut = frame(at, "holds")
+        pieces.append({"start_frame": first, "end_frame": cut, "hold_frames": frame(held, "holds")})
+        first = cut
+    if first < end_frame:
+        pieces.append({"start_frame": first, "end_frame": end_frame, "hold_frames": 0})
+    played = end_frame - start_frame
+    held_frames = sum(piece["hold_frames"] for piece in pieces)
     return {
         "scenes": [scene["id"] for scene in emulator],
         "start_frame": start_frame,
         "end_frame": end_frame,
-        "frames": end_frame - start_frame,
-        "seconds": round((end_frame - start_frame) / FPS, 3),
+        "pieces": pieces,
+        "played_frames": played,
+        "held_frames": held_frames,
+        "frames": played + held_frames,
+        "seconds": round((played + held_frames) / FPS, 3),
     }
 
 
@@ -207,9 +256,11 @@ def content_filters(
     """The video graph for the content: the footage, then the capture, then captions.
 
     The footage is converted to 25 fps first (``fps`` holds each frame until the next
-    one) and then cut by frame number, so the clip is exactly ``emulator['frames']``
-    frames at 1x. The capture fills the rest of the narration to the frame. The
-    captions are burned on the joined content, so they run on the narration's clock.
+    one) and then cut by frame number into the planned pieces, each played at 1x and
+    its last frame repeated for its hold (``tpad`` with ``stop_mode=clone``), so the
+    clip is exactly ``emulator['frames']`` frames. The capture fills the rest of the
+    narration to the frame. The captions are burned on the joined content, so they
+    run on the narration's clock.
     """
     total_frames = round(narration_total * FPS)
     desktop_frames = total_frames - int(emulator["frames"])
@@ -221,9 +272,18 @@ def content_filters(
         "FontName=Arial,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
         "BorderStyle=1,Outline=0,Shadow=0,MarginV=6,Alignment=2"
     )
-    return [
-        f"[{footage_input}:v]fps={FPS},trim=start_frame={emulator['start_frame']}:"
-        f"end_frame={emulator['end_frame']},setpts=PTS-STARTPTS,"
+    pieces = list(emulator["pieces"])
+    names = [f"[fp{i}]" for i in range(len(pieces))]
+    graph = [f"[{footage_input}:v]fps={FPS},split={len(pieces)}{''.join(names)}"]
+    for i, piece in enumerate(pieces):
+        hold = f",tpad=stop_mode=clone:stop={piece['hold_frames']}" if piece["hold_frames"] else ""
+        graph.append(
+            f"{names[i]}trim=start_frame={piece['start_frame']}:end_frame={piece['end_frame']},"
+            f"setpts=PTS-STARTPTS{hold}[fq{i}]"
+        )
+    joined = "".join(f"[fq{i}]" for i in range(len(pieces)))
+    graph.extend([
+        f"{joined}concat=n={len(pieces)}:v=1:a=0,"
         f"scale={EMU_W}:{EMU_H}:flags=lanczos,pad=1920:1080:{EMU_X}:{EMU_Y}:color={bg},"
         f"format=yuv420p,setsar=1[emubase]",
         f"[{label_input}:v]format=rgba[emulabel]",
@@ -234,7 +294,8 @@ def content_filters(
         f"format=yuv420p,setsar=1[desk]",
         f"[emu][desk]concat=n=2:v=1:a=0,"
         f"subtitles='{subtitle_path}':force_style='{style}',format=yuv420p,setsar=1[body]",
-    ]
+    ])
+    return graph
 
 
 def srt_windows(text: str) -> list[tuple[float, float, str]]:
@@ -312,6 +373,10 @@ def main() -> None:
     label_png = cards / "emulator-label.png"
     card(title_png, title_lines(short, facts))
     card(outro_png, outro_lines(short, facts))
+    for path in (title_png, outro_png):
+        edge = card_edge_density(path)
+        if edge >= CARD_EDGE_CEILING:
+            raise SystemExit(f"{path.name} edge density {edge:.2f} is too close to the gate's 4.5")
     label = emulator_label(facts)
     label_plate(label_png, label)
 
@@ -426,7 +491,8 @@ def main() -> None:
         "releaseSha": release_sha,
         "recordedFrom": (
             "Android TV emulator footage from CI, then a local server with MERCURY_OFFLINE=1 "
-            "in desktop Chromium at 1920x1080 through the D-pad bridge"
+            "in desktop Chromium at 1920x1080 CSS pixels (the desktop layout) through the "
+            "D-pad bridge"
         ),
         "publicDeployment": "live",
         "durationSeconds": round(duration, 3),
@@ -452,8 +518,15 @@ def main() -> None:
             "bytes": footage.stat().st_size,
             "sourceSeconds": footage_seconds,
             "windowSeconds": [emulator["start_frame"] / FPS, emulator["end_frame"] / FPS],
+            "heldStaticFrames": [
+                {"atSeconds": piece["end_frame"] / FPS, "seconds": piece["hold_frames"] / FPS}
+                for piece in emulator["pieces"] if piece["hold_frames"]
+            ],
             "seconds": emulator_seconds,
-            "conversion": "variable to 25 fps by holding each frame until the next; 1x",
+            "conversion": (
+                "variable to 25 fps by holding each frame until the next; 1x; listed static "
+                "frames held longer"
+            ),
             "label": label,
         },
         "capture": {

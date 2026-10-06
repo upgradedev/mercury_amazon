@@ -1,11 +1,11 @@
 {
   "schema": "mercury.video_plan/1",
-  "status": "RENDERED LOCALLY, NOT UPLOADED. This plan is for the next take, not yet recorded. Its content opens on Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on an AOSP Android TV emulator, Android 14 / API 34, loading the public demo (build ea2cff5, record-only), at 1x. That is footage, not a Fire TV device and not a runtime receipt; the Android TV emulator runtime receipt is a separate file, android_tv_runtime_receipt.json. The rest is a local run of this repository in desktop Chromium at 1920x1080 with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. An emulator beat's seconds are its footage window; a desktop beat's seconds are its measured hold, the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. The event FAQ permits the Android TV Emulator and does not require physical hardware.",
+  "status": "RENDERED LOCALLY, NOT UPLOADED. This plan is for the next take. Its content opens on Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on an AOSP Android TV emulator, Android 14 / API 34, loading the public demo (build ea2cff5, record-only), at 1x, with two holds of a static frame. That is footage, not a Fire TV device and not a runtime receipt; the Android TV emulator runtime receipt is a separate file, android_tv_runtime_receipt.json. The rest is a local run of this repository in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540 CSS) with MERCURY_OFFLINE=1, driven through the D-pad bridge the Leanback app calls. An emulator beat's seconds are its footage window plus its holds; a desktop beat's seconds are its measured hold, the length of its synthesized audio plus a 0.65 s tail, from video/generate-narration.py. The media lives outside the repository; video/README.md says where. The event FAQ permits the Android TV Emulator and does not require physical hardware.",
   "project": "mercury_amazon",
   "title": "Mercury: Fire TV incident board",
   "source_of_truth": "scripts/build_video_plan.py",
   "generated_by_command": "python scripts/build_video_plan.py",
-  "note": "words_count and words_per_minute are computed from narration_text by the generator. duration_sec is the beat's hold in the render: for an android_tv_emulator beat its window of the CI footage, for a desktop_capture beat the measured audio length plus a 0.65 s tail. total_duration_sec is the content only; the title card (4 s) and the closing card (3 s) are added by video/build-video.py.",
+  "note": "words_count and words_per_minute are computed from narration_text by the generator. duration_sec is the beat's hold in the render: for an android_tv_emulator beat its window of the CI footage plus its holds of a static frame, for a desktop_capture beat the measured audio length plus a 0.65 s tail. total_duration_sec is the content only; the title card (4 s) and the closing card (3 s) are added by video/build-video.py.",
   "emulator_footage": {
     "artifact": "mercury-android-tv-footage-f423ba57ecfe688b8dafe899e06ab29dfdb7a90c",
     "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/37475795991",
@@ -17,7 +17,269 @@
     "file": "journey.mp4",
     "frames_at_25_fps": 691
   },
-  "total_duration_sec": 162.382,
+  "emulator_footage_frames": [
+    [
+      0,
+      0.0,
+      "Leanback home screen"
+    ],
+    [
+      1,
+      0.755,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      2,
+      1.565,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      3,
+      1.783,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      4,
+      2.032,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      5,
+      2.188,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      6,
+      2.402,
+      "home screen, the favourites label redrawn"
+    ],
+    [
+      7,
+      2.492,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      8,
+      3.994,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      9,
+      4.131,
+      "home screen, unchanged to the eye"
+    ],
+    [
+      10,
+      4.169,
+      "home screen, its last frame"
+    ],
+    [
+      11,
+      4.228,
+      "black: the app cold-starts"
+    ],
+    [
+      12,
+      4.39,
+      "black"
+    ],
+    [
+      13,
+      4.723,
+      "black"
+    ],
+    [
+      14,
+      4.793,
+      "black"
+    ],
+    [
+      15,
+      4.883,
+      "black"
+    ],
+    [
+      16,
+      4.981,
+      "black"
+    ],
+    [
+      17,
+      5.061,
+      "black"
+    ],
+    [
+      18,
+      5.109,
+      "black, on screen until the board appears"
+    ],
+    [
+      19,
+      8.856,
+      "the board first shows: Not asked, What broke?, API NOT CHECKED"
+    ],
+    [
+      20,
+      9.056,
+      "the same board, repainted"
+    ],
+    [
+      21,
+      10.074,
+      "CHECKING; focus ring on Ask what changed"
+    ],
+    [
+      22,
+      10.277,
+      "CHECKING"
+    ],
+    [
+      23,
+      10.428,
+      "API REACHABLE; checkout-api ASKING, call in flight"
+    ],
+    [
+      24,
+      11.16,
+      "checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab; other rows ASKING"
+    ],
+    [
+      25,
+      11.282,
+      "payments-worker NOTHING TO REVERT"
+    ],
+    [
+      26,
+      11.403,
+      "search-indexer CANNOT ATTRIBUTE"
+    ],
+    [
+      27,
+      11.513,
+      "release-train CANNOT ATTRIBUTE"
+    ],
+    [
+      28,
+      11.63,
+      "quiet-service INSUFFICIENT DATA: all five rows answered; static until 14.439"
+    ],
+    [
+      29,
+      14.439,
+      "Right: focus on Stage rollback"
+    ],
+    [
+      30,
+      15.296,
+      "Center: Stage rollback drawn pressed"
+    ],
+    [
+      31,
+      15.847,
+      "ROLLBACK STAGED, Roll back to 9b07e3d, lease 300s"
+    ],
+    [
+      32,
+      15.879,
+      "lease 300s, focus settles on Stage rollback"
+    ],
+    [
+      33,
+      16.901,
+      "lease 299s"
+    ],
+    [
+      34,
+      17.691,
+      "lease 298s"
+    ],
+    [
+      35,
+      18.6,
+      "lease 297s"
+    ],
+    [
+      36,
+      19.907,
+      "lease 296s"
+    ],
+    [
+      37,
+      20.11,
+      "Right: focus on Confirm"
+    ],
+    [
+      38,
+      20.765,
+      "lease 295s"
+    ],
+    [
+      39,
+      21.25,
+      "Center: Confirm drawn pressed; still ROLLBACK STAGED"
+    ],
+    [
+      40,
+      21.691,
+      "RECORDED, no pipeline contacted; ROLLBACK RECORDED, NOT SENT"
+    ],
+    [
+      41,
+      21.812,
+      "the same, legend Next press: Publish responder handoff; static until 26.290"
+    ],
+    [
+      42,
+      26.29,
+      "Center: scrolled to the handoff section, focus on Publish handoff, no handoff yet"
+    ],
+    [
+      43,
+      26.588,
+      "the shared handoff: SHARED REVISION 13, HTTP 200 in 210 ms"
+    ],
+    [
+      44,
+      26.616,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      45,
+      26.791,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      46,
+      26.87,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      47,
+      26.96,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      48,
+      27.086,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      49,
+      27.138,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      50,
+      27.245,
+      "the same handoff; the page finishes scrolling"
+    ],
+    [
+      51,
+      27.434,
+      "the same handoff, the last frame; the clip ends at 27.64 at 25 fps"
+    ]
+  ],
+  "total_duration_sec": 163.852,
   "max_allowed_seconds": 180.0,
   "beats": [
     {
@@ -25,67 +287,79 @@
       "beat_id": "beat_01_tv_launch",
       "source": "android_tv_emulator",
       "timestamp_start": 0.0,
-      "timestamp_end": 7.6,
-      "duration_sec": 7.6,
-      "words_count": 20,
-      "words_per_minute": 157.9,
-      "narration_text": "From the home screen, the debug A P K starts on an Android TV emulator and loads the public demo.",
-      "visual_action": "Emulator footage, 1.00 s to 8.60 s of journey.mp4 at 1x: the Leanback home screen, then black while the app cold-starts and its WebView loads the demo."
+      "timestamp_end": 9.64,
+      "duration_sec": 9.64,
+      "words_count": 25,
+      "words_per_minute": 155.6,
+      "narration_text": "From the home screen, the debug A P K opens the public demo on an Android TV emulator. The screen stays black while it loads.",
+      "visual_action": "Emulator footage from 0.32 s of journey.mp4 at 1x: the Leanback home screen to 4.169 s (frame 10), then black from 4.228 s (frame 11) while the app cold-starts; the board first shows at 8.856 s (frame 19)."
     },
     {
       "beat_index": 2,
       "beat_id": "beat_02_tv_board",
       "source": "android_tv_emulator",
-      "timestamp_start": 7.6,
-      "timestamp_end": 13.32,
-      "duration_sec": 5.72,
-      "words_count": 13,
-      "words_per_minute": 136.4,
-      "narration_text": "The board answers: checkout A P I at twelve point nine times baseline.",
-      "visual_action": "Emulator footage, 8.60 s to 14.32 s: the end of the cold start, the board appears, CHECKING, then checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab from the demo's invented deploy feed, then all five rows."
+      "timestamp_start": 9.64,
+      "timestamp_end": 15.6,
+      "duration_sec": 5.96,
+      "words_count": 15,
+      "words_per_minute": 151.0,
+      "narration_text": "The board asks on its own: checkout A P I, twelve point nine times baseline.",
+      "visual_action": "Emulator footage from 9.96 s: CHECKING at 10.074 s (frame 21), checkout-api ASKING at 10.428 s (frame 23), checkout-api 12.9x, TEMPORAL CANDIDATE, Commit 4f1c2ab from the demo's invented deploy feed at 11.160 s (frame 24), all five rows at 11.630 s (frame 28). That static board is held 1.52 s at 12.00 s."
     },
     {
       "beat_index": 3,
       "beat_id": "beat_03_tv_stage",
       "source": "android_tv_emulator",
-      "timestamp_start": 13.32,
-      "timestamp_end": 18.32,
-      "duration_sec": 5.0,
-      "words_count": 10,
-      "words_per_minute": 120.0,
-      "narration_text": "Right, then center stages a rollback. Its lease counts down.",
-      "visual_action": "Emulator footage, 14.32 s to 19.32 s: D-pad Right to Stage rollback, Center. Rollback staged, the lease counting down from 300 s."
+      "timestamp_start": 15.6,
+      "timestamp_end": 21.48,
+      "duration_sec": 5.88,
+      "words_count": 12,
+      "words_per_minute": 122.4,
+      "narration_text": "Right, then center. A rollback is staged, and its lease counts down.",
+      "visual_action": "Emulator footage from 14.40 s: D-pad Right moves focus to Stage rollback at 14.439 s (frame 29), Center at 15.296 s (frame 30), ROLLBACK STAGED with a 300 s lease at 15.847 s (frame 31), counting down to 296 s."
     },
     {
       "beat_index": 4,
-      "beat_id": "beat_04_tv_confirm_publish",
+      "beat_id": "beat_04_tv_confirm",
       "source": "android_tv_emulator",
-      "timestamp_start": 18.32,
-      "timestamp_end": 26.64,
-      "duration_sec": 8.32,
+      "timestamp_start": 21.48,
+      "timestamp_end": 27.4,
+      "duration_sec": 5.92,
       "words_count": 13,
-      "words_per_minute": 93.8,
-      "narration_text": "Right, center confirms: recorded, no pipeline contacted, record only. Center publishes the handoff.",
-      "visual_action": "Emulator footage, 19.32 s to the end at 27.64 s: D-pad Right to Confirm, Center. RECORDED, no pipeline contacted, held on the board; then Center on Publish handoff and the shared handoff, SHARED REVISION 13, HTTP 200."
+      "words_per_minute": 131.8,
+      "narration_text": "Right, then center confirms. Recorded, no pipeline contacted: this demo is record only.",
+      "visual_action": "Emulator footage from 20.28 s: focus on Confirm since 20.110 s (frame 37), Center at 21.250 s (frame 39), RECORDED, no pipeline contacted at 21.691 s (frame 40), static on the board until 26.290 s."
     },
     {
       "beat_index": 5,
-      "beat_id": "beat_05_desktop_board",
-      "source": "desktop_capture",
-      "timestamp_start": 26.64,
-      "timestamp_end": 41.454,
-      "duration_sec": 14.814,
-      "words_count": 41,
-      "words_per_minute": 166.1,
-      "narration_text": "The rest is the same board, run locally in a desktop browser at ten eighty p, so each answer can be read. Mercury counts only commits that touch runtime files, and names one only when exactly one landed before the spike.",
-      "visual_action": "The desktop take begins: the loaded board at 1920x1080, focus on Ask what changed. No key pressed."
+      "beat_id": "beat_05_tv_publish",
+      "source": "android_tv_emulator",
+      "timestamp_start": 27.4,
+      "timestamp_end": 31.36,
+      "duration_sec": 3.96,
+      "words_count": 7,
+      "words_per_minute": 106.1,
+      "narration_text": "Center publishes the handoff: shared revision thirteen.",
+      "visual_action": "Emulator footage from 26.20 s to the end: Center scrolls to the handoff with focus on Publish handoff at 26.290 s (frame 42), the shared handoff, SHARED REVISION 13, HTTP 200 at 26.588 s (frame 43). The last frame is held 2.52 s."
     },
     {
       "beat_index": 6,
-      "beat_id": "beat_06_board_on_load",
+      "beat_id": "beat_06_desktop_board",
       "source": "desktop_capture",
-      "timestamp_start": 41.454,
-      "timestamp_end": 59.473,
+      "timestamp_start": 31.36,
+      "timestamp_end": 43.388,
+      "duration_sec": 12.028,
+      "words_count": 33,
+      "words_per_minute": 164.6,
+      "narration_text": "The rest is the same board, run locally from this commit in a desktop browser at ten eighty p. Mercury names a commit only when exactly one runtime change landed before the spike.",
+      "visual_action": "The desktop take begins: the loaded board in desktop Chromium at 1920x1080 CSS (the desktop layout, not the Fire TV WebView's 960x540), focus on Ask what changed. No key pressed."
+    },
+    {
+      "beat_index": 7,
+      "beat_id": "beat_07_board_on_load",
+      "source": "desktop_capture",
+      "timestamp_start": 43.388,
+      "timestamp_end": 61.407,
       "duration_sec": 18.019,
       "words_count": 40,
       "words_per_minute": 133.2,
@@ -93,35 +367,35 @@
       "visual_action": "Hold on the board. The five rows read Temporal candidate, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, each from the server's answer."
     },
     {
-      "beat_index": 7,
-      "beat_id": "beat_07_crowded_refusal",
+      "beat_index": 8,
+      "beat_id": "beat_08_crowded_refusal",
       "source": "desktop_capture",
-      "timestamp_start": 59.473,
-      "timestamp_end": 77.027,
+      "timestamp_start": 61.407,
+      "timestamp_end": 78.961,
       "duration_sec": 17.554,
       "words_count": 45,
       "words_per_minute": 153.8,
       "narration_text": "Down walks the rows. Release train shows a spike well above its baseline, but several runtime changes landed in the window before it, and no metric says which one did it. Mercury cannot attribute this, and offers no rollback. Rolling back would be a guess.",
-      "visual_action": "D-pad Down four times to release-train, then Center. The verdict reads Cannot attribute this with the number of changes that landed, Next reads No rollback offered, and Stage rollback and Confirm are disabled."
+      "visual_action": "D-pad Down four times to release-train, then Center, all before the second caption. The verdict reads Cannot attribute this with the number of changes that landed, Next reads No rollback offered, and Stage rollback and Confirm are disabled."
     },
     {
-      "beat_index": 8,
-      "beat_id": "beat_08_named_with_odds",
+      "beat_index": 9,
+      "beat_id": "beat_09_named_with_odds",
       "source": "desktop_capture",
-      "timestamp_start": 77.027,
-      "timestamp_end": 96.81,
+      "timestamp_start": 78.961,
+      "timestamp_end": 98.744,
       "duration_sec": 19.783,
       "words_count": 49,
       "words_per_minute": 148.6,
       "narration_text": "On checkout A P I, exactly one runtime change landed before the spike, so Mercury names it, and prints its own odds: on held-out generated cases a named commit is the cause fifty percent of the time, over fifty eight namings, if a fault shows within seventy five minutes.",
-      "visual_action": "D-pad Up three times to checkout-api, then Center. The verdict names the commit as the only runtime change, quotes its message, and reads 50.0% held-out precision (synthetic, \u226475m lag)."
+      "visual_action": "D-pad Up three times to checkout-api, then Center, inside the first caption. The verdict names the commit as the only runtime change, quotes its message, and reads 50.0% held-out precision (synthetic, \u226475m lag)."
     },
     {
-      "beat_index": 9,
-      "beat_id": "beat_09_provenance",
+      "beat_index": 10,
+      "beat_id": "beat_10_provenance",
       "source": "desktop_capture",
-      "timestamp_start": 96.81,
-      "timestamp_end": 107.445,
+      "timestamp_start": 98.744,
+      "timestamp_end": 109.379,
       "duration_sec": 10.635,
       "words_count": 30,
       "words_per_minute": 169.3,
@@ -129,23 +403,23 @@
       "visual_action": "Hold on the OFFLINE FIXTURE stamp under the reading and the dashed STAND-IN stamp against Mercury's commits. No key pressed. (The public demo in the emulator footage names a deploy from an invented feed instead.)"
     },
     {
-      "beat_index": 10,
-      "beat_id": "beat_10_stage_to_evidence",
+      "beat_index": 11,
+      "beat_id": "beat_11_stage_to_evidence",
       "source": "desktop_capture",
-      "timestamp_start": 107.445,
-      "timestamp_end": 125.974,
-      "duration_sec": 18.529,
-      "words_count": 37,
-      "words_per_minute": 119.8,
-      "narration_text": "Up, right, center stages the rollback; right, center confirms it, and the board holds recorded, not sent. Center publishes the handoff. Down reaches the evidence behind the odds: fifty eight namings, in eleven hundred sixty synthetic cases.",
-      "visual_action": "D-pad Up, Right to Stage rollback, Center: Rollback staged. Right to Confirm, Center: nothing scrolls, the large figure reads RECORDED, no pipeline contacted, and the legend reads Next press: Publish responder handoff. Center publishes: HTTP 200, the handoff's responder, facts and next step clear the key bar under the rollback steps. Down lands on Incident evidence: 50.0% over 58 namings in 1160 synthetic labelled cases."
+      "timestamp_start": 109.379,
+      "timestamp_end": 126.283,
+      "duration_sec": 16.904,
+      "words_count": 38,
+      "words_per_minute": 134.9,
+      "narration_text": "Up, right, center: the rollback is staged. Right, center confirms it, and the board holds recorded, not sent. Center publishes the handoff. Down shows the evidence behind the odds: fifty eight namings, in eleven hundred sixty synthetic cases.",
+      "visual_action": "Each press on its spoken word. Up, Right to Stage rollback, Center: Rollback staged. Right to Confirm, Center: nothing scrolls, the large figure reads RECORDED, no pipeline contacted, and the legend reads Next press: Publish responder handoff. Center publishes: HTTP 200, the handoff's responder, facts and next step clear the key bar under the rollback steps. Down lands on Incident evidence: 50.0% over 58 namings in 1160 synthetic labelled cases."
     },
     {
-      "beat_index": 11,
-      "beat_id": "beat_11_dpad",
+      "beat_index": 12,
+      "beat_id": "beat_12_dpad",
       "source": "desktop_capture",
-      "timestamp_start": 125.974,
-      "timestamp_end": 138.141,
+      "timestamp_start": 126.283,
+      "timestamp_end": 138.45,
       "duration_sec": 12.167,
       "words_count": 32,
       "words_per_minute": 157.8,
@@ -153,28 +427,28 @@
       "visual_action": "D-pad Right to Delivery velocity, Center. The panel opens and the BACK legend changes from Exit to the Fire TV launcher to Back to the wall."
     },
     {
-      "beat_index": 12,
-      "beat_id": "beat_12_fixtures",
+      "beat_index": 13,
+      "beat_id": "beat_13_fixtures",
       "source": "desktop_capture",
-      "timestamp_start": 138.141,
-      "timestamp_end": 150.726,
+      "timestamp_start": 138.45,
+      "timestamp_end": 151.035,
       "duration_sec": 12.585,
       "words_count": 32,
       "words_per_minute": 152.6,
       "narration_text": "Its answer is a recording, stamped offline fixture, because no GitHub token is set. Back returns to the wall, not out of the app. Cloud spend is a fixture too, marked synthetic.",
-      "visual_action": "D-pad Down scrolls the rest of the DORA answer into view with its OFFLINE FIXTURE stamp; the cursor stays in the panel. Back returns to the wall and the legend changes back. Right to Cloud spend, Center: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC. Back to the wall."
+      "visual_action": "D-pad Down scrolls the rest of the DORA answer into view with its OFFLINE FIXTURE stamp; the cursor stays in the panel. Back returns to the wall and the legend changes back. Right to Cloud spend and Center before the third caption: the spend answer carries OFFLINE FIXTURE and says its figures are SYNTHETIC. Back to the wall."
     },
     {
-      "beat_index": 13,
-      "beat_id": "beat_13_build_check",
+      "beat_index": 14,
+      "beat_id": "beat_14_build_check",
       "source": "desktop_capture",
-      "timestamp_start": 150.726,
-      "timestamp_end": 162.382,
-      "duration_sec": 11.656,
-      "words_count": 27,
-      "words_per_minute": 139.0,
-      "narration_text": "Last, the server reports its build: the commit on the opening card, in fixture mode. The emulator footage came from C I, not a Fire TV device.",
-      "visual_action": "Down to How it answers, Down to Check, Center. The connection line reads GET /health returned 200, the build's short SHA, and GitHub live: no, fixture mode."
+      "timestamp_start": 151.035,
+      "timestamp_end": 163.852,
+      "duration_sec": 12.817,
+      "words_count": 29,
+      "words_per_minute": 135.8,
+      "narration_text": "Down, down, center: the server reports its build, the commit on the opening card, in fixture mode. The emulator footage came from C I, not a Fire TV device.",
+      "visual_action": "Down to How it answers, Down to Check, Center, each on its spoken word. The connection line reads GET /health returned 200, the build's short SHA, and GitHub live: no, fixture mode."
     }
   ]
 }

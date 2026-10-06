@@ -1,56 +1,90 @@
 # Demo video
 
 **Status: rendered locally, not uploaded.** The last render is the 2026-10-01 take at
-`9620743` (table below). The next take is planned and its narration is synthesized,
-but it has not been recorded or composed yet. It opens on the Android TV emulator
-footage from CI. Nothing has a public link until the owner uploads it, and nothing in
-this directory is the video itself.
+`9620743` (table below). The next take opens on the Android TV
+emulator footage from CI; its plan and narration are below. Nothing has a public link
+until the owner uploads it, and nothing in this directory is the video itself.
 
 ## The next take: emulator footage first
 
 | Item | Value |
 |---|---|
-| Plan | `scripts/build_video_plan.py`, which writes `narration.json` and `cue_sheet.json`; `SHOT_LIST.md` lists the beats |
-| Content | 162.382 s in 13 beats: 26.64 s of emulator footage in 4 beats, then 135.742 s of desktop take in 9 beats |
-| Planned length | 169.382 s with the 4 s title card and the 3 s closing card; the gate allows under 175 s |
+| Plan | `scripts/build_video_plan.py`, which writes `narration.json` and `cue_sheet.json`; `SHOT_LIST.md` lists the beats and every frame of the footage |
+| Content | 163.852 s in 14 beats: 31.36 s of emulator footage in 5 beats (27.32 s played at 1x, 4.04 s of held static frames), then 132.492 s of desktop take in 9 beats |
+| Planned length | 170.852 s with the 4 s title card and the 3 s closing card; the gate allows under 175 s |
 | Footage | `journey.mp4` from the artifact `mercury-android-tv-footage-f423ba57ecfe688b8dafe899e06ab29dfdb7a90c`, CI run [37475795991](https://github.com/upgradedev/mercury_amazon/actions/runs/37475795991) |
+| Desktop picture | Desktop Chromium at 1920x1080 CSS pixels, the desktop layout, not the Fire TV WebView's 960x540 CSS layout (see below) |
 | Narration | Synthesized 2026-10-06 into the workspace folder `reviews/videos_20261006/mercury_amazon/narration/`, outside git |
-| Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2` |
-| Characters synthesized | 1120 sent to ElevenLabs in all calls (`synthesis-log.jsonl`): 928 in the 7 new or changed beats that ship, plus 192 for a longer closing beat that was replaced to keep the plan under 172 s. The 6 unchanged beats (1273 characters) reuse the `reviews/videos_muse_20261001` audio, copied to their new beat numbers with matching cache keys. 2201 characters are in the planned narration |
+| Voice | ElevenLabs premade voice `pNInz6obpgDQGcFmaJgB` (Adam), model `eleven_multilingual_v2`, through the `with-timestamps` endpoint for the beats synthesized since the first 2026-10-06 run |
+| Characters synthesized | 2378 sent to ElevenLabs in all calls on 2026-10-06 (`synthesis-log.jsonl`). The 8 beats whose words changed were synthesized with their alignment; the 6 unchanged beats reuse earlier audio under their new beat numbers, with matching cache keys |
 
 ### What it shows
 
 * **The title card** (4 s) says what the product is first: "Mercury. An incident board
-  for the team's Fire TV. It names the deploy behind a spike only when it can." Two
-  smaller lines name the two sources in the order they play: "Android TV emulator, API
-  34, CI run 37475795991; local desktop run of `<sha7>`." Then "Offline fixtures,
-  record-only rollback."
-* **The emulator footage** opens the content: 26.64 s of `journey.mp4`, from 1.00 s to
-  its end at 27.64 s, at 1x. It is the debug APK built at `f423ba5`, on an AOSP Android
-  TV emulator (x86), Android 14 / API 34, loading the public demo, build `ea2cff5`,
-  which is record-only. The journey:
-  * the Leanback home screen, where the app is launched with its Leanback launcher
-    intent;
-  * black while it cold-starts and its WebView loads the demo;
-  * the board answering on its own: checkout-api 12.9x, TEMPORAL CANDIDATE, Commit
-    4f1c2ab, a deploy from the demo's invented, display-only feed;
-  * Right and Center: Rollback staged, the lease counting down;
-  * Right and Center: RECORDED, no pipeline contacted;
-  * Center: the responder handoff published, SHARED REVISION 13, HTTP 200.
+  for the team's Fire TV. It names the deploy behind a spike only when it can." Smaller
+  lines name the two sources in the order they play: "Android TV emulator footage, API
+  34, CI run 37475795991." and "Then a local run of `<sha7>` in a desktop browser at
+  1920x1080, not the TV layout." Then "Offline fixtures, record-only rollback."
+* **The emulator footage** opens the content: `journey.mp4` from 0.32 s to its end at
+  27.64 s, at 1x, with two static frames held longer. It is the debug APK built at
+  `f423ba5`, on an AOSP Android TV emulator (x86), Android 14 / API 34, loading the
+  public demo, build `ea2cff5`, which is record-only. The journey, by frame (the full
+  table is in `SHOT_LIST.md`):
+  * the Leanback home screen to 4.169 s (frame 10). The app is launched with its
+    Leanback launcher intent, which shows nothing on the home screen;
+  * black from 4.228 s (frame 11) while it cold-starts and its WebView loads the demo;
+  * the board first shows at 8.856 s (frame 19), Not asked;
+  * CHECKING at 10.074 s, ASKING at 10.428 s, then checkout-api 12.9x, TEMPORAL
+    CANDIDATE, Commit 4f1c2ab at 11.160 s (frame 24), a deploy from the demo's
+    invented, display-only feed; all five rows at 11.630 s;
+  * Right at 14.439 s and Center at 15.296 s: Rollback staged at 15.847 s, the lease
+    counting down;
+  * Right at 20.110 s and Center at 21.250 s (frame 39, still STAGED): RECORDED, no
+    pipeline contacted at 21.691 s (frame 40), static until 26.290 s;
+  * Center: the page scrolls to Publish handoff at 26.290 s (frame 42), and the
+    responder handoff shows at 26.588 s (frame 43), SHARED REVISION 13, HTTP 200.
 
   The D-pad presses are key codes sent by the CI script. A label under the picture
   reads "Android TV emulator (API 34), debug APK, public demo build ea2cff5, CI run
-  37475795991" for as long as the footage plays. Four beats of narration fit the
-  footage exactly. Each beat is held for its window of the footage, and its words were
-  placed on the frames (`SHOT_LIST.md` lists them).
+  37475795991" for as long as the footage plays. Five beats of narration cover it.
 * **The desktop take** follows. The narration says once that it is the same board, run
-  locally in a desktop browser at 1080p, so each answer can be read. The local board
-  names one of Mercury's own commits, stamped STAND-IN, where the public demo names the
-  invented feed's deploy. The desktop journey presses the same keys as the 2026-10-01
-  take. The stage, confirm and handoff presses share one beat, because the footage has
-  just shown them at a viewer's pace.
-* **The closing card** (3 s) repeats the CI run, the demo build and the commit. It says
-  the emulator runtime receipt is a separate record.
+  locally from this commit in a desktop browser at 1080p. The local board names one of
+  Mercury's own commits, stamped STAND-IN, where the public demo names the invented
+  feed's deploy. The desktop journey presses the same keys as the 2026-10-01 take. The
+  stage, confirm and handoff presses share one beat, each on the word that names it.
+* **The closing card** (3 s) repeats the CI run, the demo build and the commit, says the
+  desktop part is a desktop browser at 1920x1080, and says the emulator runtime receipt
+  is a separate record.
+
+### Captions and words follow the picture
+
+No caption names a value or a state, such as 12.9x, RECORDED or the published handoff,
+more than 0.5 s before the frame that shows it, and a spoken word naming a press lands
+within 0.5 s of the press's visible effect. Over the footage, each beat's caption cues
+start on spoken words read off the voice's character alignment (`marks` in the plan),
+and `tests/video/test_emulator_open_cut.py` checks every such cue and press against the
+frame table. The closest calls: the board beat's first caption names asking 0.47 s
+before ASKING shows, and "center" in the confirm beat is spoken 0.42 s before Confirm is
+drawn pressed. In the desktop take, `video/capture-local.py` presses each such key on
+its spoken word (the stage-to-evidence and build-check beats) or before the caption
+that names its result (the release-train, checkout-api and cloud spend presses).
+
+### Why the desktop part is not at the TV viewport
+
+The Fire TV WebView lays the page out at 960x540 CSS pixels at a device scale factor of
+2, and the Leanback app injects `MercuryHost`, which turns on `html.tv-host` and the key
+bar. The emulator footage shows that layout. On 2026-10-06 the whole scripted journey
+was rehearsed at that viewport, with DSF 2, the `MercuryHost` stub the browser tests
+use, a 1920x1080 recording and a local server on port 8875 at `e76e6da`. Every press,
+focus check and awaited answer passed unchanged, with no page errors
+(`reviews/videos_20261006/mercury_amazon/rehearsal_tv/capture/capture-receipt.json`).
+The frames did not read well. Headless Chromium films CSS pixels: Playwright's recorder
+wrote the 960x540 page into the top-left quarter of the 1920x1080 file, and a raw CDP
+screencast, in old and new headless, also returned 960x540 frames. The TV layout would
+reach the video as a 960x540 picture upscaled, with half the detail of the desktop take.
+The take therefore stays at 1920x1080 CSS pixels, and the title card, the narration and
+the closing card call it a desktop browser. `MERCURY_CAPTURE_VIEWPORT=tv` reruns the
+rehearsal.
 
 ### What the footage is, and what it is not
 
@@ -69,19 +103,25 @@ both.
 ### How the footage is cut
 
 The screenrecord writes a frame only when the screen changes (52 frames in 27.62 s).
+Its frame times were read by index with ffprobe and each frame was looked at by index
+(`select=eq(n\,I)`); seeking it with `-ss` returns a neighbouring frame.
 `video/build-video.py` converts it to 25 fps by holding each frame until the next one,
 then cuts it by frame number:
 
-* nothing is sped up or slowed;
-* no moment is held past its own recorded length, and nothing is cut out of the middle,
-  so the 4.6 s cold start stays in;
-* the first second of the idle home screen is trimmed, and the launch stays on it.
+* nothing is sped up or slowed, and nothing is cut out of the middle, so the 4.6 s cold
+  start stays in;
+* two frames the source shows still are held longer: the answered board for 1.52 s at
+  12.00 s (still in the source from 11.630 s to 14.439 s) and the last frame, the
+  shared handoff, for 2.52 s. `scripts/build_video_plan.py` refuses a hold on a frame
+  the source replaces within a second;
+* the first 0.32 s of the idle home screen is trimmed.
 
-The cut points are `FOOTAGE_CUTS` in `scripts/build_video_plan.py`, each on a 25 fps
-frame, read off the footage's frame times. `video/generate-narration.py` holds each
-emulator beat for exactly its window. It refuses a beat whose audio plus 0.3 s does not
-fit, rather than stretch the footage. `video/build-video.py` refuses footage whose
-provenance (run, commits, OS, device, byte count) differs from the one the plan names.
+The cut points are `FOOTAGE_CUTS` and the holds `FOOTAGE_HOLDS` in
+`scripts/build_video_plan.py`, each on a 25 fps frame. `video/generate-narration.py`
+holds each emulator beat for exactly its window plus its holds. It refuses a beat whose
+audio plus 0.3 s does not fit, rather than stretch the footage. `video/build-video.py`
+refuses footage whose provenance (run, commits, OS, device, byte count) differs from
+the one the plan names.
 
 ### Recording and composing it
 
@@ -96,8 +136,8 @@ export MERCURY_VIDEO_ROOT=C:/dev/solutions/private_amazon_devpost/reviews/videos
 export MERCURY_EMULATOR_FOOTAGE=<the unpacked mercury-android-tv-footage-f423ba5... artifact folder>
 export MERCURY_RELEASE_SHA=$(git rev-parse HEAD)    # the commit the local server reports
 export FFMPEG=/path/to/ffmpeg FFPROBE=/path/to/ffprobe
-MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8873 &
-MERCURY_CAPTURE_URL=http://127.0.0.1:8873/ python video/capture-local.py
+MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8875 &
+MERCURY_CAPTURE_URL=http://127.0.0.1:8875/ python video/capture-local.py
 python video/build-video.py
 cd "$MERCURY_VIDEO_ROOT/output" && VIDEO_MANIFEST=video_manifest.json \
   CAPTION_WINDOWS=caption_windows.json python <repo>/scripts/verify_video_sync.py mercury-demo.mp4
@@ -105,7 +145,7 @@ cd "$MERCURY_VIDEO_ROOT/output" && VIDEO_MANIFEST=video_manifest.json \
 
 The narration is already in `narration/`. Rerunning `video/generate-narration.py`
 reuses every beat whose words have not changed and calls ElevenLabs for none of them.
-The capture skips the four emulator beats: its timeline starts at the first desktop
+The capture skips the five emulator beats: its timeline starts at the first desktop
 beat, and its receipt records that start as `narrationStartSeconds`.
 
 ## The last render: the 2026-10-01 take
@@ -182,12 +222,13 @@ cannot drift from the picture.
    caption text, the action on screen and its source (emulator footage or desktop).
 2. `python video/generate-narration.py` synthesizes each beat with ElevenLabs, measures
    it with ffprobe, and holds it for its length plus 0.65 s, or for its footage window.
-   It writes `timing.json` and the captions. Caption cues start at the measured pauses
-   in the voice.
+   It writes `timing.json` and the captions. A caption cue starts on its spoken mark,
+   read off the voice's character alignment, or else at a measured pause in the voice.
 3. `python video/capture-local.py` refuses to record unless the server's `/health`
    reports the commit being recorded, waits until all five board rows have answered,
-   then drives the desktop journey beat by beat. Every press checks which control took
-   focus and every answer is awaited from the server; a journey that drifts aborts.
+   then drives the desktop journey beat by beat, each named press on its spoken word.
+   Every press checks which control took focus and every answer is awaited from the
+   server; a journey that drifts aborts.
 4. `python video/build-video.py` cuts the footage, trims the capture to the rest of the
    narration, joins them, adds the two cards, burns the captions, mixes the beats at
    their measured starts, normalises to -16 LUFS, and checks the result is within one
@@ -225,7 +266,7 @@ Edit the beat in `scripts/build_video_plan.py` and rerun it. `generate-narration
 then re-synthesizes only the beat whose words changed and reuses the rest, so every
 other beat keeps its measured length. For a desktop beat, record again and compose
 again. For an emulator beat, the new words must fit its footage window. To re-roll a
-beat without changing its words, set `NARRATION_FORCE=beat_10_stage_to_evidence`.
+beat without changing its words, set `NARRATION_FORCE=beat_11_stage_to_evidence`.
 
 Any new commit changes what the desktop board shows, because in offline mode the commit
 it names is one of this repository's own. Restart the server after committing and record
@@ -236,10 +277,13 @@ at that commit; the title card and the Check line both name it.
 * The footage is an AOSP Android TV emulator in CI, not a Fire TV device. It loads the
   public demo (`ea2cff5`), not a local run of the recorded commit.
 * The desktop take is a desktop browser, not the APK.
-* The emulator's cold start is 4.6 s of black on screen, kept at 1x.
-* The desktop journey was retimed into fewer beats without a browser probe, because none
-  could be run while it was planned. The key sequence is the recorded one, but the merged
-  stage, confirm and handoff beat presses faster than the 2026-10-01 take did.
+* The emulator's cold start is 4.6 s of black on screen, kept at 1x. Two static frames
+  of the footage are held longer, 4.04 s in all, so the words fit before the next press.
+* The desktop take is the desktop layout at 1920x1080 CSS pixels, not the Fire TV
+  WebView's 960x540 layout, because headless Chromium films that layout at half the
+  detail (see above).
+* The merged stage, confirm and handoff beat presses faster than the 2026-10-01 take
+  did, because each press now lands on the word that names it.
 * The named commit is one of this repository's own on the desktop, and a hand-written
   stand-in on the public demo. The metric is generated. The board labels all three.
 * The board's headline scramble animation is suppressed in the desktop take: the

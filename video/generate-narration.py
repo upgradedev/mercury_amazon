@@ -28,7 +28,16 @@ tail. Nothing downstream invents a timestamp. What changed for this repository:
      refuses it when its measured audio plus ``FIXED_HOLD_MARGIN_SECONDS`` does not
      fit, rather than stretch or cut the footage. Every other beat keeps the kit's
      measured hold. Each scene in ``timing.json`` also carries the beat's
-     ``source``, so the capture and the compose know which beats are footage.
+     ``source``, so the capture and the compose know which beats are footage, and
+     an emulator beat's footage window and its holds of a static frame.
+  7. Every beat is synthesized with ElevenLabs' ``with-timestamps`` endpoint, the
+     same voice and settings, so its character alignment is kept beside the audio
+     (``NN-beat.alignment.json``). A beat may name ``marks``, spoken phrases; their
+     start times go to ``timing.json`` as ``marksSeconds``. A beat's
+     ``caption_cues`` are its caption pieces in order; a cue that names a mark
+     starts on that word, so a caption naming a value or a state appears with the
+     frame that shows it, and the capture presses a key on a mark. Cues without a
+     mark keep the pause-based boundaries of point 5.
 
 Kept from the kit: per-beat caching keyed on the speech text and voice settings, so
 changing one beat costs one call; the 3 to 40 s per beat and 90 to 174 s total
@@ -39,12 +48,13 @@ Run from the repository root:
     MERCURY_VIDEO_ROOT=/path/outside/git FFPROBE=ffprobe ELEVENLABS_API_KEY=... \\
         python video/generate-narration.py
 
-``NARRATION_FORCE=beat_10_stage_to_evidence`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
+``NARRATION_FORCE=beat_11_stage_to_evidence`` re-rolls one beat; ``NARRATION_FORCE=all`` all.
 The key is read from the environment and never printed or written anywhere.
 """
 
 from __future__ import annotations
 
+import base64
 import datetime
 import hashlib
 import json
@@ -172,8 +182,9 @@ def elevenlabs_key() -> str:
     raise SystemExit("no ElevenLabs key: set one of " + ", ".join(ELEVENLABS_KEY_ENV_NAMES))
 
 
-def synthesize_elevenlabs(text: str, config: dict[str, object], retries: int = 3) -> bytes:
-    """The request body and retry loop are the kit's, unchanged."""
+def synthesize_elevenlabs(text: str, config: dict[str, object], retries: int = 3) -> tuple[bytes, dict]:
+    """The request body and retry loop are the kit's. The endpoint is the kit's with
+    ``/with-timestamps``, which returns the same audio and its character alignment."""
     voice_id = str(config.get("voiceId", ""))
     model_id = str(config.get("modelId", "eleven_multilingual_v2"))
     output_format = str(config.get("outputFormat", "mp3_44100_128"))
@@ -185,7 +196,7 @@ def synthesize_elevenlabs(text: str, config: dict[str, object], retries: int = 3
         raise SystemExit("tts.elevenLabs.outputFormat is malformed")
     key = elevenlabs_key()
     url = (
-        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
         f"?output_format={output_format}"
     )
     body = json.dumps(
@@ -208,14 +219,20 @@ def synthesize_elevenlabs(text: str, config: dict[str, object], retries: int = 3
                 headers={
                     "xi-api-key": key,
                     "Content-Type": "application/json",
-                    "Accept": "audio/mpeg",
+                    "Accept": "application/json",
                 },
             )
             with urllib.request.urlopen(request, timeout=90) as response:
-                data = response.read()
+                payload = json.load(response)
+            data = base64.b64decode(payload["audio_base64"])
             if len(data) < 3000:
                 raise RuntimeError(f"tiny audio ({len(data)} bytes)")
-            return data
+            alignment = payload["alignment"]
+            return data, {
+                "characters": alignment["characters"],
+                "starts": alignment["character_start_times_seconds"],
+                "ends": alignment["character_end_times_seconds"],
+            }
         except Exception as error:  # noqa: BLE001
             # Only the exception type and HTTP status reach the log, never headers.
             last = error
@@ -246,6 +263,36 @@ def cached_key(sidecar: pathlib.Path) -> str | None:
     except (OSError, ValueError):
         return None
     return recorded if isinstance(recorded, str) else None
+
+
+def mark_times(identifier: str, speech: str, marks: dict[str, str], alignment: dict | None) -> dict[str, float]:
+    """The start of each marked phrase, read off the character alignment."""
+    if not marks:
+        return {}
+    if not alignment or "".join(alignment.get("characters", [])) != speech:
+        raise SystemExit(f"beat {identifier} names marks but has no alignment for its words")
+    times = {}
+    for name, phrase in marks.items():
+        if speech.count(phrase) != 1:
+            raise SystemExit(f"beat {identifier}: mark {name} is not spoken exactly once")
+        times[name] = round(float(alignment["starts"][speech.index(phrase)]), 3)
+    return times
+
+
+def caption_bounds(identifier: str, cues: list[list[object]], seconds: float,
+                   quiet: list[tuple[float, float]], marks: dict[str, float]) -> list[tuple[float, float]]:
+    """Each caption cue's (start, end) inside the beat. With marks, a cue starts on its
+    mark and ends where the next starts; without, the pause-based bounds of point 5."""
+    pieces = [str(cue[0]) for cue in cues]
+    named = [cue[1] for cue in cues]
+    if not any(named):
+        return cue_bounds(pieces, seconds, quiet)
+    if named[0] is not None or any(mark is None for mark in named[1:]):
+        raise SystemExit(f"beat {identifier}: with marks, every cue but the first starts on a mark")
+    starts = [0.0] + [marks[str(mark)] for mark in named[1:]]
+    if starts != sorted(starts) or len(set(starts)) != len(starts):
+        raise SystemExit(f"beat {identifier}: its marked cues are not in spoken order")
+    return [(starts[i], starts[i + 1] if i + 1 < len(starts) else seconds) for i in range(len(starts))]
 
 
 def beat_hold(identifier: str, seconds: float, fixed: object) -> float:
@@ -298,17 +345,22 @@ def main() -> None:
             raise SystemExit(f"beat {identifier} still contains a <PLACEHOLDER>; fill it in first")
         audio = out / f"{index:02d}-{identifier}.mp3"
         sidecar = out / f"{index:02d}-{identifier}.cache.json"
+        aligned = out / f"{index:02d}-{identifier}.alignment.json"
+        marks = beat.get("marks") or {}
         key = cache_key(speech, tts)
         reuse = (
             identifier not in forced
             and "all" not in forced
             and audio.is_file()
             and cached_key(sidecar) == key
+            and (not marks or cached_key(aligned) == key)
         )
         if reuse:
             print(f"reused {audio.name}")
         else:
-            audio.write_bytes(synthesize_elevenlabs(speech, tts["elevenLabs"]))
+            data, alignment = synthesize_elevenlabs(speech, tts["elevenLabs"])
+            audio.write_bytes(data)
+            aligned.write_text(json.dumps({"cacheKey": key, **alignment}) + "\n", encoding="utf-8")
             sidecar.write_text(
                 json.dumps({"cacheKey": key, "provider": "elevenlabs"}, indent=2) + "\n",
                 encoding="utf-8",
@@ -325,10 +377,17 @@ def main() -> None:
         if seconds < 3 or seconds > 40:
             raise SystemExit(f"beat audio duration is unsafe: {identifier} {seconds:.3f}s")
         hold = beat_hold(identifier, seconds, beat.get("fixed_hold_seconds"))
-        parts = sentences(caption)
+        alignment = json.loads(aligned.read_text(encoding="utf-8")) if aligned.is_file() else None
+        if alignment is not None and alignment.get("cacheKey") != key:
+            alignment = None
+        marked = mark_times(identifier, speech, marks, alignment)
+        caption_cues = beat.get("caption_cues") or [[part, None] for part in sentences(caption)]
+        if " ".join(str(cue[0]) for cue in caption_cues) != caption:
+            raise SystemExit(f"beat {identifier}: its caption cues do not join to its caption text")
         sentence_starts = []
-        for sentence, (begin, finish) in zip(parts, cue_bounds(parts, seconds, pauses(audio))):
-            cues.append((offset + begin, offset + finish, wrapped(sentence)))
+        bounds = caption_bounds(identifier, caption_cues, seconds, pauses(audio), marked)
+        for cue, (begin, finish) in zip(caption_cues, bounds):
+            cues.append((offset + begin, offset + finish, wrapped(str(cue[0]))))
             sentence_starts.append(round(begin, 3))
         timing.append(
             {
@@ -340,12 +399,17 @@ def main() -> None:
                 "startSeconds": round(offset, 3),
                 "speechCharacters": len(speech),
                 "sentenceStartsSeconds": sentence_starts,
+                "marksSeconds": marked,
             }
         )
         window = beat.get("footage_window_seconds")
         if window is not None:
-            # Where in the footage this beat plays; the compose cuts the clip from it.
+            # Where in the footage this beat plays, and which static frames it holds;
+            # the compose cuts the clip from them.
             timing[-1]["footageWindowSeconds"] = [float(window[0]), float(window[1])]
+            timing[-1]["footageHoldsSeconds"] = [
+                [float(at), float(held)] for at, held in beat.get("footage_holds_seconds") or []
+            ]
         offset += hold
     if not 90 <= offset < 175:
         raise SystemExit(f"narration must be 90-174 seconds, observed {offset:.3f}")

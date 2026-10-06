@@ -7,11 +7,17 @@ is the same journey logic in Python against a local server:
 
   * the server's own ``/health`` must report ``MERCURY_RELEASE_SHA`` before anything
     is recorded, so the commit on the title card is the commit that answered;
-  * Chromium records at 1920x1080, the size the Fire TV WebView renders;
+  * the take is desktop Chromium at 1920x1080 CSS pixels, the desktop layout; the
+    Fire TV WebView lays the same page out at 960x540 CSS pixels at a device scale
+    factor of 2 (``VIEWPORTS`` says why the take does not use that layout);
   * every key is sent through ``window.navigateDpad``, the bridge the Leanback
     ``MainActivity`` calls, never a mouse click;
   * the timeline starts only after all five board rows show a verdict from the
     server, and each beat is held for its measured length from ``timing.json``;
+  * a key whose effect the narration names is pressed on the spoken word: at a
+    mark read off the voice's alignment (``marksSeconds`` in ``timing.json``) or just
+    before the caption that names its result, so no caption or word runs ahead of
+    the picture;
   * every press checks which control took focus, and every answer is awaited from
     the server, so a journey that drifts from the narration aborts instead of being
     filmed. Nothing on screen is staged or edited; waiting is real waiting. The one
@@ -25,7 +31,7 @@ beat, and ``video/build-video.py`` puts the footage in front of the desktop capt
 
 Run from the repository root, with the server already running:
 
-    MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8803
+    MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8875
     MERCURY_VIDEO_ROOT=/path/outside/git MERCURY_RELEASE_SHA=$(git rev-parse HEAD) \\
         python video/capture-local.py
 
@@ -44,6 +50,25 @@ import time
 import urllib.request
 
 TRAILING_HOLD_SECONDS = 2.5
+#: The two layouts this script can record. ``tv`` is the Fire TV WebView's: a 1080p
+#: Fire TV reports a 960x540 CSS viewport at two device pixels per CSS pixel, and the
+#: Leanback app injects ``MercuryHost`` before the page runs, which turns on
+#: ``html.tv-host`` and the remote's key bar. The emulator footage shows the same
+#: layout. ``desktop`` is a desktop browser at 1920x1080 CSS, the 2026-10-01 take.
+#: Both are recorded into a 1920x1080 file.
+#:
+#: The take uses ``desktop``. A rehearsal at ``tv`` on 2026-10-06 passed the whole
+#: journey unchanged (every press, focus and answer), but headless Chromium films CSS
+#: pixels, not device pixels: Playwright's recorder and a raw CDP screencast both
+#: return 960x540 frames at a device scale factor of 2, so the TV layout would reach
+#: the video as a 960x540 picture upscaled, with half the detail of the desktop take.
+VIEWPORTS = {
+    "tv": {"width": 960, "height": 540, "scale": 2, "host": True},
+    "desktop": {"width": 1920, "height": 1080, "scale": 1, "host": False},
+}
+DEFAULT_VIEWPORT = "desktop"
+#: What the Fire TV app injects (MainActivity.MercuryHost); the stub the browser tests use.
+HOST_STUB = "window.MercuryHost = { reportJourney: function () {} };"
 EMULATOR_SOURCE = "android_tv_emulator"
 #: The beats that play over emulator footage. They open the take; nothing is recorded
 #: for them here.
@@ -51,19 +76,20 @@ EMULATOR_SCENES = [
     "beat_01_tv_launch",
     "beat_02_tv_board",
     "beat_03_tv_stage",
-    "beat_04_tv_confirm_publish",
+    "beat_04_tv_confirm",
+    "beat_05_tv_publish",
 ]
 #: The beats this script records, in order.
 EXPECTED_SCENES = [
-    "beat_05_desktop_board",
-    "beat_06_board_on_load",
-    "beat_07_crowded_refusal",
-    "beat_08_named_with_odds",
-    "beat_09_provenance",
-    "beat_10_stage_to_evidence",
-    "beat_11_dpad",
-    "beat_12_fixtures",
-    "beat_13_build_check",
+    "beat_06_desktop_board",
+    "beat_07_board_on_load",
+    "beat_08_crowded_refusal",
+    "beat_09_named_with_odds",
+    "beat_10_provenance",
+    "beat_11_stage_to_evidence",
+    "beat_12_dpad",
+    "beat_13_fixtures",
+    "beat_14_build_check",
 ]
 
 FOCUSED = """() => { const c = window.mercuryNav && window.mercuryNav.current;
@@ -103,61 +129,84 @@ def text_appears(selector: str, needle: str) -> str:
 
 
 # Each beat: a list of (when, key, expected focus label or None, condition to await or None).
-# ``when`` is seconds into the beat, or ("sentence", n, extra) for n-th caption sentence start.
+# ``when`` is seconds into the beat; ("sentence", n, extra) for the n-th caption cue's
+# start plus ``extra``; or ("mark", name, extra) for a spoken mark from timing.json.
 JOURNEY: dict[str, list[tuple[object, str, str | None, str | None]]] = {
-    "beat_05_desktop_board": [],
-    "beat_06_board_on_load": [],
-    "beat_07_crowded_refusal": [
-        (0.3, "DOWN", "Ask about checkout-api", None),
-        (0.9, "DOWN", "Ask about payments worker", None),
-        (1.5, "DOWN", "Ask about search indexer", None),
-        (2.1, "DOWN", "Ask about release train", None),
-        (2.9, "SELECT", "Ask about release train", text_appears("#heroHeadline", "Cannot attribute")),
+    "beat_06_desktop_board": [],
+    "beat_07_board_on_load": [],
+    # The four Downs and Center land while "Down walks the rows" is spoken, so the
+    # verdict is on screen before the caption that describes it.
+    "beat_08_crowded_refusal": [
+        (0.2, "DOWN", "Ask about checkout-api", None),
+        (0.5, "DOWN", "Ask about payments worker", None),
+        (0.8, "DOWN", "Ask about search indexer", None),
+        (1.1, "DOWN", "Ask about release train", None),
+        (1.4, "SELECT", "Ask about release train", text_appears("#heroHeadline", "Cannot attribute")),
     ],
-    "beat_08_named_with_odds": [
-        (0.3, "UP", "Ask about search indexer", None),
-        (0.9, "UP", "Ask about payments worker", None),
-        (1.5, "UP", "Ask about checkout-api", None),
-        (2.2, "SELECT", "Ask about checkout-api", text_appears("#heroHeadline", "Commit")),
+    # The Ups and Center land under "On checkout-api", before the caption that says
+    # exactly one runtime change landed.
+    "beat_09_named_with_odds": [
+        (0.0, "UP", "Ask about search indexer", None),
+        (0.2, "UP", "Ask about payments worker", None),
+        (0.4, "UP", "Ask about checkout-api", None),
+        (0.6, "SELECT", "Ask about checkout-api", text_appears("#heroHeadline", "Commit")),
     ],
-    "beat_09_provenance": [],
+    "beat_10_provenance": [],
     # The stage, confirm and handoff presses of the 2026-10-01 take, in the same order
-    # with the same checks, now in one beat: the emulator footage has already shown
-    # them at a viewer's pace. The offsets follow the measured words: "right, center
-    # confirms" from 3.08 s, "Center publishes" at the second sentence, "Down" at the
-    # third.
-    "beat_10_stage_to_evidence": [
-        (0.0, "UP", "Ask what changed", None),
-        (0.6, "RIGHT", "Stage governed rollback", None),
-        (1.2, "SELECT", "Stage governed rollback", text_appears("#heroEyebrow", "Rollback staged")),
-        (3.1, "RIGHT", "Confirm rollback", None),
+    # with the same checks, each on the word that names it. Publish is pressed a
+    # quarter second before "Center publishes", because its answer takes that long to
+    # come up.
+    "beat_11_stage_to_evidence": [
+        (("mark", "up", 0.0), "UP", "Ask what changed", None),
+        (("mark", "stage_right", 0.0), "RIGHT", "Stage governed rollback", None),
+        (("mark", "stage_center", 0.0), "SELECT", "Stage governed rollback",
+         text_appears("#heroEyebrow", "Rollback staged")),
+        (("mark", "confirm_right", 0.0), "RIGHT", "Confirm rollback", None),
         # The payoff stays on the board: the large figure reads RECORDED, the page has
         # not scrolled, and Publish handoff is only the next stop (no ring yet).
-        (3.6, "SELECT", "Publish responder handoff", BOARD_RECORDED),
+        (("mark", "confirm_center", 0.0), "SELECT", "Publish responder handoff", BOARD_RECORDED),
         # The cursor stays on Publish and the handoff's answer comes up above the key bar.
-        (("sentence", 1, 0.0), "SELECT", "Publish responder handoff", text_appears("#handoffOutput", "Next step")),
-        (("sentence", 2, 0.0), "DOWN", "Incident evidence panel", None),
+        (("mark", "publish", -0.25), "SELECT", "Publish responder handoff",
+         text_appears("#handoffOutput", "Next step")),
+        (("mark", "down", 0.0), "DOWN", "Incident evidence panel", None),
     ],
-    "beat_11_dpad": [
+    "beat_12_dpad": [
         (0.8, "RIGHT", "Delivery velocity panel", None),
         (("sentence", 1, 0.0), "SELECT", "Load DORA velocity", text_appears("#doraOutput", "offline-fixture")),
     ],
     # An open panel holds the remote until BACK: DOWN at its foot scrolls the rest of
-    # the answer into view and the cursor stays on the panel's button.
-    "beat_12_fixtures": [
-        (0.2, "DOWN", "Load DORA velocity", None),
+    # the answer into view and the cursor stays on the panel's button. Cloud spend is
+    # opened before the caption that calls it synthetic.
+    "beat_13_fixtures": [
+        (0.0, "DOWN", "Load DORA velocity", None),
         (("sentence", 1, 0.0), "BACK", "Delivery velocity panel", None),
-        (("sentence", 2, 0.0), "RIGHT", "Cloud spend panel", None),
-        (("sentence", 2, 0.8), "SELECT", "Scan AWS spend", text_appears("#costOutput", "offline-fixture")),
+        (("sentence", 2, -0.8), "RIGHT", "Cloud spend panel", None),
+        (("sentence", 2, -0.4), "SELECT", "Scan AWS spend", text_appears("#costOutput", "offline-fixture")),
         (("sentence", 2, 2.0), "BACK", "Cloud spend panel", None),
     ],
-    "beat_13_build_check": [
-        (0.2, "DOWN", "How it answers panel", None),
-        (0.6, "DOWN", "Check connection", None),
-        (1.0, "SELECT", "Check connection",
+    "beat_14_build_check": [
+        (("mark", "down", 0.0), "DOWN", "How it answers panel", None),
+        (("mark", "down_again", 0.0), "DOWN", "Check connection", None),
+        (("mark", "center", 0.0), "SELECT", "Check connection",
          r"() => /^GET \/health returned 200[^\n]*Build/.test(document.getElementById('connDetail').textContent)"),
     ],
 }
+
+
+def planned_offset(scene: dict[str, object], when: object) -> float:
+    """Seconds into the beat at which a press is planned."""
+    if not isinstance(when, tuple):
+        return float(when)
+    kind, anchor, extra = when
+    if kind == "sentence":
+        starts = scene.get("sentenceStartsSeconds") or [0.0]
+        return float(starts[int(anchor)]) + float(extra)
+    if kind == "mark":
+        marks = scene.get("marksSeconds") or {}
+        if anchor not in marks:
+            raise SystemExit(f"{scene['id']} has no spoken mark {anchor!r} in timing.json")
+        return float(marks[anchor]) + float(extra)
+    raise SystemExit(f"unknown press anchor {kind!r}")
 
 
 def desktop_scenes(scenes: list[dict[str, object]]) -> tuple[list[dict[str, object]], float]:
@@ -191,6 +240,10 @@ def main() -> None:
     release_sha = os.environ["MERCURY_RELEASE_SHA"]
     base_url = os.environ.get("MERCURY_CAPTURE_URL", "http://127.0.0.1:8803/")
     capture = root / "capture"
+    viewport = os.environ.get("MERCURY_CAPTURE_VIEWPORT", DEFAULT_VIEWPORT)
+    if viewport not in VIEWPORTS:
+        raise SystemExit(f"MERCURY_CAPTURE_VIEWPORT must be one of {sorted(VIEWPORTS)}")
+    layout = VIEWPORTS[viewport]
     timing = json.loads((root / "narration" / "timing.json").read_text(encoding="utf-8"))
     scenes, desktop_start = desktop_scenes(timing["scenes"])
     served = health(base_url)
@@ -209,22 +262,27 @@ def main() -> None:
     errors: list[str] = []
     log: list[dict[str, object]] = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=["--force-device-scale-factor=1"])
+        browser = playwright.chromium.launch(args=[f"--force-device-scale-factor={layout['scale']}"])
         # Reduced motion, so the headline's split-flap animation renders
         # instantly: frames taken mid-flip show scrambled glyphs.
         context = browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            device_scale_factor=1,
+            viewport={"width": layout["width"], "height": layout["height"]},
+            device_scale_factor=layout["scale"],
             record_video_dir=str(capture / "raw"),
             record_video_size={"width": 1920, "height": 1080},
             reduced_motion="reduce",
         )
+        if layout["host"]:
+            context.add_init_script(HOST_STUB)
         page = context.new_page()
         created = time.monotonic()
         page.on("pageerror", lambda error: errors.append(f"page:{error}"))
         page.on("console", lambda message: errors.append(f"console:{message.text}") if message.type == "error" else None)
         page.goto(base_url, wait_until="networkidle", timeout=60_000)
         page.wait_for_function(ROWS_ANSWERED, timeout=30_000)
+        tv_host = page.evaluate("() => document.documentElement.classList.contains('tv-host')")
+        if tv_host != layout["host"]:
+            raise SystemExit(f"html.tv-host is {tv_host}, expected {layout['host']} for the {viewport} layout")
         if page.evaluate(FOCUSED) != "Ask what changed":
             raise SystemExit("the page did not start with focus on Ask what changed")
         page.wait_for_timeout(1000)
@@ -244,14 +302,9 @@ def main() -> None:
         for scene in scenes:
             start = timeline + float(scene["startSeconds"]) - desktop_start
             end = start + float(scene["holdSeconds"])
-            starts = scene.get("sentenceStartsSeconds") or [0.0]
             entry: dict[str, object] = {"id": scene["id"], "lateStartSeconds": round(time.monotonic() - start, 3), "actions": []}
             for when, key, expected, condition in JOURNEY[scene["id"]]:
-                if isinstance(when, tuple):
-                    _, sentence, extra = when
-                    offset = float(starts[sentence]) + float(extra)
-                else:
-                    offset = float(when)
+                offset = planned_offset(scene, when)
                 target = start + offset
                 wait = target - time.monotonic()
                 if wait > 0:
@@ -291,7 +344,11 @@ def main() -> None:
         "releaseSha": release_sha,
         "server": {key: served.get(key) for key in ("build_sha", "rollback_dispatch", "github_live", "dpad_demo_approval")},
         "url": base_url,
-        "viewport": "1920x1080",
+        "viewport": viewport,
+        "cssViewport": f"{layout['width']}x{layout['height']}",
+        "deviceScaleFactor": layout["scale"],
+        "tvHost": layout["host"],
+        "recordedSize": "1920x1080",
         "input": "window.navigateDpad",
         "sceneCount": len(scenes),
         "trimLeadSeconds": round(timeline - created, 3),
