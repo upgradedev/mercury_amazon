@@ -85,6 +85,12 @@ jobs:
         # split block and the delay-ceiling sensitivity rows.
         run: python scripts/attribution_split.py --check
 
+      - name: Naive attribution baselines agree with the recorded summary
+        # docs/EVIDENCE.md compares the shipped engine with blame-the-latest-deploy and
+        # blame-every-deploy-in-the-window on the same held-out cases. This proves
+        # attribution_baselines_summary.json is what the committed rules produce there.
+        run: python scripts/naive_attribution_baselines.py --check
+
       - name: Train-split tuning record agrees with a fresh sweep
         # A test pins the shipped engine to attribution_tuning_summary.json, so the
         # record itself is re-derived here rather than trusted.
