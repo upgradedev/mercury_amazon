@@ -393,8 +393,8 @@ BEATS = [
 ]
 
 STATUS = (
-    "RENDERED LOCALLY, NOT UPLOADED. This plan is for the next take. Its content opens on "
-    "Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on "
+    "RENDERED LOCALLY, NOT UPLOADED. This plan is the 2026-10-06 take, rendered at "
+    "48010c9. Its content opens on Android TV emulator footage from CI run 37475795991: the debug APK built at f423ba5 on "
     "an AOSP Android TV emulator, Android 14 / API 34, loading the public demo (build "
     "ea2cff5, record-only), at 1x, with two holds of a static frame. That is footage, not a "
     "Fire TV device and not a runtime receipt; the Android TV emulator runtime receipt is a "

@@ -1,14 +1,19 @@
 # Demo video
 
-**Status: rendered locally, not uploaded.** The last render is the 2026-10-01 take at
-`9620743` (table below). The next take opens on the Android TV
-emulator footage from CI; its plan and narration are below. Nothing has a public link
-until the owner uploads it, and nothing in this directory is the video itself.
+**Status: rendered locally, not uploaded.** The last render is the 2026-10-06 take at
+`48010c9`, which opens on the Android TV emulator footage from CI. Nothing has a public
+link until the owner uploads it, and nothing in this directory is the video itself.
 
-## The next take: emulator footage first
+## The 2026-10-06 take: emulator footage first
 
 | Item | Value |
 |---|---|
+| Recorded commit | `48010c9e4014d2cbe9124113e589a0736bd98584`, reported by the local server's own `/health` during the take; the board's Check line reads Build 48010c9 |
+| File | `mercury-demo.mp4`, in the workspace folder `reviews/videos_20261006/mercury_amazon/output/`, outside git |
+| Length | 170.852 s (ffprobe format duration), 1920x1080, 25 fps, AAC 48 kHz, -16.4 LUFS integrated (ffmpeg ebur128) |
+| SHA-256 | `6d8c0d457fa77dd49160e7c65cf52dc9ba630f5a2718a1c7bcf55b17b51690da` |
+| Sync gate | `scripts/verify_video_sync.py`, unchanged: all checks passed (`sync-gate.txt` beside the mp4) |
+| Capture | desktop Chromium at 1920x1080 CSS, every press on plan, no page errors (`capture/capture-receipt.json`) |
 | Plan | `scripts/build_video_plan.py`, which writes `narration.json` and `cue_sheet.json`; `SHOT_LIST.md` lists the beats and every frame of the footage |
 | Content | 163.852 s in 14 beats: 31.36 s of emulator footage in 5 beats (27.32 s played at 1x, 4.04 s of held static frames), then 132.492 s of desktop take in 9 beats |
 | Planned length | 170.852 s with the 4 s title card and the 3 s closing card; the gate allows under 175 s |
@@ -148,7 +153,13 @@ reuses every beat whose words have not changed and calls ElevenLabs for none of 
 The capture skips the five emulator beats: its timeline starts at the first desktop
 beat, and its receipt records that start as `narrationStartSeconds`.
 
-## The last render: the 2026-10-01 take
+After the compose, frames of the finished file were taken by frame number at every
+caption cue that names a value or a press, and half a second later. Each named value
+was on screen by then: 12.9x, Rollback staged, RECORDED, the handoff, SHARED REVISION
+13, the release-train and checkout-api verdicts, the evidence sentence, SYNTHETIC and
+the build line. The black caption leaves before the board first shows.
+
+## The previous render: the 2026-10-01 take
 
 | Item | Value |
 |---|---|
@@ -161,12 +172,12 @@ beat, and its receipt records that start as `narrationStartSeconds`.
 | Sync gate | `scripts/verify_video_sync.py`: all checks passed |
 
 It predates the emulator footage: its picture is the desktop capture from the first beat
-to the last, and its closing beat said so. The next take replaces it. Next to the mp4 sit
+to the last, and its closing beat said so. The 2026-10-06 take replaces it. Next to the mp4 sit
 `video-receipt.json`, `captions.en.srt`, `sync-gate.txt` and the gate's two inputs. The
 per-beat audio, `timing.json` and the capture with its own receipt are in the sibling
 `narration/` and `capture/` folders.
 
-Its desktop journey is the one the next take keeps:
+Its desktop journey is the one the 2026-10-06 take keeps:
 
 * One continuous take of the page served by
   `MERCURY_OFFLINE=1 python -m uvicorn src.interfaces.mcp_server:app --port 8873`,
@@ -186,7 +197,7 @@ Its desktop journey is the one the next take keeps:
   change, and release-train reads 5 runtime changes landed.
 * The held-out figures are the ones the board and the README print: 90.0% refusals, and
   50.0% precision over 58 namings if a fault shows within 75 minutes. They are unchanged
-  at the current master, and the next take speaks the same two.
+  at the current master, and the 2026-10-06 take speaks the same two.
 * The product makes no sound. The narration carries the story; Read aloud stays off.
 * The picture is shown at 87.5% so the captions sit in a band under it and never cover
   the board. The page itself was captured at full 1920x1080.
