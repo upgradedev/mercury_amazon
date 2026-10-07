@@ -9,7 +9,9 @@
 # Mercury tile, each one chosen from a uiautomator dump (scripts/android_tv_tile_focus.py),
 # then Center once the dump shows that the focused node names Mercury. If the tile is not
 # focused within FOOTAGE_MAX_DPAD_PRESSES presses, or Center does not start Mercury, the
-# script falls back to 'am start' and says so in timeline.tsv and footage-provenance.json.
+# script falls back to 'am start' and says so in timeline.tsv and footage-provenance.json,
+# then exits non-zero unless FOOTAGE_REQUIRE_DPAD=0: footage of the fallback does not show
+# the launch a viewer makes, so it must not pass as if it did.
 # screenrecord is the primary capture; a 1 fps screencap sequence is the fallback,
 # because the emulator's software GPU can break screenrecord.
 set -euo pipefail
@@ -22,6 +24,7 @@ pace="${FOOTAGE_PACE_SECONDS:-3}"
 # is held for the full pace before Center.
 nav_pace="$(awk -v p="$pace" 'BEGIN { printf "%.2f", p / 2 }')"
 max_presses="${FOOTAGE_MAX_DPAD_PRESSES:-20}"
+require_dpad="${FOOTAGE_REQUIRE_DPAD:-1}"
 package="io.github.upgradedev.mercury.wallboard"
 mkdir -p "$out/frames" "$out/ui"
 
@@ -42,27 +45,39 @@ current_pid() {
   adb shell pidof "$package" 2>/dev/null | tr -d '\r' || true
 }
 
+# A new process means the system killed Mercury and something started it again
+# (run 37573814194: Play services restarted itself and took Mercury with it, then
+# the journey's own Right and Center relaunched it from the launcher).
+check_same_process() {
+  local context="$1"
+  local now
+  now="$(current_pid)"
+  if [[ -z "$now" ]]; then
+    echo "Mercury process exited $context" >&2
+    return 1
+  fi
+  if [[ "$now" != "$mercury_pid" ]]; then
+    echo "Mercury was restarted (pid $mercury_pid, now $now) $context" >&2
+    adb logcat -d 2>/dev/null | grep -E "Killing [0-9]+:$package|has died" > "$out/mercury-killed.txt" || true
+    return 1
+  fi
+}
+
 wait_for_event() {
   local event="$1"
   local deadline=$((SECONDS + 120))
-  local now
+  if [[ -z "$mercury_pid" ]]; then
+    echo "No Mercury process to wait on for event: $event" >&2
+    return 1
+  fi
   while (( SECONDS < deadline )); do
-    if adb logcat -d -s MercuryCockpit:I '*:S' 2>/dev/null | grep -Fq "$event"; then
+    # Only lines from the process the journey launched count, so a restarted process
+    # that logs the same event cannot satisfy the wait.
+    if adb logcat -d --pid="$mercury_pid" -s MercuryCockpit:I '*:S' 2>/dev/null | grep -Fq "$event"; then
+      check_same_process "after event: $event" || return 1
       return 0
     fi
-    now="$(current_pid)"
-    if [[ -z "$now" ]]; then
-      echo "Mercury process exited before event: $event" >&2
-      return 1
-    fi
-    # A new process means the system killed Mercury and something started it again
-    # (run 37573814194: Play services restarted itself and took Mercury with it, then
-    # the journey's own Right and Center relaunched it from the launcher).
-    if [[ -n "$mercury_pid" && "$now" != "$mercury_pid" ]]; then
-      echo "Mercury was restarted (pid $mercury_pid, now $now) before event: $event" >&2
-      adb logcat -d 2>/dev/null | grep -E "Killing [0-9]+:$package|has died" > "$out/mercury-killed.txt" || true
-      return 1
-    fi
+    check_same_process "before event: $event" || return 1
     sleep 1
   done
   echo "Timed out waiting for event: $event" >&2
@@ -131,7 +146,8 @@ adb shell am force-stop "$package"
 # After a cold boot Play services can restart itself once, and the system then kills
 # every app using its font provider, Mercury's WebView included (run 37573814194).
 # Wait until com.google.android.gms.persistent has kept one pid for 90 s, at most 300 s,
-# before recording; the outcome goes to play-services-settle.txt.
+# before recording; the outcome goes to play-services-settle.txt. If it has not settled
+# by then, the script stops here instead of filming a journey a restart could cut short.
 settle_deadline=$((SECONDS + 300))
 settle_pid=""
 settle_since=$SECONDS
@@ -153,6 +169,10 @@ while (( SECONDS < settle_deadline )); do
   sleep 5
 done
 echo "Play services: $settle_note" | tee "$out/play-services-settle.txt"
+if [[ "$settle_note" == "did not settle within 300 s" ]]; then
+  echo "Play services did not keep one pid for 90 s within 300 s, so the journey is not recorded" >&2
+  exit 1
+fi
 # Give the launcher time to add the new tile before going home.
 sleep 5
 adb shell input keyevent KEYCODE_HOME
@@ -241,7 +261,7 @@ launch_path="am_start_fallback"
 if [[ -n "$focused_label" ]]; then
   mark "focus on the Mercury tile: $focused_label"
   sleep "$pace"
-  mark "launch Mercury from the Leanback launcher"
+  mark "press Center on the Mercury tile"
   press KEYCODE_DPAD_CENTER
   presses=$((presses + 1))
   # wait_for_event gives up as soon as Mercury has no process, so wait for the
@@ -255,6 +275,7 @@ if [[ -n "$focused_label" ]]; then
     sleep 1
   done
   if [[ "$launch_path" == "dpad" ]]; then
+    mark "Mercury resumed after Center on its tile"
     mercury_pid="$(current_pid)"
     {
       echo "Launched by KEYCODE_DPAD_CENTER on the focused tile: $focused_label"
@@ -270,7 +291,7 @@ if [[ "$launch_path" == "dpad" ]]; then
 else
   launch_detail="$fallback_reason"
   mark "launch path: am start fallback ($launch_detail)"
-  mark "launch Mercury from the Leanback launcher"
+  mark "launch Mercury by am start (fallback)"
   adb shell am start -W \
     -a android.intent.action.MAIN \
     -c android.intent.category.LEANBACK_LAUNCHER \
@@ -304,6 +325,9 @@ wait_for_event "journey:handoff_published:checkout-api-active:"
 mark "responder handoff published"
 sleep "$pace"
 sleep "$pace"
+# The handoff hold is filmed too, so a restart during it must fail the run.
+check_same_process "during the final handoff hold"
+mark "Mercury pid $mercury_pid unchanged to the end of the journey"
 
 stop_recording
 trap - EXIT
@@ -348,3 +372,8 @@ provenance = {
 (out / "footage-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(provenance, indent=2))
 PY
+
+if [[ "$launch_path" != "dpad" && "$require_dpad" != "0" ]]; then
+  echo "Mercury was not opened by D-pad ($launch_detail). FOOTAGE_REQUIRE_DPAD=0 accepts the fallback." >&2
+  exit 1
+fi

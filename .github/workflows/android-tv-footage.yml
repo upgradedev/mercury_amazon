@@ -253,6 +253,29 @@ jobs:
               -vf "scale=1920:-2,format=yuv420p" -c:v libx264 -r 25 frames-1fps.mp4
           fi
           ls -la
+      - name: Print the footage frame table
+        # One row per screenrecord frame, read by index (the file is variable frame
+        # rate): index, time, mean luma, and mean difference from the previous frame.
+        # A reviewer can then check the cut points in the job log without the artifact.
+        if: always()
+        shell: bash
+        run: |
+          cd build/android-tv-footage 2>/dev/null || exit 0
+          for f in timeline.tsv ui/decisions.tsv launcher.txt play-services-settle.txt; do
+            [ -f "$f" ] && { echo "== $f"; cat "$f"; }
+          done
+          [ -s journey.mp4 ] || { echo "no journey.mp4"; exit 0; }
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+          ffmpeg -hide_banner -loglevel error -i journey.mp4 -fps_mode passthrough \
+            -vf "signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=luma.txt" -f null -
+          ffmpeg -hide_banner -loglevel error -i journey.mp4 -fps_mode passthrough \
+            -vf "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=diff.txt" -f null -
+          echo "== frame table (index, pts_time, YAVG, diff from previous)"
+          paste <(grep -o 'pts_time:[0-9.]*' luma.txt | cut -d: -f2) \
+                <(grep -o 'YAVG=[0-9.e+-]*' luma.txt | cut -d= -f2) \
+                <( (echo -; grep -o 'YAVG=[0-9.e+-]*' diff.txt | cut -d= -f2) ) \
+            | awk -F'\t' 'NF >= 2 && $1 != "" { printf "frame\t%d\t%s\t%s\t%s\n", NR - 1, $1, $2, $3 }'
+          rm -f luma.txt diff.txt
       - name: Upload the footage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

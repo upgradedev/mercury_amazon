@@ -208,37 +208,55 @@ both.
 A judge review of the take at `f7512bf` found that the footage never shows Mercury
 being opened from the Leanback home screen. `scripts/android_tv_footage.sh` started it
 with `am start` of the `LEANBACK_LAUNCHER` intent, and the cut starts on the loaded
-board. The script now opens it the way a viewer would, with the key codes a TV remote
-emits:
+board. The footage script now opens it the way a viewer would, with the key codes a TV
+remote emits. This changes the CI footage only. The shipped take is not re-cut yet (see
+the end of this section), so a judge watching it still sees the board without the launch.
 
 * After the install it waits until Play services has kept one process for 90 s (at
   most 300 s, the outcome in `play-services-settle.txt`). After a cold boot Play
   services can restart itself once, and the system then kills Mercury, whose WebView
   uses its font provider: that is what failed run 37573814194, after the D-pad launch
-  had worked. If Mercury's process still changes during the journey, the script stops
-  and says so instead of filming a relaunched app. Then it waits 5 s, presses Home,
-  and records the home activity (`home-activity.txt`).
+  had worked. If Play services has not settled within 300 s, the script fails before it
+  records anything. Then it waits 5 s, presses Home, and records the home activity
+  (`home-activity.txt`).
 * It takes a `uiautomator dump` and `scripts/android_tv_tile_focus.py` reads it. The
   helper finds the focused node and the node whose label contains "Mercury" (the app
   label is "Mercury Incident Board"), and returns the D-pad key that moves focus
   towards the tile: Up or Down until the rows overlap, then Left or Right. When no tile
   names Mercury, it moves to the launcher's Apps entry and opens it with Center, or
   sweeps along the rows. Each move is followed by half of `FOOTAGE_PACE_SECONDS`, then
-  the next dump.
-* Once a dump shows that the focused node, or a node inside it, names Mercury, the
-  script holds that frame for `FOOTAGE_PACE_SECONDS` and presses `KEYCODE_DPAD_CENTER`.
-  It then waits up to 30 s for Mercury's activity to be resumed before it waits for
-  the page, and writes the resumed-activity line to `launcher.txt`.
+  the next dump. It reports focus only when the focused node lies inside a tile-sized
+  box around the matching label, and it reports that label.
+* Once a dump shows focus on the Mercury tile, the script holds that frame for
+  `FOOTAGE_PACE_SECONDS`, writes `press Center on the Mercury tile` and presses
+  `KEYCODE_DPAD_CENTER`. It then waits up to 30 s for Mercury's activity to be resumed,
+  and only then writes `Mercury resumed after Center on its tile` and the
+  resumed-activity line to `launcher.txt`.
 * The walk is bounded: at most `FOOTAGE_MAX_DPAD_PRESSES` presses (default 20) and
   75 s. If the tile is not focused within that bound, or Center does not start Mercury,
-  the script falls back to `am start` as before. It does not hide the fallback.
+  the script falls back to `am start`, writes `launch Mercury by am start (fallback)`,
+  finishes the journey and the provenance file, and then exits non-zero, so the workflow
+  fails. `FOOTAGE_REQUIRE_DPAD=0` accepts the fallback on purpose.
+* Mercury's process is pinned from the launch. Every awaited event is read with
+  `logcat --pid` for that process only, the pid is compared again after each event, and
+  once more after the final handoff hold, before the recording stops. A restarted app,
+  at any point of the filmed journey, fails the run and names both pids. The last
+  timeline row, `Mercury pid N unchanged to the end of the journey`, records the check.
 
 Which path was used is recorded twice. `timeline.tsv` gets a row
 `launch path: dpad (...)` or `launch path: am start fallback (<reason>)`, and
 `footage-provenance.json` gets `launch_path` (`dpad` or `am_start_fallback`),
 `launch_presses`, `launch_detail` and `home_activity`. Every dump is kept as
 `ui/NN.xml`, with each decision in `ui/decisions.tsv`. The rest of the journey (the
-opening answer, then Stage, Confirm and Publish) is unchanged.
+opening answer, then Stage, Confirm and Publish) is unchanged. The workflow also prints
+one row per screenrecord frame to its log (index, time, mean luma, mean difference from
+the previous frame), so the cut points can be checked without the artifact.
+
+The figures below were read by frame index: ffprobe's frame times, then
+`select=eq(n\,I)` with `-fps_mode passthrough`, and `signalstats` for the mean luma
+(YAVG) of each frame and of its difference from the previous one. A difference under
+0.1 gray levels is invisible. The runs before this change wrote the older label
+`launch Mercury from the Leanback launcher` before Center.
 
 The first run of this script, CI run
 [37572841698](https://github.com/upgradedev/mercury_amazon/actions/runs/37572841698)
@@ -246,30 +264,57 @@ The first run of this script, CI run
 Its home activity was `com.google.android.tvlauncher/.MainActivity`. The dumps chose
 Up to the Home tab, Right to the Apps tab, then Down twice, from Live TV onto the tile
 labelled "Mercury Incident Board": 4 moves, then Center, so `launch_presses` is 5. Its
-`journey.mp4` has 81 variable-rate frames in 57.34 s, read by index with ffprobe and
-`select=eq(n\,I)`. Frame 32 (16.05 s) has focus on Live TV in the Apps tab. Frame 33
-(21.00 s) has focus on the Mercury tile, with its label shown. The launcher answers
-Center at frame 39 (28.81 s), the screen is black from frame 45 (32.86 s) while
-Mercury starts, and the board is drawn by frame 50 (33.19 s). The rest of the journey
-follows as before and ends with the shared handoff. The focused tile is on screen for
-7.8 s, not the 3 s pace: the half pace after the last move and the dump that confirms
-focus come before it.
+`journey.mp4` has 81 variable-rate frames in 57.34 s:
+
+* frame 32 (16.05 s): focus on Live TV in the Apps tab;
+* frames 33 to 38 (21.00 s to 21.35 s): focus moves onto the Mercury tile, with its
+  label shown;
+* frame 39 (28.81 s): written when Center was pressed, but it differs from frame 38 by
+  0.04 gray levels, so nothing visible answers the press;
+* frames 45 to 50 (32.86 s to 33.19 s): black, YAVG 16, while Mercury starts;
+* frame 51 (38.32 s): the first board frame, already at its final scale (it differs by
+  0.12 gray levels from the settled board of the third run, frame 53). The black lasts
+  5.5 s.
 
 The second run, 37573814194, launched Mercury the same way and then failed: Play
 services restarted itself and the system killed Mercury with it (above). The third run,
 CI run [37575030928](https://github.com/upgradedev/mercury_amazon/actions/runs/37575030928)
 (merge commit `1c32462`, branch head `7a8c7dc`), waited for Play services first
 ("pid 3147 unchanged for 90 s") and passed. It took the same 5 presses. Its
-`journey.mp4` has 84 frames in 55.65 s. Frame 35 (15.96 s) has focus on Live TV, frame
-36 (20.26 s) has focus on the Mercury tile with its label shown, the launcher answers
-Center at frame 42 (27.69 s), the screen is black from frame 45 (30.13 s), and the
-board is drawn at frame 52 (34.93 s). The journey ends with the shared handoff at
-frame 83 (55.42 s).
+`journey.mp4` has 84 frames in 55.65 s:
+
+* frame 0: the home screen;
+* frame 35 (15.96 s): focus on Live TV;
+* frames 36 to 41 (20.26 s to 20.61 s): focus moves onto the Mercury tile, label shown;
+* frame 42 (27.69 s): written when Center was pressed, 0.05 gray levels from frame 41,
+  so again nothing visible answers the press;
+* frames 45 to 51 (30.13 s to 30.95 s): black, YAVG 16; the black lasts 4.8 s;
+* frame 52 (34.93 s): the board's first paint, at the wrong scale, zoomed and cropped
+  (YAVG 43.2);
+* frame 53 (35.75 s): the board at its final scale (YAVG 37.8);
+* frame 83 (55.42 s): the shared handoff.
+
+The focused tile stays on screen until the black: 11.9 s in the first run (21.00 s to
+32.86 s) and 9.9 s in the third (20.26 s to 30.13 s), not the 3 s pace. The half pace
+after the last move, the dump that confirms focus, the pace hold and Mercury's own
+start all come before the screen changes.
 
 The take at `f7512bf` still uses the footage of run 37475795991, which was launched
-with `am start`. `FOOTAGE_CUTS`, `FOOTAGE_HOLDS` and the expected provenance in
-`scripts/build_video_plan.py` belong to that footage and are unchanged. A take that
-shows the D-pad launch needs those cut again against a new footage run.
+with `am start`. `FOOTAGE_CUTS`, `FOOTAGE_HOLDS`, `FIRST_SHOWN_FRAME` and the expected
+provenance in `scripts/build_video_plan.py`, and its "CI launched the app by intent"
+lines, belong to that footage and are unchanged, because they are true of the take
+they describe. A take that shows the D-pad launch needs, against a passing footage run:
+
+* new `FOOTAGE_CUTS`, `FOOTAGE_HOLDS` and expected provenance, with `launch_path`
+  `dpad` checked;
+* the walk kept, then the tile hold trimmed to about the 3 s pace;
+* the black start cut down, and the board entered at its settled frame (frame 53 in
+  run 37575030928, not the zoomed first paint at frame 52);
+* a branded tile. Until the next J4 cycle, the banner the launcher shows for Mercury,
+  `app/src/main/res/drawable/firetv_banner.xml`, is a placeholder: a navy rectangle
+  with a plain blue box and no name or logo, and the D-pad footage keeps it on screen
+  for the whole tile hold. Changing it touches `app/`, which invalidates the J4 receipt,
+  so it is not part of this footage change.
 
 ### How the footage is cut
 

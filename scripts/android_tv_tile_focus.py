@@ -132,10 +132,13 @@ def decide(nodes: list[Node], target_text: str) -> tuple[str, str]:
         if small_focus and contains(focused, target):
             return "FOCUSED", target.label
     if targets:
-        box = min((focus_box(t) for t in targets), key=lambda n: n.area)
-        if contains(box, focused) and small_focus:
-            return "FOCUSED", targets[0].label
-        return direction(focused, box), "towards {!r} from {}".format(targets[0].label, signature)
+        # Keep each target with its own focus box, so the label reported is the one
+        # whose box was chosen, never another node that also matched.
+        box, target = min(((focus_box(t), t) for t in targets), key=lambda pair: pair[0].area)
+        small_box = box.area <= MAX_TILE_SHARE * screen
+        if small_focus and small_box and contains(box, focused):
+            return "FOCUSED", target.label
+        return direction(focused, box), "towards {!r} from {}".format(target.label, signature)
 
     entries = [n for n in nodes if n.label and APPS_ENTRY.match(n.label)]
     for entry in entries:
