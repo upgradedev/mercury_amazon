@@ -62,8 +62,8 @@ The sponsor product row passed on 2026-09-30: the candidate APK completed its no
 journey on the allowed Android TV Emulator twice, and the checked runtime receipt is landed.
 J4 went red twice on 2026-10-01 as the page moved under the receipt, and run 36922314984
 re-drove the journey against the current page. It is red again on 2026-10-07: the Check
-focus-ring fix moved docs/index.html after run 37464864870, and the next emulator receipt
-closes it. Details in P01-1 below.
+focus-ring fix moved docs/index.html and the branded Leanback banner moved app/ after run
+37464864870, and the next emulator receipt closes it. Details in P01-1 below.
 
 ## 3. Findings
 
@@ -72,7 +72,7 @@ A row that restates an older judgement says so and carries the older date.
 
 | ID | Lens | Finding | Verdict | Evidence |
 |---|---|---|---|---|
-| P01-1 | Sponsor product owner | The candidate has an automated Android TV install and D-pad journey. J4 was red until 2026-09-30, when emulator runs 36661614006 and 36669903334 produced content-addressed runtime receipts and J4 turned green; red again 2026-10-01, because the receipt predated the candidate-language page and docs/index.html invalidated it; run 36798893479 re-drove the journey against the new page and J4 turned green; red again the same day, because the hero-cause clamp moved docs/index.html after the receipt build; run 36922314984 re-drove the journey against the clamped page and J4 turned green again; run 37464864870 re-drove it against the PR #42 page and J4 stayed green; red again 2026-10-07, because the Check focus-ring fix moved docs/index.html after that receipt build. The official FAQ permits this emulator route and does not require physical hardware; the next emulator receipt closes this row | FAIL | `.github/workflows/android-tv-emulator.yml`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
+| P01-1 | Sponsor product owner | The candidate has an automated Android TV install and D-pad journey. J4 was red until 2026-09-30, when emulator runs 36661614006 and 36669903334 produced content-addressed runtime receipts and J4 turned green; red again 2026-10-01, because the receipt predated the candidate-language page and docs/index.html invalidated it; run 36798893479 re-drove the journey against the new page and J4 turned green; red again the same day, because the hero-cause clamp moved docs/index.html after the receipt build; run 36922314984 re-drove the journey against the clamped page and J4 turned green again; run 37464864870 re-drove it against the PR #42 page and J4 stayed green; red again 2026-10-07, because the Check focus-ring fix moved docs/index.html and the branded Leanback banner moved app/ after that receipt build. The official FAQ permits this emulator route and does not require physical hardware; the next emulator receipt closes this row | FAIL | `.github/workflows/android-tv-emulator.yml`, `python ci/readiness.py`, `tests/unit/test_readiness_gates.py`, `docs/FIRE_TV_BUILD.md` |
 | P01-2 | Sponsor product owner | The review of 2026-09-04 recorded that "Fire TV spatial navigation and Alexa voice query are load-bearing" for this entry. The Alexa half was never true of this repository. It does not survive restatement, and a test now fails the build if any document claims it | FAIL | `tests/e2e/test_documentation_claims.py` |
 | P01-3 | Sponsor product owner | What is load-bearing and does exist: the D-pad and the arrow keys are one focus code path, driven by the same spec on both inputs | PASS | `tests/e2e/spatial_nav_spec.js`, `tests/e2e/test_html_structure.py` |
 | P06-1 | UX designer | The hero action is marked and the layout carries responsive breakpoints, so the primary action is visible without reading. Gate H1 passes | PASS | `python ci/readiness.py`, `tests/e2e/test_html_structure.py` |
@@ -86,7 +86,7 @@ A row that restates an older judgement says so and carries the older date.
 | P08-5 | Recruiter | Second defect found by writing this file. The README's first-run timing figure did not reproduce for three independent readers. It is re-measured, the measurement is recorded by a script, and a test compares the README against it | FAIL | `python scripts/time_test_suite.py`, `suite_timing_summary.json`, `tests/e2e/test_documentation_claims.py` |
 | K-1 | Recruiter | Kill criteria. The 2026-09-04 record named a cost-radar burn-rate threshold as this entry's kill criterion. `tests/unit/test_cost_radar.py` holds one test and asserts no such threshold, so that row does not survive restatement either. The kill criteria this repository actually ships are the nine rollback refusals, each with a recorded failing input, which is what gate I5 counts | PASS | `python ci/readiness.py`, `tests/integration/test_rollback_authorization.py` |
 
-**4 of the 13 findings are failures** (P01-1 reopened when the Check focus-ring fix moved docs/index.html after run 37464864870), and two of those four were found by writing
+**4 of the 13 findings are failures** (P01-1 reopened when the Check focus-ring fix and the Leanback banner moved docs/index.html and app/ after run 37464864870), and two of those four were found by writing
 this document rather than by the review it restates. That is the argument for making
 the restatement a repository artifact instead of a workspace one. Those two counts are
 compared against this table by `tests/e2e/test_documentation_claims.py`, so they

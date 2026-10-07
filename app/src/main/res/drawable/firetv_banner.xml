@@ -1,13 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mercury's Leanback banner: the board's split-flap M mark and the MERCURY
+     wordmark in the board's colours (docs/index.html). The launcher shows the app
+     label, "Mercury Incident Board", under it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="320dp"
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
     <path
-        android:fillColor="#0f172a"
-        android:pathData="M0,0h320v180h-320z" />
+        android:fillColor="#0B0C0E"
+        android:pathData="M0,0 L320,0 L320,180 L0,180 Z" />
     <path
-        android:fillColor="#38bdf8"
-        android:pathData="M40,40h240v100h-240z" />
+        android:fillColor="#1D2025"
+        android:pathData="M18.8,56.4 L86,56.4 L86,88.8 L18.8,88.8 Z" />
+    <path
+        android:fillColor="#16181C"
+        android:pathData="M18.8,91.2 L86,91.2 L86,123.6 L18.8,123.6 Z" />
+    <path
+        android:strokeColor="#FFB23F"
+        android:strokeWidth="7.68"
+        android:strokeLineJoin="miter"
+        android:pathData="M34.4,109.2 L34.4,72 L52.4,92.4 L70.4,72 L70.4,109.2" />
+    <path
+        android:fillColor="#050506"
+        android:pathData="M18.8,88.08 L86,88.08 L86,91.92 L18.8,91.92 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M108,73 L113,73 L113,107 L108,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M126,73 L131,73 L131,107 L126,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M108,73 L114,73 L119.5,86 L125,73 L131,73 L121.5,95 L117.5,95 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M136,73 L141,73 L141,107 L136,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M136,73 L159,73 L159,78 L136,78 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M136,87.5 L155,87.5 L155,92.5 L136,92.5 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M136,102 L159,102 L159,107 L136,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M164,73 L169,73 L169,107 L164,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M164,73 L187,73 L187,78 L164,78 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M182,73 L187,73 L187,92 L182,92 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M164,87 L187,87 L187,92 L164,92 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M173,92 L179,92 L187,107 L181,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M192,73 L197,73 L197,107 L192,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M192,73 L215,73 L215,78 L192,78 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M192,102 L215,102 L215,107 L192,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M220,73 L225,73 L225,107 L220,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M238,73 L243,73 L243,107 L238,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M220,102 L243,102 L243,107 L220,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M248,73 L253,73 L253,107 L248,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M248,73 L271,73 L271,78 L248,78 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M266,73 L271,73 L271,92 L266,92 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M248,87 L271,87 L271,92 L248,92 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M257,92 L263,92 L271,107 L265,107 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M276,73 L282,73 L287.5,85 L293,73 L299,73 L290,93 L285,93 Z" />
+    <path
+        android:fillColor="#EEE7D8"
+        android:pathData="M285,91 L290,91 L290,107 L285,107 Z" />
 </vector>

@@ -1181,7 +1181,7 @@ python ci/readiness.py
 # SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
 ```
 
-**45/53 readiness gates** (46 with run 37464864870 at `ea2cff5`; the Check focus-ring fix moved `docs/index.html` after that receipt build, and the next emulator receipt restores it. It was 45 twice before for the same reason, while PR #42 had moved the file after run 36922314984's build and at `b99b154`, when the hero-cause clamp had moved it). J4 is
+**45/53 readiness gates** (46 with run 37464864870 at `ea2cff5`; the Check focus-ring fix moved `docs/index.html` and the branded Leanback banner moved `app/` after that receipt build, and the next emulator receipt restores it. It was 45 twice before for the same reason, while PR #42 had moved the file after run 36922314984's build and at `b99b154`, when the hero-cause clamp had moved it). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1197,8 +1197,9 @@ The file exists at the repository root; run 37464864870 wrote the current one fr
 build `ea2cff5`. On a checkout where a live runtime path changed after the receipt
 was written, the gate fails and names the stale file instead of passing on a
 journey the receipt never saw. This branch is that checkout: the fix that keeps the
-focus ring on Check clear of the CONNECTION heading moved `docs/index.html` after
-run 37464864870, so J4 is red naming the file until the next emulator receipt lands.
+focus ring on Check clear of the CONNECTION heading moved `docs/index.html`, and the
+branded Leanback banner moved `app/src/main/res/drawable/firetv_banner.xml`, after
+run 37464864870, so J4 is red naming those files until the next emulator receipt lands.
 That happened twice on 2026-10-01, first because `docs/index.html` carried the
 candidate language the 2026-09-30 receipt predated, and then because the hero-cause
 clamp moved the same file after run 36798893479, and a third time on 2026-10-06,
@@ -1239,7 +1240,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `ea2cff5`, the PR #42 head, since a 2026-10-06 code deploy the owner authorised before merge, so the emulator receipt could run against the exact build. The live zip was re-downloaded and its SHA-256 matched the local package, `/health` reported `ea2cff5`, record-only, and the runtime receipt's `endpoint_health_build_sha` records the same SHA. That deploy put PR #42's runtime changes live: the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause. Before it, `e0a857a` was served from the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved) to the 2026-10-06 deploy, and a re-probe on 2026-10-05 still reported it; `b99b154` was the code deploy before that (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. The commits after `ea2cff5` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD. The 2026-10-06 deploy's own probe record stays in the workspace outside git and the committed `deploy_teardown_receipt.json` was not refreshed, so G2 still fails; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `ea2cff5`, the PR #42 head, since a 2026-10-06 code deploy the owner authorised before merge, so the emulator receipt could run against the exact build. The live zip was re-downloaded and its SHA-256 matched the local package, `/health` reported `ea2cff5`, record-only, and the runtime receipt's `endpoint_health_build_sha` records the same SHA. That deploy put PR #42's runtime changes live: the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause. Before it, `e0a857a` was served from the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved) to the 2026-10-06 deploy, and a re-probe on 2026-10-05 still reported it; `b99b154` was the code deploy before that (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. Up to the Check focus-ring fix, the commits after `ea2cff5` touched only the runtime receipt, docs and tests. That fix changes `docs/index.html`, which the Lambda serves, so from it until the next deploy the live board lacks that one CSS rule and does not match HEAD. The 2026-10-06 deploy's own probe record stays in the workspace outside git and the committed `deploy_teardown_receipt.json` was not refreshed, so G2 still fails; see [Known limitations](#known-limitations).
 
 ---
 
