@@ -235,6 +235,21 @@ Which path was used is recorded twice. `timeline.tsv` gets a row
 `ui/NN.xml`, with each decision in `ui/decisions.tsv`. The rest of the journey (the
 opening answer, then Stage, Confirm and Publish) is unchanged.
 
+The first run of this script, CI run
+[37572841698](https://github.com/upgradedev/mercury_amazon/actions/runs/37572841698)
+(pull request merge commit `6cc72f8`, branch head `c2264fb`), took the D-pad path.
+Its home activity was `com.google.android.tvlauncher/.MainActivity`. The dumps chose
+Up to the Home tab, Right to the Apps tab, then Down twice, from Live TV onto the tile
+labelled "Mercury Incident Board": 4 moves, then Center, so `launch_presses` is 5. Its
+`journey.mp4` has 81 variable-rate frames in 57.34 s, read by index with ffprobe and
+`select=eq(n\,I)`. Frame 32 (16.05 s) has focus on Live TV in the Apps tab. Frame 33
+(21.00 s) has focus on the Mercury tile, with its label shown. The launcher answers
+Center at frame 39 (28.81 s), the screen is black from frame 45 (32.86 s) while
+Mercury starts, and the board is drawn by frame 50 (33.19 s). The rest of the journey
+follows as before and ends with the shared handoff. The focused tile is on screen for
+7.8 s, not the 3 s pace: the half pace after the last move and the dump that confirms
+focus come before it.
+
 The take at `f7512bf` still uses the footage of run 37475795991, which was launched
 with `am start`. `FOOTAGE_CUTS`, `FOOTAGE_HOLDS` and the expected provenance in
 `scripts/build_video_plan.py` belong to that footage and are unchanged. A take that
