@@ -462,6 +462,10 @@
     /* Connection controls: useful, never the first thing on a television. */
     .connection { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
     .connection .actions-bar { align-items: center; }
+    /* The kicker sits right above Check: leave room for the 8px focus ring (4px offset,
+       4px outline) plus a gap that scales with the type, so the ring never cuts
+       through the heading. */
+    .connection .section-kicker { margin-bottom: calc(8px + 0.4rem); }
     .setup-row {
       display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: var(--fs-small);
       background-color: var(--flap); border: 1px solid var(--rule);

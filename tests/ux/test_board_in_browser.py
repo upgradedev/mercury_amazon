@@ -116,14 +116,14 @@ def browser(sync_playwright):
 
 
 def open_board(browser, base_url, *, width=1920, height=1080, host=False, reduced_motion=None,
-               offline=False, init_script=None, routes=()):
+               offline=False, init_script=None, routes=(), scale=1):
     """Open the board and return (context, page, console_errors, refused_requests).
 
     ``routes`` is a sequence of (url pattern, handler) pairs registered before the
     page loads, for a test that needs to show the board an answer this checkout's
     server does not give (the public Lambda's, which has no git checkout).
     """
-    options = {"viewport": {"width": width, "height": height}, "device_scale_factor": 1,
+    options = {"viewport": {"width": width, "height": height}, "device_scale_factor": scale,
                "color_scheme": "dark"}
     if reduced_motion:
         options["reduced_motion"] = reduced_motion
@@ -855,6 +855,60 @@ def test_every_board_row_stays_above_the_key_bar_in_every_verdict(
             assert geometry["smallestFont"] >= floor_px, (
                 f"{where}: text renders at {geometry['smallestFont']}px, under {floor_px}px"
             )
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+CHECK_RING_GEOMETRY = """() => {
+  const check = document.querySelector('#btnCheck');
+  window.mercuryNav.setFocus(check);
+  check.scrollIntoView({ block: 'center' });
+  const style = getComputedStyle(check);
+  const reach = parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+  const box = check.getBoundingClientRect();
+  const kicker = document.querySelector('#connectionTitle');
+  const heading = kicker.getBoundingClientRect();
+  const range = document.createRange();
+  range.selectNodeContents(kicker);
+  const text = range.getBoundingClientRect();
+  return {
+    ringed: check.classList.contains('tv-focused') && style.outlineStyle !== 'none',
+    reach,
+    ring: { top: box.top - reach, left: box.left - reach, right: box.right + reach },
+    heading: { top: heading.top, bottom: heading.bottom, left: heading.left, right: heading.right },
+    text: { bottom: text.bottom, left: text.left, right: text.right },
+  };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host, scale",
+    [(1920, 1080, False, 1), (960, 540, True, 2)],
+    ids=["tv-browser-1920x1080", "firetv-webview-960x540-dsf2"],
+)
+def test_the_check_focus_ring_clears_the_connection_heading(
+        browser, base_url, width, height, host, scale):
+    """The ring on Check used to cut through the CONNECTION heading above it.
+
+    The kicker sat directly on the actions bar, and the 10-foot ring reaches 8px past
+    the button (4px offset, 4px outline), so in the desktop take the ring's top edge
+    ran through the heading's letters. The ring's box, read from the computed outline,
+    has to start below the heading's box, which it shares columns with.
+    """
+    context, page, errors, _ = open_board(
+        browser, base_url, width=width, height=height, host=host, scale=scale)
+    try:
+        wait_for_board(page)
+        geometry = page.evaluate(CHECK_RING_GEOMETRY)
+        assert geometry["ringed"], f"Check shows no focus ring, so this proves nothing: {geometry}"
+        assert geometry["reach"] >= 8, geometry
+        ring, heading, text = geometry["ring"], geometry["heading"], geometry["text"]
+        assert ring["left"] < text["right"] and text["left"] < ring["right"], (
+            f"the ring and the heading share no columns, so this proves nothing: {geometry}")
+        assert ring["top"] >= heading["bottom"], (
+            f"at {width}x{height} the Check ring starts at y={ring['top']:.1f}, inside the "
+            f"CONNECTION heading, which ends at y={heading['bottom']:.1f}")
         assert errors == [], errors
     finally:
         context.close()
