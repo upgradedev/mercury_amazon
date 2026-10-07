@@ -5,6 +5,11 @@
 # gate J4 rests on scripts/android_tv_smoke.sh. The journey is the same one, driven at
 # a pace a viewer can follow: the Leanback home screen, the launch, the opening answer,
 # then Stage, Confirm (record-only) and Publish with the key codes a TV remote emits.
+# The launch is the one a viewer makes: D-pad presses from the home screen to the
+# Mercury tile, each one chosen from a uiautomator dump (scripts/android_tv_tile_focus.py),
+# then Center once the dump shows that the focused node names Mercury. If the tile is not
+# focused within FOOTAGE_MAX_DPAD_PRESSES presses, or Center does not start Mercury, the
+# script falls back to 'am start' and says so in timeline.tsv and footage-provenance.json.
 # screenrecord is the primary capture; a 1 fps screencap sequence is the fallback,
 # because the emulator's software GPU can break screenrecord.
 set -euo pipefail
@@ -13,7 +18,12 @@ endpoint="https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/"
 apk="app/build/outputs/apk/debug/app-debug.apk"
 out="build/android-tv-footage"
 pace="${FOOTAGE_PACE_SECONDS:-3}"
-mkdir -p "$out/frames"
+# Each move waits half the pace on top of the dump that follows it; the focused tile
+# is held for the full pace before Center.
+nav_pace="$(awk -v p="$pace" 'BEGIN { printf "%.2f", p / 2 }')"
+max_presses="${FOOTAGE_MAX_DPAD_PRESSES:-20}"
+package="io.github.upgradedev.mercury.wallboard"
+mkdir -p "$out/frames" "$out/ui"
 
 if [[ ! -s "$out/endpoint-health.json" ]]; then
   echo "The public demo's /health record is missing" >&2
@@ -34,7 +44,7 @@ wait_for_event() {
     if adb logcat -d -s MercuryCockpit:I '*:S' 2>/dev/null | grep -Fq "$event"; then
       return 0
     fi
-    if ! adb shell pidof io.github.upgradedev.mercury.wallboard >/dev/null 2>&1; then
+    if ! adb shell pidof "$package" >/dev/null 2>&1; then
       echo "Mercury process exited before event: $event" >&2
       return 1
     fi
@@ -47,6 +57,34 @@ wait_for_event() {
 press() {
   mark "$1"
   adb shell input keyevent "$1"
+}
+
+dump_ui() {
+  local file
+  file="$out/ui/$(printf '%02d' "$1").xml"
+  local try
+  for try in 1 2 3; do
+    if adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 \
+      && adb exec-out cat /sdcard/ui.xml > "$file" 2>/dev/null \
+      && [[ -s "$file" ]]; then
+      echo "$file"
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+# Captured first, then matched: with pipefail, grep -q closing a pipe early can fail it.
+resumed_line() {
+  local activities
+  activities="$(adb shell dumpsys activity activities 2>/dev/null || true)"
+  grep -E 'ResumedActivity' <<< "$activities" || true
+}
+
+mercury_resumed() {
+  adb shell pidof "$package" >/dev/null 2>&1 || return 1
+  [[ "$(resumed_line)" == *"$package/"* ]]
 }
 
 frames_loop() {
@@ -74,9 +112,13 @@ trap stop_recording EXIT
 
 adb logcat -c
 adb install -r "$apk" | tee "$out/adb-install.txt"
-adb shell am force-stop io.github.upgradedev.mercury.wallboard
+adb shell am force-stop "$package"
+# Give the launcher time to add the new tile before going home.
+sleep 5
 adb shell input keyevent KEYCODE_HOME
 sleep 3
+adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN \
+  -c android.intent.category.HOME > "$out/home-activity.txt" 2>&1 || true
 
 adb shell rm -f /sdcard/journey.mp4
 adb shell screenrecord --time-limit 175 --bit-rate 8000000 /sdcard/journey.mp4 > "$out/screenrecord.log" 2>&1 &
@@ -87,12 +129,113 @@ frames_pid=$!
 mark "Leanback home screen"
 sleep "$pace"
 
-mark "launch Mercury from the Leanback launcher"
-adb shell am start -W \
-  -a android.intent.action.MAIN \
-  -c android.intent.category.LEANBACK_LAUNCHER \
-  -n io.github.upgradedev.mercury.wallboard/.MainActivity \
-  | tee "$out/launcher.txt"
+# Walk the home screen to the Mercury tile. Every decision is kept in ui/decisions.tsv
+# and every dump in ui/NN.xml.
+printf 'dump\taction\tdetail\n' > "$out/ui/decisions.tsv"
+presses=0
+step=0
+focused_label=""
+fallback_reason="Mercury tile not focused after $max_presses presses"
+sweep="KEYCODE_DPAD_RIGHT"
+last_signature=""
+last_key=""
+# The walk must leave the journey room inside screenrecord's 175 s.
+nav_deadline=$((SECONDS + 75))
+while :; do
+  file="$(dump_ui "$step")" || file=""
+  decision="NOFOCUS"$'\t'"uiautomator dump failed"
+  if [[ -n "$file" ]]; then
+    decision="$(python3 scripts/android_tv_tile_focus.py "$file" --target Mercury 2>>"$out/ui/focus.log")" \
+      || decision="NOFOCUS"$'\t'"focus helper failed"
+  fi
+  action="${decision%%$'\t'*}"
+  detail="${decision#*$'\t'}"
+  printf '%02d\t%s\t%s\n' "$step" "$action" "$detail" >> "$out/ui/decisions.tsv"
+  step=$((step + 1))
+  if [[ "$action" == "FOCUSED" ]]; then
+    focused_label="$detail"
+    break
+  fi
+  if (( presses >= max_presses )); then
+    break
+  fi
+  if (( SECONDS >= nav_deadline )); then
+    fallback_reason="Mercury tile not focused within 75 s ($presses presses)"
+    break
+  fi
+  case "$action" in
+    KEYCODE_DPAD_UP|KEYCODE_DPAD_DOWN|KEYCODE_DPAD_LEFT|KEYCODE_DPAD_RIGHT)
+      key="$action"
+      ;;
+    OPEN)
+      mark "focus on the launcher's $detail entry"
+      sleep "$nav_pace"
+      key="KEYCODE_DPAD_CENTER"
+      ;;
+    SEARCH)
+      # Neither the tile nor an Apps entry is on screen: sweep along the row, and
+      # drop a row and turn round when focus stops moving.
+      if [[ "$detail" == "$last_signature" && "$last_key" == "$sweep" ]]; then
+        key="KEYCODE_DPAD_DOWN"
+        if [[ "$sweep" == "KEYCODE_DPAD_RIGHT" ]]; then sweep="KEYCODE_DPAD_LEFT"; else sweep="KEYCODE_DPAD_RIGHT"; fi
+      elif [[ "$detail" == "$last_signature" && "$last_key" == "KEYCODE_DPAD_DOWN" ]]; then
+        fallback_reason="focus stopped moving before the Mercury tile appeared"
+        break
+      else
+        key="$sweep"
+      fi
+      last_signature="$detail"
+      ;;
+    *)
+      # No focused node yet: any D-pad key gives the launcher focus.
+      key="KEYCODE_DPAD_DOWN"
+      ;;
+  esac
+  press "$key"
+  last_key="$key"
+  presses=$((presses + 1))
+  if [[ "$key" == "KEYCODE_DPAD_CENTER" ]]; then sleep 3; else sleep "$nav_pace"; fi
+done
+
+launch_path="am_start_fallback"
+if [[ -n "$focused_label" ]]; then
+  mark "focus on the Mercury tile: $focused_label"
+  sleep "$pace"
+  mark "launch Mercury from the Leanback launcher"
+  press KEYCODE_DPAD_CENTER
+  presses=$((presses + 1))
+  # wait_for_event gives up as soon as Mercury has no process, so wait for the
+  # activity before waiting for the page.
+  deadline=$((SECONDS + 30))
+  while (( SECONDS < deadline )); do
+    if mercury_resumed; then
+      launch_path="dpad"
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$launch_path" == "dpad" ]]; then
+    {
+      echo "Launched by KEYCODE_DPAD_CENTER on the focused tile: $focused_label"
+      resumed_line
+    } | tee "$out/launcher.txt"
+  else
+    fallback_reason="Center on the focused tile did not start Mercury within 30 s"
+  fi
+fi
+if [[ "$launch_path" == "dpad" ]]; then
+  launch_detail="$presses presses, focus on \"$focused_label\", then KEYCODE_DPAD_CENTER"
+  mark "launch path: dpad ($launch_detail)"
+else
+  launch_detail="$fallback_reason"
+  mark "launch path: am start fallback ($launch_detail)"
+  mark "launch Mercury from the Leanback launcher"
+  adb shell am start -W \
+    -a android.intent.action.MAIN \
+    -c android.intent.category.LEANBACK_LAUNCHER \
+    -n "$package/.MainActivity" \
+    | tee "$out/launcher.txt"
+fi
 wait_for_event "journey:page_loaded:$endpoint"
 mark "board loaded from the public demo"
 # Stage stays disabled until the opening correlation renders (run 36915746324).
@@ -125,13 +268,15 @@ trap - EXIT
 
 device_model="$(adb shell getprop ro.product.model | tr -d '\r')"
 os_version="Android $(adb shell getprop ro.build.version.release | tr -d '\r') / API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"
-python3 - "$out" "$device_model" "$os_version" <<'PY'
+python3 - "$out" "$device_model" "$os_version" "$launch_path" "$presses" "$launch_detail" <<'PY'
 import json
 import os
 import sys
 from pathlib import Path
 
 out, device_model, os_version = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+launch_path, launch_presses, launch_detail = sys.argv[4], int(sys.argv[5]), sys.argv[6]
+home_activity = out / "home-activity.txt"
 health = json.loads((out / "endpoint-health.json").read_text(encoding="utf-8"))
 video = out / "journey.mp4"
 provenance = {
@@ -148,6 +293,12 @@ provenance = {
     "os_version": os_version,
     "screenrecord_bytes": video.stat().st_size if video.exists() else 0,
     "fallback_frames": len(list((out / "frames").glob("*.png"))),
+    # "dpad": Center on the tile the dump showed focused; "am_start_fallback": it did not.
+    "launch_path": launch_path,
+    "launch_presses": launch_presses,
+    "launch_detail": launch_detail,
+    "home_activity": home_activity.read_text(encoding="utf-8", errors="replace").strip()
+    if home_activity.exists() else "",
     "timeline": [line.split("\t") for line in (out / "timeline.tsv").read_text(encoding="utf-8").splitlines()[1:]],
 }
 (out / "footage-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")

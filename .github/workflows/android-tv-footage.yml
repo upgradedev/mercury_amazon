@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/android-tv-footage.yml
       - scripts/android_tv_footage.sh
+      - scripts/android_tv_tile_focus.py
 
 jobs:
   emulator-footage:

@@ -203,6 +203,43 @@ commit. It loads the public demo, which served `ea2cff5`, and the desktop take i
 local run of the recorded commit. The title card, both labels and the closing card name
 both.
 
+### How the footage opens Mercury
+
+A judge review of the take at `f7512bf` found that the footage never shows Mercury
+being opened from the Leanback home screen. `scripts/android_tv_footage.sh` started it
+with `am start` of the `LEANBACK_LAUNCHER` intent, and the cut starts on the loaded
+board. The script now opens it the way a viewer would, with the key codes a TV remote
+emits:
+
+* After the install it waits 5 s, presses Home, and records the home activity
+  (`home-activity.txt`).
+* It takes a `uiautomator dump` and `scripts/android_tv_tile_focus.py` reads it. The
+  helper finds the focused node and the node whose label contains "Mercury" (the app
+  label is "Mercury Incident Board"), and returns the D-pad key that moves focus
+  towards the tile: Up or Down until the rows overlap, then Left or Right. When no tile
+  names Mercury, it moves to the launcher's Apps entry and opens it with Center, or
+  sweeps along the rows. Each move is followed by half of `FOOTAGE_PACE_SECONDS`, then
+  the next dump.
+* Once a dump shows that the focused node, or a node inside it, names Mercury, the
+  script holds that frame for `FOOTAGE_PACE_SECONDS` and presses `KEYCODE_DPAD_CENTER`.
+  It then waits up to 30 s for Mercury's activity to be resumed before it waits for
+  the page, and writes the resumed-activity line to `launcher.txt`.
+* The walk is bounded: at most `FOOTAGE_MAX_DPAD_PRESSES` presses (default 20) and
+  75 s. If the tile is not focused within that bound, or Center does not start Mercury,
+  the script falls back to `am start` as before. It does not hide the fallback.
+
+Which path was used is recorded twice. `timeline.tsv` gets a row
+`launch path: dpad (...)` or `launch path: am start fallback (<reason>)`, and
+`footage-provenance.json` gets `launch_path` (`dpad` or `am_start_fallback`),
+`launch_presses`, `launch_detail` and `home_activity`. Every dump is kept as
+`ui/NN.xml`, with each decision in `ui/decisions.tsv`. The rest of the journey (the
+opening answer, then Stage, Confirm and Publish) is unchanged.
+
+The take at `f7512bf` still uses the footage of run 37475795991, which was launched
+with `am start`. `FOOTAGE_CUTS`, `FOOTAGE_HOLDS` and the expected provenance in
+`scripts/build_video_plan.py` belong to that footage and are unchanged. A take that
+shows the D-pad launch needs those cut again against a new footage run.
+
 ### How the footage is cut
 
 The screenrecord writes a frame only when the screen changes (52 frames in 27.62 s).
