@@ -255,6 +255,17 @@ follows as before and ends with the shared handoff. The focused tile is on scree
 7.8 s, not the 3 s pace: the half pace after the last move and the dump that confirms
 focus come before it.
 
+The second run, 37573814194, launched Mercury the same way and then failed: Play
+services restarted itself and the system killed Mercury with it (above). The third run,
+CI run [37575030928](https://github.com/upgradedev/mercury_amazon/actions/runs/37575030928)
+(merge commit `1c32462`, branch head `7a8c7dc`), waited for Play services first
+("pid 3147 unchanged for 90 s") and passed. It took the same 5 presses. Its
+`journey.mp4` has 84 frames in 55.65 s. Frame 35 (15.96 s) has focus on Live TV, frame
+36 (20.26 s) has focus on the Mercury tile with its label shown, the launcher answers
+Center at frame 42 (27.69 s), the screen is black from frame 45 (30.13 s), and the
+board is drawn at frame 52 (34.93 s). The journey ends with the shared handoff at
+frame 83 (55.42 s).
+
 The take at `f7512bf` still uses the footage of run 37475795991, which was launched
 with `am start`. `FOOTAGE_CUTS`, `FOOTAGE_HOLDS` and the expected provenance in
 `scripts/build_video_plan.py` belong to that footage and are unchanged. A take that
