@@ -897,7 +897,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-698 tests and a re-measure on an idle machine is pending**.
+730 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -941,7 +941,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 698 passed
+# 730 passed
 ```
 
 #### Step 3: Start the server
@@ -1163,7 +1163,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 698 passed
+python -m pytest tests/ -q                                    # 730 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2092 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
@@ -1291,8 +1291,10 @@ given a substitute number.
   `build_sha` from `/health`; every merge ships a deploy verified byte-identical: a full code deploy, or an env-only SHA move over a proven-identical zip (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and compared after every deploy).
   Readiness gate G2 pins the deployed build against the committed receipt: it passes when the deployed SHA is HEAD or an ancestor with unchanged live runtime files, and fails naming the files that moved after the deploy. It runs in labelled offline-fixture
   mode. The allowed-target receipt above covers the APK.
-* **No published video.** One 170.61 s take, recorded at `9620743` with the figures this
-  build prints, is rendered locally and not yet uploaded (see `video/README.md`).
+* **No published video.** One 163.09 s take, which opens on the Android TV emulator
+  footage from CI run 37475795991 and then a local desktop run of `f7512bf` with the
+  figures this build prints, is rendered locally and not yet uploaded (see
+  `video/README.md`).
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
   record-only journey, but the J4 evidence is the APK completing it in the emulator,

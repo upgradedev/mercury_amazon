@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.61 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 37464864870; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.85 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 37464864870; public access is still pending ([details](#what-is-real-and-what-is-not)).
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -33,7 +33,7 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials.
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-698%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-730%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -154,7 +154,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 698 passed
+# 730 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -210,15 +210,18 @@ the PR #42 runtime changes, record-only; the runtime receipt's
 rollback is recorded, never sent to a pipeline. **Missing:**
 
 - **A published video.** One take is rendered and not yet uploaded:
-  `reviews/videos_muse_20261001/mercury_amazon/output/mercury-demo.mp4` in the workspace,
-  outside git, 170.61 s (ffprobe), 1920x1080, recorded at commit `9620743` in desktop
-  Chromium (its `video-receipt.json`), every key sent through the D-pad bridge the
-  Leanback app calls, with burned-in captions. It shows the figures this page prints,
-  50.0% held-out precision over 58 namings and 90.0% refusals, and after Confirm the
-  board holding RECORDED, no pipeline contacted. No device or emulator appears in it,
-  and it says so. It predates this build's board: the take quotes one of this
-  repository's commits, while the public board now names a stand-in from an invented,
-  labelled deploy feed. Details in [video/README.md](video/README.md).
+  `reviews/videos_20261006/mercury_amazon/output/mercury-demo.mp4` in the workspace,
+  outside git, 163.09 s (ffprobe), 1920x1080. It opens on 23.32 s of Android TV
+  emulator footage from CI run 37475795991: the debug APK on an AOSP emulator, API 34,
+  loading the public demo (`ea2cff5`, record-only), from the board's first frame, at 1x
+  with two static frames held longer. That is emulator footage, not a Fire TV device, and
+  it does not show the app being opened from the launcher. A label names each source on
+  every frame. The rest is a local run of commit `f7512bf` in a desktop browser at
+  1920x1080, not the TV layout, every key sent through the D-pad bridge the Leanback app
+  calls, with burned-in captions. It speaks the 50.0% held-out precision where the board
+  prints it and the 58 namings over the evidence sentence, and after Confirm shows the
+  board holding RECORDED, no pipeline contacted. The
+  sync gate passed. Details in [video/README.md](video/README.md).
 - **A public repository.** Private until the reviewers are added as collaborators; see
   [Run it locally](#run-it-locally).
 
