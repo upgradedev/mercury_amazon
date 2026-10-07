@@ -37,15 +37,30 @@ mark() {
   printf '%s\t%s\n' "$(awk -v a="$(date +%s.%N)" -v b="$t0" 'BEGIN { printf "%.2f", a - b }')" "$1" >> "$keys"
 }
 
+mercury_pid=""
+current_pid() {
+  adb shell pidof "$package" 2>/dev/null | tr -d '\r' || true
+}
+
 wait_for_event() {
   local event="$1"
   local deadline=$((SECONDS + 120))
+  local now
   while (( SECONDS < deadline )); do
     if adb logcat -d -s MercuryCockpit:I '*:S' 2>/dev/null | grep -Fq "$event"; then
       return 0
     fi
-    if ! adb shell pidof "$package" >/dev/null 2>&1; then
+    now="$(current_pid)"
+    if [[ -z "$now" ]]; then
       echo "Mercury process exited before event: $event" >&2
+      return 1
+    fi
+    # A new process means the system killed Mercury and something started it again
+    # (run 37573814194: Play services restarted itself and took Mercury with it, then
+    # the journey's own Right and Center relaunched it from the launcher).
+    if [[ -n "$mercury_pid" && "$now" != "$mercury_pid" ]]; then
+      echo "Mercury was restarted (pid $mercury_pid, now $now) before event: $event" >&2
+      adb logcat -d 2>/dev/null | grep -E "Killing [0-9]+:$package|has died" > "$out/mercury-killed.txt" || true
       return 1
     fi
     sleep 1
@@ -113,6 +128,31 @@ trap stop_recording EXIT
 adb logcat -c
 adb install -r "$apk" | tee "$out/adb-install.txt"
 adb shell am force-stop "$package"
+# After a cold boot Play services can restart itself once, and the system then kills
+# every app using its font provider, Mercury's WebView included (run 37573814194).
+# Wait until com.google.android.gms.persistent has kept one pid for 90 s, at most 300 s,
+# before recording; the outcome goes to play-services-settle.txt.
+settle_deadline=$((SECONDS + 300))
+settle_pid=""
+settle_since=$SECONDS
+settle_note="did not settle within 300 s"
+while (( SECONDS < settle_deadline )); do
+  gms_pid="$(adb shell pidof com.google.android.gms.persistent 2>/dev/null | tr -d '\r' || true)"
+  if [[ "$gms_pid" != "$settle_pid" ]]; then
+    settle_pid="$gms_pid"
+    settle_since=$SECONDS
+  fi
+  if [[ -z "$gms_pid" ]] && ! adb shell pm path com.google.android.gms >/dev/null 2>&1; then
+    settle_note="no Play services on this image"
+    break
+  fi
+  if [[ -n "$gms_pid" ]] && (( SECONDS - settle_since >= 90 )); then
+    settle_note="pid $gms_pid unchanged for 90 s"
+    break
+  fi
+  sleep 5
+done
+echo "Play services: $settle_note" | tee "$out/play-services-settle.txt"
 # Give the launcher time to add the new tile before going home.
 sleep 5
 adb shell input keyevent KEYCODE_HOME
@@ -215,6 +255,7 @@ if [[ -n "$focused_label" ]]; then
     sleep 1
   done
   if [[ "$launch_path" == "dpad" ]]; then
+    mercury_pid="$(current_pid)"
     {
       echo "Launched by KEYCODE_DPAD_CENTER on the focused tile: $focused_label"
       resumed_line
@@ -235,6 +276,7 @@ else
     -c android.intent.category.LEANBACK_LAUNCHER \
     -n "$package/.MainActivity" \
     | tee "$out/launcher.txt"
+  mercury_pid="$(current_pid)"
 fi
 wait_for_event "journey:page_loaded:$endpoint"
 mark "board loaded from the public demo"
@@ -299,6 +341,8 @@ provenance = {
     "launch_detail": launch_detail,
     "home_activity": home_activity.read_text(encoding="utf-8", errors="replace").strip()
     if home_activity.exists() else "",
+    "play_services_settle": (out / "play-services-settle.txt").read_text(encoding="utf-8").strip()
+    if (out / "play-services-settle.txt").exists() else "",
     "timeline": [line.split("\t") for line in (out / "timeline.tsv").read_text(encoding="utf-8").splitlines()[1:]],
 }
 (out / "footage-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")

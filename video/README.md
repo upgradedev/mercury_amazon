@@ -211,8 +211,13 @@ with `am start` of the `LEANBACK_LAUNCHER` intent, and the cut starts on the loa
 board. The script now opens it the way a viewer would, with the key codes a TV remote
 emits:
 
-* After the install it waits 5 s, presses Home, and records the home activity
-  (`home-activity.txt`).
+* After the install it waits until Play services has kept one process for 90 s (at
+  most 300 s, the outcome in `play-services-settle.txt`). After a cold boot Play
+  services can restart itself once, and the system then kills Mercury, whose WebView
+  uses its font provider: that is what failed run 37573814194, after the D-pad launch
+  had worked. If Mercury's process still changes during the journey, the script stops
+  and says so instead of filming a relaunched app. Then it waits 5 s, presses Home,
+  and records the home activity (`home-activity.txt`).
 * It takes a `uiautomator dump` and `scripts/android_tv_tile_focus.py` reads it. The
   helper finds the focused node and the node whose label contains "Mercury" (the app
   label is "Mercury Incident Board"), and returns the D-pad key that moves focus
