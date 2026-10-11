@@ -4,8 +4,8 @@ CI run 37579019212 failed six tests on a branch that changed only footage and
 receipts: ``git log -20`` at HEAD filled with commits the runtime filter sets aside,
 the burst behind ``release-train`` left the window, and the crowded refusal turned
 into an attribution. The server now serves a recorded window pinned at one merge
-(``src/infrastructure/local_git_window.py``). These tests stack new commits on a
-checkout and show the verdicts stay where the README's table puts them.
+(``src/infrastructure/local_git_window.py``). These tests build a repository where HEAD
+flips a verdict and show the pinned window keeps the README's table.
 """
 from __future__ import annotations
 
@@ -53,10 +53,11 @@ def _verdicts(local_provider) -> dict[str, tuple[str, str | None]]:
 
 
 def _stack_lone_runtime_commits(root, count: int) -> None:
-    """A checkout whose newest commits each touch src/ and sit two hours apart.
+    """A temporary repository of lone src/ commits, each two hours apart.
 
-    That is the shape that broke CI: plenty of commits, none with company in its
-    75 minute window, so an unpinned demo has no crowded window to refuse.
+    Not the CI breakage itself (docs and receipt commits pushed this repository's
+    runtime commits out of the window), but the same effect: no commit has company
+    in its 75 minute window, so reading git log at HEAD has no crowded window to refuse.
     """
     git = ["git", "-c", "user.name=Mercury Test", "-c", "user.email=test@example.invalid",
            "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -96,9 +97,20 @@ def test_new_commits_cannot_change_the_release_train_verdict(tmp_path):
     assert PinnedGitWindowProvider(repo_root=tmp_path / "no-checkout").list_recent_commits() == []
 
 
+def _git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=PinnedGitWindowProvider().repo_root,
+                          capture_output=True, text=True, timeout=30)
+
+
 def test_the_recorded_window_is_this_repositorys_real_git_log():
     if not LocalGitCommitProvider().is_available:
         pytest.skip("not a git checkout")
+    # A shallow clone (git clone --depth 1) lacks the pinned commit's history.
+    if _git("rev-parse", "--is-shallow-repository").stdout.strip() == "true":
+        pytest.skip("shallow clone: the pinned window's history is not here")
+    pinned = PinnedGitWindowProvider().pinned_at
+    if not pinned or _git("cat-file", "-e", f"{pinned}^{{commit}}").returncode != 0:
+        pytest.skip(f"pinned commit {pinned[:7] or '(none)'} is not in this clone")
     result = subprocess.run(
         [sys.executable, "scripts/record_local_git_window.py", "--check"],
         cwd=PinnedGitWindowProvider().repo_root, capture_output=True, text=True, timeout=60,

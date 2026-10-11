@@ -178,8 +178,8 @@ same reason. The server used to read `git log -20` at HEAD, and a stack of docs 
 receipt commits pushed every runtime change out of those 20, so the crowded window
 behind `release-train` emptied and the refusal became an attribution (CI run
 37579019212, six failed tests). `python scripts/record_local_git_window.py --check`
-compares the recording to `git log`, and `tests/unit/test_local_git_window.py` stacks
-25 new runtime commits on a checkout and shows all five verdicts stay put.
+compares the recording to `git log`. `tests/unit/test_local_git_window.py` builds a temp repo of 25 lone
+runtime commits, where `git log` at HEAD flips `release-train`, and the pinned window keeps all five.
 
 The fixture used to be two module constants, so every service name returned the
 same spike and no refusal verdict was reachable from any input a reader could
