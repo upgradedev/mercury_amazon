@@ -1,0 +1,78 @@
+schema-version = 1
+
+# Mercury on Vega OS: a WebView shell for the cockpit page the Fire OS app loads.
+# Build on Linux or macOS with the Vega SDK: npm ci && npm run build:release.
+# On a Vega Fire TV stick in Developer Mode (developer-mode.html):
+#   vega device install-app --packagePath build/armv7-release/mercurycockpit_armv7.vpkg
+#   vega device launch-app --appName com.upgradedev.mercury.main
+# The Vega Virtual Device on Ubuntu or an Intel Mac refuses this package: it has
+# no /com.amazon.kepler.webview_4 module (kvd-issues.html).
+
+[package]
+title = "Mercury Cockpit"
+version = "1.0.0"
+id = "com.upgradedev.mercury"
+
+[os.version]
+min = "1.2"
+target = "1.2"
+
+[needs]
+[[needs.module]]
+id = "/com.amazon.vega.os@IVega_1_2"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.webview_4@IWebview_4"
+
+
+
+[components]
+[[components.interactive]]
+id = "com.upgradedev.mercury.main"
+runtime-module = "/com.amazon.kepler.runtime.react_native_kepler_4@IReactNativeKepler_0"
+launch-type = "singleton"
+categories = ["com.amazon.category.main"]
+
+[wants]
+# Web renderer service for rendering web content
+[[wants.service]]
+id = "com.amazon.webview.renderer_service"
+
+# If Web App needs keyboard support (the cockpit has text fields)
+[[wants.service]]
+id = "com.amazon.inputmethod.service"
+
+# The template's four video playback services (media.server, mediametrics,
+# mediabuffer, mediatransform) are left out: the cockpit plays no video.
+
+# If Web App needs audio playback (the cockpit reads verdicts aloud)
+[[wants.service]]
+id = "com.amazon.audio.stream"
+
+# Required for audio management features to work in WebView, features like audio focus, volume control 
+[[wants.service]]
+id = "com.amazon.audio.control"
+
+# To enable accessibility support for your app, we recommend you add the UCC service with the Service Registrar
+[[wants.service]]
+id = "com.amazon.kepler.ucc.publisher"
+
+# Uncomment below section to enable encrypted media playback (DRM content)
+# [[wants.service]]
+# id = "com.amazon.drm.key"
+# [[wants.service]]
+# id = "com.amazon.drm.crypto"
+# [[needs.privilege]]
+# id = "com.amazon.privilege.security.file-sharing"
+
+# Enable Group-IPC to access media services
+[[wants.service]]
+id = "com.amazon.gipc.uuid.*"
+[offers]
+[[offers.service]]
+id = "com.amazon.gipc.uuid.*" 
+
+# You may add other services as needed

@@ -21,12 +21,13 @@ vpkg_for() {
   find "$1/build" -name "*_$2.vpkg" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-
 }
 
-# build <dir> <arch> <label>: one Release build for one architecture. Falls back
-# to the project's own build:release script when --target is not accepted.
+# build <dir> <arch> <label>: one Release build for one architecture, through
+# the project's own build:release script so its flags (--build-number) apply.
+# Falls back to the script without --target if no vpkg for <arch> appears.
 build() {
   local dir="$1" arch="$2" label="$3" log rc vpkg
   log="$OUT/logs/$label-build-$arch.log"
-  (cd "$dir" && timeout 1200 npx react-native build-vega --build-type Release --target "$arch") > "$log" 2>&1
+  (cd "$dir" && timeout 1200 npm run build:release -- --target "$arch") > "$log" 2>&1
   rc=$?
   if [ -z "$(vpkg_for "$dir" "$arch")" ]; then
     echo "--- no $arch vpkg after --target (exit $rc); trying npm run build:release" >> "$log"
@@ -43,13 +44,18 @@ build() {
   return 1
 }
 
-npm_install() {  # npm_install <dir> <label>
+npm_install() {  # npm_install <dir> <label>: npm ci when a lockfile is committed
+  local log="$OUT/logs/$2-npm-install.log"
   mark "npm install ($2)"
-  if (cd "$1" && npm install --no-audit --no-fund) > "$OUT/logs/$2-npm-install.log" 2>&1; then
-    status "${2}_npm_install" ok
+  if [ -f "$1/package-lock.json" ] && (cd "$1" && npm ci --no-audit --no-fund) > "$log" 2>&1; then
+    status "${2}_npm_install" "ok (npm ci)"
     return 0
   fi
-  tail -60 "$OUT/logs/$2-npm-install.log"
+  if (cd "$1" && npm install --no-audit --no-fund) >> "$log" 2>&1; then
+    status "${2}_npm_install" "ok (npm install)"
+    return 0
+  fi
+  tail -60 "$log"
   status "${2}_npm_install" failed
   return 1
 }
@@ -110,6 +116,19 @@ for file in manifest.toml package.json package-lock.json; do
   cp "$app/$file" "$OUT/logs/mercury-$file" 2>/dev/null || true
 done
 find "$app/build" -maxdepth 3 > "$OUT/logs/mercury-build-tree.txt" 2>/dev/null || true
+
+# A committed vega/ must not change when it is installed, tested and built.
+if [ "$(status_of mercury_build_mode)" = direct ]; then
+  git -C "$repo" status --porcelain -- vega/ > "$OUT/logs/vega-tree-after-build.txt"
+  git -C "$repo" diff -- vega/ > "$OUT/logs/vega-tree-after-build.diff"
+  if [ -s "$OUT/logs/vega-tree-after-build.txt" ]; then
+    status vega_tree_after_build dirty
+    echo "::warning::building changed tracked files under vega/"
+    cat "$OUT/logs/vega-tree-after-build.txt"
+  else
+    status vega_tree_after_build clean
+  fi
+fi
 
 # The armv7 package is the one a Vega Fire TV stick installs; without it the
 # step fails. A missing x86_64 package is left to the verdict step, so the

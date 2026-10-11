@@ -1,6 +1,15 @@
-node_modules/
-build/
-dist/
-.tmp/
-buildinfo.json
+*.iml
+*.swp
+.idea
+.DS_Store
+.vscode
+.tmp
+
+dist
+build
+node_modules
+CMakeUserPresets.json
 npm-debug.log
+
+# Written by each Vega build (local paths)
+buildinfo.json

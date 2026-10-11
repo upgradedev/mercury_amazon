@@ -30,12 +30,25 @@ status_of() {  # status_of <name>: the recorded value, or empty
   cat "$OUT/status/$1" 2>/dev/null || true
 }
 
-# vda is the Vega device bridge. Calling the binary directly avoids starting
-# the Node-based CLI for every key press; `vega exec vda` is the fallback.
-VDA_BIN="$(find "$HOME/vega" -type f -name vda -perm -u+x 2>/dev/null | head -1 || true)"
-vda() {
-  if [ -n "$VDA_BIN" ]; then "$VDA_BIN" "$@"; else vega exec vda "$@"; fi
-}
+# vda is the Vega device bridge, at $KEPLER_SDK_PATH/bin/tools/vda
+# (vda-tools.html). Calling the binary directly avoids starting the Node-based
+# CLI for every key press; `vega exec vda` is the fallback. VDA is an array so
+# that `timeout N "${VDA[@]}" ...` works: timeout runs programs, not functions.
+VDA=()
+if [ -s "$OUT/status/vda_path" ] && [ -x "$(cat "$OUT/status/vda_path")" ]; then
+  VDA=("$(cat "$OUT/status/vda_path")")
+else
+  for candidate in "${KEPLER_SDK_PATH:-/nonexistent}/bin/tools/vda" \
+    $(find -L "$HOME/vega" -name vda -type f 2>/dev/null | head -3); do
+    if [ -x "$candidate" ]; then
+      VDA=("$candidate")
+      printf '%s\n' "$candidate" > "$OUT/status/vda_path"
+      break
+    fi
+  done
+fi
+[ ${#VDA[@]} -gt 0 ] || VDA=(vega exec vda)
+vda() { "${VDA[@]}" "$@"; }
 
 device_name() {  # the CLI's name for the booted VVD; VirtualDevice per run-apps.html
   local name
@@ -68,8 +81,8 @@ shot() {
     printf '%s\tconsole\t%s\t%s\n' "$name" "$(stat -c%s "$png")" "$score" >> "$OUT/frames/index.tsv"
   fi
   if [ "${GUEST_SHOTS:-1}" = 1 ]; then
-    if timeout 30 vda shell gwsi-tool-screenshooter /tmp/mercury-shot.png >> "$OUT/logs/screenshots.log" 2>&1 \
-      && timeout 30 vda pull /tmp/mercury-shot.png "$guest" >> "$OUT/logs/screenshots.log" 2>&1 \
+    if timeout 30 "${VDA[@]}" shell gwsi-tool-screenshooter /tmp/mercury-shot.png >> "$OUT/logs/screenshots.log" 2>&1 \
+      && timeout 30 "${VDA[@]}" pull /tmp/mercury-shot.png "$guest" >> "$OUT/logs/screenshots.log" 2>&1 \
       && [ -s "$guest" ]; then
       score="$(python3 "$CI_DIR/vvd_console.py" nonblack "$guest")"
       printf '%s\tguest\t%s\t%s\n' "$name" "$(stat -c%s "$guest")" "$score" >> "$OUT/frames/index.tsv"
@@ -88,7 +101,7 @@ nonblack_ok() {  # nonblack_ok <png> [min]: true when the frame rendered somethi
 
 key() {  # key <KEY_*>: one short press through the input daemon
   mark "key $1"
-  timeout 30 vda shell inputd-cli button_press "$1" short >> "$OUT/logs/inputd.log" 2>&1 \
+  timeout 30 "${VDA[@]}" shell inputd-cli button_press "$1" short >> "$OUT/logs/inputd.log" 2>&1 \
     || echo "inputd-cli $1 failed" >> "$OUT/logs/inputd.log"
 }
 

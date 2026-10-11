@@ -38,8 +38,8 @@ jobs:
     env:
       OUT: ${{ github.workspace }}/build/vega-evidence
       TEMPLATE_OUT: ${{ github.workspace }}/build/vega-template
-      # 0 records unit test and type check results without stopping the build.
-      VEGA_STRICT_CHECKS: "0"
+      # 1 stops the build when the unit tests or the type check fail.
+      VEGA_STRICT_CHECKS: "1"
       # The SDK installer and CLI take their defaults instead of prompting.
       NONINTERACTIVE: "true"
     steps:
@@ -149,7 +149,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$OUT"
-          if [ ! -s "$OUT/journey.webm" ]; then python3 vega/ci/provenance.py "$OUT" --stitch || true; fi
+          python3 vega/ci/provenance.py "$OUT" --stitch || true
           if [ -f "$OUT/logs/device.log" ]; then gzip -f "$OUT/logs/device.log"; fi
           python3 vega/ci/provenance.py "$OUT"
           ls -la "$OUT" "$OUT/frames" 2>/dev/null | head -80

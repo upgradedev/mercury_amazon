@@ -8,9 +8,10 @@
 Footage, not a runtime receipt: nothing here is read by ci/readiness.py, and
 gate J4 still rests on .github/workflows/android-tv-emulator.yml.
 
-The bar: an armv7 vpkg was built, the helloWorld control rendered on the VVD,
-and Mercury either completed the remote journey or hit the one documented
-limit, the VVD's missing WebView module (kvd-issues.html).
+The bar: an armv7 vpkg was built, the helloWorld control rendered on the VVD
+and a D-pad press changed its frame, and Mercury either completed the remote
+journey or hit the one documented limit, the VVD's missing WebView module
+(kvd-issues.html).
 """
 from __future__ import annotations
 
@@ -64,7 +65,7 @@ def build(out: Path) -> dict:
         {"frame": row[0], "method": row[1], "bytes": int(row[2]), "size_and_nonblack": row[3]}
         for row in read_tsv(out / "frames" / "index.tsv") if len(row) >= 4
     ]
-    video = out / "journey.webm"
+    videos = {path.name: path.stat().st_size for path in sorted(out.glob("*.webm"))}
     stitched = out / "frames-1fps.mp4"
     events = (out / "journey-events.txt")
     return {
@@ -91,12 +92,14 @@ def build(out: Path) -> dict:
             "device_name": status.get("device_name"),
         },
         "control_result": status.get("control_result"),
+        "control_rendered": status.get("control_rendered"),
+        "control_focus_moved": status.get("control_focus_moved"),
         "control_running": status.get("control_running"),
         "mercury_result": status.get("mercury_result"),
         "mercury_missing_module": status.get("mercury_missing_module"),
         "mercury_back": status.get("mercury_back"),
         "journey_events": events.read_text(encoding="utf-8").splitlines() if events.exists() else [],
-        "screenrecord_bytes": video.stat().st_size if video.exists() else 0,
+        "screenrecord_bytes": videos,
         "stitched_video_bytes": stitched.stat().st_size if stitched.exists() else 0,
         "frames": frames,
         "timeline": read_tsv(out / "timeline.tsv"),
@@ -114,6 +117,7 @@ def summary(record: dict) -> str:
         ("vpkgs", ", ".join(f"{name} {meta['bytes']} B sha256 {meta['sha256'][:12]}" for name, meta in record["vpkgs"].items()) or "none"),
         ("VVD boot", f"{record['vvd']['boot']} ({record['vvd']['gpu_mode']}, capture {record['vvd']['capture']}, developer mode {record['vvd']['developer_mode']})"),
         ("Control (helloWorld)", f"{record['control_result']} (running-apps: {record['control_running']})"),
+        ("Screen recordings", ", ".join(f"{name} {size} B" for name, size in record["screenrecord_bytes"].items()) or "none"),
         ("Mercury on the VVD", record["mercury_result"]),
         ("Missing module", (record["mercury_missing_module"] or "").replace("\n", " / ")),
         ("Journey events", str(len(record["journey_events"]))),
@@ -132,8 +136,8 @@ def verdict(record: dict) -> list[str]:
         problems.append("no armv7 vpkg was built")
     if record["vvd"]["boot"] != "ready":
         problems.append(f"the VVD did not boot to a visible screen: {record['vvd']['boot']}")
-    if record["control_result"] != "rendered":
-        problems.append(f"the helloWorld control did not render: {record['control_result']}")
+    if record["control_result"] != "rendered_and_focus_moved":
+        problems.append(f"the helloWorld control did not render and move focus: {record['control_result']}")
     if record["mercury_result"] not in ACCEPTED_MERCURY:
         problems.append(f"Mercury on the VVD: {record['mercury_result']}")
     return problems
@@ -143,8 +147,8 @@ def stitch(out: Path) -> int:
     """Join the step frames into a video, two seconds each, in name order.
 
     For each step the console capture is used when it rendered, else the
-    in-guest one. This is the fallback when the console's screenrecord did not
-    produce journey.webm.
+    in-guest one. The console's screenrecord webm files are the primary video;
+    this is the step-by-step version a reader can scrub.
     """
     import subprocess
 

@@ -35,15 +35,15 @@ console_up() { ss -ltn 2>/dev/null | grep -q ':5554 '; }
 
 wait_ready() {  # wait_ready <seconds>: until a capture is not black
   local deadline=$((SECONDS + $1)) probe="$OUT/frames/boot-probe.png"
-  timeout 180 vda wait-for-device >> "$OUT/logs/vvd-boot.log" 2>&1 || true
+  timeout 180 "${VDA[@]}" wait-for-device >> "$OUT/logs/vvd-boot.log" 2>&1 || true
   while (( SECONDS < deadline )); do
     if python3 "$CI_DIR/vvd_console.py" screenshot "$probe" >> "$OUT/logs/vvd-boot.log" 2>&1 \
       && nonblack_ok "$probe" 0.004; then
       status vvd_capture console
       return 0
     fi
-    if timeout 30 vda shell gwsi-tool-screenshooter /tmp/boot-probe.png >> "$OUT/logs/vvd-boot.log" 2>&1 \
-      && timeout 30 vda pull /tmp/boot-probe.png "$probe.guest.png" >> "$OUT/logs/vvd-boot.log" 2>&1 \
+    if timeout 30 "${VDA[@]}" shell gwsi-tool-screenshooter /tmp/boot-probe.png >> "$OUT/logs/vvd-boot.log" 2>&1 \
+      && timeout 30 "${VDA[@]}" pull /tmp/boot-probe.png "$probe.guest.png" >> "$OUT/logs/vvd-boot.log" 2>&1 \
       && nonblack_ok "$probe.guest.png" 0.004; then
       status vvd_capture guest
       return 0
@@ -141,27 +141,29 @@ status device_name "$(device_name)"
 # inputd-cli needs developer mode for button_press (inputdcli.html); without it
 # the help lists only get_camera_cover_open_close, get_mic_state and
 # get_screen_size. Enabling it reboots the device.
-timeout 30 vda shell inputd-cli --help > "$OUT/logs/inputd-help.txt" 2>&1 || true
-if grep -q button_press "$OUT/logs/inputd-help.txt"; then
+help_lists_button_press() {  # help_lists_button_press <file>
+  timeout 30 "${VDA[@]}" shell inputd-cli --help > "$1" 2>&1 || true
+  grep -q button_press "$1"
+}
+if help_lists_button_press "$OUT/logs/inputd-help.txt"; then
   status vvd_developer_mode already_on
 else
   mark "enable developer mode (the VVD reboots)"
-  timeout 60 vda shell vsm developer-mode enable > "$OUT/logs/developer-mode.log" 2>&1 || true
-  sleep 45
+  timeout 60 "${VDA[@]}" shell vsm developer-mode enable > "$OUT/logs/developer-mode.log" 2>&1 || true
+  sleep 30
   status vvd_developer_mode still_limited
-  deadline=$((SECONDS + 420))
+  deadline=$((SECONDS + 180))
   while (( SECONDS < deadline )); do
-    timeout 60 vda wait-for-device >> "$OUT/logs/developer-mode.log" 2>&1 || true
-    if timeout 30 vda shell inputd-cli --help > "$OUT/logs/inputd-help-after.txt" 2>&1 \
-      && grep -q button_press "$OUT/logs/inputd-help-after.txt"; then
+    timeout 60 "${VDA[@]}" wait-for-device >> "$OUT/logs/developer-mode.log" 2>&1 || true
+    if help_lists_button_press "$OUT/logs/inputd-help-after.txt"; then
       status vvd_developer_mode enabled
       break
     fi
     sleep 10
   done
-  wait_ready 300 || echo "::warning::no non-black screen after the developer mode reboot"
+  wait_ready 180 || echo "::warning::no non-black screen after the developer mode reboot"
   shot 00-vvd-developer-mode
 fi
-timeout 30 vda shell inputd-cli get_screen_size > "$OUT/logs/inputd-screen-size.txt" 2>&1 || true
+timeout 30 "${VDA[@]}" shell inputd-cli get_screen_size > "$OUT/logs/inputd-screen-size.txt" 2>&1 || true
 { free -h; df -h /; } > "$OUT/logs/host-after-boot.txt" 2>&1
 echo "developer mode: $(status_of vvd_developer_mode)"

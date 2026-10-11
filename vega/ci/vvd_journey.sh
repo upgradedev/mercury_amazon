@@ -27,7 +27,7 @@ device="$(device_name)"
 vda shell loggingctl log -o short-precise -f > "$OUT/logs/device.log" 2>&1 &
 log_pid=$!
 recording=""
-if python3 "$CI_DIR/vvd_console.py" record-start "$OUT/journey.webm" 180 > "$OUT/logs/screenrecord.log" 2>&1; then
+if python3 "$CI_DIR/vvd_console.py" record-start "$OUT/vvd-mercury.webm" 180 > "$OUT/logs/screenrecord.log" 2>&1; then
   recording=1
 fi
 
