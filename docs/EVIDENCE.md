@@ -1172,7 +1172,7 @@ because it shells out to `git log` for the commit fallback.
 
 ```bash
 python -m pytest tests/ -q                                    # 732 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2092 statements
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2135 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
