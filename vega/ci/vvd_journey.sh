@@ -73,11 +73,11 @@ if [ $install_rc != 0 ]; then
       echo "unnamed in the error; the only extra need over the control is webview_4" >> "$OUT/status/mercury_missing_module"
     else
       status mercury_result blocked_other_module_missing
-      shot 21-mercury-install-refused
+      shot 21-launcher-after-refusal
       exit 1
     fi
     echo "::warning::Amazon's documented VVD limit reproduced: $missing"
-    shot 21-mercury-install-refused
+    shot 21-launcher-after-refusal
     exit 0
   fi
   status mercury_result install_failed

@@ -29,6 +29,11 @@ for attempt in 1 2 3; do
   log="$OUT/logs/sdk-install-$attempt.log"
   if curl -fsSL --retry 3 --retry-delay 5 https://sdk-installer.vega.labcollab.net/get_vvm.sh -o "$installer"; then
     sha256sum "$installer" | tee "$OUT/logs/get_vvm.sha256"
+    if [ -n "${GET_VVM_SHA256:-}" ] && [ "$(sha256sum "$installer" | cut -d' ' -f1)" != "$GET_VVM_SHA256" ]; then
+      status sdk_install installer_changed
+      echo "::error::get_vvm.sh differs from the reviewed installer (GET_VVM_SHA256); review it, then update the pin"
+      exit 1
+    fi
     started=$SECONDS
     if NONINTERACTIVE=true timeout 1200 bash "$installer" < /dev/null > "$log" 2>&1; then
       echo "installer finished in $((SECONDS - started)) s" | tee -a "$log"

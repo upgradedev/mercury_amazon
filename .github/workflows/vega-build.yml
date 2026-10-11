@@ -1,9 +1,9 @@
-name: Vega OS build and virtual device run
+name: Vega OS build and virtual device control run
 
-# Builds Mercury's Vega OS app (vega/) with Amazon's Vega SDK and runs it on the
-# Vega Virtual Device (VVD): armv7 for Vega Fire TV sticks, x86_64 for the VVD on
-# this Intel runner. It then drives the same remote journey that
-# android-tv-footage.yml films on Fire OS.
+# Builds Mercury's Vega OS app (vega/) with Amazon's Vega SDK and tries it on the
+# Vega Virtual Device (VVD), recording the result: armv7 for Vega Fire TV sticks,
+# x86_64 for the VVD on this Intel runner. If Mercury installs, the run drives the
+# same remote journey that android-tv-footage.yml films on Fire OS.
 #
 # Footage and build evidence, not a runtime receipt. It writes nothing that
 # ci/readiness.py reads and touches none of ANDROID_TV_RUNTIME_PATHS, so gate J4
@@ -12,16 +12,19 @@ name: Vega OS build and virtual device run
 # Known limit: Amazon documents that the VVD has no WebView module on Ubuntu or
 # Intel Macs (https://developer.amazon.com/docs/vega/0.24/kvd-issues.html,
 # "Webview-based Vega app fails on Ubuntu"). So the run also installs Amazon's
-# helloWorld template as a control. If the control renders and Mercury's install
-# reports the missing module, the result is that documented limit, not a broken
-# pipeline. The verdict step accepts only that outcome or a completed journey.
+# helloWorld template as a control. A green verdict means one of two outcomes:
+# Mercury completed the journey, or the VVD refused Mercury for the missing
+# /com.amazon.kepler.webview_4@IWebview_4 module while the control rendered. The
+# second outcome is accepted, and it does NOT mean Mercury ran on Vega OS: read
+# status/mercury_result in the evidence artifact before quoting a run.
+#
+# Manual only. The SDK installer (get_vvm.sh) shows a license agreement and
+# NONINTERACTIVE=true accepts it, which places the run under the Amazon Program
+# Materials License Agreement (https://developer.amazon.com/support/legal/pml).
+# Dispatch it only after the repository owner has accepted those terms. The unit
+# tests and type check of vega/ run without the SDK in vega-checks.yml.
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/mercury-vega-20261011]
-    paths:
-      - vega/**
-      - .github/workflows/vega-build.yml
 
 permissions:
   contents: read
@@ -32,7 +35,7 @@ concurrency:
 
 jobs:
   vega:
-    name: Build for Vega OS and run on the Vega Virtual Device
+    name: Build Mercury for Vega OS; VVD control run
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -42,6 +45,12 @@ jobs:
       VEGA_STRICT_CHECKS: "1"
       # The SDK installer and CLI take their defaults instead of prompting.
       NONINTERACTIVE: "true"
+      # The SDK of the evidence run 38154659098 (vega-provenance.json sdk_version);
+      # install_sdk.sh passes it to get_vvm.sh, so a rerun builds with the same SDK.
+      VEGA_SDK_VERSION: "0.24.12112"
+      # sha256 of get_vvm.sh as downloaded in run 38154659098 (logs/get_vvm.sha256).
+      # install_sdk.sh stops when the installer changes, so a new one is reviewed first.
+      GET_VVM_SHA256: "0e5386581e5cf518202687213dd26d1b35e70242d1bd190cdea7096a99476ae0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
