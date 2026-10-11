@@ -170,17 +170,19 @@ def test_an_anchored_simulation_says_it_was_anchored(client):
 
 
 def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(client):
-    """The README's demo table, driven against this checkout's real git log.
+    """The README's demo table, driven against this repository's recorded git log window.
 
     This used to be conditional: the anchored-simulation test above only asserted
     anything ``if data["offending_commit"] is not None``, so the day checkout-api
     stopped attributing, the table in the README would have gone stale with the suite
-    still green. It can stop attributing: which commit the fixture anchors to is chosen
-    from the real log, and the log grows every time somebody commits.
+    still green. It could stop attributing: which commit the fixture anchors to was
+    chosen from git log at HEAD, which grows every time somebody commits. The window is
+    now recorded at one merge (tests/unit/test_local_git_window.py shows new commits
+    cannot move it).
 
-    So the verdicts are asserted, not conditioned on. If a burst of commits ever makes
-    the attributing demo unreachable, this fails and the README is corrected rather
-    than quietly wrong.
+    So the verdicts are asserted, not conditioned on. If a re-recorded window ever makes
+    a demo row unreachable, this fails and the README is corrected rather than quietly
+    wrong.
     """
     expected = {
         "checkout-api": ("ANOMALY_ATTRIBUTED", None),
@@ -193,8 +195,9 @@ def test_the_five_demo_services_reach_the_five_verdicts_the_readme_promises(clie
         data = client.post("/mcp/tools/what_changed", json={"service_name": service}).json()
         assert data["verdict"] == verdict, (
             f"{service} returned {data['verdict']}, not the {verdict} the README's demo "
-            f"table promises. The fixture anchors to this checkout's real git log, so a "
-            f"burst of commits can move this: fix the anchoring or the table, not this test."
+            f"table promises. The fixture anchors to the recorded git log window, so a "
+            f"re-recorded window (scripts/record_local_git_window.py) can move this: fix the "
+            f"anchoring, the recording or the table, not this test."
         )
         assert data["attribution"]["refusal_reason"] == refusal, service
         # Correlation alone never creates a rollback target. Even an attributed
