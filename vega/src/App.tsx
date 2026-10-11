@@ -5,8 +5,9 @@
  * wallboard/MainActivity.kt. It loads the same cockpit page that the Fire OS
  * app, GitHub Pages and the Lambda serve, so both Fire TV platforms show one
  * war room instead of two copies that can drift apart. The shell adds what a
- * browser lacks: the remote's BACK key, the MercuryHost bridge and an offline
- * screen.
+ * browser lacks: the remote's BACK key, the MercuryHost bridge, an offline
+ * screen, and the launch splash held until the first page load (the Lambda can
+ * be cold) instead of a blank screen.
  */
 import {WebView} from '@amazon-devices/webview';
 import type {
@@ -19,6 +20,10 @@ import type {
 import * as React from 'react';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {BackHandler, StyleSheet, Text, View} from 'react-native';
+import {
+  useHideSplashScreenCallback,
+  usePreventHideSplashScreen,
+} from '@amazon-devices/react-native-kepler';
 import {COCKPIT_URL, hostOf} from './cockpitUrl';
 import {
   BACK_FROM_APP,
@@ -29,15 +34,33 @@ import {
 } from './hostBridge';
 
 const BACKGROUND = '#060913';
+/** The splash never outlives this, even if the page neither loads nor fails. */
+export const SPLASH_LIMIT_MS = 20000;
 
 export const App = () => {
   const webRef = useRef<WebViewMethods>(null);
   const pageLoaded = useRef(false);
   const [failure, setFailure] = useState<string | null>(null);
 
+  // As in Amazon's vegaWebview template: keep the launch splash up until the
+  // page has loaded, so a cold Lambda shows the splash rather than a blank
+  // screen. It also goes when the offline screen appears, and after
+  // SPLASH_LIMIT_MS at the latest.
+  usePreventHideSplashScreen();
+  const hideSplashScreenCallback = useHideSplashScreenCallback();
+  const splashHidden = useRef(false);
+  const hideSplash = useCallback(() => {
+    if (!splashHidden.current) {
+      splashHidden.current = true;
+      hideSplashScreenCallback();
+    }
+  }, [hideSplashScreenCallback]);
+
   useEffect(() => {
     console.info(`[${TAG}] Loading Mercury cockpit from ${COCKPIT_URL}`);
-  }, []);
+    const timer = setTimeout(hideSplash, SPLASH_LIMIT_MS);
+    return () => clearTimeout(timer);
+  }, [hideSplash]);
 
   // Normally the WebView takes BACK itself (allowSystemKeyEvents) and the page
   // handles it. If the platform delivers it here instead, run the page's own
@@ -100,6 +123,7 @@ export const App = () => {
         injectedJavaScriptBeforeContentLoaded={HOST_BOOTSTRAP}
         onLoad={(event: WebViewNavigationEvent) => {
           pageLoaded.current = true;
+          hideSplash();
           const url = event.nativeEvent.url || COCKPIT_URL;
           console.info(`[${TAG}] journey:page_loaded:${url}`);
         }}
@@ -111,6 +135,7 @@ export const App = () => {
           // must not blank a working cockpit (MainActivity's rule).
           if (!pageLoaded.current) {
             setFailure(description);
+            hideSplash();
           }
         }}
         onHttpError={({nativeEvent}: WebViewHttpErrorEvent) => {

@@ -5,13 +5,16 @@ schema-version = 1
 # On a Vega Fire TV stick in Developer Mode (developer-mode.html):
 #   vega device install-app --packagePath build/armv7-release/mercurycockpit_armv7.vpkg
 #   vega device launch-app --appName com.upgradedev.mercury.main
-# The Vega Virtual Device on Ubuntu or an Intel Mac refuses this package: it has
-# no /com.amazon.kepler.webview_4 module (kvd-issues.html).
+# The Vega Virtual Device on Ubuntu or an Intel Mac refuses this package because
+# it has no WebView module (kvd-issues.html). Test on a Vega Fire TV stick.
 
 [package]
 title = "Mercury Cockpit"
 version = "1.0.0"
 id = "com.upgradedev.mercury"
+# 512x512 PNG under assets/image (manifest [package] reference; same form as
+# icon = "@image/default_app_icon.png" in AmazonAppDev/vega-scrolling-sample).
+icon = "@image/mercury_icon.png"
 
 [os.version]
 min = "1.2"
@@ -21,13 +24,16 @@ target = "1.2"
 [[needs.module]]
 id = "/com.amazon.vega.os@IVega_1_2"
 
+# The next two lines only make explicit what the build adds anyway. Amazon's
+# vegaWebview template does not declare them, and the build step
+# amzn_kepler_manifest_module_remapper adds both to any package that depends
+# on @amazon-devices/webview. Deleting them would not let the Ubuntu VVD
+# install this package: that device lacks the webview_4 module.
 [[needs.module]]
 id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
 
 [[needs.module]]
 id = "/com.amazon.kepler.webview_4@IWebview_4"
-
-
 
 [components]
 [[components.interactive]]

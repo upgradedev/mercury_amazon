@@ -18,7 +18,8 @@
  *    move twice).
  *  - BACK reaches the page as key "GoBack", keyCode 27, because the WebView sets
  *    allowSystemKeyEvents. firetv_nav.js listens for Backspace and Escape only,
- *    so a capture listener handles GoBack first. The order matches
+ *    so a capture listener handles GoBack first. Escape typed in a text field
+ *    (INPUT, TEXTAREA, contentEditable) is left to the field. The order matches
  *    MainActivity.handleBack: the page (window.navigateDpad('BACK')), then
  *    history, then the platform, which the app reaches when the page posts
  *    back_unhandled.
@@ -80,7 +81,13 @@ export const HOST_BOOTSTRAP = `(function () {
     send({ type: 'back_unhandled' });
   };
   function isBack(event) {
-    return event.key === 'GoBack' || event.keyCode === 27;
+    if (event.key !== 'GoBack' && event.keyCode !== 27) { return false; }
+    // Escape in a text field belongs to the field, as in firetv_nav.js. The
+    // remote's BACK (GoBack) still navigates: it is the TV user's only way out.
+    var target = event.target;
+    var typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+      || target.isContentEditable === true);
+    return event.key === 'GoBack' || !typing;
   }
   window.addEventListener('keydown', function (event) {
     if (!isBack(event)) { return; }

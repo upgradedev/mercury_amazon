@@ -12,6 +12,7 @@ type Listener = (event: Record<string, unknown>) => void;
 type FakeEvent = {
   key: string;
   keyCode: number;
+  target: Record<string, unknown> | null;
   repeat: boolean;
   prevented: boolean;
   stopped: boolean;
@@ -35,10 +36,11 @@ function fakePage(options: {navigateDpad?: (direction: string) => boolean; histo
   // The bootstrap only touches window, setTimeout, Date and JSON.
   const install = (script: string) => new Function('window', script)(win);
   install(HOST_BOOTSTRAP);
-  const press = (key: string, keyCode: number): FakeEvent => {
+  const press = (key: string, keyCode: number, target: Record<string, unknown> | null = null): FakeEvent => {
     const event: FakeEvent = {
       key,
       keyCode,
+      target,
       repeat: false,
       prevented: false,
       stopped: false,
@@ -112,6 +114,31 @@ describe('HOST_BOOTSTRAP', () => {
   it('runs the same routine when BACK reaches the app instead', () => {
     const {posted, install} = fakePage({navigateDpad: () => false});
     install(BACK_FROM_APP);
+    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
+  });
+
+  it('leaves Escape in a text field to the field', () => {
+    const navigateDpad = jest.fn(() => false);
+    const {posted, press} = fakePage({navigateDpad});
+    for (const target of [{tagName: 'INPUT'}, {tagName: 'TEXTAREA'}, {tagName: 'DIV', isContentEditable: true}]) {
+      const event = press('Escape', 27, target);
+      expect(event.prevented).toBe(false);
+      expect(event.stopped).toBe(false);
+    }
+    expect(navigateDpad).not.toHaveBeenCalled();
+    expect(posted).toHaveLength(0);
+  });
+
+  it('still takes the remote BACK while a text field has focus', () => {
+    const {posted, press} = fakePage({navigateDpad: () => false});
+    const event = press('GoBack', 27, {tagName: 'INPUT'});
+    expect(event.prevented).toBe(true);
+    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
+  });
+
+  it('takes Escape outside a text field as BACK', () => {
+    const {posted, press} = fakePage({navigateDpad: () => false});
+    expect(press('Escape', 27, {tagName: 'BUTTON'}).prevented).toBe(true);
     expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
   });
 
