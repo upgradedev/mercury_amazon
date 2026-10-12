@@ -1,13 +1,23 @@
 /**
- * Vega OS host for the Mercury cockpit.
+ * Vega OS host for the Mercury incident board.
  *
  * The Vega counterpart of app/src/main/kotlin/io/github/upgradedev/mercury/
- * wallboard/MainActivity.kt. It loads the same cockpit page that the Fire OS
- * app, GitHub Pages and the Lambda serve, so both Fire TV platforms show one
- * war room instead of two copies that can drift apart. The shell adds what a
- * browser lacks: the remote's BACK key, the MercuryHost bridge, an offline
- * screen, and the launch splash held until the first page load (the Lambda can
- * be cold) instead of a blank screen.
+ * wallboard/MainActivity.kt. The board itself is the page the Fire OS app,
+ * GitHub Pages and the Lambda serve, so both Fire TV platforms show one war
+ * room instead of two copies that can drift apart. What is native here:
+ *
+ *  - LaunchView (ShellScreens.tsx), drawn over the WebView until its first
+ *    load, and OfflineView with a focusable Try again instead of a blank or
+ *    white failure. shell.ts decides which one shows.
+ *  - Focus: the WebView takes focus when it mounts (hasTVPreferredFocus, as
+ *    Amazon's WebView guide sets it) and LaunchView has nothing focusable, so
+ *    the board has the D-pad when LaunchView lifts. Try again mounts a fresh
+ *    WebView, which takes focus back from the button.
+ *  - BACK, through BackHandler. allowSystemKeyEvents stays false, so the page
+ *    never receives the remote's BACK itself and every press comes here. On
+ *    LaunchView and OfflineView it closes the app. On the board it goes to the
+ *    page first (BACK_FROM_APP), then history, then the platform, which is
+ *    MainActivity.handleBack's order.
  */
 import {WebView} from '@amazon-devices/webview';
 import type {
@@ -18,65 +28,46 @@ import type {
   WebViewNavigationEvent,
 } from '@amazon-devices/webview/dist/types/WebViewTypes';
 import * as React from 'react';
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {BackHandler, StyleSheet, Text, View} from 'react-native';
-import {
-  useHideSplashScreenCallback,
-  usePreventHideSplashScreen,
-} from '@amazon-devices/react-native-kepler';
+import {useCallback, useEffect, useReducer, useRef} from 'react';
+import {BackHandler, StyleSheet, View} from 'react-native';
 import {COCKPIT_URL, hostOf} from './cockpitUrl';
-import {
-  BACK_FROM_APP,
-  HOST_BOOTSTRAP,
-  TAG,
-  journeyLine,
-  parseHostMessage,
-} from './hostBridge';
-
-const BACKGROUND = '#060913';
-/** The splash never outlives this, even if the page neither loads nor fails. */
-export const SPLASH_LIMIT_MS = 20000;
+import {BACK_FROM_APP, HOST_BOOTSTRAP, TAG, journeyLine, parseHostMessage} from './hostBridge';
+import {CONNECT_TIMEOUT_MS, INITIAL_SHELL, describeLoadError, shellReducer} from './shell';
+import {LaunchView, OfflineView} from './ShellScreens';
+import {BOARD} from './theme';
 
 export const App = () => {
+  const [{attempt, phase, reason}, dispatch] = useReducer(shellReducer, INITIAL_SHELL);
   const webRef = useRef<WebViewMethods>(null);
-  const pageLoaded = useRef(false);
-  const [failure, setFailure] = useState<string | null>(null);
-
-  // As in Amazon's vegaWebview template: keep the launch splash up until the
-  // page has loaded, so a cold Lambda shows the splash rather than a blank
-  // screen. It also goes when the offline screen appears, and after
-  // SPLASH_LIMIT_MS at the latest.
-  usePreventHideSplashScreen();
-  const hideSplashScreenCallback = useHideSplashScreenCallback();
-  const splashHidden = useRef(false);
-  const hideSplash = useCallback(() => {
-    if (!splashHidden.current) {
-      splashHidden.current = true;
-      hideSplashScreenCallback();
-    }
-  }, [hideSplashScreenCallback]);
+  // The WebView's own answer to "is there history?", from its last navigation
+  // event: MainActivity asks webView.canGoBack() at the same point.
+  const canGoBack = useRef(false);
 
   useEffect(() => {
-    console.info(`[${TAG}] Loading Mercury cockpit from ${COCKPIT_URL}`);
-    const timer = setTimeout(hideSplash, SPLASH_LIMIT_MS);
+    if (phase !== 'connecting') {
+      return undefined;
+    }
+    console.info(`[${TAG}] Connecting to ${COCKPIT_URL} (attempt ${attempt})`);
+    const timer = setTimeout(() => {
+      console.warn(`[${TAG}] No load from ${hostOf(COCKPIT_URL)} in ${CONNECT_TIMEOUT_MS} ms`);
+      dispatch({type: 'timed_out', attempt});
+    }, CONNECT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [hideSplash]);
+  }, [phase, attempt]);
 
-  // Normally the WebView takes BACK itself (allowSystemKeyEvents) and the page
-  // handles it. If the platform delivers it here instead, run the page's own
-  // BACK routine. On the offline screen there is no WebView, so returning false
-  // lets the platform default close the app.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       const web = webRef.current;
-      if (!web || failure !== null) {
-        return false;
+      if (phase === 'board' && web) {
+        web.injectJavaScript(BACK_FROM_APP);
+      } else {
+        // LaunchView or OfflineView: there is nothing to go back to.
+        BackHandler.exitApp();
       }
-      web.injectJavaScript(BACK_FROM_APP);
       return true;
     });
     return () => subscription.remove();
-  }, [failure]);
+  }, [phase]);
 
   const onMessage = useCallback((event: WebViewMessageEvent) => {
     const message = parseHostMessage(event.nativeEvent.data);
@@ -84,68 +75,67 @@ export const App = () => {
       return;
     }
     if (message.type === 'back_unhandled') {
-      // The page and its history had nothing to close: leave, as
-      // MainActivity.handleBack does with finish().
-      BackHandler.exitApp();
+      // The page had nothing open to close: history next, then leave.
+      if (canGoBack.current && webRef.current) {
+        webRef.current.goBack();
+      } else {
+        BackHandler.exitApp();
+      }
       return;
     }
     console.info(`[${TAG}] ${journeyLine(message.event, message.detail)}`);
   }, []);
 
-  if (failure !== null) {
-    return (
-      <View style={styles.offline}>
-        <Text style={styles.offlineTitle}>Mercury cockpit unreachable</Text>
-        <Text style={styles.offlineBody}>
-          This Fire TV could not load {COCKPIT_URL}
-        </Text>
-        <Text style={styles.offlineHint}>Reported: {failure}</Text>
-        <Text style={styles.offlineHint}>
-          Check that {hostOf(COCKPIT_URL)} is reachable, then relaunch. Press
-          BACK to close.
-        </Text>
-      </View>
-    );
-  }
+  const retry = useCallback(() => {
+    console.info(`[${TAG}] Try again`);
+    canGoBack.current = false;
+    dispatch({type: 'retry'});
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <WebView
-        ref={webRef}
-        style={styles.webview}
-        source={{uri: COCKPIT_URL}}
-        hasTVPreferredFocus={true}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        mediaPlaybackRequiresUserAction={false}
-        mixedContentMode="never"
-        allowSystemKeyEvents={true}
-        injectedJavaScriptBeforeContentLoaded={HOST_BOOTSTRAP}
-        onLoad={(event: WebViewNavigationEvent) => {
-          pageLoaded.current = true;
-          hideSplash();
-          const url = event.nativeEvent.url || COCKPIT_URL;
-          console.info(`[${TAG}] journey:page_loaded:${url}`);
-        }}
-        onError={({nativeEvent}: WebViewErrorEvent) => {
-          const description = nativeEvent.description || 'unknown error';
-          console.warn(`[${TAG}] Cockpit failed to load: ${nativeEvent.code} ${description}`);
-          // Vega's onError has no isMainFrame flag. A failure before the first
-          // successful load is the main document; a later sub-resource failure
-          // must not blank a working cockpit (MainActivity's rule).
-          if (!pageLoaded.current) {
-            setFailure(description);
-            hideSplash();
-          }
-        }}
-        onHttpError={({nativeEvent}: WebViewHttpErrorEvent) => {
-          console.warn(
-            `[${TAG}] HTTP ${nativeEvent.statusCode} at ${nativeEvent.url} (main frame: ${nativeEvent.isMainFrame})`,
-          );
-        }}
-        onMessage={onMessage}
-        onCloseWindow={() => BackHandler.exitApp()}
-      />
+    <View style={styles.root}>
+      {phase !== 'offline' && (
+        <WebView
+          key={attempt}
+          ref={webRef}
+          style={styles.webview}
+          source={{uri: COCKPIT_URL}}
+          hasTVPreferredFocus={true}
+          allowSystemKeyEvents={false}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          mediaPlaybackRequiresUserAction={false}
+          mixedContentMode="never"
+          injectedJavaScriptBeforeContentLoaded={HOST_BOOTSTRAP}
+          onLoadStart={({nativeEvent}: WebViewNavigationEvent) => {
+            canGoBack.current = nativeEvent.canGoBack === true;
+          }}
+          onLoad={({nativeEvent}: WebViewNavigationEvent) => {
+            canGoBack.current = nativeEvent.canGoBack === true;
+            console.info(`[${TAG}] journey:page_loaded:${nativeEvent.url || COCKPIT_URL}`);
+            dispatch({type: 'loaded', attempt});
+          }}
+          onError={({nativeEvent}: WebViewErrorEvent) => {
+            const failure = describeLoadError(nativeEvent.code, nativeEvent.description);
+            console.warn(`[${TAG}] Cockpit failed to load: ${failure}`);
+            dispatch({type: 'load_failed', attempt, reason: failure});
+          }}
+          onHttpError={({nativeEvent}: WebViewHttpErrorEvent) => {
+            console.warn(
+              `[${TAG}] HTTP ${nativeEvent.statusCode} at ${nativeEvent.url} (main frame: ${nativeEvent.isMainFrame})`,
+            );
+            if (nativeEvent.isMainFrame) {
+              dispatch({type: 'main_frame_failed', attempt, reason: `HTTP ${nativeEvent.statusCode}`});
+            }
+          }}
+          onMessage={onMessage}
+          onCloseWindow={() => BackHandler.exitApp()}
+        />
+      )}
+      {phase === 'connecting' && <LaunchView />}
+      {phase === 'offline' && (
+        <OfflineView host={hostOf(COCKPIT_URL)} reason={reason ?? 'unknown error'} onRetry={retry} />
+      )}
     </View>
   );
 };
@@ -154,15 +144,6 @@ export default App;
 
 // flex: 1 on the container is what Vega needs for the WebView to take focus.
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: BACKGROUND},
-  webview: {flex: 1, backgroundColor: BACKGROUND},
-  offline: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-    paddingVertical: 60,
-    paddingHorizontal: 150,
-  },
-  offlineTitle: {color: '#8b5cf6', fontSize: 52, marginBottom: 24},
-  offlineBody: {color: '#f8fafc', fontSize: 30, marginBottom: 20},
-  offlineHint: {color: '#94a3b8', fontSize: 24, marginBottom: 12},
+  root: {flex: 1, backgroundColor: BOARD.ground},
+  webview: {flex: 1, backgroundColor: BOARD.ground},
 });

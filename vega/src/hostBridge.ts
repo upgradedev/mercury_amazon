@@ -15,17 +15,20 @@
  *  - Arrows and Enter stay with the page. docs/firetv_nav.js already calls
  *    preventDefault on them, which is how a page turns off the WebView's
  *    built-in spatial navigation, so the app never forwards them (focus would
- *    move twice).
- *  - BACK reaches the page as key "GoBack", keyCode 27, because the WebView sets
- *    allowSystemKeyEvents. firetv_nav.js listens for Backspace and Escape only,
- *    so a capture listener handles GoBack first. Escape typed in a text field
- *    (INPUT, TEXTAREA, contentEditable) is left to the field. The order matches
- *    MainActivity.handleBack: the page (window.navigateDpad('BACK')), then
- *    history, then the platform, which the app reaches when the page posts
- *    back_unhandled.
- *  - If the platform hands BACK to the app's BackHandler instead, the app
- *    injects BACK_FROM_APP, which runs the same routine. A 300 ms guard stops
- *    one press from being handled twice if both paths fire.
+ *    move twice). The bootstrap adds no key listener of its own, so Escape and
+ *    Backspace also reach firetv_nav.js exactly as in a browser.
+ *  - The remote's BACK never reaches the page as a key: the WebView keeps
+ *    allowSystemKeyEvents false, so BACK goes to the app's BackHandler, and on
+ *    the board the app injects BACK_FROM_APP. That runs window.mercuryVegaBack,
+ *    which works like MainActivity.handleBack asking the page:
+ *      1. A focused text field (INPUT of a text type, TEXTAREA,
+ *         contentEditable) keeps BACK: the field loses focus and nothing else
+ *         happens, so BACK never closes a panel or the app under a typist.
+ *      2. The page closes what is open (window.navigateDpad('BACK')).
+ *      3. Otherwise the page posts back_unhandled. The app then goes back in
+ *         history when the WebView reports canGoBack, and exits when it does
+ *         not. history.length cannot make that call: it counts forward
+ *         entries too, so a page could keep going "back" from its first entry.
  */
 export const TAG = 'MercuryCockpit';
 export const HOST_NAME = 'mercury-vega-webview';
@@ -71,39 +74,26 @@ export const HOST_BOOTSTRAP = `(function () {
       }
     };
   }
-  var lastBack = 0;
+  var TEXT_INPUT_TYPES = /^(text|password|search|email|url|tel|number)$/i;
+  function isTextField(node) {
+    if (!node) { return false; }
+    if (node.isContentEditable === true || node.tagName === 'TEXTAREA') { return true; }
+    return node.tagName === 'INPUT' && TEXT_INPUT_TYPES.test(node.type || 'text');
+  }
   window.mercuryVegaBack = function () {
-    var now = Date.now();
-    if (now - lastBack < 300) { return; }
-    lastBack = now;
+    var active = window.document ? window.document.activeElement : null;
+    if (isTextField(active) && typeof active.blur === 'function') { active.blur(); return; }
     if (typeof window.navigateDpad === 'function' && window.navigateDpad('BACK') === true) { return; }
-    if (window.history && window.history.length > 1) { window.history.back(); return; }
     send({ type: 'back_unhandled' });
   };
-  function isBack(event) {
-    if (event.key !== 'GoBack' && event.keyCode !== 27) { return false; }
-    // Escape in a text field belongs to the field, as in firetv_nav.js. The
-    // remote's BACK (GoBack) still navigates: it is the TV user's only way out.
-    var target = event.target;
-    var typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
-      || target.isContentEditable === true);
-    return event.key === 'GoBack' || !typing;
-  }
-  window.addEventListener('keydown', function (event) {
-    if (!isBack(event)) { return; }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (!event.repeat) { window.mercuryVegaBack(); }
-  }, true);
-  window.addEventListener('keyup', function (event) {
-    if (!isBack(event)) { return; }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }, true);
 })();
 true;`;
 
-/** What the app injects when BACK reaches its BackHandler instead of the page. */
+/**
+ * What the app injects for a BACK press on the board. A page without the
+ * bootstrap (it runs on every navigation, so this is a safety net) is treated
+ * as having nothing open.
+ */
 export const BACK_FROM_APP = `(function () {
   if (typeof window.mercuryVegaBack === 'function') { window.mercuryVegaBack(); return; }
   if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage('{"type":"back_unhandled"}'); }

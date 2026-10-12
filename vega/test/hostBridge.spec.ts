@@ -7,64 +7,44 @@ import {
   sanitizeEvent,
 } from '../src/hostBridge';
 
-type Listener = (event: Record<string, unknown>) => void;
+type FakeElement = {tagName: string; type?: string; isContentEditable?: boolean; blur?: jest.Mock};
 
-type FakeEvent = {
-  key: string;
-  keyCode: number;
-  target: Record<string, unknown> | null;
-  repeat: boolean;
-  prevented: boolean;
-  stopped: boolean;
-  preventDefault: () => void;
-  stopImmediatePropagation: () => void;
-};
-
-/** A window with just enough surface for the bootstrap: listeners, history, the bridge. */
-function fakePage(options: {navigateDpad?: (direction: string) => boolean; historyLength?: number} = {}) {
-  const listeners: Record<string, Listener[]> = {};
+/**
+ * A window with just enough surface for the bootstrap: the bridge, the page's
+ * navigateDpad, history and document.activeElement. addEventListener is
+ * recorded, to show the bootstrap leaves every key to the page.
+ */
+function fakePage(
+  options: {
+    navigateDpad?: (direction: string) => boolean;
+    historyLength?: number;
+    active?: FakeElement | null;
+    bridge?: boolean;
+  } = {},
+) {
   const posted: string[] = [];
+  const listeners: string[] = [];
   const back = jest.fn();
   const win: Record<string, unknown> = {
-    ReactNativeWebView: {postMessage: (data: string) => posted.push(data)},
-    addEventListener: (type: string, fn: Listener) => {
-      (listeners[type] = listeners[type] || []).push(fn);
-    },
+    addEventListener: (type: string) => listeners.push(type),
     history: {length: options.historyLength ?? 1, back},
     navigateDpad: options.navigateDpad,
+    document: {activeElement: options.active ?? null},
   };
-  // The bootstrap only touches window, setTimeout, Date and JSON.
-  const install = (script: string) => new Function('window', script)(win);
-  install(HOST_BOOTSTRAP);
-  const press = (key: string, keyCode: number, target: Record<string, unknown> | null = null): FakeEvent => {
-    const event: FakeEvent = {
-      key,
-      keyCode,
-      target,
-      repeat: false,
-      prevented: false,
-      stopped: false,
-      preventDefault() {
-        this.prevented = true;
-      },
-      stopImmediatePropagation() {
-        this.stopped = true;
-      },
-    };
-    (listeners.keydown || []).forEach(fn => fn(event as unknown as Record<string, unknown>));
-    return event;
+  const attachBridge = () => {
+    win.ReactNativeWebView = {postMessage: (data: string) => posted.push(data)};
   };
-  return {win, posted, press, back, install};
+  if (options.bridge !== false) {
+    attachBridge();
+  }
+  // The scripts only touch window, setTimeout and JSON.
+  const run = (script: string) => new Function('window', script)(win);
+  run(HOST_BOOTSTRAP);
+  const pressBack = () => run(BACK_FROM_APP);
+  return {win, posted, listeners, back, run, pressBack, attachBridge};
 }
 
 describe('HOST_BOOTSTRAP', () => {
-  let now = 1_000_000;
-  beforeEach(() => {
-    now += 10_000;
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
-  });
-  afterEach(() => jest.restoreAllMocks());
-
   it('exposes the MercuryHost surface index.html checks for', () => {
     const {win} = fakePage();
     const host = win.MercuryHost as Record<string, () => unknown>;
@@ -83,78 +63,98 @@ describe('HOST_BOOTSTRAP', () => {
     });
   });
 
-  it('lets the page consume GoBack', () => {
-    const {posted, press} = fakePage({navigateDpad: direction => direction === 'BACK'});
-    const event = press('GoBack', 27);
-    expect(event.prevented).toBe(true);
-    expect(event.stopped).toBe(true);
-    expect(posted).toHaveLength(0);
-  });
-
-  it('goes back in history before asking the app to exit', () => {
-    const {posted, press, back} = fakePage({navigateDpad: () => false, historyLength: 3});
-    press('GoBack', 27);
-    expect(back).toHaveBeenCalledTimes(1);
-    expect(posted).toHaveLength(0);
-  });
-
-  it('reports GoBack the page and its history did not use', () => {
-    const {posted, press} = fakePage({navigateDpad: () => false});
-    press('GoBack', 27);
-    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
-  });
-
-  it('handles one press once when the key and the app both deliver it', () => {
-    const {posted, press, install} = fakePage({navigateDpad: () => false});
-    press('GoBack', 27);
-    install(BACK_FROM_APP);
-    expect(posted).toHaveLength(1);
-  });
-
-  it('runs the same routine when BACK reaches the app instead', () => {
-    const {posted, install} = fakePage({navigateDpad: () => false});
-    install(BACK_FROM_APP);
-    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
-  });
-
-  it('leaves Escape in a text field to the field', () => {
-    const navigateDpad = jest.fn(() => false);
-    const {posted, press} = fakePage({navigateDpad});
-    for (const target of [{tagName: 'INPUT'}, {tagName: 'TEXTAREA'}, {tagName: 'DIV', isContentEditable: true}]) {
-      const event = press('Escape', 27, target);
-      expect(event.prevented).toBe(false);
-      expect(event.stopped).toBe(false);
+  it('holds journey events until the bridge exists, then sends them in order', () => {
+    jest.useFakeTimers();
+    try {
+      const {win, posted, attachBridge} = fakePage({bridge: false});
+      const host = win.MercuryHost as {reportJourney: (e: string, d: string) => void};
+      host.reportJourney('what_changed', 'first');
+      host.reportJourney('rollback_staged', 'second');
+      expect(posted).toHaveLength(0);
+      attachBridge();
+      jest.advanceTimersByTime(100);
+      expect(posted.map(data => (parseHostMessage(data) as {detail: string}).detail)).toEqual([
+        'first',
+        'second',
+      ]);
+    } finally {
+      jest.useRealTimers();
     }
-    expect(navigateDpad).not.toHaveBeenCalled();
-    expect(posted).toHaveLength(0);
   });
 
-  it('still takes the remote BACK while a text field has focus', () => {
-    const {posted, press} = fakePage({navigateDpad: () => false});
-    const event = press('GoBack', 27, {tagName: 'INPUT'});
-    expect(event.prevented).toBe(true);
-    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
-  });
-
-  it('takes Escape outside a text field as BACK', () => {
-    const {posted, press} = fakePage({navigateDpad: () => false});
-    expect(press('Escape', 27, {tagName: 'BUTTON'}).prevented).toBe(true);
-    expect(parseHostMessage(posted[0])).toEqual({type: 'back_unhandled'});
-  });
-
-  it('leaves arrows and Enter to firetv_nav.js', () => {
-    const {posted, press} = fakePage({navigateDpad: () => true});
-    expect(press('ArrowRight', 39).prevented).toBe(false);
-    expect(press('Enter', 13).prevented).toBe(false);
-    expect(posted).toHaveLength(0);
+  it('adds no key listener, so arrows, Enter, Escape and Backspace stay with firetv_nav.js', () => {
+    const {listeners} = fakePage();
+    expect(listeners).toEqual([]);
   });
 
   it('installs once even if injected twice', () => {
-    const {win, posted, press, install} = fakePage({navigateDpad: () => false});
-    install(HOST_BOOTSTRAP);
-    press('GoBack', 27);
+    const {win, posted, run, pressBack} = fakePage({navigateDpad: () => false});
+    const first = win.mercuryVegaBack;
+    run(HOST_BOOTSTRAP);
+    expect(win.mercuryVegaBack).toBe(first);
+    pressBack();
     expect(posted).toHaveLength(1);
-    expect(typeof win.mercuryVegaBack).toBe('function');
+  });
+});
+
+describe('BACK on the board (BACK_FROM_APP)', () => {
+  it('lets the page close what is open', () => {
+    const navigateDpad = jest.fn((direction: string) => direction === 'BACK');
+    const {posted, pressBack} = fakePage({navigateDpad});
+    pressBack();
+    expect(navigateDpad).toHaveBeenCalledWith('BACK');
+    expect(posted).toHaveLength(0);
+  });
+
+  it('reports a BACK the page did not use, and leaves history to the app', () => {
+    const {posted, back, pressBack} = fakePage({navigateDpad: () => false, historyLength: 3});
+    pressBack();
+    expect(back).not.toHaveBeenCalled();
+    expect(posted.map(parseHostMessage)).toEqual([{type: 'back_unhandled'}]);
+  });
+
+  it('handles every press: two quick presses are two answers', () => {
+    const {posted, pressBack} = fakePage({navigateDpad: () => false});
+    pressBack();
+    pressBack();
+    expect(posted).toHaveLength(2);
+  });
+
+  it('takes a focused text field out of focus and does nothing else', () => {
+    const fields: FakeElement[] = [
+      {tagName: 'INPUT', type: 'text'},
+      {tagName: 'INPUT', type: 'password'},
+      {tagName: 'TEXTAREA'},
+      {tagName: 'DIV', isContentEditable: true},
+    ];
+    for (const field of fields) {
+      field.blur = jest.fn();
+      const navigateDpad = jest.fn(() => false);
+      const {posted, pressBack} = fakePage({navigateDpad, active: field});
+      pressBack();
+      expect(field.blur).toHaveBeenCalledTimes(1);
+      expect(navigateDpad).not.toHaveBeenCalled();
+      expect(posted).toHaveLength(0);
+    }
+  });
+
+  it('treats a focused button or checkbox as the page, not as a text field', () => {
+    for (const active of [{tagName: 'BUTTON'}, {tagName: 'INPUT', type: 'checkbox'}]) {
+      const blur = jest.fn();
+      const navigateDpad = jest.fn(() => false);
+      const {posted, pressBack} = fakePage({navigateDpad, active: {...active, blur}});
+      pressBack();
+      expect(blur).not.toHaveBeenCalled();
+      expect(navigateDpad).toHaveBeenCalledWith('BACK');
+      expect(posted.map(parseHostMessage)).toEqual([{type: 'back_unhandled'}]);
+    }
+  });
+
+  it('reaches the app even on a page without the bootstrap', () => {
+    const posted: string[] = [];
+    const win = {ReactNativeWebView: {postMessage: (data: string) => posted.push(data)}};
+    new Function('window', BACK_FROM_APP)(win);
+    expect(posted.map(parseHostMessage)).toEqual([{type: 'back_unhandled'}]);
   });
 });
 
