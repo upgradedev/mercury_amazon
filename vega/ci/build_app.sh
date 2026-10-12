@@ -115,6 +115,17 @@ ls -la "$OUT/vpkg"
 for file in manifest.toml package.json package-lock.json; do
   cp "$app/$file" "$OUT/logs/mercury-$file" 2>/dev/null || true
 done
+# The manifest each vpkg carries: vega/manifest.toml plus the modules the
+# build's remapper (amzn_kepler_manifest_module_remapper) added for the
+# @amazon-devices packages, WebView included.
+for arch in armv7 x86_64; do
+  packaged="$(find "$app/build" -path "*/vega/$arch/Release/manifest.toml" 2>/dev/null | head -1)"
+  if [ -n "$packaged" ]; then
+    cp "$packaged" "$OUT/logs/mercury-manifest-packaged-$arch.toml"
+    status "mercury_packaged_webview_$arch" \
+      "$(grep -c 'com.amazon.kepler.webview_4@IWebview_4' "$packaged" || true)"
+  fi
+done
 find "$app/build" -maxdepth 3 > "$OUT/logs/mercury-build-tree.txt" 2>/dev/null || true
 
 # A committed vega/ must not change when it is installed, tested and built.

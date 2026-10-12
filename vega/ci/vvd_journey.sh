@@ -54,14 +54,20 @@ cat "$OUT/logs/mercury-install.log"
 needs_modules() {  # needs_modules <manifest.toml>: the [[needs.module]] ids, sorted
   awk '/^\[/{inside = ($0 ~ /^\[\[needs\.module\]\]/)} inside && /^id *=/{gsub(/^id *= *"|" *$/, ""); print}' "$1" | sort
 }
+packaged_manifest() {  # packaged_manifest <app dir>: the x86_64 vpkg's manifest, else the source one
+  local found
+  found="$(find "$1/build" -path '*/vega/x86_64/Release/manifest.toml' 2>/dev/null | head -1)"
+  printf '%s' "${found:-$1/manifest.toml}"
+}
 if [ $install_rc != 0 ]; then
   sleep 3
   missing="$(grep -hiE 'module dependency not found|IWebview|webview_[0-9]' \
     "$OUT/logs/mercury-install.log" "$OUT/logs/device.log" 2>/dev/null | head -8)"
   printf '%s\n' "$missing" > "$OUT/status/mercury_missing_module"
-  # What Mercury needs that the control app (installed fine) does not.
-  comm -23 <(needs_modules "$(status_of mercury_app_dir)/manifest.toml") \
-    <(needs_modules "$(status_of template_root_helloWorld)/manifest.toml") > "$OUT/status/mercury_extra_needs"
+  # What Mercury's package needs that the control's (installed fine) does not.
+  # Both are read from the built packages: the remapper adds modules at build time.
+  comm -23 <(needs_modules "$(packaged_manifest "$(status_of mercury_app_dir)")") \
+    <(needs_modules "$(packaged_manifest "$(status_of template_root_helloWorld)")") > "$OUT/status/mercury_extra_needs"
   if grep -qi 'module dependency not found' <<< "$missing"; then
     if grep -qiE 'IWebview|webview_[0-9]' <<< "$missing"; then
       status mercury_result blocked_webview_module_missing

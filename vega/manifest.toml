@@ -1,39 +1,34 @@
 schema-version = 1
 
-# Mercury on Vega OS: a WebView shell for the cockpit page the Fire OS app loads.
+# Mercury on Vega OS: a native React Native shell around the incident board
+# page the Fire OS app loads.
 # Build on Linux or macOS with the Vega SDK: npm ci && npm run build:release.
-# On a Vega Fire TV stick in Developer Mode (developer-mode.html):
-#   vega device install-app --packagePath build/armv7-release/mercurycockpit_armv7.vpkg
+# The Vega Virtual Device runs WebView apps only on an Apple Silicon Mac; on
+# Ubuntu or an Intel Mac it refuses this package (kvd-issues.html). On a Mac
+# VVD, or a Vega Fire TV stick in Developer Mode (developer-mode.html):
+#   vega device install-app --packagePath build/<arch>-release/mercurycockpit_<arch>.vpkg
 #   vega device launch-app --appName com.upgradedev.mercury.main
-# The Vega Virtual Device on Ubuntu or an Intel Mac refuses this package because
-# it has no WebView module (kvd-issues.html). Test on a Vega Fire TV stick.
 
 [package]
 title = "Mercury Cockpit"
 version = "1.0.0"
 id = "com.upgradedev.mercury"
-# 512x512 PNG under assets/image (manifest [package] reference; same form as
-# icon = "@image/default_app_icon.png" in AmazonAppDev/vega-scrolling-sample).
+# The board's wordmark tile from docs/index.html, as manifest-package.html asks:
+# a 512x512 PNG (1 MB at most) under assets/image. Without it the launcher
+# shows the system's grey placeholder.
 icon = "@image/mercury_icon.png"
 
 [os.version]
 min = "1.2"
 target = "1.2"
 
+# As in Amazon's vegaWebview template. The build's module remapper adds the
+# WebView, KeplerScript and React Native runtime modules that the installed
+# @amazon-devices packages need (amzn_kepler_manifest_module_remapper in the
+# build log), so they are not listed by hand.
 [needs]
 [[needs.module]]
 id = "/com.amazon.vega.os@IVega_1_2"
-
-# The next two lines only make explicit what the build adds anyway. Amazon's
-# vegaWebview template does not declare them, and the build step
-# amzn_kepler_manifest_module_remapper adds both to any package that depends
-# on @amazon-devices/webview. Deleting them would not let the Ubuntu VVD
-# install this package: that device lacks the webview_4 module.
-[[needs.module]]
-id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
-
-[[needs.module]]
-id = "/com.amazon.kepler.webview_4@IWebview_4"
 
 [components]
 [[components.interactive]]
