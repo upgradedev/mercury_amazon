@@ -22,13 +22,23 @@ icon = "@image/mercury_icon.png"
 min = "1.2"
 target = "1.2"
 
-# As in Amazon's vegaWebview template. The build's module remapper adds the
-# WebView, KeplerScript and React Native runtime modules that the installed
-# @amazon-devices packages need (amzn_kepler_manifest_module_remapper in the
-# build log), so they are not listed by hand.
+# Amazon's vegaWebview template lists only the Vega OS module. The Vega build
+# then writes the KeplerScript and WebView modules into this file, because the
+# @amazon-devices packages need them, and puts them in each package's manifest
+# (amzn_kepler_manifest_module_remapper adds the React Native runtime there
+# too). They are committed in the form the build writes, so a build leaves
+# vega/ unchanged: without them, run 38236004538 left this file modified.
+# They are not why the Ubuntu VVD refuses the package: that device has no
+# webview_4 module, and the build would add the line anyway.
 [needs]
 [[needs.module]]
 id = "/com.amazon.vega.os@IVega_1_2"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.webview_4@IWebview_4"
 
 [components]
 [[components.interactive]]
