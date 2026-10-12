@@ -117,15 +117,23 @@ for file in manifest.toml package.json package-lock.json; do
 done
 # The manifest each vpkg carries: vega/manifest.toml plus the modules the
 # build's remapper (amzn_kepler_manifest_module_remapper) added for the
-# @amazon-devices packages, WebView included.
+# @amazon-devices packages, WebView included. The run log shows the module
+# ids, what the build said about the icon, and where it staged the icon.
 for arch in armv7 x86_64; do
   packaged="$(find "$app/build" -path "*/vega/$arch/Release/manifest.toml" 2>/dev/null | head -1)"
   if [ -n "$packaged" ]; then
     cp "$packaged" "$OUT/logs/mercury-manifest-packaged-$arch.toml"
     status "mercury_packaged_webview_$arch" \
       "$(grep -c 'com.amazon.kepler.webview_4@IWebview_4' "$packaged" || true)"
+    echo "Modules the $arch package needs:"
+    grep -E '^id *= *"/' "$packaged" || true
   fi
 done
+echo "Build lines on the icon and the module remapper:"
+sed -E 's/\x1b\[[0-9;]*m//g' "$OUT"/logs/mercury-build-*.log \
+  | grep -E 'package\.icon|Found dependencies to add|needs: \[' | sort -u || true
+echo "Icon files the build staged:"
+find "$app/build" -name 'mercury_icon*.png' -printf '%s\t%p\n' 2>/dev/null | head -8 || true
 find "$app/build" -maxdepth 3 > "$OUT/logs/mercury-build-tree.txt" 2>/dev/null || true
 
 # A committed vega/ must not change when it is installed, tested and built.
