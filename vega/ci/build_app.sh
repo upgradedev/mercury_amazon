@@ -2,7 +2,9 @@
 # build_app.sh mercury | control
 #
 # mercury: builds Mercury's Vega app, armv7 for Fire TV sticks first, then
-#   x86_64 for the Vega Virtual Device on this Intel runner (run-apps.html:
+#   x86_64 for the Vega Virtual Device on this Intel runner, then aarch64 for
+#   the VVD on an M-series Mac, the one VVD that runs WebView apps
+#   (build-an-app.html, kvd-issues.html; run-apps.html:
 #   build/<ARCH>-<TYPE>/<APP>_<ARCH>.vpkg). vega/ builds as committed when it
 #   has a package.json. Without one, the committed src/ and test/ are laid over
 #   the freshly generated vegaWebview template, so the SDK's own package.json
@@ -102,7 +104,7 @@ if [ "$strict" = 1 ] && { [ $jest_rc != 0 ] || [ $tsc_rc != 0 ]; }; then
 fi
 
 : > "$OUT/vpkg/SHA256SUMS"
-for arch in armv7 x86_64; do
+for arch in armv7 x86_64 aarch64; do
   mark "build Mercury $arch"
   if vpkg="$(build "$app" "$arch" mercury)"; then
     cp "$vpkg" "$OUT/vpkg/"
@@ -119,7 +121,7 @@ done
 # build's remapper (amzn_kepler_manifest_module_remapper) added for the
 # @amazon-devices packages, WebView included. The run log shows the module
 # ids, what the build said about the icon, and where it staged the icon.
-for arch in armv7 x86_64; do
+for arch in armv7 x86_64 aarch64; do
   packaged="$(find "$app/build" -path "*/vega/$arch/Release/manifest.toml" 2>/dev/null | head -1)"
   if [ -n "$packaged" ]; then
     cp "$packaged" "$OUT/logs/mercury-manifest-packaged-$arch.toml"
@@ -151,5 +153,6 @@ fi
 
 # The armv7 package is the one a Vega Fire TV stick installs; without it the
 # step fails. A missing x86_64 package is left to the verdict step, so the
-# virtual device steps still run.
+# virtual device steps still run. A missing aarch64 package (the Mac VVD's)
+# shows as mercury_build_aarch64 in status/ and in the vpkg artifact.
 [ -n "$(status_of mercury_vpkg_armv7)" ] || { echo "::error::no armv7 vpkg"; exit 1; }

@@ -2,8 +2,9 @@ name: Vega OS build and virtual device control run
 
 # Builds Mercury's Vega OS app (vega/) with Amazon's Vega SDK and tries it on the
 # Vega Virtual Device (VVD), recording the result: armv7 for Vega Fire TV sticks,
-# x86_64 for the VVD on this Intel runner. If Mercury installs, the run drives the
-# same remote journey that android-tv-footage.yml films on Fire OS.
+# x86_64 for the VVD on this Intel runner, aarch64 for the VVD on an M-series Mac
+# (build-an-app.html), where the board is filmed. If Mercury installs, the run
+# drives the same remote journey that android-tv-footage.yml films on Fire OS.
 #
 # Footage and build evidence, not a runtime receipt. It writes nothing that
 # ci/readiness.py reads and touches none of ANDROID_TV_RUNTIME_PATHS, so gate J4
@@ -103,7 +104,7 @@ jobs:
         timeout-minutes: 10
         run: bash vega/ci/templates.sh
 
-      - name: Build Mercury for Vega OS (armv7, x86_64)
+      - name: Build Mercury for Vega OS (armv7, x86_64, aarch64)
         id: build
         timeout-minutes: 45
         run: bash vega/ci/build_app.sh mercury
