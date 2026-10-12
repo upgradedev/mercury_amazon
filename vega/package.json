@@ -17,6 +17,7 @@
     "release": "npm-run-all lint test build:app"
   },
   "dependencies": {
+    "@amazon-devices/kepler-performance-api": "^0.1.4",
     "@amazon-devices/react-native-kepler": "^4.0.0",
     "@amazon-devices/webview": "^4.0.0",
     "react": "19.2.0",

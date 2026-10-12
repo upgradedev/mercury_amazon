@@ -2,7 +2,7 @@ import * as React from 'react';
 import {act, fireEvent, render, screen} from '@testing-library/react-native';
 import {App} from '../src/App';
 import {COCKPIT_URL, hostOf} from '../src/cockpitUrl';
-import {BACK_FROM_APP, HOST_BOOTSTRAP} from '../src/hostBridge';
+import {BACK_ANSWER_TIMEOUT_MS, BACK_FROM_APP, HOST_BOOTSTRAP} from '../src/hostBridge';
 import {CONNECT_TIMEOUT_MS} from '../src/shell';
 import {BOARD} from '../src/theme';
 
@@ -22,6 +22,30 @@ jest.mock('@amazon-devices/webview', () => {
     }),
   };
 });
+
+// The Vega Performance API calls global.performance.reportFullyDrawn, which
+// only the Vega runtime defines; the test counts the calls instead.
+const mockReportFullyDrawn = jest.fn();
+jest.mock('@amazon-devices/kepler-performance-api', () => ({
+  useReportFullyDrawn: () => mockReportFullyDrawn,
+}));
+
+// Vega's app state manager, as one shared instance the test can drive.
+const mockAppStateListeners: Array<(state: string) => void> = [];
+const mockAppState = {
+  getCurrentState: jest.fn(() => 'active'),
+  addAppStateListener: jest.fn((_name: string, listener: (state: string) => void) => {
+    mockAppStateListeners.push(listener);
+    return {
+      remove: () => {
+        const index = mockAppStateListeners.indexOf(listener);
+        if (index !== -1) {
+          mockAppStateListeners.splice(index, 1);
+        }
+      },
+    };
+  }),
+};
 
 // react-native resolves to @amazon-devices/react-native-kepler (jest.config.json
 // moduleNameMapper), so this replaces exactly what the app imports from it.
@@ -53,6 +77,7 @@ jest.mock('@amazon-devices/react-native-kepler', () => {
     StyleSheet: {create: (styles: unknown) => styles, flatten},
     Text: 'Text',
     View: 'View',
+    useKeplerAppStateManager: () => mockAppState,
   };
 });
 
@@ -70,6 +95,29 @@ function pressBack() {
       }
     }
     BackHandler.exitApp();
+  });
+}
+
+/** The app moving between foreground and background. */
+function appStateTo(state: string) {
+  act(() => {
+    for (const listener of [...mockAppStateListeners]) {
+      listener(state);
+    }
+  });
+}
+
+/** One postMessage from the page. */
+function pagePosts(data: string) {
+  act(() => {
+    webView().onMessage({nativeEvent: {data}});
+  });
+}
+
+function onBoard(canGoBack = false) {
+  render(<App />);
+  act(() => {
+    webView().onLoad(loaded(canGoBack));
   });
 }
 
@@ -107,6 +155,8 @@ describe('App', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockBackListeners.length = 0;
+    mockAppStateListeners.length = 0;
+    mockReportFullyDrawn.mockReset();
     mockWebMounted.mockClear();
     mockWebMethods.injectJavaScript.mockClear();
     mockWebMethods.goBack.mockClear();
@@ -263,31 +313,151 @@ describe('App', () => {
   });
 
   it('exits when the page reports a BACK it did not use and there is no history', () => {
-    render(<App />);
-    act(() => {
-      webView().onLoad(loaded(false));
-    });
-    act(() => {
-      webView().onMessage({nativeEvent: {data: '{"type":"journey","event":"x"}'}});
-    });
+    onBoard(false);
+    pagePosts('{"type":"journey","event":"x"}');
     expect(BackHandler.exitApp).not.toHaveBeenCalled();
-    act(() => {
-      webView().onMessage({nativeEvent: {data: '{"type":"back_unhandled"}'}});
-    });
+    pressBack();
+    pagePosts('{"type":"back_unhandled"}');
     expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
     expect(mockWebMethods.goBack).not.toHaveBeenCalled();
   });
 
   it('goes back in history before exiting when the WebView can', () => {
-    render(<App />);
+    onBoard(true);
+    pressBack();
+    pagePosts('{"type":"back_unhandled"}');
+    expect(mockWebMethods.goBack).toHaveBeenCalledTimes(1);
+    expect(BackHandler.exitApp).not.toHaveBeenCalled();
+  });
+
+  it('ignores a BACK answer nobody asked for, so the page cannot close the app', () => {
+    onBoard(false);
+    pagePosts('{"type":"back_unhandled"}');
+    expect(BackHandler.exitApp).not.toHaveBeenCalled();
+  });
+
+  it('exits when the page never answers BACK (hung page, no bootstrap, no bridge)', () => {
+    onBoard(false);
+    pressBack();
     act(() => {
-      webView().onLoad(loaded(true));
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS - 1);
     });
+    expect(BackHandler.exitApp).not.toHaveBeenCalled();
     act(() => {
-      webView().onMessage({nativeEvent: {data: '{"type":"back_unhandled"}'}});
+      jest.advanceTimersByTime(1);
+    });
+    expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      `[MercuryCockpit] BACK: no answer from the page in ${BACK_ANSWER_TIMEOUT_MS} ms`,
+    );
+  });
+
+  it('goes back in history when the page never answers and the WebView can', () => {
+    onBoard(true);
+    pressBack();
+    act(() => {
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS);
     });
     expect(mockWebMethods.goBack).toHaveBeenCalledTimes(1);
     expect(BackHandler.exitApp).not.toHaveBeenCalled();
+  });
+
+  it('stays open when the page answers that it handled BACK', () => {
+    onBoard(false);
+    pressBack();
+    pagePosts('{"type":"back_handled"}');
+    act(() => {
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS * 3);
+    });
+    expect(BackHandler.exitApp).not.toHaveBeenCalled();
+    expect(mockWebMethods.goBack).not.toHaveBeenCalled();
+  });
+
+  it('acts once when a late answer arrives after the deadline', () => {
+    onBoard(false);
+    pressBack();
+    act(() => {
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS);
+    });
+    pagePosts('{"type":"back_unhandled"}');
+    expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for an answer to every press before it gives up', () => {
+    onBoard(false);
+    pressBack();
+    pressBack();
+    pagePosts('{"type":"back_handled"}');
+    act(() => {
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS);
+    });
+    // The second press had no answer, so the deadline still applies to it.
+    expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a pending BACK when the board goes offline', () => {
+    onBoard(false);
+    pressBack();
+    act(() => {
+      webView().onHttpError({nativeEvent: {statusCode: 503, url: COCKPIT_URL, isMainFrame: true}});
+    });
+    act(() => {
+      jest.advanceTimersByTime(BACK_ANSWER_TIMEOUT_MS * 2);
+    });
+    expect(BackHandler.exitApp).not.toHaveBeenCalled();
+    expect(screen.getByTestId('offline-view')).toBeTruthy();
+  });
+
+  it('reports fully drawn once, at the first board, not for the launch or offline view', () => {
+    render(<App />);
+    const first = webView();
+    expect(mockReportFullyDrawn).not.toHaveBeenCalled();
+    failBeforeLoad();
+    expect(mockReportFullyDrawn).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText('Try again'));
+    act(() => {
+      first.onLoad(loaded());
+    });
+    expect(mockReportFullyDrawn).not.toHaveBeenCalled();
+    act(() => {
+      webView().onLoad(loaded());
+    });
+    expect(mockReportFullyDrawn).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith('[MercuryCockpit] fully_drawn:cold_start');
+    // A later load of the same board (a reload) is not a new cold start.
+    act(() => {
+      webView().onLoad(loaded());
+    });
+    expect(mockReportFullyDrawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports fully drawn again on a warm resume of the board, and not before it loaded', () => {
+    render(<App />);
+    appStateTo('background');
+    appStateTo('active');
+    expect(mockReportFullyDrawn).not.toHaveBeenCalled();
+    act(() => {
+      webView().onLoad(loaded());
+    });
+    expect(mockReportFullyDrawn).toHaveBeenCalledTimes(1);
+    appStateTo('background');
+    appStateTo('active');
+    expect(mockReportFullyDrawn).toHaveBeenCalledTimes(2);
+    expect(info).toHaveBeenCalledWith('[MercuryCockpit] fully_drawn:warm_start');
+    // Active to active is not a resume.
+    appStateTo('active');
+    expect(mockReportFullyDrawn).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the app running when the runtime cannot record fully drawn', () => {
+    mockReportFullyDrawn.mockImplementationOnce(() => {
+      throw new Error('nativePerformanceReportFullyDrawn is not a function');
+    });
+    onBoard(false);
+    expect(screen.queryByTestId('launch-view')).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      '[MercuryCockpit] reportFullyDrawn failed: Error: nativePerformanceReportFullyDrawn is not a function',
+    );
   });
 
   it('logs journey events with the Kotlin bounds', () => {

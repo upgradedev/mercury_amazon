@@ -37,7 +37,9 @@ function fakePage(
   if (options.bridge !== false) {
     attachBridge();
   }
-  // The scripts only touch window, setTimeout and JSON.
+  // The scripts only touch window, setTimeout and JSON. They are evaluated
+  // here the way the WebView evaluates injected JavaScript.
+  // eslint-disable-next-line no-new-func
   const run = (script: string) => new Function('window', script)(win);
   run(HOST_BOOTSTRAP);
   const pressBack = () => run(BACK_FROM_APP);
@@ -98,12 +100,12 @@ describe('HOST_BOOTSTRAP', () => {
 });
 
 describe('BACK on the board (BACK_FROM_APP)', () => {
-  it('lets the page close what is open', () => {
+  it('lets the page close what is open, and says so', () => {
     const navigateDpad = jest.fn((direction: string) => direction === 'BACK');
     const {posted, pressBack} = fakePage({navigateDpad});
     pressBack();
     expect(navigateDpad).toHaveBeenCalledWith('BACK');
-    expect(posted).toHaveLength(0);
+    expect(posted.map(parseHostMessage)).toEqual([{type: 'back_handled'}]);
   });
 
   it('reports a BACK the page did not use, and leaves history to the app', () => {
@@ -113,14 +115,14 @@ describe('BACK on the board (BACK_FROM_APP)', () => {
     expect(posted.map(parseHostMessage)).toEqual([{type: 'back_unhandled'}]);
   });
 
-  it('handles every press: two quick presses are two answers', () => {
+  it('answers every press: two quick presses are two answers', () => {
     const {posted, pressBack} = fakePage({navigateDpad: () => false});
     pressBack();
     pressBack();
     expect(posted).toHaveLength(2);
   });
 
-  it('takes a focused text field out of focus and does nothing else', () => {
+  it('takes a focused text field out of focus, does nothing else, and says so', () => {
     const fields: FakeElement[] = [
       {tagName: 'INPUT', type: 'text'},
       {tagName: 'INPUT', type: 'password'},
@@ -134,7 +136,7 @@ describe('BACK on the board (BACK_FROM_APP)', () => {
       pressBack();
       expect(field.blur).toHaveBeenCalledTimes(1);
       expect(navigateDpad).not.toHaveBeenCalled();
-      expect(posted).toHaveLength(0);
+      expect(posted.map(parseHostMessage)).toEqual([{type: 'back_handled'}]);
     }
   });
 
@@ -153,6 +155,7 @@ describe('BACK on the board (BACK_FROM_APP)', () => {
   it('reaches the app even on a page without the bootstrap', () => {
     const posted: string[] = [];
     const win = {ReactNativeWebView: {postMessage: (data: string) => posted.push(data)}};
+    // eslint-disable-next-line no-new-func
     new Function('window', BACK_FROM_APP)(win);
     expect(posted.map(parseHostMessage)).toEqual([{type: 'back_unhandled'}]);
   });
@@ -167,6 +170,11 @@ describe('journey sanitising', () => {
     expect(journeyLine('rollback_confirmed', 'RECORDED_ONLY:DPAD_RECORD_ONLY_DEMO')).toBe(
       'journey:rollback_confirmed:RECORDED_ONLY:DPAD_RECORD_ONLY_DEMO',
     );
+  });
+
+  it('reads both BACK answers and keeps nothing else from them', () => {
+    expect(parseHostMessage(JSON.stringify({type: 'back_handled', extra: 'x'}))).toEqual({type: 'back_handled'});
+    expect(parseHostMessage('{"type":"back_unhandled"}')).toEqual({type: 'back_unhandled'});
   });
 
   it('drops anything that is not a host message', () => {

@@ -25,17 +25,32 @@
  *         contentEditable) keeps BACK: the field loses focus and nothing else
  *         happens, so BACK never closes a panel or the app under a typist.
  *      2. The page closes what is open (window.navigateDpad('BACK')).
+ *      In both cases the page posts back_handled.
  *      3. Otherwise the page posts back_unhandled. The app then goes back in
  *         history when the WebView reports canGoBack, and exits when it does
  *         not. history.length cannot make that call: it counts forward
  *         entries too, so a page could keep going "back" from its first entry.
+ *    Every press gets one answer. If none comes within BACK_ANSWER_TIMEOUT_MS
+ *    (a hung page, a page without the bootstrap or without the bridge), the
+ *    app acts as if the page posted back_unhandled, so BACK can always close
+ *    the app from the remote.
  */
 export const TAG = 'MercuryCockpit';
 export const HOST_NAME = 'mercury-vega-webview';
 export const APP_VERSION = '1.0.0';
 
+/**
+ * How long the app waits for the page to answer a BACK press before it goes
+ * back in history or exits on its own. ESTIMATE: no Vega device has timed the
+ * injectJavaScript and postMessage round trip yet. It errs long, because an
+ * answer that comes after it is ignored, and the app has already gone back or
+ * exited by then, which is worse than a dead page holding BACK for 1.5 s.
+ */
+export const BACK_ANSWER_TIMEOUT_MS = 1500;
+
 export type HostMessage =
   | {type: 'journey'; event: string; detail: string}
+  | {type: 'back_handled'}
   | {type: 'back_unhandled'};
 
 export const HOST_BOOTSTRAP = `(function () {
@@ -82,8 +97,15 @@ export const HOST_BOOTSTRAP = `(function () {
   }
   window.mercuryVegaBack = function () {
     var active = window.document ? window.document.activeElement : null;
-    if (isTextField(active) && typeof active.blur === 'function') { active.blur(); return; }
-    if (typeof window.navigateDpad === 'function' && window.navigateDpad('BACK') === true) { return; }
+    if (isTextField(active) && typeof active.blur === 'function') {
+      active.blur();
+      send({ type: 'back_handled' });
+      return;
+    }
+    if (typeof window.navigateDpad === 'function' && window.navigateDpad('BACK') === true) {
+      send({ type: 'back_handled' });
+      return;
+    }
     send({ type: 'back_unhandled' });
   };
 })();
@@ -128,8 +150,8 @@ export function parseHostMessage(data: unknown): HostMessage | null {
     return null;
   }
   const record = parsed as Record<string, unknown>;
-  if (record.type === 'back_unhandled') {
-    return {type: 'back_unhandled'};
+  if (record.type === 'back_handled' || record.type === 'back_unhandled') {
+    return {type: record.type};
   }
   if (record.type === 'journey' && typeof record.event === 'string') {
     const detail = typeof record.detail === 'string' ? record.detail : '';

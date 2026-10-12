@@ -17,9 +17,22 @@
  *    never receives the remote's BACK itself and every press comes here. On
  *    LaunchView and OfflineView it closes the app. On the board it goes to the
  *    page first (BACK_FROM_APP), then history, then the platform, which is
- *    MainActivity.handleBack's order.
+ *    MainActivity.handleBack's order. A page that does not answer within
+ *    BACK_ANSWER_TIMEOUT_MS counts as having nothing open, so a hung page
+ *    cannot trap the remote.
+ *  - Startup KPIs: reportFullyDrawn (Vega Performance API) marks the first
+ *    frame of the board, and again the first frame after a warm resume, so
+ *    'vega exec perf kpi-visualizer' can report time to fully drawn (TTFD)
+ *    next to the time to first frame (TTFF) the OS measures on its own
+ *    (measure-app-kpis.html).
  */
+import {useReportFullyDrawn} from '@amazon-devices/kepler-performance-api';
+import {useKeplerAppStateManager} from '@amazon-devices/react-native-kepler';
+import type {KeplerAppStateChangeData} from '@amazon-devices/react-native-kepler';
 import {WebView} from '@amazon-devices/webview';
+// The package root (dist/index.d.ts in 4.0.2) exports only WebView,
+// CookieManager and Cookie, so the event and method types come from the file
+// that declares them.
 import type {
   WebViewErrorEvent,
   WebViewHttpErrorEvent,
@@ -31,7 +44,14 @@ import * as React from 'react';
 import {useCallback, useEffect, useReducer, useRef} from 'react';
 import {BackHandler, StyleSheet, View} from 'react-native';
 import {COCKPIT_URL, hostOf} from './cockpitUrl';
-import {BACK_FROM_APP, HOST_BOOTSTRAP, TAG, journeyLine, parseHostMessage} from './hostBridge';
+import {
+  BACK_ANSWER_TIMEOUT_MS,
+  BACK_FROM_APP,
+  HOST_BOOTSTRAP,
+  TAG,
+  journeyLine,
+  parseHostMessage,
+} from './hostBridge';
 import {CONNECT_TIMEOUT_MS, INITIAL_SHELL, describeLoadError, shellReducer} from './shell';
 import {LaunchView, OfflineView} from './ShellScreens';
 import {BOARD} from './theme';
@@ -40,8 +60,84 @@ export const App = () => {
   const [{attempt, phase, reason}, dispatch] = useReducer(shellReducer, INITIAL_SHELL);
   const webRef = useRef<WebViewMethods>(null);
   // The WebView's own answer to "is there history?", from its last navigation
-  // event: MainActivity asks webView.canGoBack() at the same point.
+  // event: MainActivity asks webView.canGoBack() at the same point. History
+  // only moves on page loads: docs/index.html and docs/firetv_nav.js use no
+  // pushState, replaceState or hash routing, so onLoadStart and onLoad see
+  // every change.
   const canGoBack = useRef(false);
+  // BACK presses the page has not answered yet, and the deadline for them.
+  const pendingBack = useRef(0);
+  const backTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportFullyDrawn = useReportFullyDrawn();
+  const appState = useKeplerAppStateManager();
+  // The board has been drawn once, so a warm resume shows it at once.
+  const boardDrawn = useRef(false);
+  const phaseNow = useRef(phase);
+  useEffect(() => {
+    phaseNow.current = phase;
+  }, [phase]);
+
+  const markFullyDrawn = useCallback(
+    (why: string) => {
+      try {
+        reportFullyDrawn();
+        console.info(`[${TAG}] fully_drawn:${why}`);
+      } catch (error) {
+        console.warn(`[${TAG}] reportFullyDrawn failed: ${String(error)}`);
+      }
+    },
+    [reportFullyDrawn],
+  );
+
+  const clearBackWait = useCallback(() => {
+    pendingBack.current = 0;
+    if (backTimer.current !== null) {
+      clearTimeout(backTimer.current);
+      backTimer.current = null;
+    }
+  }, []);
+
+  // The page had nothing open to close: history next, then leave.
+  const leaveBoard = useCallback(() => {
+    if (canGoBack.current && webRef.current) {
+      webRef.current.goBack();
+    } else {
+      BackHandler.exitApp();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'board' && !boardDrawn.current) {
+      boardDrawn.current = true;
+      markFullyDrawn('cold_start');
+    }
+  }, [phase, markFullyDrawn]);
+
+  useEffect(() => {
+    let last: KeplerAppStateChangeData = appState.getCurrentState();
+    const subscription = appState.addAppStateListener('change', (next: KeplerAppStateChangeData) => {
+      if (
+        next === 'active' &&
+        (last === 'background' || last === 'inactive') &&
+        boardDrawn.current &&
+        phaseNow.current === 'board'
+      ) {
+        markFullyDrawn('warm_start');
+      }
+      if (typeof next === 'string') {
+        last = next;
+      }
+    });
+    return () => subscription.remove();
+  }, [appState, markFullyDrawn]);
+
+  // Only the board waits for the page; leaving it drops any wait.
+  useEffect(() => {
+    if (phase !== 'board') {
+      clearBackWait();
+    }
+  }, [phase, clearBackWait]);
+  useEffect(() => clearBackWait, [clearBackWait]);
 
   useEffect(() => {
     if (phase !== 'connecting') {
@@ -59,6 +155,15 @@ export const App = () => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       const web = webRef.current;
       if (phase === 'board' && web) {
+        pendingBack.current += 1;
+        if (backTimer.current !== null) {
+          clearTimeout(backTimer.current);
+        }
+        backTimer.current = setTimeout(() => {
+          console.warn(`[${TAG}] BACK: no answer from the page in ${BACK_ANSWER_TIMEOUT_MS} ms`);
+          clearBackWait();
+          leaveBoard();
+        }, BACK_ANSWER_TIMEOUT_MS);
         web.injectJavaScript(BACK_FROM_APP);
       } else {
         // LaunchView or OfflineView: there is nothing to go back to.
@@ -67,30 +172,41 @@ export const App = () => {
       return true;
     });
     return () => subscription.remove();
-  }, [phase]);
+  }, [phase, clearBackWait, leaveBoard]);
 
-  const onMessage = useCallback((event: WebViewMessageEvent) => {
-    const message = parseHostMessage(event.nativeEvent.data);
-    if (!message) {
-      return;
-    }
-    if (message.type === 'back_unhandled') {
-      // The page had nothing open to close: history next, then leave.
-      if (canGoBack.current && webRef.current) {
-        webRef.current.goBack();
-      } else {
-        BackHandler.exitApp();
+  const onMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      const message = parseHostMessage(event.nativeEvent.data);
+      if (!message) {
+        return;
       }
-      return;
-    }
-    console.info(`[${TAG}] ${journeyLine(message.event, message.detail)}`);
-  }, []);
+      if (message.type === 'back_handled' || message.type === 'back_unhandled') {
+        // An answer nobody waits for (it came after the deadline, or no BACK
+        // was pressed) changes nothing: the app already acted, or never asked.
+        if (pendingBack.current === 0) {
+          return;
+        }
+        pendingBack.current -= 1;
+        if (pendingBack.current === 0) {
+          clearBackWait();
+        }
+        if (message.type === 'back_unhandled') {
+          clearBackWait();
+          leaveBoard();
+        }
+        return;
+      }
+      console.info(`[${TAG}] ${journeyLine(message.event, message.detail)}`);
+    },
+    [clearBackWait, leaveBoard],
+  );
 
   const retry = useCallback(() => {
     console.info(`[${TAG}] Try again`);
     canGoBack.current = false;
+    clearBackWait();
     dispatch({type: 'retry'});
-  }, []);
+  }, [clearBackWait]);
 
   return (
     <View style={styles.root}>
