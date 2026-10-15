@@ -1,0 +1,89 @@
+schema-version = 1
+
+# Mercury on Vega OS: a native React Native shell around the incident board
+# page the Fire OS app loads.
+# Build on Linux or macOS with the Vega SDK: npm ci && npm run build:release.
+# The Vega Virtual Device runs WebView apps only on an Apple Silicon Mac; on
+# Ubuntu or an Intel Mac it refuses this package (kvd-issues.html). On a Mac
+# VVD, or a Vega Fire TV stick in Developer Mode (developer-mode.html):
+#   vega device install-app --packagePath build/<arch>-release/mercurycockpit_<arch>.vpkg
+#   vega device launch-app --appName com.upgradedev.mercury.main
+
+[package]
+title = "Mercury Cockpit"
+version = "1.0.0"
+id = "com.upgradedev.mercury"
+# The board's wordmark tile from docs/index.html, as manifest-package.html asks:
+# a 512x512 PNG (1 MB at most) under assets/image. Without it the launcher
+# shows the system's grey placeholder.
+icon = "@image/mercury_icon.png"
+
+[os.version]
+min = "1.2"
+target = "1.2"
+
+# Amazon's vegaWebview template lists only the Vega OS module. The Vega build
+# then writes the KeplerScript and WebView modules into this file, because the
+# @amazon-devices packages need them, and puts them in each package's manifest
+# (amzn_kepler_manifest_module_remapper adds the React Native runtime there
+# too). They are committed in the form the build writes, so a build leaves
+# vega/ unchanged: without them, run 38236004538 left this file modified.
+# They are not why the Ubuntu VVD refuses the package: that device has no
+# webview_4 module, and the build would add the line anyway.
+[needs]
+[[needs.module]]
+id = "/com.amazon.vega.os@IVega_1_2"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.webview_4@IWebview_4"
+
+[components]
+[[components.interactive]]
+id = "com.upgradedev.mercury.main"
+runtime-module = "/com.amazon.kepler.runtime.react_native_kepler_4@IReactNativeKepler_0"
+launch-type = "singleton"
+categories = ["com.amazon.category.main"]
+
+[wants]
+# Web renderer service for rendering web content
+[[wants.service]]
+id = "com.amazon.webview.renderer_service"
+
+# If Web App needs keyboard support (the cockpit has text fields)
+[[wants.service]]
+id = "com.amazon.inputmethod.service"
+
+# The template's four video playback services (media.server, mediametrics,
+# mediabuffer, mediatransform) are left out: the cockpit plays no video.
+
+# If Web App needs audio playback (the cockpit reads verdicts aloud)
+[[wants.service]]
+id = "com.amazon.audio.stream"
+
+# Required for audio management features to work in WebView, features like audio focus, volume control 
+[[wants.service]]
+id = "com.amazon.audio.control"
+
+# To enable accessibility support for your app, we recommend you add the UCC service with the Service Registrar
+[[wants.service]]
+id = "com.amazon.kepler.ucc.publisher"
+
+# Uncomment below section to enable encrypted media playback (DRM content)
+# [[wants.service]]
+# id = "com.amazon.drm.key"
+# [[wants.service]]
+# id = "com.amazon.drm.crypto"
+# [[needs.privilege]]
+# id = "com.amazon.privilege.security.file-sharing"
+
+# Enable Group-IPC to access media services
+[[wants.service]]
+id = "com.amazon.gipc.uuid.*"
+[offers]
+[[offers.service]]
+id = "com.amazon.gipc.uuid.*" 
+
+# You may add other services as needed

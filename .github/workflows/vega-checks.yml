@@ -1,0 +1,48 @@
+name: Vega app checks
+
+# Unit tests and type check of Mercury's Vega OS app (vega/), without the Vega
+# SDK: npm ci from the committed lockfile (registry.npmjs.org only), Jest and
+# tsc. It runs on every pull request and push that touches vega/, so a later
+# edit to vega/ cannot skip its checks. The SDK build and the Vega Virtual
+# Device control run stay in vega-build.yml, which is dispatched by hand.
+#
+# The @amazon-devices packages ship under the Amazon Program Materials License
+# Agreement (their LICENSE files point to
+# https://developer.amazon.com/support/legal/pml).
+on:
+  pull_request:
+    paths:
+      - vega/**
+      - .github/workflows/vega-checks.yml
+  push:
+    branches: [master]
+    paths:
+      - vega/**
+      - .github/workflows/vega-checks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Vega app unit tests and type check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: vega
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Tool versions
+        run: node -v && npm -v
+
+      - name: Install from the lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Jest
+        run: npx jest --ci
+
+      - name: Type check
+        run: npx tsc --noEmit
