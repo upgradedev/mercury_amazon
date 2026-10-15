@@ -48,7 +48,7 @@ from src.infrastructure.github_actions_dispatcher import (
     RollbackDispatchError,
 )
 from src.infrastructure.github_adapter import GitHubTelemetryAdapter
-from src.infrastructure.local_git_adapter import LocalGitCommitProvider
+from src.infrastructure.local_git_window import PinnedGitWindowProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 from src.infrastructure.trial_summary import naming_accuracy
 from src.interfaces.handoff_routes import register_handoff_routes
@@ -129,7 +129,7 @@ cloudwatch_adapter = CloudWatchMetricAdapter()
 dora_use_case = CalculateDORAUseCase(github_adapter)
 cost_use_case = DetectCostAnomaliesUseCase(aws_adapter)
 pr_use_case = InspectPRBottlenecksUseCase(github_adapter)
-local_git_provider = LocalGitCommitProvider()
+local_git_provider = PinnedGitWindowProvider()  # git log -20 pinned at one merge
 # The last fallback, used where there is neither a GitHub token nor a git checkout
 # (the public Lambda): an invented deploy feed, labelled as one, for display only. The
 # trial's commit recording is not used here, so the board never quotes the

@@ -123,8 +123,10 @@ can never make a fixture look live.
 ### The demo path, and what it does to the data
 
 With no credentials at all, the war room still works end to end: the commits are
-real ones read from your checkout with `git log` (on the public Lambda, which has no
-checkout, they are the invented deploy feed in
+real ones from this repository's `git log`, a 20-commit window recorded at merge
+`a4ec9aa` in `src/infrastructure/fixtures/local_git_window.json` and served wherever a
+git checkout exists (on the public Lambda, which has no checkout, they are the invented
+deploy feed in
 `src/infrastructure/fixtures/deploy_feed_fixture.json`), and the simulated metric
 series is anchored after one of them so the correlation is coherent. The metric text
 does not vouch for the commits; it defers to the commit stamp beside the answer. The
@@ -167,11 +169,17 @@ done
 Where each reading is placed is itself a choice, and the response says which choice
 it was. The attributing demo is anchored to the newest commit that is **alone** in
 its own attribution window, and the crowded demo to the commit with the **most**
-company in its window, both picked from the real `git log` of your checkout. That is
-deliberate and it is disclosed in the provenance the screen renders: without it,
-whether `checkout-api` named a commit or refused depended on how often somebody had
-committed in the hour before HEAD, so the same repository demonstrated different
-verdicts on different days.
+company in its window, both picked from that recorded window of this repository's
+real `git log`. That is deliberate and it is disclosed in the provenance the screen
+renders: without it, whether `checkout-api` named a commit or refused depended on how
+often somebody had committed in the hour before HEAD, so the same repository
+demonstrated different verdicts on different days. The window itself is pinned for the
+same reason. The server used to read `git log -20` at HEAD, and a stack of docs and
+receipt commits pushed every runtime change out of those 20, so the crowded window
+behind `release-train` emptied and the refusal became an attribution (CI run
+37579019212, six failed tests). `python scripts/record_local_git_window.py --check`
+compares the recording to `git log`. `tests/unit/test_local_git_window.py` builds a temp repo of 25 lone
+runtime commits, where `git log` at HEAD flips `release-train`, and the pinned window keeps all five.
 
 The fixture used to be two module constants, so every service name returned the
 same spike and no refusal verdict was reachable from any input a reader could
@@ -897,7 +905,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-730 tests and a re-measure on an idle machine is pending**.
+732 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -941,7 +949,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 730 passed
+# 732 passed
 ```
 
 #### Step 3: Start the server
@@ -1163,8 +1171,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 730 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2092 statements
+python -m pytest tests/ -q                                    # 732 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2135 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
