@@ -571,11 +571,13 @@ def test_an_unknown_service_is_refused_rather_than_given_an_invented_incident(cl
     assert "does not invent a reading" in data["metric_provenance"]["detail"]
 
 
-def test_the_cockpit_offers_exactly_the_services_the_fixture_knows():
+def test_the_cockpit_offers_exactly_the_services_the_fixture_knows(client):
     """The demo buttons on the page and the fixture must not drift apart."""
     from pathlib import Path
 
     from src.infrastructure.cloudwatch_adapter import SIMULATED_SERVICES
+    from src.infrastructure.demo_evidence import seed_recorded_demo_evidence
+    from src.interfaces.mcp_server import deployment_evidence, incident_use_case
 
     page = (Path(__file__).resolve().parent.parent.parent / "docs" / "index.html").read_text(
         encoding="utf-8"
@@ -588,3 +590,20 @@ def test_the_cockpit_offers_exactly_the_services_the_fixture_knows():
     assert len(unknown) == 1, (
         f"the cockpit must offer exactly one name the fixture refuses, found {sorted(unknown)}"
     )
+    seed_recorded_demo_evidence(incident_use_case, deployment_evidence)
+    for service in ("checkout-api", "payments-worker", "search-indexer", "release-train", "quiet-service"):
+        rev = client.get("/mcp/demo-handoff/revision").json()["revision"]
+        res = client.post(
+            "/mcp/tools/demo_update_handoff",
+            json={"expected_revision": rev, "service_name": service},
+        )
+        assert res.status_code == 200, f"{service}: {res.text}"
+        body = res.json()
+        assert body["authorization_mode"] == "DPAD_RECORD_ONLY_DEMO"
+        assert body["revision"] == rev + 1
+        if service != "checkout-api":
+            assert service in body["current_action"]
+            assert any(service in fact for fact in body["confirmed_facts"])
+
+
+

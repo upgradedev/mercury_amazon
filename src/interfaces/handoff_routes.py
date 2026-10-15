@@ -27,6 +27,7 @@ DEMO_STAMP = {"authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": 
 
 class DemoHandoffRequest(BaseModel):
     expected_revision: int | None = Field(default=None, ge=0)
+    service_name: str = Field(default="checkout-api", min_length=1, max_length=64)
 
 
 def register_handoff_routes(
@@ -34,7 +35,7 @@ def register_handoff_routes(
     store: IncidentHandoffStore,
     require_operator: Callable[..., str],
     validate_record_only_demo: Callable[[str], None],
-    demo_payload: Callable[[], dict | None],
+    demo_payload: Callable[..., dict | None],
 ) -> None:
     """Register the demo handoff and revision routes on the server's own app.
 
@@ -55,7 +56,7 @@ def register_handoff_routes(
     async def demo_update_handoff(req: DemoHandoffRequest) -> dict[str, Any]:
         """Publish fixed fixture content; accept no responder-authored text."""
         validate_record_only_demo(DEMO_ACTION_ID)
-        payload = demo_payload()
+        payload = demo_payload(req.service_name)
         if payload is None:
             raise HTTPException(status_code=409, detail="The labelled demo handoff is unavailable.")
         try:

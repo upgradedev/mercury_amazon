@@ -684,7 +684,7 @@ def _validate_record_only_demo(action_id: str) -> None:
 
 register_handoff_routes(
     app, incident_handoffs, require_operator, _validate_record_only_demo,
-    lambda: recorded_demo_handoff(incident_use_case, deployment_evidence))
+    lambda service_name="checkout-api": recorded_demo_handoff(incident_use_case, deployment_evidence, service_name))
 
 
 @app.post("/mcp/tools/demo_stage_rollback")
