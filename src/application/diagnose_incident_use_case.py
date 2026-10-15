@@ -113,10 +113,16 @@ class DiagnoseIncidentUseCase:
         if not raw and self._local_commits is not None:
             raw = self._local_commits.list_recent_commits(limit=20)
             source = DataSource.LOCAL_GIT
-            detail = (
-                "{count} commits read from the local git checkout with git log, because no "
-                "GitHub token is configured. These are real commits from this repository, "
-                "not the service being monitored."
+            # The server wires a recorded, pinned window of the local log
+            # (src/infrastructure/local_git_window.py), which says so in its own detail.
+            detail = getattr(
+                self._local_commits,
+                "detail",
+                (
+                    "{count} commits read from the local git checkout with git log, because no "
+                    "GitHub token is configured. These are real commits from this repository, "
+                    "not the service being monitored."
+                ),
             )
 
         if not raw and self._recorded_commits is not None:

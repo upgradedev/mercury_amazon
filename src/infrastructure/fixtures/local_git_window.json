@@ -1,0 +1,537 @@
+{
+  "schema": "mercury.local_git_window/1",
+  "note": "The window LocalGitCommitProvider would read with git log -20 at the pinned commit, recorded so new commits cannot change the local demo's verdicts. Real commits of this repository, nothing edited. Served only where a git checkout exists; the public Lambda has none and serves the invented deploy feed instead.",
+  "recorded_by_command": "python scripts/record_local_git_window.py",
+  "source_command": "git log -20 --name-only --no-renames a4ec9aa2d720975c0451e8b44ccc407c78f453ed",
+  "pinned_at_sha": "a4ec9aa2d720975c0451e8b44ccc407c78f453ed",
+  "limit": 20,
+  "commits": [
+    {
+      "sha": "a4ec9aa",
+      "full_sha": "a4ec9aa2d720975c0451e8b44ccc407c78f453ed",
+      "message": "Merge pull request #44 from upgradedev/claude/mercury-emulator-cut-20261006",
+      "author": "Efthimios",
+      "committed_at": "2026-10-07T07:28:54+03:00",
+      "paths": null
+    },
+    {
+      "sha": "e54be11",
+      "full_sha": "e54be11c823b61e5b78cd97efd8236a131ca6ac8",
+      "message": "Record the take rendered at f7512bf",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:42:44+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "f7512bf",
+      "full_sha": "f7512bffaadd231079bfa8c0da540ff5fe7bfc94",
+      "message": "Record the take rendered at a85056b",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:25:39+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "a85056b",
+      "full_sha": "a85056b8469435ca473d95fe6285a04dbfc82534",
+      "message": "Press publish and Down 0.15 s before their spoken words",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:16:54+03:00",
+      "paths": [
+        "video/capture-local.py"
+      ]
+    },
+    {
+      "sha": "4d9982d",
+      "full_sha": "4d9982de72ed77ca165b7e7da94812598425e5a0",
+      "message": "Record the take rendered at 6ef9d75",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:13:20+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "6ef9d75",
+      "full_sha": "6ef9d753983d696b7b7317f907b9b7d6660a614c",
+      "message": "Press publish, Down and the release-train keys before their captions",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:03:12+03:00",
+      "paths": [
+        "video/capture-local.py"
+      ]
+    },
+    {
+      "sha": "f862edb",
+      "full_sha": "f862edbb54f3b80801742a70a1b6ba284aeb1c08",
+      "message": "Cut the launch and the black, and label every source on screen",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:54:16+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "383e0d8",
+      "full_sha": "383e0d83366def38ac58048937f4796fee3f5716",
+      "message": "Record the 2026-10-06 take rendered at 81d6144",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:19:18+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "video/README.md"
+      ]
+    },
+    {
+      "sha": "81d6144",
+      "full_sha": "81d61446f6100a82e3d0e7c23e16e8992178c4ac",
+      "message": "Record the 2026-10-06 take rendered at 48010c9",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:01:22+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "48010c9",
+      "full_sha": "48010c9e4014d2cbe9124113e589a0736bd98584",
+      "message": "Put every emulator caption and press on its frame, and fix the CI collection",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T22:49:43+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "e76e6da",
+      "full_sha": "e76e6dab376031443b541dc483a3d64ebf075493",
+      "message": "Retire the no-emulator claim from the README's video line",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T19:37:17+03:00",
+      "paths": [
+        "README.md"
+      ]
+    },
+    {
+      "sha": "24561dc",
+      "full_sha": "24561dcc3d023d7fa9a7a904300acc802c857013",
+      "message": "Open the demo take on the Android TV emulator footage",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T19:33:41+03:00",
+      "paths": [
+        "README.md",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    {
+      "sha": "f423ba5",
+      "full_sha": "f423ba57ecfe688b8dafe899e06ab29dfdb7a90c",
+      "message": "Merge pull request #42 from upgradedev/claude/mercury-page-truth-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T16:58:16+03:00",
+      "paths": null
+    },
+    {
+      "sha": "5891007",
+      "full_sha": "5891007d44f1209653e1fb00a0eb1991e4cfe359",
+      "message": "Land Android TV runtime receipt from run 37464864870 at ea2cff5, J4 green, 46/53",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T16:32:58+03:00",
+      "paths": [
+        "README.md",
+        "android_tv_runtime_receipt.json",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/DEVPOST_SUBMISSION.md",
+        "docs/EVIDENCE.md",
+        "docs/FIRE_TV_BUILD.md",
+        "docs/FRICTION_LOG.md",
+        "tests/e2e/test_documentation_claims.py",
+        "tests/unit/test_firetv_app_structure.py",
+        "tests/unit/test_readiness_gates.py",
+        "video/README.md"
+      ]
+    },
+    {
+      "sha": "ea2cff5",
+      "full_sha": "ea2cff580962f408b17973c0e0b349ada9b6062c",
+      "message": "Merge origin/master (#40, #41, #43) into the page truth branch",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T09:09:12+03:00",
+      "paths": null
+    },
+    {
+      "sha": "b8767b6",
+      "full_sha": "b8767b6f535f25eb147f28ce37e67f94cc46aafd",
+      "message": "Merge pull request #43 from upgradedev/claude/mercury-naive-baselines-20261006",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:20:40+03:00",
+      "paths": null
+    },
+    {
+      "sha": "a59fbe2",
+      "full_sha": "a59fbe2ad5e83244e3eca178fb9ec67775c1c221",
+      "message": "Merge pull request #41 from upgradedev/claude/mercury-friction-log-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:19:38+03:00",
+      "paths": null
+    },
+    {
+      "sha": "46d7468",
+      "full_sha": "46d7468ef55bf4e736434e80531a8782368406cd",
+      "message": "Merge pull request #40 from upgradedev/claude/mercury-tv-footage-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:18:54+03:00",
+      "paths": null
+    },
+    {
+      "sha": "36df584",
+      "full_sha": "36df584d8b593b18fde9e13370cbb709dc0d9185",
+      "message": "Measure attribution against two naive baselines on the held-out set",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T01:27:31+03:00",
+      "paths": [
+        ".github/workflows/ci.yml",
+        "README.md",
+        "attribution_baselines_summary.json",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/naive_attribution_baselines.py",
+        "tests/unit/test_naive_attribution_baselines.py"
+      ]
+    },
+    {
+      "sha": "17a2ea1",
+      "full_sha": "17a2ea14d2d87e612f703b687dd6901e5d21695b",
+      "message": "fix(f7,docs): remove the orphaned recording adapter, true provenance and deploy claims",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T01:00:22+03:00",
+      "paths": [
+        "README.md",
+        "coverage_summary.json",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/DEVPOST_SUBMISSION.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_lambda_package.py",
+        "src/application/diagnose_incident_use_case.py",
+        "src/infrastructure/deploy_feed_fixture.py",
+        "src/infrastructure/recorded_commit_adapter.py",
+        "tests/integration/test_mcp_endpoints.py",
+        "tests/unit/test_change_scope.py",
+        "tests/unit/test_recorded_commit_adapter.py"
+      ]
+    }
+  ],
+  "parents": {
+    "a4ec9aa": {
+      "sha": "f423ba5",
+      "full_sha": "f423ba57ecfe688b8dafe899e06ab29dfdb7a90c",
+      "message": "Merge pull request #42 from upgradedev/claude/mercury-page-truth-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T16:58:16+03:00",
+      "paths": null
+    },
+    "e54be11": {
+      "sha": "f7512bf",
+      "full_sha": "f7512bffaadd231079bfa8c0da540ff5fe7bfc94",
+      "message": "Record the take rendered at a85056b",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:25:39+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    "f7512bf": {
+      "sha": "a85056b",
+      "full_sha": "a85056b8469435ca473d95fe6285a04dbfc82534",
+      "message": "Press publish and Down 0.15 s before their spoken words",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:16:54+03:00",
+      "paths": [
+        "video/capture-local.py"
+      ]
+    },
+    "a85056b": {
+      "sha": "4d9982d",
+      "full_sha": "4d9982de72ed77ca165b7e7da94812598425e5a0",
+      "message": "Record the take rendered at 6ef9d75",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:13:20+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    "4d9982d": {
+      "sha": "6ef9d75",
+      "full_sha": "6ef9d753983d696b7b7317f907b9b7d6660a614c",
+      "message": "Press publish, Down and the release-train keys before their captions",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-07T00:03:12+03:00",
+      "paths": [
+        "video/capture-local.py"
+      ]
+    },
+    "6ef9d75": {
+      "sha": "f862edb",
+      "full_sha": "f862edbb54f3b80801742a70a1b6ba284aeb1c08",
+      "message": "Cut the launch and the black, and label every source on screen",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:54:16+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    "f862edb": {
+      "sha": "383e0d8",
+      "full_sha": "383e0d83366def38ac58048937f4796fee3f5716",
+      "message": "Record the 2026-10-06 take rendered at 81d6144",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:19:18+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "video/README.md"
+      ]
+    },
+    "383e0d8": {
+      "sha": "81d6144",
+      "full_sha": "81d61446f6100a82e3d0e7c23e16e8992178c4ac",
+      "message": "Record the 2026-10-06 take rendered at 48010c9",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T23:01:22+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "scripts/build_video_plan.py",
+        "video/README.md",
+        "video/cue_sheet.json",
+        "video/narration.json"
+      ]
+    },
+    "81d6144": {
+      "sha": "48010c9",
+      "full_sha": "48010c9e4014d2cbe9124113e589a0736bd98584",
+      "message": "Put every emulator caption and press on its frame, and fix the CI collection",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T22:49:43+03:00",
+      "paths": [
+        "README.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    "48010c9": {
+      "sha": "e76e6da",
+      "full_sha": "e76e6dab376031443b541dc483a3d64ebf075493",
+      "message": "Retire the no-emulator claim from the README's video line",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T19:37:17+03:00",
+      "paths": [
+        "README.md"
+      ]
+    },
+    "e76e6da": {
+      "sha": "24561dc",
+      "full_sha": "24561dcc3d023d7fa9a7a904300acc802c857013",
+      "message": "Open the demo take on the Android TV emulator footage",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T19:33:41+03:00",
+      "paths": [
+        "README.md",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_video_plan.py",
+        "tests/video/test_emulator_open_cut.py",
+        "video/README.md",
+        "video/SHOT_LIST.md",
+        "video/build-video.py",
+        "video/capture-local.py",
+        "video/cue_sheet.json",
+        "video/generate-narration.py",
+        "video/narration.json"
+      ]
+    },
+    "24561dc": {
+      "sha": "f423ba5",
+      "full_sha": "f423ba57ecfe688b8dafe899e06ab29dfdb7a90c",
+      "message": "Merge pull request #42 from upgradedev/claude/mercury-page-truth-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T16:58:16+03:00",
+      "paths": null
+    },
+    "f423ba5": {
+      "sha": "b8767b6",
+      "full_sha": "b8767b6f535f25eb147f28ce37e67f94cc46aafd",
+      "message": "Merge pull request #43 from upgradedev/claude/mercury-naive-baselines-20261006",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:20:40+03:00",
+      "paths": null
+    },
+    "5891007": {
+      "sha": "ea2cff5",
+      "full_sha": "ea2cff580962f408b17973c0e0b349ada9b6062c",
+      "message": "Merge origin/master (#40, #41, #43) into the page truth branch",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T09:09:12+03:00",
+      "paths": null
+    },
+    "ea2cff5": {
+      "sha": "17a2ea1",
+      "full_sha": "17a2ea14d2d87e612f703b687dd6901e5d21695b",
+      "message": "fix(f7,docs): remove the orphaned recording adapter, true provenance and deploy claims",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T01:00:22+03:00",
+      "paths": [
+        "README.md",
+        "coverage_summary.json",
+        "docs/COMPLIANCE_AND_ARCHITECTURE.md",
+        "docs/DEVPOST_SUBMISSION.md",
+        "docs/EVIDENCE.md",
+        "docs/UAT_TESTBOOK.md",
+        "scripts/build_lambda_package.py",
+        "src/application/diagnose_incident_use_case.py",
+        "src/infrastructure/deploy_feed_fixture.py",
+        "src/infrastructure/recorded_commit_adapter.py",
+        "tests/integration/test_mcp_endpoints.py",
+        "tests/unit/test_change_scope.py",
+        "tests/unit/test_recorded_commit_adapter.py"
+      ]
+    },
+    "b8767b6": {
+      "sha": "a59fbe2",
+      "full_sha": "a59fbe2ad5e83244e3eca178fb9ec67775c1c221",
+      "message": "Merge pull request #41 from upgradedev/claude/mercury-friction-log-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:19:38+03:00",
+      "paths": null
+    },
+    "a59fbe2": {
+      "sha": "46d7468",
+      "full_sha": "46d7468ef55bf4e736434e80531a8782368406cd",
+      "message": "Merge pull request #40 from upgradedev/claude/mercury-tv-footage-20261005",
+      "author": "Efthimios",
+      "committed_at": "2026-10-06T08:18:54+03:00",
+      "paths": null
+    },
+    "46d7468": {
+      "sha": "8b879af",
+      "full_sha": "8b879af696cb374d191cf5ca6e519bd4de0d6a71",
+      "message": "Merge pull request #39 from upgradedev/muse/receipt-mercury-20261001-e0a857a",
+      "author": "Efthimios",
+      "committed_at": "2026-10-02T00:03:23+03:00",
+      "paths": null
+    },
+    "36df584": {
+      "sha": "8b879af",
+      "full_sha": "8b879af696cb374d191cf5ca6e519bd4de0d6a71",
+      "message": "Merge pull request #39 from upgradedev/muse/receipt-mercury-20261001-e0a857a",
+      "author": "Efthimios",
+      "committed_at": "2026-10-02T00:03:23+03:00",
+      "paths": null
+    },
+    "17a2ea1": {
+      "sha": "fefe067",
+      "full_sha": "fefe06782c6d1b1bcf386af8875147f583e3ec89",
+      "message": "fix(provenance): stop calling the public board's commits real",
+      "author": "Efthimios Fousekis",
+      "committed_at": "2026-10-06T00:33:41+03:00",
+      "paths": [
+        "docs/index.html",
+        "scripts/build_lambda_package.py",
+        "src/application/diagnose_incident_use_case.py",
+        "src/infrastructure/cloudwatch_adapter.py",
+        "src/infrastructure/deploy_feed_fixture.py",
+        "src/infrastructure/recorded_commit_adapter.py",
+        "tests/integration/test_mcp_endpoints.py",
+        "tests/unit/test_aws_adapters.py"
+      ]
+    }
+  }
+}
