@@ -578,10 +578,28 @@ def test_the_manifest_names_no_file_that_is_not_committed():
     assert (DOCS / start_url).exists()
 
 
-def test_no_service_worker_claims_an_offline_cache_that_is_never_filled():
+def test_no_service_worker_claims_an_offline_cache_that_is_never_filled(html):
     """The previous worker cached nothing and named another product's cache."""
     assert not (DOCS / "sw.js").exists()
     assert "serviceWorker" not in INDEX.read_text(encoding="utf-8")
+    script = html.split("<script>")[-1]
+    # M1: publishHandoff honours an explicit operator secret and passes service_name on demo path
+    assert "var explicitSecret = el('opSecret').value.trim();" in script
+    assert "service_name: state.service" in script
+    # M2: loadObservability renders provenanceBlock, updates tileSpendStamp, and announces/speaks
+    obs_start = script.index("async function loadObservability")
+    obs_body = script[obs_start:script.index("// -------------------------------------------------------------- Wiring up", obs_start)]
+    assert "provenanceBlock(obsProvenance, true)" in obs_body
+    assert "announce('Observability audit for ' + data.service" in obs_body
+    assert "speak(data.voice_summary ||" in obs_body
+    # M3: 1080p and tv-host hero rules clear the fixed keybar without shifting layout
+    assert ".hero { min-height: calc(100vh - 7.6rem); margin-bottom: 3.5rem; }" in html
+    assert ".tv-host .hero { min-height: calc(100vh - 7.6rem); margin-bottom: 3.5rem; }" in html
+    # M4: literal space text nodes between quote-label and quote, and before .row-sha
+    assert "cause.appendChild(h('span', 'quote-label', 'Commit message'));\n        cause.appendChild(document.createTextNode(' '));" in script
+    assert "verdict.appendChild(document.createTextNode(' '));\n        verdict.appendChild(h('span', 'row-sha', sha));" in script
+    # M5: faster split-flap tick for rapid service switches
+    assert "var FLAP_TICK_MS = 24;" in script
 
 
 # -------------------------------------------------- The real navigator spec run
@@ -595,3 +613,5 @@ def test_spatial_navigation_spec_passes():
     )
     assert result.returncode == 0, f"spatial navigation spec failed:\n{result.stdout}\n{result.stderr}"
     assert "spatial navigation assertions passed" in result.stdout
+
+

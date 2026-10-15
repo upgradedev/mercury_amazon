@@ -55,9 +55,42 @@ def seed_recorded_demo_evidence(incident_use_case, deployment_evidence: Deployme
         ))
 
 
-def recorded_demo_handoff(incident_use_case, deployment_evidence: DeploymentEvidenceLedger) -> dict | None:
+DEMO_FIXTURE_SERVICES = frozenset(
+    {"checkout-api", "payments-worker", "search-indexer", "release-train", "quiet-service"}
+)
+
+
+def recorded_demo_handoff(
+    incident_use_case,
+    deployment_evidence: DeploymentEvidenceLedger,
+    service_name: str = "checkout-api",
+) -> dict | None:
     """Return fixed handoff content only when the complete labelled fixture exists."""
-    correlation = incident_use_case.execute("checkout-api", 60)
+    if service_name not in DEMO_FIXTURE_SERVICES:
+        return None
+    correlation = incident_use_case.execute(service_name, 60)
+    if service_name != "checkout-api":
+        if not correlation.metric_provenance.data_source.startswith("offline-fixture"):
+            return None
+        verdict_fact = (
+            correlation.handoff_fact
+            or correlation.refusal_statement
+            or correlation.voice_summary
+        )
+        return {
+            "incident_id": "checkout-api-active",
+            "responder": "D-pad demo responder",
+            "current_action": f"Recorded fixture handoff for {service_name} ({correlation.verdict.value})",
+            "confirmed_facts": [
+                f"{service_name}: {correlation.metric_name} is {correlation.current_value} against baseline "
+                f"{correlation.baseline_value}",
+                verdict_fact,
+            ],
+            "next_step": (
+                f"Keep investigating; Mercury has not produced an actionable rollback target for "
+                f"{service_name}. This fixture never contacts a deployment pipeline."
+            ),
+        }
     offending = correlation.offending_commit
     if not correlation.rollback_is_available or offending is None:
         return None
@@ -87,3 +120,4 @@ def recorded_demo_handoff(incident_use_case, deployment_evidence: DeploymentEvid
             "deployment pipeline."
         ),
     }
+
