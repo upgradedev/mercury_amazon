@@ -54,7 +54,7 @@ async def _invoke(scope: dict[str, Any], body: bytes) -> dict[str, Any]:
     async def receive() -> dict[str, Any]:
         nonlocal sent
         if sent:
-            return {"type": "http.disconnect"}
+            return await asyncio.Event().wait()
         sent = True
         return {"type": "http.request", "body": body, "more_body": False}
 
