@@ -257,15 +257,15 @@ Stated here rather than left for a judge to find:
   emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
   below, because the deployed page predated the revision retry. Full 5-of-5 journeys
   followed on 2026-09-30 (runs 36661614006 and 36669903334), and run 36798893479 on
-  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation. Run 37464864870 on 2026-10-06 re-drove all five against the PR #42 page, served by the Lambda redeployed at `ea2cff5`, and wrote the receipt checked in now.
+  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation. Run 37464864870 on 2026-10-06 re-drove all five against the PR #42 page at `ea2cff5`, and run 38808232691 on 2026-10-15 re-drove all five against the PR #50 page, served by the Lambda redeployed at `fdb5f56`, and wrote the receipt checked in now.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It runs the PR #42 build: redeployed on 2026-10-06
+  publishes the deployed build SHA. It runs the PR #50 build: redeployed on 2026-10-15
   and probed the same day (`curl -s <url>/health`), `/health` reported
-  `ea2cff580962f408b17973c0e0b349ada9b6062c`, record-only. That puts the PR #42 runtime
-  changes live (the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause). Before that deploy it ran
+  `fdb5f560168443db0d81c8d65d3e4b9b27fb858a`, record-only. That puts the PR #50 runtime
+  changes live (service-specific handoff templates, declared observability gap panel and spend tile sync, 1080p hero compact fit above the sticky keybar, explicit spacing in heroCause and row-verdict, and split-flap race cancellation) on top of the PR #42 runtime changes (`ea2cff5`, deployed on 2026-10-06). Before that it ran
   `e0a857ae70349bd481140ced097d0791402d347b` (probed on 2026-10-01 and again on 2026-10-05),
   with the departures board, self-hosted fonts, the candidate headline and the candidate
   wording on the demo handoff. Earlier on 2026-10-01 it ran `1bc8cd5`, then `b99b154`; on 2026-09-30 it ran `b2f7868`; on

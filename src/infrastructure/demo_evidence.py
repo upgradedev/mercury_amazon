@@ -70,7 +70,7 @@ def recorded_demo_handoff(
         return None
     correlation = incident_use_case.execute(service_name, 60)
     if service_name != "checkout-api":
-        if not correlation.metric_provenance.data_source.startswith("offline-fixture"):
+        if not correlation.metric_provenance.source.value.startswith("offline-fixture"):
             return None
         verdict_fact = (
             correlation.handoff_fact
