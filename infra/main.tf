@@ -139,7 +139,7 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
         Resource = [
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
           "arn:aws:bedrock:*::foundation-model/amazon.nova-*",
-          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
+          "arn:aws:bedrock:${var.aws_region}:*:inference-profile/*"
         ]
       }
     ]
