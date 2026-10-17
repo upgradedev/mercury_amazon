@@ -22,8 +22,12 @@ rolled back from the remote, behind five checks and a single-use token.
 
 **Amazon technology.** Fire TV: a Leanback Android app in `app/` hosts the board in a
 WebView and forwards the remote's D-pad keys to it. AWS: the server runs on Lambda
-behind a function URL, keeps handoffs and spent tokens in DynamoDB, and reads
-CloudWatch error metrics and Cost Explorer spend when it has credentials.
+behind a function URL, keeps handoffs and spent tokens in DynamoDB, reads
+CloudWatch error metrics and Cost Explorer spend when it has credentials, serves
+`MCP 2025-11-25` Streamable HTTP on `POST /mcp`, and synthesizes 10-foot commander
+briefs on `POST /mcp/tools/agent_incident_brief` with Claude Sonnet 5
+(`anthropic.claude-sonnet-5`) on Amazon Bedrock (or a deterministic offline brief
+when `MERCURY_OFFLINE=1` and no Bedrock key is present).
 
 | Link | What you get today |
 |---|---|

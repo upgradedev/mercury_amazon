@@ -398,7 +398,8 @@ AGENT_DECK_JS = r"""(function () {
     '#bedrockAgentSection .agent-pill-amber { border-color:var(--amber, #FFB23F); color:var(--amber, #FFB23F); font-weight:600; }',
     '#bedrockAgentSection .agent-card { border-top:2px solid var(--amber, #FFB23F); background:var(--flap, #14171D); padding:0.9rem 1rem; margin-top:0.75rem; }',
     '#bedrockAgentSection .agent-brief-10ft { font-family:var(--display, sans-serif); font-size:var(--fs-row, 1.25rem); color:var(--ink, #F3F5F8); line-height:1.35; margin:0.4rem 0 0.6rem; }',
-    '#bedrockAgentSection .agent-pre { white-space:pre-wrap; word-break:break-word; overflow-x:auto; max-width:100%; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.75rem; background:var(--board, #0E1014); border:1px solid var(--rule, #2A2E37); color:var(--ink-2, #A7B0C0); margin-top:0.5rem; }'
+    '#bedrockAgentSection .agent-pre { white-space:pre-wrap; word-break:break-word; overflow-x:auto; max-width:100%; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.75rem; background:var(--board, #0E1014); border:1px solid var(--rule, #2A2E37); color:var(--ink-2, #A7B0C0); margin-top:0.5rem; }',
+    '.btn-hero-agent-jump { border-color:var(--ok, #3DD68C) !important; color:var(--ok, #3DD68C) !important; }'
   ].join('\n');
   document.head.appendChild(style);
 
@@ -467,7 +468,7 @@ AGENT_DECK_JS = r"""(function () {
   var out = mk('div');
   out.id = 'bedrockAgentOutput';
   var empty = mk('div', 'empty-state-card',
-    'Select any service on the departures board above and press "Ask Claude Sonnet 5 Commander" or "Verify MCP 2025-11-25 Handshake" to run live Amazon Bedrock synthesis and Streamable HTTP tool discovery.'
+    'Hydrating live Amazon Bedrock Claude Sonnet 5 Incident Commander brief and MCP 2025-11-25 Streamable HTTP telemetry…'
   );
   empty.id = 'bedrockAgentEmpty';
   out.appendChild(empty);
@@ -475,6 +476,20 @@ AGENT_DECK_JS = r"""(function () {
   sec.appendChild(consoleBox);
 
   anchor.parentNode.insertBefore(sec, anchor.nextSibling);
+
+  var heroActions = document.querySelector('.hero-actions');
+  if (heroActions && !document.getElementById('btnHeroJumpToAgent')) {
+    var jumpBtn = mk('button', 'btn btn-hero-agent-jump', 'Claude Sonnet 5 + MCP 2025-11-25 Live ↓');
+    jumpBtn.id = 'btnHeroJumpToAgent';
+    jumpBtn.type = 'button';
+    jumpBtn.setAttribute('data-tv-focusable', '');
+    jumpBtn.setAttribute('data-tv-label', 'Jump to AI Incident Commander and MCP 2025-11-25 War Room');
+    jumpBtn.title = 'Scroll to live Amazon Bedrock Claude Sonnet 5 Incident Commander and MCP 2025-11-25 War Room';
+    jumpBtn.addEventListener('click', function () {
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    heroActions.appendChild(jumpBtn);
+  }
 
   btnBrief.addEventListener('click', async function () {
     var svc = activeService();
@@ -510,7 +525,7 @@ AGENT_DECK_JS = r"""(function () {
       card.appendChild(mk('p', 'agent-brief-10ft', syn.commander_brief_10ft || ''));
       card.appendChild(mk('p', 'note', 'Root-Cause Hypothesis: ' + (syn.root_cause_hypothesis || '')));
       card.appendChild(mk('p', 'note', 'Draft Responder Handoff — Action: ' + (draft.current_action || '') + ' | Next step: ' + (draft.next_step || '')));
-      card.appendChild(mk('p', 'note', 'Guardrail: ' + (syn.governance_guardrail || '')));
+      card.appendChild(mk('p', 'note', 'Guardrail: ' + (syn.guardrail_attestation || syn.governance_guardrail || '')));
       out.insertBefore(card, out.firstChild);
       latencySpan.textContent = 'POST /mcp/tools/agent_incident_brief (' + svc + ') · ' + (syn.latency_ms || elapsed) + ' ms';
     } catch (err) {
@@ -611,12 +626,19 @@ AGENT_DECK_JS = r"""(function () {
       card.appendChild(pills);
       card.appendChild(mk('p', 'note', 'Published Tools (' + tools.length + '): ' + tools.map(function (t) { return t.name; }).join(', ')));
       card.appendChild(mk('pre', 'agent-pre', JSON.stringify((callBody.result && callBody.result.structuredContent) || callBody, null, 2)));
-      out.insertBefore(card, out.firstChild);
+      out.appendChild(card);
       latencySpan.textContent = 'MCP 2025-11-25 verified (' + tools.length + ' tools · ' + elapsed + ' ms)';
     } finally {
       btnMcp.disabled = false;
     }
   });
+
+  setTimeout(function () {
+    btnBrief.click();
+    setTimeout(function () {
+      btnMcp.click();
+    }, 180);
+  }, 120);
 })();
 """
 
