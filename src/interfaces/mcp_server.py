@@ -51,6 +51,7 @@ from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_window import PinnedGitWindowProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 from src.infrastructure.trial_summary import naming_accuracy
+from src.interfaces.agent_mcp_routes import bedrock_agent, register_agent_mcp_routes
 from src.interfaces.handoff_routes import register_handoff_routes
 
 logger = logging.getLogger("mercury.mcp")
@@ -302,15 +303,11 @@ async def health_check() -> dict[str, Any]:
     process cannot determine its own commit.
     """
     return {
-        "status": "ok",
-        "service": "mercury-firetv-cockpit",
-        "version": app.version,
-        "build_sha": BUILD_SHA,
-        "rollback_secret_is_ephemeral": ROLLBACK_SECRET_IS_EPHEMERAL,
-        "github_live": github_adapter.can_call_live,
-        "rollback_dispatch": _dispatch_mode(),
-        "durable_state": bool(state_store),
-        "dpad_demo_approval": _dispatch_mode() == "record-only",
+        "status": "ok", "service": "mercury-firetv-cockpit", "version": app.version,
+        "build_sha": BUILD_SHA, "rollback_secret_is_ephemeral": ROLLBACK_SECRET_IS_EPHEMERAL,
+        "github_live": github_adapter.can_call_live, "rollback_dispatch": _dispatch_mode(),
+        "durable_state": bool(state_store), "dpad_demo_approval": _dispatch_mode() == "record-only",
+        "mcp_protocol": "2025-11-25", "bedrock_agent": bedrock_agent.health_summary(),
     }
 
 
@@ -685,6 +682,7 @@ def _validate_record_only_demo(action_id: str) -> None:
 register_handoff_routes(
     app, incident_handoffs, require_operator, _validate_record_only_demo,
     lambda service_name="checkout-api": recorded_demo_handoff(incident_use_case, deployment_evidence, service_name))
+register_agent_mcp_routes(app)
 
 
 @app.post("/mcp/tools/demo_stage_rollback")
