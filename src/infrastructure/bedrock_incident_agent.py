@@ -29,7 +29,7 @@ from typing import Any, Callable
 
 DEFAULT_MODEL_ID = "anthropic.claude-sonnet-5"
 DEFAULT_REGION = "eu-west-1"
-MODEL_CALL_TIMEOUT_SEC = 8.0
+MODEL_CALL_TIMEOUT_SEC = 25.0
 CREDENTIAL_CACHE_SECONDS = 300.0
 
 CAPABILITY_READY = "ready_to_attempt"
@@ -205,7 +205,7 @@ class BedrockIncidentAgentAdapter:
         prompt = (
             "You are Mercury's 10-Foot Fire TV SRE Incident Commander Agent on Amazon Bedrock.\n"
             "Synthesize an incident diagnosis and responder handoff brief from the telemetry correlation.\n"
-            "Return ONLY a valid JSON object with exactly these keys:\n"
+            "Return ONLY a valid JSON object (1-2 concise sentences per field) with these exact keys:\n"
             '  "incident_severity": one of ["SEV-1_ROLLBACK_READY", "SEV-2_ATTRIBUTION_REFUSED", "NOMINAL_NO_ANOMALY"],\n'
             '  "commander_brief_10ft": 2 concise sentences suitable for a 10-foot TV war-room screen,\n'
             '  "root_cause_hypothesis": technical explanation of the metric reading vs candidate commits,\n'
@@ -213,7 +213,7 @@ class BedrockIncidentAgentAdapter:
             f"Service: {service}\n"
             f"Verdict: {verdict}\n"
             f"Metric: {json.dumps(metric)}\n"
-            f"Attribution details: {json.dumps(attribution)}\n"
+            f"Attribution details: commits_in_window={attribution.get('commits_in_window')}, set_aside={attribution.get('commits_set_aside')}, refusal={attribution.get('refusal_statement')}\n"
             f"Offending commit candidate: {json.dumps(offending)}\n"
             f"Recommended governed action: {json.dumps(recommended)}\n"
         )
@@ -221,7 +221,7 @@ class BedrockIncidentAgentAdapter:
             client = self._build_client()
             response = client.messages.create(
                 model=self.model_id,
-                max_tokens=4096,
+                max_tokens=1200,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=MODEL_CALL_TIMEOUT_SEC,
             )
