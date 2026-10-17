@@ -491,7 +491,7 @@ AGENT_DECK_JS = r"""(function () {
     heroActions.appendChild(jumpBtn);
   }
 
-  btnBrief.addEventListener('click', async function () {
+  async function runBrief() {
     var svc = activeService();
     btnBrief.disabled = true;
     latencySpan.textContent = 'Calling Amazon Bedrock Claude Sonnet 5 for ' + svc + '…';
@@ -533,7 +533,8 @@ AGENT_DECK_JS = r"""(function () {
     } finally {
       btnBrief.disabled = false;
     }
-  });
+  }
+  btnBrief.addEventListener('click', runBrief);
 
   btnPublish.addEventListener('click', async function () {
     var svc = activeService();
@@ -573,7 +574,7 @@ AGENT_DECK_JS = r"""(function () {
     }
   });
 
-  btnMcp.addEventListener('click', async function () {
+  async function runMcp() {
     btnMcp.disabled = true;
     latencySpan.textContent = 'Running MCP 2025-11-25 Streamable HTTP handshake…';
     try {
@@ -631,13 +632,12 @@ AGENT_DECK_JS = r"""(function () {
     } finally {
       btnMcp.disabled = false;
     }
-  });
+  }
+  btnMcp.addEventListener('click', runMcp);
 
   setTimeout(function () {
-    btnBrief.click();
-    setTimeout(function () {
-      btnMcp.click();
-    }, 180);
+    runBrief();
+    setTimeout(runMcp, 180);
   }, 120);
 })();
 """
