@@ -371,9 +371,13 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
 
 
 def render_cockpit_response(index_path: Path, request: Request) -> Response:
-    """Serve docs/index.html, injecting /mcp/agent-deck.js on AWS Lambda or when ?agent=1 is set."""
+    """Serve docs/index.html, injecting /mcp/agent-deck.js on AWS Lambda, local uvicorn, or ?agent=1."""
     if index_path.exists():
-        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or request.query_params.get("agent") == "1":
+        if (
+            os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+            or request.query_params.get("agent") == "1"
+            or (not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("MERCURY_OFFLINE") != "1")
+        ):
             html = index_path.read_text(encoding="utf-8")
             injected = html.replace(
                 "</body>",
@@ -390,8 +394,17 @@ AGENT_DECK_JS = r"""(function () {
   var anchor = document.getElementById('rollback') || document.getElementById('hero');
   if (!anchor || !anchor.parentNode) return;
 
+  function syncTvViewport() {
+    if (!window.MercuryHost && window.innerWidth >= 900 && window.innerWidth < 1400 && window.innerHeight <= 600) {
+      document.documentElement.classList.add('tv-host');
+    }
+  }
+  syncTvViewport();
+  window.addEventListener('resize', syncTvViewport);
+
   var style = document.createElement('style');
   style.textContent = [
+    '#bedrockAgentSection, #bedrockAgentSection * { box-sizing:border-box; max-width:100%; overflow-wrap:anywhere; }',
     '#bedrockAgentSection .agent-pills { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.65rem 0; }',
     '#bedrockAgentSection .agent-pill { font-family:var(--mono, monospace); font-size:var(--fs-small, 0.9rem); padding:0.2rem 0.6rem; border:1px solid var(--rule, #2A2E37); background:var(--board, #0E1014); color:var(--ink-2, #A7B0C0); }',
     '#bedrockAgentSection .agent-pill-ok { border-color:var(--ok, #3DD68C); color:var(--ok, #3DD68C); font-weight:600; }',
@@ -399,7 +412,7 @@ AGENT_DECK_JS = r"""(function () {
     '#bedrockAgentSection .agent-card { border-top:2px solid var(--amber, #FFB23F); background:var(--flap, #14171D); padding:0.9rem 1rem; margin-top:0.75rem; }',
     '#bedrockAgentSection .agent-brief-10ft { font-family:var(--display, sans-serif); font-size:var(--fs-row, 1.25rem); color:var(--ink, #F3F5F8); line-height:1.35; margin:0.4rem 0 0.6rem; }',
     '#bedrockAgentSection .agent-pre { white-space:pre-wrap; word-break:break-word; overflow-x:auto; max-width:100%; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.75rem; background:var(--board, #0E1014); border:1px solid var(--rule, #2A2E37); color:var(--ink-2, #A7B0C0); margin-top:0.5rem; }',
-    '.btn-hero-agent-jump { border-color:var(--ok, #3DD68C) !important; color:var(--ok, #3DD68C) !important; }'
+    '.btn-hero-agent-jump { border-color:var(--ok, #3DD68C) !important; color:var(--ok, #3DD68C) !important; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.45rem 0.75rem; white-space:nowrap; }'
   ].join('\n');
   document.head.appendChild(style);
 
@@ -491,9 +504,12 @@ AGENT_DECK_JS = r"""(function () {
     heroActions.appendChild(jumpBtn);
   }
 
-  async function runBrief() {
-    var svc = activeService();
+  var briefSeq = 0;
+  async function runBrief(overrideSvc) {
+    var svc = (typeof overrideSvc === 'string' && overrideSvc) ? overrideSvc : activeService();
+    var mySeq = ++briefSeq;
     btnBrief.disabled = true;
+    btnBrief.setAttribute('aria-busy', 'true');
     latencySpan.textContent = 'Calling Amazon Bedrock Claude Sonnet 5 for ' + svc + '…';
     try {
       var t0 = performance.now();
@@ -503,6 +519,7 @@ AGENT_DECK_JS = r"""(function () {
         body: JSON.stringify({ service_name: svc, environment: 'production', time_window_minutes: 60, prefer_bedrock: true })
       });
       var d = await r.json();
+      if (mySeq !== briefSeq) return;
       var elapsed = Math.round(performance.now() - t0);
       var syn = d.agent_synthesis || {};
       var draft = syn.responder_handoff_draft || {};
@@ -531,10 +548,21 @@ AGENT_DECK_JS = r"""(function () {
     } catch (err) {
       latencySpan.textContent = 'Error calling agent_incident_brief';
     } finally {
-      btnBrief.disabled = false;
+      if (mySeq === briefSeq) {
+        btnBrief.disabled = false;
+        btnBrief.setAttribute('aria-busy', 'false');
+      }
     }
   }
-  btnBrief.addEventListener('click', runBrief);
+  btnBrief.addEventListener('click', function () { runBrief(); });
+
+  document.addEventListener('click', function (ev) {
+    var row = ev.target && ev.target.closest && ev.target.closest('.btn-demo[data-service]');
+    if (row) {
+      var svc = row.getAttribute('data-service');
+      setTimeout(function () { runBrief(svc); }, 40);
+    }
+  });
 
   btnPublish.addEventListener('click', async function () {
     var svc = activeService();
