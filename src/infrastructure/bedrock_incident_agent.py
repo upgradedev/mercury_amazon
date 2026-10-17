@@ -222,7 +222,6 @@ class BedrockIncidentAgentAdapter:
             response = client.messages.create(
                 model=self.model_id,
                 max_tokens=420,
-                temperature=0.0,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=MODEL_CALL_TIMEOUT_SEC,
             )
