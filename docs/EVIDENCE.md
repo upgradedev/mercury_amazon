@@ -905,7 +905,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-732 tests and a re-measure on an idle machine is pending**.
+737 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -949,7 +949,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 732 passed
+# 737 passed
 ```
 
 #### Step 3: Start the server
@@ -1173,7 +1173,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 732 passed
+python -m pytest tests/ -q                                    # 737 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2144 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
