@@ -149,6 +149,22 @@ def test_health_and_agent_endpoints_expose_bedrock_and_mcp_2025_11_25():
     assert "agent_synthesis" in b_body
     assert b_body["agent_synthesis"]["incident_severity"] == "SEV-1_ROLLBACK_READY"
 
+    deck_resp = client.get("/mcp/agent-deck.js")
+    assert deck_resp.status_code == 200
+    assert "application/javascript" in deck_resp.headers.get("content-type", "")
+    assert "btnAgentBrief" in deck_resp.text
+    assert "btnAgentPublishHandoff" in deck_resp.text
+    assert "btnAgentMcpHandshake" in deck_resp.text
+
+    root_default = client.get("/")
+    assert root_default.status_code == 200
+    assert "/mcp/agent-deck.js" not in root_default.text
+
+    root_agent = client.get("/?agent=1")
+    assert root_agent.status_code == 200
+    assert '<script src="/mcp/agent-deck.js" defer></script>' in root_agent.text
+
+
 
 def test_mcp_2025_11_25_streamable_http_lifecycle_and_all_tools():
     from src.infrastructure.demo_evidence import seed_recorded_demo_evidence

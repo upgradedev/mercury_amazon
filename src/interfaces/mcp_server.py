@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src.application.calculate_dora_use_case import CalculateDORAUseCase
@@ -51,7 +51,11 @@ from src.infrastructure.github_adapter import GitHubTelemetryAdapter
 from src.infrastructure.local_git_window import PinnedGitWindowProvider
 from src.infrastructure.observability_harness import PrivateObservabilityHarness
 from src.infrastructure.trial_summary import naming_accuracy
-from src.interfaces.agent_mcp_routes import bedrock_agent, register_agent_mcp_routes
+from src.interfaces.agent_mcp_routes import (  # noqa: E501
+    bedrock_agent,
+    register_agent_mcp_routes,
+    render_cockpit_response,
+)
 from src.interfaces.handoff_routes import register_handoff_routes
 
 logger = logging.getLogger("mercury.mcp")
@@ -755,12 +759,9 @@ async def recommendation_liveness(
 # -------------------------------------------------------------- Cockpit files
 
 @app.get("/")
-async def serve_cockpit():
+async def serve_cockpit(request: Request):
     """Serve the same cockpit page that GitHub Pages publishes from docs/."""
-    index_path = WEB_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return JSONResponse({"message": "Mercury API is running. The cockpit page was not found in docs/."})
+    return render_cockpit_response(WEB_DIR / "index.html", request)
 
 
 # There is deliberately no StaticFiles mount over docs/. A blanket mount serves
