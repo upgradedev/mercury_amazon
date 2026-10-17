@@ -128,6 +128,19 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
           "dynamodb:Query"
         ]
         Resource = aws_dynamodb_table.mercury_state.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock-mantle:CreateInference"
+        ]
+        Resource = [
+          "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:*::foundation-model/amazon.nova-*",
+          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
+        ]
       }
     ]
   })
@@ -158,8 +171,8 @@ resource "aws_lambda_function" "mercury_wallboard_function" {
   handler          = "src.interfaces.lambda_handler.handler"
   filename         = var.lambda_package_path
   source_code_hash = filebase64sha256(var.lambda_package_path)
-  memory_size      = 256
-  timeout          = 15
+  memory_size      = 1769
+  timeout          = 30
 
   environment {
     variables = {
