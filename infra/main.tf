@@ -82,6 +82,8 @@ resource "aws_dynamodb_table" "mercury_state" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 # 1. IAM Execution Role for Lambda
 resource "aws_iam_role" "mercury_lambda_role" {
   name = "mercury-lambda-role-euw1-${var.environment}"
@@ -118,7 +120,7 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/mercury-wallboard-euw1-${var.environment}:*"
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/mercury-wallboard-euw1-${var.environment}:*"
       },
       {
         Effect = "Allow"
@@ -139,7 +141,7 @@ resource "aws_iam_policy" "mercury_serverless_policy" {
         Resource = [
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
           "arn:aws:bedrock:*::foundation-model/amazon.nova-*",
-          "arn:aws:bedrock:${var.aws_region}:*:inference-profile/*"
+          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
         ]
       }
     ]

@@ -339,13 +339,16 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                     },
                 )
         except Exception as exc:  # noqa: BLE001
+            import re as _re
+
+            safe_msg = _re.sub(r"arn:aws:[^\s\"']+", "arn:aws:[REDACTED]", str(exc))[:240]
             return JSONResponse(
                 status_code=200,
                 content={
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "content": [{"type": "text", "text": f"Tool '{name}' failed: {exc}"}],
+                        "content": [{"type": "text", "text": f"Tool '{name}' failed ({type(exc).__name__}): {safe_msg}"}],
                         "isError": True,
                     },
                 },
