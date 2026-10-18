@@ -691,13 +691,7 @@ register_agent_mcp_routes(app)
 
 @app.post("/mcp/tools/demo_stage_rollback")
 async def demo_stage_rollback(req: StageRollbackRequest) -> dict[str, Any]:
-    """Stage only the checked-in demo target, with no external side effect.
-
-    This route exists so a Fire TV remote can complete the public fixture journey
-    without typing an operator secret. It is fail-closed when any real dispatcher
-    is selected, and both markers must explicitly identify themselves as offline
-    fixtures. The normal stage route remains bearer-authenticated.
-    """
+    """Stage only the checked-in demo target, with no external side effect."""
     _validate_record_only_demo(req.action_id)
     try:
         offending, target = deployment_evidence.validate_pair(
@@ -748,11 +742,7 @@ async def demo_confirm_rollback(req: ConfirmRollbackRequest) -> dict[str, Any]:
 async def recommendation_liveness(
     action_id: str, current_metric_value: float = Query(..., allow_inf_nan=False),
 ) -> dict[str, Any]:
-    """Record an operator reading; recovery permanently withdraws this staged action.
-
-    No telemetry provider is fetched here. Confirmation checks this same state
-    and its TTL before either record-only or external dispatch.
-    """
+    """Record an operator reading; recovery permanently withdraws this staged action."""
     return rollback_use_case.recommendation_liveness(action_id, current_metric_value)
 
 
@@ -764,28 +754,12 @@ async def serve_cockpit(request: Request):
     return render_cockpit_response(WEB_DIR / "index.html", request)
 
 
-# There is deliberately no StaticFiles mount over docs/. A blanket mount serves
-# every file in that directory, including the written documentation, which is
-# exactly what the allowlist in serve_cockpit_asset below exists to prevent. The
-# cockpit links its assets relatively, so that one route is sufficient.
-
-
 @app.get("/{asset_name}")
 async def serve_cockpit_asset(asset_name: str):
-    """Serve the cockpit's sibling assets at the paths the page requests them from.
-
-    The page is written once and served from both GitHub Pages and this server, so it
-    links its scripts, manifest and self-hosted fonts relatively; this resolves them here.
-
-    Only the extensions in :data:`COCKPIT_ASSET_TYPES` are served, and only files
-    that resolve to a direct child of ``docs/``, so this cannot be walked out of
-    the directory into the rest of the repository.
-    """
-    suffix = Path(asset_name).suffix.lower()
-    media_type = COCKPIT_ASSET_TYPES.get(suffix)
+    """Serve allowlisted sibling assets from docs/ without exposing Markdown docs."""
+    media_type = COCKPIT_ASSET_TYPES.get(Path(asset_name).suffix.lower())
     if media_type is None:
         raise HTTPException(status_code=404, detail="Not found")
-
     candidate = (WEB_DIR / asset_name).resolve()
     if candidate.parent != WEB_DIR.resolve() or not candidate.is_file():
         raise HTTPException(status_code=404, detail="Not found")

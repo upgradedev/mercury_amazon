@@ -82,6 +82,21 @@ def test_bedrock_incident_agent_synthesizes_and_caches_with_injected_client():
     assert res2["cached"] is True
     assert fake_client.messages.calls == 1
 
+    from pathlib import Path
+
+    from src.infrastructure.bedrock_incident_agent import MAX_CACHE_ENTRIES
+
+    for idx in range(MAX_CACHE_ENTRIES + 5):
+        adapter._cache[f"seed-{idx}"] = {"idx": idx}
+    adapter.synthesize_incident_brief(
+        what_changed_payload={**sample_payload, "service": "orders-api"},
+    )
+    assert len(adapter._cache) == MAX_CACHE_ENTRIES
+    assert "seed-0" not in adapter._cache
+    tf_text = (Path(__file__).resolve().parents[2] / "infra" / "main.tf").read_text(encoding="utf-8")
+    assert 'data "aws_caller_identity" "current"' in tf_text
+    assert "${data.aws_caller_identity.current.account_id}:inference-profile/*" in tf_text
+
 
 def test_bedrock_incident_agent_falls_back_cleanly_on_error_and_nominal_services():
     plain_client = _FakeBedrockClient("Plain prose without JSON braces", should_raise=False)

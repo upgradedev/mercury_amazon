@@ -31,6 +31,7 @@ DEFAULT_MODEL_ID = "anthropic.claude-sonnet-5"
 DEFAULT_REGION = "eu-west-1"
 MODEL_CALL_TIMEOUT_SEC = 25.0
 CREDENTIAL_CACHE_SECONDS = 300.0
+MAX_CACHE_ENTRIES = 256
 
 CAPABILITY_READY = "ready_to_attempt"
 CAPABILITY_NO_SDK = "unavailable_sdk_not_installed"
@@ -240,6 +241,8 @@ class BedrockIncidentAgentAdapter:
                 "fallback_reason": None,
                 "cache_key_sha256": cache_key,
             }
+            while len(self._cache) >= MAX_CACHE_ENTRIES:
+                self._cache.pop(next(iter(self._cache)), None)
             self._cache[cache_key] = dict(result)
             return result
         except Exception as exc:  # noqa: BLE001
