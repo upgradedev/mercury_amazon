@@ -26,7 +26,7 @@ import httpx
 
 DEFAULT_URL = "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws"
 RECEIPT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy_teardown_receipt.json")
-BODY_EXCERPT_CHARS = 400
+BODY_EXCERPT_CHARS = 800
 
 
 def local_head_sha(repo_root: str) -> str | None:

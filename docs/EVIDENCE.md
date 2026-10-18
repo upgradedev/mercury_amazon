@@ -1188,10 +1188,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
+# SUMMARY: 47/53 PASSED, 6/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates** (45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`). J4 is
+**47/53 readiness gates** (46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1227,7 +1227,7 @@ persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which three are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 47/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -1249,7 +1249,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `fdb5f56`, the PR #50 head, since a 2026-10-15 code deploy the owner authorised before merge, so the emulator receipt could run against the exact build. `/health` reported `fdb5f56`, record-only, and the runtime receipt's `endpoint_health_build_sha` records the same SHA. That deploy put PR #50's runtime changes live (service-specific handoff templates, declared observability gap panel and spend tile sync, 1080p hero compact fit above the sticky keybar, explicit spacing in heroCause and row-verdict, and split-flap race cancellation) on top of the 2026-10-06 deploy at `ea2cff5` (PR #42: the operator handoff's candidate wording, the invented deploy feed on the public board, NO LIVE DATA on an empty or failed CloudWatch read, the single fixture stripe and the qualifier-first hero cause). Before that, `e0a857a` was served from the 2026-10-01 env-only SHA move (PR #38; the rebuilt zip was byte-identical to the `b99b154` one, so only `MERCURY_BUILD_SHA` moved, with the rollback secret preserved) to the 2026-10-06 deploy, and a re-probe on 2026-10-05 still reported it; `b99b154` was the code deploy before that (PR #37, clamp verified live by re-downloading the zip), then `1bc8cd5` (PR #34, candidate wording), then `b2f7868`. The commits after `fdb5f56` touch only the runtime receipt, docs and tests, so the live behavior matches HEAD. The 2026-10-15 deploy's own probe record stays in the workspace outside git and the committed `deploy_teardown_receipt.json` was not refreshed, so G2 still fails; see [Known limitations](#known-limitations).
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `b58977d80b4d8d3f6db5307a8e470aa4637c8a8f`, probed on 2026-10-18 by `scripts/probe_deployment.py` and recorded in `deploy_teardown_receipt.json`. Since `b58977d` only the probe script, receipt and documentation moved, so `deployed_checkout_problem` verifies zero live runtime changes and gate G2 passes. Earlier deployments served `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
 
 ---
 
