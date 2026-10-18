@@ -1,28 +1,28 @@
 {
   "schema": "mercury.deploy_receipt/2",
   "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
-  "probed_at_utc": "2026-09-26T18:07:27Z",
-  "probed_at_epoch": 1790446047.0394073,
+  "probed_at_utc": "2026-10-18T13:12:14Z",
+  "probed_at_epoch": 1792329134.8037543,
   "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws",
   "probes": [
     {
       "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
       "http_status": 200,
-      "elapsed_ms": 10494.1,
-      "body_excerpt": "<!DOCTYPE html>\r\n<html lang=\"en\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n  <title>Mercury Fire TV Incident Commander</title>\r\n  <meta name=\"description\" content=\"A 10-foot incident war room: what broke, which change caused it, and a governed rollback from the remote.\">\r\n  <link rel=\"manifest\" href=\"manifest.json\">\r\n  <meta name=",
+      "elapsed_ms": 646.84,
+      "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mercury Fire TV incident board</title>\n  <meta name=\"description\" content=\"An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.\">\n  <link rel=\"manifest\" href=\"manifest.json\">\n  <meta name=\"theme-color\" content=\"#0B0C0E\">\n  <link rel=\"preload\" href=\"barlow-condensed-latin-700.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n  <style>\n    /* ------------------------------------------------------------------ Fonts\n       Served from this page's own origin, never from a font CDN: a Fire TV on an\n       on-call room network may never reach one, and the board mus",
       "error": null
     },
     {
       "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
       "http_status": 200,
-      "elapsed_ms": 333.65,
-      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"6dd76bde74542b9c6c5edc93f6d8ed36dd7b494b\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true}",
+      "elapsed_ms": 243.68,
+      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"b58977d80b4d8d3f6db5307a8e470aa4637c8a8f\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true,\"mcp_protocol\":\"2025-11-25\",\"bedrock_agent\":{\"model_id\":\"anthropic.claude-sonnet-5\",\"region\":\"eu-west-1\",\"resolved_capability\":\"ready_to_attempt\"}}",
       "error": null
     }
   ],
-  "deployed_commit_sha": "6dd76bde74542b9c6c5edc93f6d8ed36dd7b494b",
-  "local_head_sha": "1ef3578e0b74b88ae672b38a0e19e3dbaf981877",
-  "deployed_matches_local_head": false,
+  "deployed_commit_sha": "b58977d80b4d8d3f6db5307a8e470aa4637c8a8f",
+  "local_head_sha": "b58977d80b4d8d3f6db5307a8e470aa4637c8a8f",
+  "deployed_matches_local_head": true,
   "teardown_verified": false,
   "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."
 }
