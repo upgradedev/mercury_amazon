@@ -1124,15 +1124,23 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Android TV emulator run landed.** Actions run [38808232691](https://github.com/upgradedev/mercury_amazon/actions/runs/38808232691)
-built APK `998fd25c1f20efa7` (9,261,223 B) from `fdb5f56`, installed it on AOSP TV
+**Android TV emulator run landed.** Actions run [39210785053](https://github.com/upgradedev/mercury_amazon/actions/runs/39210785053)
+built APK `4f6e0b2d2ee05568` (9,261,223 B) from `e8ceae8`, installed it on AOSP TV
 (Android 14 / API 34), launched through the normal Leanback path with no URL
 override, and drove page load, attribution, record-only approval and handoff by
-D-pad against the PR #50 page, served by the Lambda redeployed at `fdb5f56` on
-2026-10-15. The receipt is checked in as
-`android_tv_runtime_receipt.json`; the run's retained artifact holds the APK,
-install and launch logs, logcat, screenshot and receipt together. The run it
-replaced, [37464864870](https://github.com/upgradedev/mercury_amazon/actions/runs/37464864870),
+D-pad against the page served by the Lambda redeployed at `e8ceae8` on 2026-10-19,
+which appends the press-only agent deck. The run did not press 'Ask the agent'. The
+receipt is checked in as `android_tv_runtime_receipt.json`; the run's retained
+artifact holds the APK, install and launch logs, logcat, screenshot and receipt
+together, and every artifact hash in the receipt was re-checked against the
+downloaded artifact. The final screenshot is a black 1920x1080 frame of 10,608 B,
+just over the writer's 10,000 B floor, so it shows nothing of the page; the journey
+proof is the five `MercuryCockpit` events in the logcat. The run it replaced,
+[38808232691](https://github.com/upgradedev/mercury_amazon/actions/runs/38808232691),
+built APK `998fd25c1f20efa7` from `fdb5f56` over the same journey against the PR #50
+page; its receipt stayed green on paper after PR #62, because the deck is appended
+from `src/`, which J4 does not watch, but it never saw the page with the deck. The run
+before that, [37464864870](https://github.com/upgradedev/mercury_amazon/actions/runs/37464864870),
 built APK `c9a3f99cec750fc0` from `ea2cff5` over the same journey against the PR #42
 page; its receipt went stale on 2026-10-15 when PR #50 moved `docs/index.html` after
 the receipt build. Run [36922314984](https://github.com/upgradedev/mercury_amazon/actions/runs/36922314984)
@@ -1195,7 +1203,7 @@ python ci/readiness.py
 # SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates** (47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`). J4 is
+**46/53 readiness gates** (47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1207,15 +1215,14 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file exists at the repository root; run 38808232691 wrote the current one from
-build `fdb5f56`. J4 watches `docs/index.html`, `docs/firetv_nav.js` and `app/`, and
-this checkout leaves them as that build had them, so J4 passes. The served page is
-not the same, though: since the agent deck, the server appends `/mcp/agent-deck.js`
-to the page, which adds a section after the rollback screen. Its buttons sit in that
-section, not in the hero row, and the browser D-pad tests now run against the page
-with the deck. The receipt never saw that page, so the emulator run has to be
-repeated after the next deploy; until then J4's green covers the D-pad journey, not
-the deck. On a checkout where a live
+The file exists at the repository root; run 39210785053 wrote the current one from
+build `e8ceae8`. J4 watches `docs/index.html`, `docs/firetv_nav.js` and `app/`, and
+this checkout leaves them as that build had them, so J4 passes. Since the agent deck,
+the server appends `/mcp/agent-deck.js` to the page, which adds a section after the
+rollback screen. Its buttons sit in that section, not in the hero row, and the browser
+D-pad tests run against the page with the deck. Run 39210785053 drove the journey on
+the live page at `e8ceae8`, deck included, so J4's green now covers the D-pad journey
+on the page as served; it still does not cover a press of 'Ask the agent'. On a checkout where a live
 runtime path changed after the receipt was written, the gate fails and names the
 stale file instead of passing on a journey the receipt never saw: that happened
 twice on 2026-10-01, first because `docs/index.html` carried the candidate language
@@ -1259,7 +1266,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `b58977d80b4d8d3f6db5307a8e470aa4637c8a8f`, probed on 2026-10-18 by `scripts/probe_deployment.py` and recorded in `deploy_teardown_receipt.json`. Since `b58977d` only the probe script, receipt and documentation moved, so `deployed_checkout_problem` verifies zero live runtime changes and gate G2 passes. Earlier deployments served `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e8ceae8fb3f76d542eace62214500730b8215991` since a 2026-10-19 deploy of the PR #62 merge: `/health` reported that SHA the same day (`curl -s <url>/health`), and so did the endpoint health read inside emulator run 39210785053. The committed `deploy_teardown_receipt.json` still records the 2026-10-18 probe of `b58977d80b4d8d3f6db5307a8e470aa4637c8a8f` by `scripts/probe_deployment.py`; live runtime files under `src/` moved after that build, so `deployed_checkout_problem` names them and gate G2 fails, not counted against CI, until a fresh probe is committed. Earlier deployments served `b58977d`, `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
 
 ---
 
@@ -1303,9 +1310,9 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **Six green emulator runs.** Runs 36661614006, 36669903334, 36798893479, 36922314984, 37464864870 and 38808232691 each compiled the public endpoint, installed
+* **Seven green emulator runs.** Runs 36661614006, 36669903334, 36798893479, 36922314984, 37464864870, 38808232691 and 39210785053 each compiled the public endpoint, installed
   the exact APK, launched without an ADB URL override and drove the record-only path
-  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Six runs
+  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Seven runs
   prove the path works and repeats, not that it is flake-free. The event FAQ does not require a physical Fire TV.
 * **The public deployment tracks HEAD.** The cockpit at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reports its
@@ -1319,7 +1326,7 @@ given a substitute number.
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
   record-only journey, but the J4 evidence is the APK completing it in the emulator,
-  which run 38808232691 recorded.
+  which run 39210785053 recorded.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.
