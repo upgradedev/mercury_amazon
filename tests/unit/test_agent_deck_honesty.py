@@ -197,7 +197,12 @@ def test_the_deck_script_makes_no_call_of_its_own_accord():
     (False, False, "unavailable_no_sdk_and_no_credentials"),
 ])
 def test_the_capability_label_follows_credentials_and_sdk(monkeypatch, creds, sdk, expected):
-    """The label an operator reads must not depend on what this machine happens to have."""
+    """The label an operator reads must not depend on what this machine happens to have.
+
+    With the server's opt-in set, the reported label is the credentials-and-SDK one.
+    Without it, see test_health_says_disabled_when_the_flag_is_off.
+    """
+    monkeypatch.setenv("MERCURY_AGENT_MODEL", "on")
     monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: creds))
     monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: sdk))
     adapter = BedrockIncidentAgentAdapter()
@@ -205,6 +210,47 @@ def test_the_capability_label_follows_credentials_and_sdk(monkeypatch, creds, sd
     # A second read inside the cache window does not resolve credentials again.
     assert adapter.credentials_present() is creds
     assert adapter.model_path_capability()["resolved_capability"] == expected
+    assert adapter.health_summary()["resolved_capability"] == expected
+
+
+@pytest.mark.parametrize("flag", [None, "off", "", "yes"])
+def test_health_says_disabled_when_the_flag_is_off(monkeypatch, flag):
+    """Live /health read 'ready_to_attempt' while MERCURY_AGENT_MODEL was not on, so
+    every brief was deterministic. With credentials and the SDK both present, the
+    reported label must still say no model will be called."""
+    if flag is None:
+        monkeypatch.delenv("MERCURY_AGENT_MODEL", raising=False)
+    else:
+        monkeypatch.setenv("MERCURY_AGENT_MODEL", flag)
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: True))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter.resolved_capability(refresh=True) == "ready_to_attempt"
+    assert adapter.health_summary()["resolved_capability"] == "disabled_by_flag"
+    assert adapter.health_summary()["model_calls_enabled"] is False
+    assert adapter.model_path_capability()["resolved_capability"] == "disabled_by_flag"
+    assert adapter.model_path_capability()["model_calls_enabled"] is False
+
+
+def test_health_says_capped_once_the_process_used_its_calls(monkeypatch):
+    monkeypatch.setenv("MERCURY_AGENT_MODEL", "on")
+    monkeypatch.setenv("MERCURY_AGENT_MODEL_MAX_CALLS", "0")
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: True))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter.health_summary()["resolved_capability"] == "disabled_call_cap_reached"
+
+
+def test_the_served_health_route_reports_the_flag(monkeypatch):
+    """The /health a judge reads, not only the adapter method."""
+    from fastapi.testclient import TestClient
+
+    from src.interfaces import mcp_server
+
+    monkeypatch.delenv("MERCURY_AGENT_MODEL", raising=False)
+    body = TestClient(mcp_server.app).get("/health").json()
+    assert body["bedrock_agent"]["resolved_capability"] == "disabled_by_flag"
+    assert body["bedrock_agent"]["model_calls_enabled"] is False
 
 
 def test_credentials_from_the_environment_count_without_boto3(monkeypatch):

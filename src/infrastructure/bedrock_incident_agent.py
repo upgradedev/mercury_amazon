@@ -48,6 +48,12 @@ CAPABILITY_READY = "ready_to_attempt"
 CAPABILITY_NO_SDK = "unavailable_sdk_not_installed"
 CAPABILITY_NO_CREDENTIALS = "unavailable_no_credentials"
 CAPABILITY_NEITHER = "unavailable_no_sdk_and_no_credentials"
+#: What /health and the brief routes report when the deployed adapter will not call a
+#: model whatever the credentials say: the server has not set MERCURY_AGENT_MODEL=on,
+#: or this process has used its MERCURY_AGENT_MODEL_MAX_CALLS. "ready_to_attempt"
+#: there read as model readiness while every brief was deterministic.
+CAPABILITY_OFF = "disabled_by_flag"
+CAPABILITY_CAPPED = "disabled_call_cap_reached"
 
 SDK_MODULE = "anthropic"
 
@@ -164,18 +170,36 @@ class BedrockIncidentAgentAdapter:
             return CAPABILITY_NO_CREDENTIALS
         return CAPABILITY_NEITHER
 
+    def reported_capability(self, refresh: bool = False) -> str:
+        """The capability a reader is shown: what a brief would actually do.
+
+        resolved_capability answers "could an attempt reach Bedrock?" from credentials
+        and the SDK. The deployed adapter also needs MERCURY_AGENT_MODEL=on and calls
+        left under the cap, so without them no brief is a model brief and this says so.
+        An injected client (tests) is its own opt-in, as in _can_attempt_live_call.
+        """
+        if self._client_factory is None:
+            if not model_calls_enabled():
+                return CAPABILITY_OFF
+            with self._model_calls_lock:
+                if self._model_calls >= max_model_calls():
+                    return CAPABILITY_CAPPED
+        return self.resolved_capability(refresh=refresh)
+
     def health_summary(self) -> dict[str, Any]:
         return {
             "model_id": public_model_label(self.model_id),
             "region": self.region_name,
-            "resolved_capability": self.resolved_capability(),
+            "resolved_capability": self.reported_capability(),
+            "model_calls_enabled": model_calls_enabled(),
         }
 
     def model_path_capability(self, refresh: bool = False) -> dict[str, Any]:
         creds = self.credentials_present(refresh=refresh)
         sdk = self.sdk_present()
         return {
-            "resolved_capability": self.resolved_capability(refresh=False),
+            "resolved_capability": self.reported_capability(refresh=False),
+            "model_calls_enabled": model_calls_enabled(),
             "credentials_present": creds,
             "sdk_installed": sdk,
             "model_id": public_model_label(self.model_id),
