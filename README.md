@@ -45,7 +45,7 @@ OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not rea
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-799%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 The repository is **private** today, so the CI badge does not resolve outside the
