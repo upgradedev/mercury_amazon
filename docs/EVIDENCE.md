@@ -1200,10 +1200,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
+# SUMMARY: 47/53 PASSED, 6/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates** (47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
+**47/53 readiness gates** (46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1244,7 +1244,7 @@ persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which three are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 47/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
@@ -1266,7 +1266,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e8ceae8fb3f76d542eace62214500730b8215991` since a 2026-10-19 deploy of the PR #62 merge: `/health` reported that SHA the same day (`curl -s <url>/health`), and so did the endpoint health read inside emulator run 39210785053. The committed `deploy_teardown_receipt.json` still records the 2026-10-18 probe of `b58977d80b4d8d3f6db5307a8e470aa4637c8a8f` by `scripts/probe_deployment.py`; live runtime files under `src/` moved after that build, so `deployed_checkout_problem` names them and gate G2 fails, not counted against CI, until a fresh probe is committed. Earlier deployments served `b58977d`, `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e8ceae8fb3f76d542eace62214500730b8215991` since a 2026-10-19 deploy of the PR #62 merge: `/health` reported that SHA the same day (`curl -s <url>/health`), and so did the endpoint health read inside emulator run 39210785053. The committed `deploy_teardown_receipt.json` records the probe of 2026-10-19 at 07:27 UTC by `scripts/probe_deployment.py` (two GETs, `/` and `/health`), which read `e8ceae8fb3f76d542eace62214500730b8215991`. No live runtime file changed between `e8ceae8` and this branch, so `deployed_checkout_problem` finds nothing and gate G2 passes. The probe before it, of 2026-10-18, read `b58977d`. Earlier deployments served `b58977d`, `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
 
 ---
 
