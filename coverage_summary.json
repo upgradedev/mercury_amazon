@@ -1,12 +1,12 @@
 {
   "schema": "mercury.coverage/1",
-  "note": "Line coverage of src/ measured by pytest-cov over the committed test suite. The CI floor is 85 percent. These figures are the TOTAL line a local Windows run printed on branch claude/mercury-hybrid-live-20261019 on 2026-10-19 (2784 statements, 201 missed, 93%); --check compares statements and percent only, because the missed count differs by machine, and CI re-measures them.",
-  "measured_at_utc": "2026-10-19T10:24:45Z",
-  "measured_by_command": "python -m pytest -p no:cacheprovider -q tests --cov=src --cov-report=term (local, Windows)",
+  "note": "Line coverage of src/ measured by pytest-cov over the committed test suite. The CI floor is 85 percent. These figures are the TOTAL line CI run 39237516187 printed at e107796 on 2026-10-19 (2784 statements, 197 missed, 93%); a local Windows run of the same code printed 2784, 201 and 93%. --check compares statements and percent only, because the missed count differs by machine.",
+  "measured_at_utc": "2026-10-19T10:28:46Z",
+  "measured_by_command": "python -m pytest tests/ -q --cov=src --cov-report=term (CI run 39237516187)",
   "equivalent_command": "python -m pytest tests/ -q --cov=src --cov-report=term",
   "python_version": "3.11.0",
-  "platform": "win32",
+  "platform": "linux",
   "statements": 2784,
-  "missed": 201,
+  "missed": 197,
   "percent": 93
 }
