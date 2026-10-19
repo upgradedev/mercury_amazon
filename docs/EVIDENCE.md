@@ -1299,11 +1299,15 @@ answered HTTP 200 in 15.37 s, timed by the client. The response reports `synthes
 `commander_brief_10ft`, `root_cause_hypothesis`, `responder_handoff_draft`), none by the
 template. The response is kept in the workspace, outside git, as
 `reviews/deploy_20261019/mercury/agent_brief_verification_e6aae2c.json`. That is one
-press, not a rate; eight earlier local calls of the same prompt took 7.7 s to 13.9 s each.
+press, not a rate. Eight local calls with `MODEL_MAX_TOKENS` at 16000 earlier that day,
+two for each of the four simulated services, all came back from the model and took
+7.7 s to 13.9 s each (`reviews/deploy_20261019/mercury/guard_eval/max_tokens_16000.json`
+in the workspace, outside git).
 Each press is one Bedrock call against the function's cap of 40 per process
 (`MERCURY_AGENT_MODEL_MAX_CALLS=40`).
 
-The two live presses before it, on older builds, fell back to the deterministic brief. On
+The two receipted live presses before it, on older builds, fell back to the deterministic
+brief. On
 `e8ceae8` the claim guard discarded Claude's answer (`fallback_reason`
 `model_claim_rejected`, 12.9 s); with that prompt 2 of 12 local briefs passed the guard,
 before PR #64 named the rejected phrasings in the prompt. On `ddccb3e` the model stopped
@@ -1510,8 +1514,11 @@ function, "so attribution was not attempted."
 reserved concurrency to 2 on 2026-10-19, in their own session, with
 `aws lambda put-function-concurrency`, outside Terraform, so `infra/main.tf` does not show
 it. At 2 the eight-row board did not fit: each of three loads of the live page had 3 to 4
-of its 8 row requests answered HTTP 429, and those rows showed a red NO ANSWER; the
-function's CloudWatch `Throttles` metric read 3 for the hour starting 21:24 UTC. With the
+of its 8 row requests answered HTTP 429, and those rows showed a red NO ANSWER. The
+function's CloudWatch `Throttles` metric, read once afterwards, gave 3 for the hourly
+datapoint starting 21:24 UTC, fewer than the 9 to 12 throttled row requests seen on the
+page; the loads were not timed against that datapoint, so the two figures are not
+reconciled. With the
 owner's approval it was raised to 10 at 22:48 UTC the same day, again with
 `aws lambda put-function-concurrency` and again outside Terraform, and three loads after
 that gave 24 of 24 row requests HTTP 200. The record of the change, with its rollback
