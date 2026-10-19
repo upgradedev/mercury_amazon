@@ -4,7 +4,7 @@
   "measured_at_utc": "2026-10-19T10:28:46Z",
   "measured_by_command": "python -m pytest tests/ -q --cov=src --cov-report=term (CI run 39237516187)",
   "equivalent_command": "python -m pytest tests/ -q --cov=src --cov-report=term",
-  "python_version": "3.11.0",
+  "python_version": "3.11.17",
   "platform": "linux",
   "statements": 2784,
   "missed": 197,

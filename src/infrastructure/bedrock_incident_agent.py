@@ -41,6 +41,12 @@ from typing import Any, Callable
 DEFAULT_MODEL_ID = "anthropic.claude-sonnet-5"
 DEFAULT_REGION = "eu-west-1"
 MODEL_CALL_TIMEOUT_SEC = 25.0
+#: Room for the model to think and still write the brief. Adaptive thinking is on by
+#: default for Claude Sonnet 5 on Bedrock and is billed against the same ceiling. At
+#: 1200, one of five local calls on 2026-10-19 stopped at max_tokens with a thinking
+#: block and no text, and the live verification press after the ddccb3e deploy failed
+#: the same way (ValueError, 16.2 s). Volcan uses 16000 for the same reason.
+MODEL_MAX_TOKENS = 16000
 CREDENTIAL_CACHE_SECONDS = 300.0
 MAX_CACHE_ENTRIES = 256
 
@@ -48,6 +54,12 @@ CAPABILITY_READY = "ready_to_attempt"
 CAPABILITY_NO_SDK = "unavailable_sdk_not_installed"
 CAPABILITY_NO_CREDENTIALS = "unavailable_no_credentials"
 CAPABILITY_NEITHER = "unavailable_no_sdk_and_no_credentials"
+#: What /health and the brief routes report when the deployed adapter will not call a
+#: model whatever the credentials say: the server has not set MERCURY_AGENT_MODEL=on,
+#: or this process has used its MERCURY_AGENT_MODEL_MAX_CALLS. "ready_to_attempt"
+#: there read as model readiness while every brief was deterministic.
+CAPABILITY_OFF = "disabled_by_flag"
+CAPABILITY_CAPPED = "disabled_call_cap_reached"
 
 SDK_MODULE = "anthropic"
 
@@ -95,7 +107,13 @@ def max_model_calls() -> int:
 
 def forbidden_claim(text: str) -> bool:
     """True when model text claims a cause or a staged or executed rollback."""
-    return bool(FORBIDDEN_CLAIMS.search(text or ""))
+    return forbidden_claim_match(text) is not None
+
+
+def forbidden_claim_match(text: str) -> str | None:
+    """The first phrase in model text that the guard rejects, or None."""
+    match = FORBIDDEN_CLAIMS.search(text or "")
+    return match.group(0) if match else None
 
 
 def public_model_label(model_id: str) -> str:
@@ -164,18 +182,36 @@ class BedrockIncidentAgentAdapter:
             return CAPABILITY_NO_CREDENTIALS
         return CAPABILITY_NEITHER
 
+    def reported_capability(self, refresh: bool = False) -> str:
+        """The capability a reader is shown: what a brief would actually do.
+
+        resolved_capability answers "could an attempt reach Bedrock?" from credentials
+        and the SDK. The deployed adapter also needs MERCURY_AGENT_MODEL=on and calls
+        left under the cap, so without them no brief is a model brief and this says so.
+        An injected client (tests) is its own opt-in, as in _can_attempt_live_call.
+        """
+        if self._client_factory is None:
+            if not model_calls_enabled():
+                return CAPABILITY_OFF
+            with self._model_calls_lock:
+                if self._model_calls >= max_model_calls():
+                    return CAPABILITY_CAPPED
+        return self.resolved_capability(refresh=refresh)
+
     def health_summary(self) -> dict[str, Any]:
         return {
             "model_id": public_model_label(self.model_id),
             "region": self.region_name,
-            "resolved_capability": self.resolved_capability(),
+            "resolved_capability": self.reported_capability(),
+            "model_calls_enabled": model_calls_enabled(),
         }
 
     def model_path_capability(self, refresh: bool = False) -> dict[str, Any]:
         creds = self.credentials_present(refresh=refresh)
         sdk = self.sdk_present()
         return {
-            "resolved_capability": self.resolved_capability(refresh=False),
+            "resolved_capability": self.reported_capability(refresh=False),
+            "model_calls_enabled": model_calls_enabled(),
             "credentials_present": creds,
             "sdk_installed": sdk,
             "model_id": public_model_label(self.model_id),
@@ -297,7 +333,13 @@ class BedrockIncidentAgentAdapter:
             f"Rollback dispatch is {rollback_dispatch}: Stage and Confirm record a decision and contact no pipeline.\n"
             "Rules:\n"
             "- Do not claim a cause. A named commit is only a temporal candidate. " + causality + "\n"
-            "- Do not say a rollback is staged, awaiting authorization, executed or completed. Nothing has been staged.\n"
+            "- Do not say a rollback is staged, awaiting authorization, executed or completed, and do not mention"
+            " rollback status at all, not even to deny it: the board shows that status itself.\n"
+            "- Never use these phrasings, which the board rejects even in a negative sentence: 'caused by',"
+            " 'root cause is', 'the cause is', 'the cause was', 'introduced the regression', 'after <commit>', 'is staged',"
+            " 'has been staged', 'awaiting', 'ready to stage', 'ready to roll back', 'was executed', 'rolled back',"
+            " 'reverted', 'dispatched'. Write 'the only runtime commit in the window was <commit>' or"
+            " 'a temporal candidate' instead.\n"
             "- Do not invent facts that are not in the data below.\n"
             "Return ONLY a valid JSON object (1-2 concise sentences per field) with these exact keys:\n"
             '  "incident_severity": one of ["SEV-1_ROLLBACK_READY", "SEV-2_ATTRIBUTION_REFUSED", "NOMINAL_NO_ANOMALY"],\n'
@@ -315,15 +357,17 @@ class BedrockIncidentAgentAdapter:
             client = self._build_client()
             response = client.messages.create(
                 model=self.model_id,
-                max_tokens=1200,
+                max_tokens=MODEL_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=MODEL_CALL_TIMEOUT_SEC,
             )
             raw_text = self._extract_first_text(response)
             parsed, model_fields = self._parse_json_or_wrap(raw_text, deterministic)
-            if forbidden_claim(json.dumps({f: parsed[f] for f in model_fields})):
-                # A model answered and its reply was discarded: say exactly that.
+            rejected_phrase = forbidden_claim_match(json.dumps({f: parsed[f] for f in model_fields}))
+            if rejected_phrase is not None:
+                # A model answered and its reply was discarded: say exactly that, and which phrase.
                 self.last_fallback_reason = "model_claim_rejected"
+                deterministic["rejected_phrase"] = rejected_phrase
                 deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
                 deterministic["fallback_reason"] = self.last_fallback_reason
                 deterministic["model_call_attempted"] = True
