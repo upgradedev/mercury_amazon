@@ -43,6 +43,26 @@ SDK_MODULE = "anthropic"
 _ARN_MODEL_RE = re.compile(r"[:/]([a-z0-9-]+(?:\.[a-z0-9-]+)+)$", re.IGNORECASE)
 
 
+#: Words a model reply may not use about this board. The data is a fixture and
+#: dispatch is record-only, so a reply that says a rollback is staged or executed, or
+#: that names a cause, is wrong whatever else it says. This is a keyword guard, not a
+#: proof: it catches the phrasings seen on the live deck, and the card still labels
+#: any model text as an advisory draft.
+FORBIDDEN_CLAIMS = re.compile(
+    r"\b(?:is|was|has been|been|now|already)\s+staged\b"
+    r"|\bawaiting\s+(?:authori[sz]ation|confirmation|approval)\b"
+    r"|\b(?:was|has been|been|is)\s+(?:executed|rolled back|reverted|performed|dispatched)\b"
+    r"|\brollback\s+(?:succeeded|completed|is complete)\b"
+    r"|\bcaused\s+by\b|\broot cause (?:is|was)\b|\bthe cause (?:is|was)\b",
+    re.IGNORECASE,
+)
+
+
+def forbidden_claim(text: str) -> bool:
+    """True when model text claims a cause or a staged or executed rollback."""
+    return bool(FORBIDDEN_CLAIMS.search(text or ""))
+
+
 def public_model_label(model_id: str) -> str:
     """Return a clean model identifier without exposing an AWS account number."""
     if not model_id.startswith("arn:"):
@@ -162,8 +182,15 @@ class BedrockIncidentAgentAdapter:
         *,
         what_changed_payload: dict[str, Any],
         prefer_bedrock: bool = True,
+        data_label: str = "OFFLINE FIXTURE",
+        rollback_dispatch: str = "record-only",
     ) -> dict[str, Any]:
-        """Produce a 10-foot SRE Incident Commander brief for a `what_changed` correlation."""
+        """Produce an advisory brief for a `what_changed` correlation.
+
+        ``data_label`` and ``rollback_dispatch`` are what the board stamps on the same
+        answer. The model is told both, and a reply that claims a cause or a staged or
+        executed rollback is discarded for the deterministic brief.
+        """
         service = str(what_changed_payload.get("service", "checkout-api"))
         verdict = str(what_changed_payload.get("verdict", "UNKNOWN"))
         metric = what_changed_payload.get("metric") or {}
@@ -179,6 +206,8 @@ class BedrockIncidentAgentAdapter:
                 "o": offending.get("sha") if isinstance(offending, dict) else None,
                 "r": recommended.get("target_commit_sha") if isinstance(recommended, dict) else None,
                 "model": public_model_label(self.model_id),
+                "d": data_label,
+                "x": rollback_dispatch,
             },
             sort_keys=True,
         )
@@ -198,18 +227,32 @@ class BedrockIncidentAgentAdapter:
             recommended=recommended,
         )
 
+        if verdict == "INSUFFICIENT_DATA":
+            # There is no reading to explain, so there is nothing to ask a model.
+            deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
+            deterministic["fallback_reason"] = "insufficient_data"
+            return deterministic
+
         if not self._can_attempt_live_call(prefer_bedrock):
             deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
             deterministic["fallback_reason"] = self.last_fallback_reason
             return deterministic
 
+        causality = attribution.get("causality_statement") or (
+            "Temporal proximity does not prove a change caused the anomaly."
+        )
         prompt = (
-            "You are Mercury's 10-Foot Fire TV SRE Incident Commander Agent on Amazon Bedrock.\n"
-            "Synthesize an incident diagnosis and responder handoff brief from the telemetry correlation.\n"
+            "You are drafting an advisory note for Mercury's Fire TV incident board.\n"
+            f"The data below is labelled {data_label}. Say so if you describe it: it is not a reading of a real service.\n"
+            f"Rollback dispatch is {rollback_dispatch}: Stage and Confirm record a decision and contact no pipeline.\n"
+            "Rules:\n"
+            "- Do not claim a cause. A named commit is only a temporal candidate. " + causality + "\n"
+            "- Do not say a rollback is staged, awaiting authorization, executed or completed. Nothing has been staged.\n"
+            "- Do not invent facts that are not in the data below.\n"
             "Return ONLY a valid JSON object (1-2 concise sentences per field) with these exact keys:\n"
             '  "incident_severity": one of ["SEV-1_ROLLBACK_READY", "SEV-2_ATTRIBUTION_REFUSED", "NOMINAL_NO_ANOMALY"],\n'
-            '  "commander_brief_10ft": 2 concise sentences suitable for a 10-foot TV war-room screen,\n'
-            '  "root_cause_hypothesis": technical explanation of the metric reading vs candidate commits,\n'
+            '  "commander_brief_10ft": 2 concise sentences for a 10-foot TV screen,\n'
+            '  "root_cause_hypothesis": what the reading and the candidate commits do and do not show,\n'
             '  "responder_handoff_draft": {"current_action": "...", "confirmed_facts": ["..."], "next_step": "..."}\n\n'
             f"Service: {service}\n"
             f"Verdict: {verdict}\n"
@@ -228,6 +271,11 @@ class BedrockIncidentAgentAdapter:
             )
             raw_text = self._extract_first_text(response)
             parsed = self._parse_json_or_wrap(raw_text, deterministic)
+            if forbidden_claim(json.dumps(parsed)):
+                self.last_fallback_reason = "model_claim_rejected"
+                deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
+                deterministic["fallback_reason"] = self.last_fallback_reason
+                return deterministic
             latency_ms = round((time.perf_counter() - started) * 1000.0, 2)
             result = {
                 **deterministic,
@@ -296,39 +344,81 @@ class BedrockIncidentAgentAdapter:
         offending: dict[str, Any] | None,
         recommended: dict[str, Any] | None,
     ) -> dict[str, Any]:
+        """Write the brief from the correlator's own verdict, never from a guess.
+
+        Every branch keys on ``verdict``, the field the board itself shows. A named
+        commit is described as a temporal candidate with the correlator's measured
+        held-out precision. Nothing here says a rollback is staged: on this board Stage
+        and Confirm are record-only, and nothing is staged until a viewer presses Stage.
+        """
         m_name = metric.get("name", "ErrorCount")
         baseline = metric.get("baseline", 0.0)
         current = metric.get("current", 0.0)
         factor = metric.get("anomaly_factor", 1.0)
+        accuracy = attribution.get("measured_accuracy") or {}
+        precision = accuracy.get("precision_when_it_names_a_commit")
+        precision_clause = (
+            f" On a held-out split, a commit Mercury names is the cause {precision} of the time."
+            if precision is not None else ""
+        )
+        causality = attribution.get("causality_statement") or (
+            "Temporal proximity does not prove it caused the anomaly."
+        )
 
-        if recommended and offending:
-            severity = "SEV-1_ROLLBACK_READY"
-            sha = offending.get("sha", "")[:7]
-            target_sha = str(recommended.get("target_commit_sha", ""))[:7]
-            files = offending.get("runtime_files") or []
+        if verdict == "INSUFFICIENT_DATA":
+            severity = "INSUFFICIENT_DATA"
+            stmt = attribution.get("refusal_statement") or (
+                f"Mercury has no readings of {m_name} for {service}."
+            )
             brief = (
-                f"{service} {m_name} spiked {factor}x ({baseline} -> {current}) after sole runtime deploy {sha}. "
-                f"Governed rollback to verified artifact {target_sha} is ready for two-step D-pad confirmation."
+                f"{service} has no readings of {m_name}, so there is nothing to explain. "
+                "Mercury refuses to guess: this is missing data, not a finding about any deploy."
+            )
+            hypothesis = stmt
+            draft = {
+                "current_action": f"No action on {service}: there are no readings to act on.",
+                "confirmed_facts": [stmt],
+                "next_step": f"Connect a real metric source for {service} before asking again.",
+            }
+        elif verdict == "ANOMALY_ATTRIBUTED" and recommended and offending:
+            severity = "SEV-1_ROLLBACK_READY"
+            sha = str(offending.get("sha", ""))[:7]
+            target_sha = str(recommended.get("target_commit_sha", ""))[:7]
+            brief = (
+                f"{service} {m_name} rose {factor}x ({baseline} to {current}), and {sha} is the "
+                f"only runtime commit in the window: a temporal candidate, not proof of cause."
+                f"{precision_clause}"
             )
             hypothesis = (
-                f"Commit {sha} ('{offending.get('message', '')}') modified runtime files {files} inside the "
-                "60-minute window prior to anomaly onset."
+                f"Commit {sha} ('{offending.get('message', '')}') is the sole runtime candidate "
+                f"before the onset. {causality}"
             )
             draft = {
-                "current_action": f"Stage and confirm governed rollback of {service} from {sha} to {target_sha}.",
+                "current_action": (
+                    f"Decide whether to stage a record-only rollback of {service} from {sha} "
+                    f"to {target_sha}. Stage has not been pressed."
+                ),
                 "confirmed_facts": [
                     f"{m_name} rose from baseline {baseline} to {current} ({factor}x).",
-                    f"Sole runtime candidate commit in window is {sha}.",
+                    f"The sole runtime candidate commit in the window is {sha}.",
                 ],
-                "next_step": f"Verify post-rollback health readback for {service} at revision {target_sha}.",
+                "next_step": (
+                    "Check the candidate's diff against the symptom before pressing Stage; "
+                    "Confirm records the decision and contacts no pipeline."
+                ),
             }
-        elif attribution.get("nothing_to_revert"):
+        elif verdict == "NO_ANOMALY" or attribution.get("nothing_to_revert"):
             severity = "NOMINAL_NO_ANOMALY"
-            brief = f"{service} {m_name} is within normal baseline ({current} vs {baseline}). Nothing to revert."
-            hypothesis = "Telemetry reading does not exceed anomaly thresholds; no rollback candidate evaluated."
+            brief = (
+                f"{service} {m_name} reads {current} against a baseline of {baseline} ({factor}x), "
+                "under the anomaly threshold. Nothing to revert."
+            )
+            hypothesis = "The reading does not cross the anomaly threshold, so no commit was evaluated."
             draft = {
                 "current_action": f"Monitor {service}; no active incident.",
-                "confirmed_facts": [f"{m_name} reading {current} is within baseline {baseline}."],
+                "confirmed_facts": [
+                    f"{m_name} reading {current} is under the anomaly threshold (baseline {baseline})."
+                ],
                 "next_step": "Continue standard wallboard observation.",
             }
         else:
@@ -336,17 +426,19 @@ class BedrockIncidentAgentAdapter:
             refusal = attribution.get("refusal_reason") or verdict
             stmt = attribution.get("refusal_statement") or "Attribution refused by correlator."
             brief = (
-                f"{service} {m_name} is elevated ({current} vs {baseline}, {factor}x), but Mercury refused "
-                f"single-commit attribution ({refusal}). Automated rollback staging stays locked."
+                f"{service} {m_name} rose {factor}x ({baseline} to {current}), but Mercury refused "
+                f"to name a commit ({refusal}). Rollback staging stays locked."
             )
             hypothesis = f"{stmt} Commits in window: {attribution.get('commits_in_window', 0)}."
             draft = {
-                "current_action": f"Investigate {service} manually; single-commit attribution refused ({refusal}).",
+                "current_action": f"Investigate {service} by hand; Mercury refused to name a commit ({refusal}).",
                 "confirmed_facts": [
-                    f"{m_name} spiked {factor}x ({baseline} -> {current}).",
+                    f"{m_name} rose {factor}x ({baseline} to {current}).",
                     str(attribution.get("handoff_fact") or stmt),
                 ],
-                "next_step": "Inspect service logs and recent config/dependency changes before manual mitigation.",
+                "next_step": (
+                    "Inspect service logs and recent config or dependency changes before any manual mitigation."
+                ),
             }
 
         return {

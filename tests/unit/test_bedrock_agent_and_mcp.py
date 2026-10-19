@@ -171,9 +171,10 @@ def test_health_and_agent_endpoints_expose_bedrock_and_mcp_2025_11_25():
     assert "btnAgentPublishHandoff" in deck_resp.text
     assert "btnAgentMcpHandshake" in deck_resp.text
 
+    # The page judges get carries the deck, so the page tests get carries it too.
     root_default = client.get("/")
     assert root_default.status_code == 200
-    assert "/mcp/agent-deck.js" not in root_default.text
+    assert '<script src="/mcp/agent-deck.js" defer></script>' in root_default.text
 
     root_agent = client.get("/?agent=1")
     assert root_agent.status_code == 200
