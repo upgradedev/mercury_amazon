@@ -188,10 +188,11 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     """The landed receipt, asserted by contents against the real checkout.
 
-    Actions run 39210785053 built the APK from e8ceae8, the PR #62 merge, and
+    Actions run 39334510932 built the APK from e6aae2c, the PR #67 merge, and
     drove the D-pad journey on an Android TV emulator against the page served
-    by the Lambda redeployed at e8ceae8 on 2026-10-19, which appends the
-    press-only agent deck. The receipt below is that run's artifact bytes,
+    by the Lambda redeployed at e6aae2c on 2026-10-19, with the hybrid
+    CloudWatch rows switched on (the endpoint health in its artifact lists
+    them under live_sources). The receipt below is that run's artifact bytes,
     downloaded and hash-verified, not written by hand; every field is asserted
     below. History: on 2026-10-01 the 2026-09-30 receipt (run 36669903334) went
     stale the day docs/index.html joined the invalidation set, run 36798893479
@@ -200,8 +201,9 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     37464864870 (build ea2cff5) restored green after PR #42 moved
     docs/index.html, and run 38808232691 (build fdb5f56) restored green after
     PR #50 moved it. PR #62 appended the deck from src/, which J4 does not
-    watch, so that receipt stayed green without seeing the deck until this
-    one landed.
+    watch, so that receipt stayed green without seeing the deck until run
+    39210785053 (build e8ceae8) landed. The hybrid rows also come from src/,
+    so that receipt stayed green without seeing them until this one landed.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -214,7 +216,7 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
     assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
     assert receipt["build_sha"] in receipt["artifact_name"]
-    assert "actions/runs/39210785053" in receipt["workflow_run_url"]
+    assert "actions/runs/39334510932" in receipt["workflow_run_url"]
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
@@ -331,10 +333,11 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
 def test_the_audit_reports_j4_green_on_the_fresh_receipt():
     """End to end: run the auditor and read J4 out of its own results.
 
-    Run 39210785053 drove the D-pad journey against the page with the agent
-    deck from build e8ceae8, and this checkout changes no live runtime path after that
-    build, so J4 passes on a journey the receipt actually saw. Run
-    38808232691 (build fdb5f56) held that pass before, and run
+    Run 39334510932 drove the D-pad journey against the page with the agent
+    deck and the hybrid CloudWatch rows from build e6aae2c, and this checkout
+    changes no live runtime path after that build, so J4 passes on a journey
+    the receipt actually saw. Run 39210785053 (build e8ceae8) held that pass
+    before, run 38808232691 (build fdb5f56) before that, and run
     37464864870 (build ea2cff5) before PR #50 moved
     docs/index.html. The stale path stays pinned by
     test_a_receipt_from_before_the_page_change_still_fails_naming_the_file.
@@ -342,7 +345,7 @@ def test_the_audit_reports_j4_green_on_the_fresh_receipt():
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
     assert results["J4"].passed is True, results["J4"].message
-    assert "39210785053" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
+    assert "39334510932" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
         encoding="utf-8"
     ), "the receipt this pass names is not the run it claims"
 

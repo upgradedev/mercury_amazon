@@ -10,7 +10,7 @@ removed rather than rewritten, so this log is shorter than it was.
 **What we exercised.** The Android TV emulator workflow,
 `.github/workflows/android-tv-emulator.yml`, has run green several times:
 `docs/EVIDENCE.md` lists runs 36661614006, 36669903334, 36798893479, 36922314984,
-37464864870, 38808232691 and 39210785053. Run 39210785053 produced the runtime receipt checked in as
+37464864870, 38808232691, 39210785053 and 39334510932. Run 39334510932 produced the runtime receipt checked in as
 `android_tv_runtime_receipt.json`, which readiness gate J4 reads.
 
 **What we did not exercise, and therefore say nothing about:** we never used the

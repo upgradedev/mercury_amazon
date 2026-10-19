@@ -196,7 +196,7 @@ the Android TV Emulator: the official FAQ says "an emulator (Android TV Emulator
 Fire TV/Vega simulator) is fine". The footage is also not a runtime receipt. Gate J4
 rests on the separate receipt, `android_tv_runtime_receipt.json`, which
 `.github/workflows/android-tv-emulator.yml` and `scripts/android_tv_smoke.sh` wrote in
-run 39210785053. The footage workflow writes no receipt and leaves J4 untouched.
+run 39334510932. The footage workflow writes no receipt and leaves J4 untouched.
 
 The footage is the one CI run 37475795991 filmed, not this repository at the recorded
 commit. It loads the public demo, which served `ea2cff5`, and the desktop take is a
