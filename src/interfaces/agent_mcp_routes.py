@@ -193,13 +193,17 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
             data_label=data_label,
             rollback_dispatch=rollback_dispatch,
         )
-        return {
+        response = {
             **correlation_payload,
             "data_label": data_label,
             "rollback_dispatch": rollback_dispatch,
             "agent_synthesis": synthesis,
-            "bedrock_model_path": bedrock_agent.model_path_capability(),
         }
+        # A deterministic brief names no model and no region anywhere in the
+        # response; agent_status reports the capability.
+        if synthesis.get("synthesis_mode") == "bedrock":
+            response["bedrock_model_path"] = bedrock_agent.model_path_capability()
+        return response
 
     @app.get("/mcp")
     async def mcp_streamable_http_get() -> Response:

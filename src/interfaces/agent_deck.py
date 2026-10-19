@@ -8,7 +8,10 @@ The deck is appended to the cockpit page. It is quiet and it is honest:
 2. Every answer card carries the data label the server returned (OFFLINE FIXTURE on
    the public deployment) and the rollback dispatch mode (record-only).
 3. The engine label names a model only when a model actually answered. Otherwise it
-   says the brief is deterministic and why. An error response is drawn as an error.
+   says the brief is deterministic and why. A reply the claim guard discarded reads
+   'model answer rejected (claim guard)'. Each field says whether the model wrote it
+   or the deterministic template filled it (``model_fields``). An error response is
+   drawn as an error.
 4. It adds no stop to the hero's D-pad row, so the order the Android TV emulator run
    proved is unchanged. Its own controls sit in a section after the rollback screen.
 """
@@ -157,6 +160,12 @@ AGENT_DECK_JS = r"""(function () {
       ok.setAttribute('data-agent-engine', 'model');
       return ok;
     }
+    if (syn.fallback_reason === 'model_claim_rejected') {
+      // A model did answer; its reply claimed a cause or a staged rollback and was discarded.
+      var rej = mk('span', 'agent-pill agent-pill-amber', 'Engine: model answer rejected (claim guard), deterministic brief shown');
+      rej.setAttribute('data-agent-engine', 'rejected');
+      return rej;
+    }
     var why = syn.fallback_reason ? ' (' + syn.fallback_reason + ')' : '';
     var det = mk('span', 'agent-pill agent-pill-amber', 'Engine: deterministic, no model answered' + why);
     det.setAttribute('data-agent-engine', 'deterministic');
@@ -200,9 +209,14 @@ AGENT_DECK_JS = r"""(function () {
       pills.appendChild(mk('span', 'agent-pill', 'Latency: ' + (syn.latency_ms || elapsed) + ' ms'));
       card.appendChild(pills);
 
+      var byModel = syn.synthesis_mode === 'bedrock' ? (syn.model_fields || []) : [];
+      function source(field) {
+        return byModel.indexOf(field) >= 0 ? 'model' : 'deterministic template';
+      }
       card.appendChild(mk('p', 'agent-brief-10ft', syn.commander_brief_10ft || ''));
-      card.appendChild(mk('p', 'note', 'What the evidence does and does not show: ' + (syn.root_cause_hypothesis || '')));
-      card.appendChild(mk('p', 'note', 'Draft handoff. Action: ' + (draft.current_action || '') + ' Next step: ' + (draft.next_step || '')));
+      card.appendChild(mk('p', 'note', 'Brief above: ' + source('commander_brief_10ft') + '.'));
+      card.appendChild(mk('p', 'note', 'What the evidence does and does not show (' + source('root_cause_hypothesis') + '): ' + (syn.root_cause_hypothesis || '')));
+      card.appendChild(mk('p', 'note', 'Draft handoff (' + source('responder_handoff_draft') + '). Action: ' + (draft.current_action || '') + ' Next step: ' + (draft.next_step || '')));
       card.appendChild(mk('p', 'note', 'Advisory only: ' + (syn.guardrail_attestation || '')));
       out.insertBefore(card, out.firstChild);
       latencySpan.textContent = 'POST /mcp/tools/agent_incident_brief (' + svc + ') · ' + (syn.latency_ms || elapsed) + ' ms';

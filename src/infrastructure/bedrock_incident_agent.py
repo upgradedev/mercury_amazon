@@ -15,6 +15,17 @@ Neuro-Symbolic Boundary
      runtime file diffs, and attribution refusals.
    - Drafts structured responder handoffs (`current_action`, `confirmed_facts`, `next_step`)
      for DynamoDB-backed multi-responder handoff coordination.
+
+Model calls are off by default
+------------------------------
+The brief routes are public, so a model is called only when the server sets
+``MERCURY_AGENT_MODEL=on``, and at most ``MERCURY_AGENT_MODEL_MAX_CALLS`` times
+(default 100) per process. Otherwise every brief is deterministic and says why
+(``fallback_reason`` ``model_off_by_default`` or ``model_call_cap_reached``).
+Re-attaching the Bedrock policy to the role is not enough on its own.
+
+Each brief names its provenance field by field: ``model_fields`` lists what a
+model wrote, ``template_fields`` what the deterministic template filled in.
 """
 from __future__ import annotations
 
@@ -50,12 +61,36 @@ _ARN_MODEL_RE = re.compile(r"[:/]([a-z0-9-]+(?:\.[a-z0-9-]+)+)$", re.IGNORECASE)
 #: any model text as an advisory draft.
 FORBIDDEN_CLAIMS = re.compile(
     r"\b(?:is|was|has been|been|now|already)\s+staged\b"
-    r"|\bawaiting\s+(?:authori[sz]ation|confirmation|approval)\b"
+    # "awaiting authorization", "awaiting authorized staging", AWAITING_AUTHORIZED_STAGING
+    r"|\bawaiting[\s_]+(?:authori|confirmation|approval)"
+    r"|\bready\s+to\s+(?:stage|roll\s*back|revert)\b"
     r"|\b(?:was|has been|been|is)\s+(?:executed|rolled back|reverted|performed|dispatched)\b"
     r"|\brollback\s+(?:succeeded|completed|is complete)\b"
-    r"|\bcaused\s+by\b|\broot cause (?:is|was)\b|\bthe cause (?:is|was)\b",
+    r"|\bcaused\s+by\b|\broot cause (?:is|was)\b|\bthe cause (?:is|was)\b"
+    r"|\bintroduced\s+the\s+(?:regression|errors?|incident|bug|spike|outage|failure)\b"
+    # "Errors rose after a4ec9aa shrank the pool": a cause told as a sequence.
+    r"|\bafter\s+(?:commit\s+)?[0-9a-f]{7,40}\b",
     re.IGNORECASE,
 )
+
+#: The fields of the recommended action a prompt may carry. Its status
+#: (AWAITING_AUTHORIZED_STAGING), lease and note describe staging, which nothing
+#: has done, so a model is never shown them.
+PROMPT_RECOMMENDED_FIELDS = ("type", "target_commit_sha", "target_service", "environment")
+BRIEF_FIELDS = ("incident_severity", "commander_brief_10ft", "root_cause_hypothesis", "responder_handoff_draft")
+DEFAULT_MAX_MODEL_CALLS = 100
+
+
+def model_calls_enabled() -> bool:
+    """A model is called only when the server opts in with MERCURY_AGENT_MODEL=on."""
+    return (os.getenv("MERCURY_AGENT_MODEL") or "off").strip().lower() == "on"
+
+
+def max_model_calls() -> int:
+    try:
+        return max(0, int(os.getenv("MERCURY_AGENT_MODEL_MAX_CALLS") or DEFAULT_MAX_MODEL_CALLS))
+    except ValueError:
+        return DEFAULT_MAX_MODEL_CALLS
 
 
 def forbidden_claim(text: str) -> bool:
@@ -87,6 +122,8 @@ class BedrockIncidentAgentAdapter:
         self._credentials_cache: tuple[bool, float] | None = None
         self._credentials_lock = threading.Lock()
         self._cache: dict[str, dict[str, Any]] = {}
+        self._model_calls = 0
+        self._model_calls_lock = threading.Lock()
 
     @staticmethod
     def sdk_present() -> bool:
@@ -157,14 +194,22 @@ class BedrockIncidentAgentAdapter:
         if not prefer_bedrock:
             self.last_fallback_reason = "prefer_bedrock_false"
             return False
-        if self._client_factory is not None:
-            return True
-        if os.getenv("PYTEST_CURRENT_TEST") and os.getenv("MERCURY_ALLOW_BEDROCK_IN_PYTEST") != "1":
-            self.last_fallback_reason = "pytest_offline_guard"
-            return False
-        if self.resolved_capability() != CAPABILITY_READY:
-            self.last_fallback_reason = self.resolved_capability()
-            return False
+        if self._client_factory is None:
+            # The deployed adapter. An injected client (tests) is its own opt-in.
+            if not model_calls_enabled():
+                self.last_fallback_reason = "model_off_by_default"
+                return False
+            if os.getenv("PYTEST_CURRENT_TEST") and os.getenv("MERCURY_ALLOW_BEDROCK_IN_PYTEST") != "1":
+                self.last_fallback_reason = "pytest_offline_guard"
+                return False
+            if self.resolved_capability() != CAPABILITY_READY:
+                self.last_fallback_reason = self.resolved_capability()
+                return False
+        with self._model_calls_lock:
+            if self._model_calls >= max_model_calls():
+                self.last_fallback_reason = "model_call_cap_reached"
+                return False
+            self._model_calls += 1
         return True
 
     @staticmethod
@@ -225,6 +270,7 @@ class BedrockIncidentAgentAdapter:
             attribution=attribution,
             offending=offending,
             recommended=recommended,
+            deployment=what_changed_payload.get("deployment_evidence"),
         )
 
         if verdict == "INSUFFICIENT_DATA":
@@ -240,6 +286,10 @@ class BedrockIncidentAgentAdapter:
 
         causality = attribution.get("causality_statement") or (
             "Temporal proximity does not prove a change caused the anomaly."
+        )
+        prompt_recommended = (
+            {k: recommended.get(k) for k in PROMPT_RECOMMENDED_FIELDS}
+            if isinstance(recommended, dict) else None
         )
         prompt = (
             "You are drafting an advisory note for Mercury's Fire TV incident board.\n"
@@ -259,7 +309,7 @@ class BedrockIncidentAgentAdapter:
             f"Metric: {json.dumps(metric)}\n"
             f"Attribution details: commits_in_window={attribution.get('commits_in_window')}, set_aside={attribution.get('commits_set_aside')}, refusal={attribution.get('refusal_statement')}\n"
             f"Offending commit candidate: {json.dumps(offending)}\n"
-            f"Recommended governed action: {json.dumps(recommended)}\n"
+            f"Rollback target if a person stages one: {json.dumps(prompt_recommended)}\n"
         )
         try:
             client = self._build_client()
@@ -270,11 +320,13 @@ class BedrockIncidentAgentAdapter:
                 timeout=MODEL_CALL_TIMEOUT_SEC,
             )
             raw_text = self._extract_first_text(response)
-            parsed = self._parse_json_or_wrap(raw_text, deterministic)
-            if forbidden_claim(json.dumps(parsed)):
+            parsed, model_fields = self._parse_json_or_wrap(raw_text, deterministic)
+            if forbidden_claim(json.dumps({f: parsed[f] for f in model_fields})):
+                # A model answered and its reply was discarded: say exactly that.
                 self.last_fallback_reason = "model_claim_rejected"
                 deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
                 deterministic["fallback_reason"] = self.last_fallback_reason
+                deterministic["model_call_attempted"] = True
                 return deterministic
             latency_ms = round((time.perf_counter() - started) * 1000.0, 2)
             result = {
@@ -287,6 +339,9 @@ class BedrockIncidentAgentAdapter:
                 "cached": False,
                 "latency_ms": latency_ms,
                 "fallback_reason": None,
+                "model_call_attempted": True,
+                "model_fields": model_fields,
+                "template_fields": [f for f in BRIEF_FIELDS if f not in model_fields],
                 "cache_key_sha256": cache_key,
             }
             while len(self._cache) >= MAX_CACHE_ENTRIES:
@@ -297,10 +352,16 @@ class BedrockIncidentAgentAdapter:
             self.last_fallback_reason = f"{type(exc).__name__}"
             deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
             deterministic["fallback_reason"] = self.last_fallback_reason
+            deterministic["model_call_attempted"] = True
             return deterministic
 
     @staticmethod
-    def _parse_json_or_wrap(raw_text: str, baseline: dict[str, Any]) -> dict[str, Any]:
+    def _parse_json_or_wrap(raw_text: str, baseline: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+        """The brief fields, and the names of the fields the model itself wrote.
+
+        A field the reply leaves out or leaves empty keeps the deterministic text and
+        is not listed, so the deck shows it as the template's, not the model's.
+        """
         cleaned = raw_text.strip()
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.DOTALL).strip()
@@ -310,29 +371,30 @@ class BedrockIncidentAgentAdapter:
             try:
                 data = json.loads(cleaned[start_idx : end_idx + 1])
                 if isinstance(data, dict):
-                    draft = data.get("responder_handoff_draft")
-                    if not isinstance(draft, dict):
-                        draft = baseline["responder_handoff_draft"]
-                    return {
-                        "incident_severity": str(
-                            data.get("incident_severity") or baseline["incident_severity"]
-                        ),
-                        "commander_brief_10ft": str(
-                            data.get("commander_brief_10ft") or baseline["commander_brief_10ft"]
-                        ),
-                        "root_cause_hypothesis": str(
-                            data.get("root_cause_hypothesis") or baseline["root_cause_hypothesis"]
-                        ),
-                        "responder_handoff_draft": draft,
-                    }
+                    fields: dict[str, Any] = {}
+                    by_model: list[str] = []
+                    for name in BRIEF_FIELDS:
+                        value = data.get(name)
+                        usable = isinstance(value, dict) if name == "responder_handoff_draft" else (
+                            isinstance(value, str) and bool(value.strip())
+                        )
+                        if usable:
+                            fields[name] = value
+                            by_model.append(name)
+                        else:
+                            fields[name] = baseline[name]
+                    return fields, by_model
             except ValueError:
                 pass
-        return {
-            "incident_severity": baseline["incident_severity"],
-            "commander_brief_10ft": cleaned[:400],
-            "root_cause_hypothesis": baseline["root_cause_hypothesis"],
-            "responder_handoff_draft": baseline["responder_handoff_draft"],
-        }
+        return (
+            {
+                "incident_severity": baseline["incident_severity"],
+                "commander_brief_10ft": cleaned[:400],
+                "root_cause_hypothesis": baseline["root_cause_hypothesis"],
+                "responder_handoff_draft": baseline["responder_handoff_draft"],
+            },
+            ["commander_brief_10ft"],
+        )
 
     def _deterministic_brief(
         self,
@@ -343,6 +405,7 @@ class BedrockIncidentAgentAdapter:
         attribution: dict[str, Any],
         offending: dict[str, Any] | None,
         recommended: dict[str, Any] | None,
+        deployment: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Write the brief from the correlator's own verdict, never from a guess.
 
@@ -358,8 +421,9 @@ class BedrockIncidentAgentAdapter:
         accuracy = attribution.get("measured_accuracy") or {}
         precision = accuracy.get("precision_when_it_names_a_commit")
         precision_clause = (
-            f" On a held-out split, a commit Mercury names is the cause {precision} of the time."
-            if precision is not None else ""
+            f" When Mercury names a commit, it was the cause in {round(float(precision) * 100)} percent "
+            "of cases on a synthetic held-out split."
+            if isinstance(precision, (int, float)) else ""
         )
         causality = attribution.get("causality_statement") or (
             "Temporal proximity does not prove it caused the anomaly."
@@ -407,6 +471,35 @@ class BedrockIncidentAgentAdapter:
                     "Confirm records the decision and contacts no pipeline."
                 ),
             }
+        elif verdict == "ANOMALY_ATTRIBUTED" and offending:
+            # A candidate is named, but no authenticated marker pair proves a target,
+            # so there is nothing to roll back to. Reachable on non-fixture data.
+            severity = "SEV-2_NO_ROLLBACK_TARGET"
+            sha = str(offending.get("sha", ""))[:7]
+            blocked = (deployment or {}).get("blocked_reason") or (
+                "No verified rollback target is recorded for this candidate."
+            )
+            brief = (
+                f"{service} {m_name} rose {factor}x ({baseline} to {current}), and {sha} is the "
+                f"only runtime commit in the window: a temporal candidate, not proof of cause."
+                f"{precision_clause} No rollback target is verified, so Stage stays locked."
+            )
+            hypothesis = (
+                f"Commit {sha} ('{offending.get('message', '')}') is the sole runtime candidate "
+                f"before the onset. {causality} {blocked}"
+            )
+            draft = {
+                "current_action": f"Investigate {service}; the candidate is {sha} and no rollback target is verified.",
+                "confirmed_facts": [
+                    f"{m_name} rose from baseline {baseline} to {current} ({factor}x).",
+                    f"The sole runtime candidate commit in the window is {sha}.",
+                    blocked,
+                ],
+                "next_step": (
+                    "Record an authenticated deployment marker and health readback for the healthy "
+                    "revision before any rollback can be staged."
+                ),
+            }
         elif verdict == "NO_ANOMALY" or attribution.get("nothing_to_revert"):
             severity = "NOMINAL_NO_ANOMALY"
             brief = (
@@ -444,9 +537,14 @@ class BedrockIncidentAgentAdapter:
         return {
             "synthesis_mode": "deterministic",
             "model_answered": None,
-            "model_id": public_model_label(self.model_id),
-            "region": self.region_name,
+            # No model wrote this brief, so it names none. agent_status reports the
+            # capability; a model brief overwrites both fields.
+            "model_id": None,
+            "region": None,
             "cached": False,
+            "model_call_attempted": False,
+            "model_fields": [],
+            "template_fields": list(BRIEF_FIELDS),
             "incident_severity": severity,
             "commander_brief_10ft": brief,
             "root_cause_hypothesis": hypothesis,

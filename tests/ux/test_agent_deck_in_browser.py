@@ -214,6 +214,7 @@ def test_engine_label_names_the_model_only_when_a_model_answered(browser, base_u
             "responder_handoff_draft": {"current_action": "Review", "next_step": "Decide"},
             "latency_ms": 12,
             "cached": False,
+            "model_fields": ["commander_brief_10ft"],
         },
     }
     context, page, _calls, _errors = _open(
@@ -225,6 +226,43 @@ def test_engine_label_names_the_model_only_when_a_model_answered(browser, base_u
         engine = page.locator("#card-agent-brief [data-agent-engine]").inner_text()
         assert "anthropic.claude-sonnet-5" in engine, engine
         assert "model answered" in engine.lower(), engine
+        card = page.locator("#card-agent-brief").inner_text()
+        # Only the field the model wrote is labelled as the model's.
+        assert "Brief above: model." in card, card
+        assert "does not show (deterministic template)" in card, card
+        assert "Draft handoff (deterministic template)" in card, card
+    finally:
+        context.close()
+
+
+def test_a_rejected_model_answer_is_labelled_as_rejected(browser, base_url):
+    rejected = {
+        "service": "checkout-api",
+        "verdict": "ANOMALY_ATTRIBUTED",
+        "data_label": "OFFLINE FIXTURE",
+        "rollback_dispatch": "record-only",
+        "agent_synthesis": {
+            "synthesis_mode": "deterministic",
+            "model_answered": None,
+            "model_id": None,
+            "fallback_reason": "model_claim_rejected",
+            "incident_severity": "SEV-1_ROLLBACK_READY",
+            "commander_brief_10ft": "A deterministic line.",
+            "root_cause_hypothesis": "A temporal candidate only.",
+            "responder_handoff_draft": {"current_action": "Review", "next_step": "Decide"},
+            "latency_ms": 12,
+            "cached": False,
+        },
+    }
+    context, page, _calls, _errors = _open(
+        browser, base_url + "/",
+        routes=[("**/mcp/tools/agent_incident_brief", _fulfil_json(200, rejected))])
+    try:
+        _press_center_on(page, "#btnAgentBrief")
+        page.locator("#card-agent-brief").wait_for(timeout=10_000)
+        engine = page.locator("#card-agent-brief [data-agent-engine]").inner_text()
+        assert "model answer rejected (claim guard)" in engine, engine
+        assert "no model answered" not in engine, engine
     finally:
         context.close()
 

@@ -43,10 +43,12 @@ def test_bedrock_incident_agent_synthesizes_and_caches_with_injected_client():
         + json.dumps(
             {
                 "incident_severity": "SEV-1_ROLLBACK_READY",
-                "commander_brief_10ft": "checkout-api 5xx spiked after commit 4812b17. Governed rollback to 3d90a01 is ready.",
+                # Since the 10-19 review the guard rejects "spiked after commit 4812b17"
+                # and "rollback ... is ready", so this reply says only what is shown.
+                "commander_brief_10ft": "checkout-api 5xx rose 15.1x; 4812b17 is the sole runtime candidate in the window, not proof of cause.",
                 "root_cause_hypothesis": "Sole runtime commit 4812b17 modified checkout handler inside the 60m window.",
                 "responder_handoff_draft": {
-                    "current_action": "Stage and confirm rollback to 3d90a01.",
+                    "current_action": "Decide whether to stage a record-only rollback to 3d90a01.",
                     "confirmed_facts": ["5xx spiked 15.1x."],
                     "next_step": "Verify post-rollback health readback.",
                 },
