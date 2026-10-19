@@ -75,8 +75,8 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 790 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 92 percent of 2508 statements |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 838 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 93 percent of 2784 statements |
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 47/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | Met | Gate J4 passes from `android_tv_runtime_receipt.json`: the APK ran on the Android TV emulator (AOSP TV x86, API 34) in CI run 39210785053, against the page served at `e8ceae8`, which carries the press-only agent deck. The run drove the five journey events; it did not press 'Ask the agent' |

@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from src.infrastructure.bedrock_incident_agent import BedrockIncidentAgentAdapter
 from src.interfaces.agent_deck import AGENT_DECK_JS
+from src.interfaces.live_rows import data_sources_sentence
 
 PROTOCOL_VERSION = "2025-11-25"
 SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION, "2025-06-18")
@@ -280,8 +281,8 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                         "instructions": (
                             "Mercury 10-Foot Fire TV Incident War Room (MCP 2025-11-25). "
                             "Use what_changed for deterministic runtime-scoped attribution, and "
-                            "agent_incident_brief for an advisory brief over it. The public data is an "
-                            "offline fixture and rollback dispatch is record-only."
+                            "agent_incident_brief for an advisory brief over it. "
+                            + data_sources_sentence()
                         ),
                     },
                 },
@@ -364,16 +365,15 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                     },
                 )
         except Exception as exc:  # noqa: BLE001
-            import re as _re
+            from src.infrastructure.safe_errors import describe_exception
 
-            safe_msg = _re.sub(r"arn:aws:[^\s\"']+", "arn:aws:[REDACTED]", str(exc))[:240]
             return JSONResponse(
                 status_code=200,
                 content={
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "content": [{"type": "text", "text": f"Tool '{name}' failed ({type(exc).__name__}): {safe_msg}"}],
+                        "content": [{"type": "text", "text": f"Tool '{name}' failed ({describe_exception(exc)})."}],
                         "isError": True,
                     },
                 },

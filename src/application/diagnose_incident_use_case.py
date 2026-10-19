@@ -22,14 +22,23 @@ do; the GitHub commits API used here does not). With a runtime filter on the cor
 a commit whose files are all outside what the server is built from is not a deploy
 candidate, and the simulated reading is placed after a candidate, never after a commit
 the filter sets aside.
+
+A live production row (an allow-listed Lambda function read from CloudWatch, see
+``CloudWatchMetricAdapter.is_live_production_row``) takes a separate path: its reading
+is correlated against no commits at all, because no deploy feed for those functions is
+connected, and errors that rise from a zero baseline are turned into a refusal rather
+than the correlator's NO_ANOMALY.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from src.domain.incident_correlation import (
+    AttributionRefusal,
     CommitRef,
+    CorrelationVerdict,
     IncidentCorrelation,
     IncidentCorrelator,
     MetricSeries,
@@ -85,6 +94,56 @@ def _commit_ref_from_entry(entry: dict) -> CommitRef | None:
         committed_at=stamp,
         paths=paths,
     )
+
+
+@dataclass(frozen=True)
+class ZeroBaselineCorrelation(IncidentCorrelation):
+    """A live row whose errors rose from a baseline of zero.
+
+    The correlator divides by the baseline, so a series of zeros ending in errors has
+    no ratio and comes back NO_ANOMALY, which the board renders as "Nothing to revert".
+    On a simulated row that cannot happen (every baseline is at least 1.00). On a real
+    function it would be a false all-clear, so the live-row path turns it into a
+    refusal instead, without touching the correlator the published trial measures.
+    """
+
+    @property
+    def refusal_statement(self) -> str:
+        return (
+            f"Mercury cannot attribute this for {self.service_name}: {self.metric_name} rose "
+            f"from zero to {self.current_value:g} in the newest reading, so there is no ratio to "
+            "a baseline, and no deploy feed for it is connected. That is missing evidence, not "
+            "a finding that nothing is wrong."
+        )
+
+    def to_voice_summary(self) -> str:
+        return (
+            f"{self.metric_name} on {self.service_name} rose from zero to {self.current_value:g} "
+            "in the newest reading. Mercury cannot attribute it to a deploy. Investigate manually."
+        )
+
+
+def guard_zero_baseline(correlation: IncidentCorrelation, series: MetricSeries) -> IncidentCorrelation:
+    """Never let errors that rose from zero read as an all-clear on a live row."""
+    latest = series.latest
+    if (
+        correlation.verdict is not CorrelationVerdict.NO_ANOMALY
+        or latest is None
+        or latest.value <= 0
+        or correlation.baseline_value > 0
+    ):
+        return correlation
+    values = {f.name: getattr(correlation, f.name) for f in fields(IncidentCorrelation)}
+    values.update(
+        verdict=CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION,
+        attribution_refusal=AttributionRefusal.NO_CANDIDATE_IN_WINDOW,
+        explanation=(
+            f"{series.metric_name} rose from a baseline of zero to {latest.value:g} in the newest "
+            "reading. A zero baseline gives no ratio, so this is not reported as normal, and with "
+            "no deploy feed connected for this function Mercury does not attribute it."
+        ),
+    )
+    return ZeroBaselineCorrelation(**values)
 
 
 class DiagnoseIncidentUseCase:
@@ -159,7 +218,36 @@ class DiagnoseIncidentUseCase:
             observed_at_utc=_iso_now(),
         )
 
+    def _is_live_production_row(self, service_name: str) -> bool:
+        check = getattr(self._metrics, "is_live_production_row", None)
+        return bool(check(service_name)) if callable(check) else False
+
+    def _correlate_live_production_row(self, service_name: str, window_minutes: int) -> IncidentCorrelation:
+        """A real production function: read live, never attributed to a commit.
+
+        The commit feed behind the board is the recorded window or the invented deploy
+        feed, and neither deploys these functions. Correlating a real error against it
+        would put a fabricated temporal candidate beside a real reading, so the commit
+        list is empty and the commit provenance says attribution was not attempted. The
+        worst a live row can say is "cannot attribute", never "temporal candidate".
+        """
+        series = self._metrics.get_error_series(service_name, window_minutes=window_minutes)
+        commit_provenance = Provenance(
+            source=DataSource.NO_LIVE_DATA,
+            detail=(
+                f"Attribution is not attempted for {service_name}: it is a live production "
+                "function and no deploy feed for it is connected, so no commit is read or named "
+                "against its reading. The simulated rows' commit feed is never used for it."
+            ),
+            observed_at_utc=_iso_now(),
+        )
+        correlation = self._correlator.correlate(service_name, series, [], commit_provenance)
+        return guard_zero_baseline(correlation, series)
+
     def execute(self, service_name: str, window_minutes: int = 60) -> IncidentCorrelation:
+        if self._is_live_production_row(service_name):
+            return self._correlate_live_production_row(service_name, window_minutes)
+
         commits, commit_provenance = self._gather_commits()
 
         # The local checkout can name a parent the fetch window cannot see

@@ -24,11 +24,21 @@ reached the correlator's two refusal verdicts. That is fixed here in two moves:
 2. A service the fixture does not know is refused. The adapter returns a series
    with no points and says why, rather than inventing a spike for a name it has
    never heard of.
+
+The hybrid board adds a third kind of row: the hackathon's own production Lambda
+functions, :data:`LIVE_PRODUCTION_FUNCTIONS`, read from CloudWatch for real
+(``AWS/Lambda`` ``Errors``, with ``Invocations`` beside it). Only those exact names
+are ever sent to CloudWatch this way, so a caller cannot use the public
+``what_changed`` route to probe other functions. They are read live whenever a live
+CloudWatch read is allowed: ``MERCURY_OFFLINE`` unset, or ``MERCURY_LIVE_CLOUDWATCH=1``
+on top of it. The four simulated services keep their fixture series either way.
 """
 from __future__ import annotations
 
 import hashlib
 import os
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -39,11 +49,36 @@ from src.domain.incident_correlation import (
     MetricSeries,
 )
 from src.domain.provenance import DataSource, Provenance
-from src.infrastructure.offline_mode import OFFLINE_REASON, offline_mode_enabled
+from src.infrastructure.offline_mode import (
+    OFFLINE_REASON,
+    live_cloudwatch_enabled,
+    offline_mode_enabled,
+)
+from src.infrastructure.safe_errors import describe_exception
 
 DEFAULT_NAMESPACE = "AWS/ApplicationELB"
 DEFAULT_METRIC = "HTTPCode_Target_5XX_Count"
 SERIES_POINTS = 6
+
+#: The hackathon's own production functions, the only names read live from
+#: ``AWS/Lambda``. Fixed in code on purpose: an allow-list a request cannot extend.
+LIVE_PRODUCTION_FUNCTIONS: tuple[str, ...] = (
+    "mercury-wallboard-euw1-prod",
+    "volcan-mcp-euw1-prod",
+    "aletheia-provenance-euw1-prod",
+)
+LIVE_LAMBDA_NAMESPACE = "AWS/Lambda"
+LIVE_LAMBDA_METRIC = "Errors"
+LIVE_LAMBDA_CONTEXT_METRIC = "Invocations"
+LIVE_LAMBDA_DIMENSION = "FunctionName"
+#: These functions are invoked a few times an hour, so a 60 minute window is mostly
+#: empty buckets. A live row always reads the last 24 hours at one hour per point.
+LIVE_LAMBDA_WINDOW_MINUTES = 24 * 60
+LIVE_LAMBDA_PERIOD_SECONDS = 3600
+#: How long one live read is reused. A public page asks every row on load, so
+#: without this each page view would be two CloudWatch calls per function.
+LIVE_CACHE_ENV = "MERCURY_CLOUDWATCH_CACHE_SECONDS"
+DEFAULT_LIVE_CACHE_SECONDS = 60.0
 
 # Where the newest simulated reading is placed relative to the newest known
 # commit. The unattributed offset is a multiple of the correlator's own
@@ -202,6 +237,11 @@ class CloudWatchMetricAdapter:
         self.simulate_incident = simulate_incident
         self._resolution_cached = False
         self._resolved_client: Any = None
+        self._live_cache: dict[str, tuple[float, MetricSeries]] = {}
+        self._live_lock = threading.Lock()
+        # The page reads the production rows in parallel; without this a second thread
+        # could see the resolution flagged as done before the client exists.
+        self._client_lock = threading.Lock()
 
     def _resolve_client(self) -> Any:
         """Return a CloudWatch client, or None when credentials do not resolve.
@@ -213,26 +253,27 @@ class CloudWatchMetricAdapter:
         """
         if self._client is not None:
             return self._client
-        if self._resolution_cached:
-            return self._resolved_client
+        with self._client_lock:
+            if self._resolution_cached:
+                return self._resolved_client
+            try:
+                import boto3
 
-        self._resolution_cached = True
-        try:
-            import boto3
-
-            session = boto3.session.Session()
-            if session.get_credentials() is None:
+                session = boto3.session.Session()
+                if session.get_credentials() is None:
+                    self._resolved_client = None
+                else:
+                    self._resolved_client = session.client("cloudwatch", region_name=self.region)
+            except Exception:
                 self._resolved_client = None
-            else:
-                self._resolved_client = session.client("cloudwatch", region_name=self.region)
-        except Exception:
-            self._resolved_client = None
-        return self._resolved_client
+            self._resolution_cached = True
+            return self._resolved_client
 
     def reset_credential_cache(self) -> None:
         """Force the next call to resolve credentials again."""
-        self._resolution_cached = False
-        self._resolved_client = None
+        with self._client_lock:
+            self._resolution_cached = False
+            self._resolved_client = None
 
     # ------------------------------------------------------------ Simulation
 
@@ -396,6 +437,148 @@ class CloudWatchMetricAdapter:
             ),
         )
 
+    # ------------------------------------------------- Live production rows
+
+    @staticmethod
+    def live_read_allowed() -> bool:
+        """True when a live CloudWatch read may be made at all.
+
+        ``MERCURY_OFFLINE`` unset allows it, as it always has. With it set, only
+        ``MERCURY_LIVE_CLOUDWATCH=1`` does, and then only for the production rows.
+        """
+        return live_cloudwatch_enabled() or not offline_mode_enabled()
+
+    @classmethod
+    def is_live_production_row(cls, service_name: str) -> bool:
+        """True for one of the allow-listed production functions, when it may be read live."""
+        return service_name in LIVE_PRODUCTION_FUNCTIONS and cls.live_read_allowed()
+
+    @staticmethod
+    def _live_cache_seconds() -> float:
+        try:
+            return max(float(os.environ.get(LIVE_CACHE_ENV, DEFAULT_LIVE_CACHE_SECONDS)), 0.0)
+        except ValueError:
+            return DEFAULT_LIVE_CACHE_SECONDS
+
+    def invalidate_live_cache(self) -> None:
+        """Drop every cached live read, so the next request goes back to CloudWatch."""
+        with self._live_lock:
+            self._live_cache.clear()
+
+    def cached_live_series(self, function_name: str) -> MetricSeries | None:
+        """The cached live read for one function while it is fresh, without calling AWS."""
+        with self._live_lock:
+            entry = self._live_cache.get(function_name)
+        if entry is None:
+            return None
+        read_at, series = entry
+        if time.monotonic() - read_at > self._live_cache_seconds():
+            return None
+        return series
+
+    def _sum_series(
+        self, client: Any, metric_name: str, function_name: str, start: datetime, end: datetime
+    ) -> list[dict[str, Any]]:
+        response = client.get_metric_statistics(
+            Namespace=LIVE_LAMBDA_NAMESPACE,
+            MetricName=metric_name,
+            Dimensions=[{"Name": LIVE_LAMBDA_DIMENSION, "Value": function_name}],
+            StartTime=start,
+            EndTime=end,
+            Period=LIVE_LAMBDA_PERIOD_SECONDS,
+            Statistics=["Sum"],
+        )
+        return sorted(response.get("Datapoints", []), key=lambda d: d["Timestamp"])
+
+    def _no_credentials_for_production_row(self, function_name: str) -> MetricSeries:
+        return MetricSeries(
+            metric_name=LIVE_LAMBDA_METRIC,
+            namespace=LIVE_LAMBDA_NAMESPACE,
+            points=[],
+            provenance=Provenance(
+                source=DataSource.OFFLINE_FIXTURE,
+                detail=(
+                    f"No AWS credentials resolved, so CloudWatch was not called for the production "
+                    f"function {function_name}, and no reading is invented for it."
+                ),
+                observed_at_utc=_iso_now(),
+            ),
+        )
+
+    def _read_production_function(self, function_name: str) -> MetricSeries:
+        """Read ``Errors`` and ``Invocations`` for one production function, uncached."""
+        client = self._resolve_client()
+        if client is None:
+            return self._no_credentials_for_production_row(function_name)
+        window_hours = LIVE_LAMBDA_WINDOW_MINUTES // 60
+        try:
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(minutes=LIVE_LAMBDA_WINDOW_MINUTES)
+            errors = self._sum_series(client, LIVE_LAMBDA_METRIC, function_name, start, end)
+            invocations = self._sum_series(client, LIVE_LAMBDA_CONTEXT_METRIC, function_name, start, end)
+        except Exception as exc:
+            return self._no_live_data(
+                function_name,
+                f"CloudWatch call failed ({describe_exception(exc)}).",
+                LIVE_LAMBDA_NAMESPACE,
+                LIVE_LAMBDA_METRIC,
+            )
+
+        read_at = _iso_now()
+        total_invocations = int(sum(float(d.get("Sum", 0.0)) for d in invocations))
+        points = [MetricPoint(at=d["Timestamp"], value=float(d.get("Sum", 0.0))) for d in errors]
+        if not points:
+            series = self._no_live_data(
+                function_name,
+                (
+                    f"CloudWatch returned no {LIVE_LAMBDA_METRIC} datapoints for the production "
+                    f"function {function_name} in the last {window_hours} hours "
+                    f"({total_invocations} invocations)."
+                ),
+                LIVE_LAMBDA_NAMESPACE,
+                LIVE_LAMBDA_METRIC,
+            )
+            return series
+        total_errors = int(sum(p.value for p in points))
+        return MetricSeries(
+            metric_name=LIVE_LAMBDA_METRIC,
+            namespace=LIVE_LAMBDA_NAMESPACE,
+            points=points,
+            provenance=Provenance(
+                source=DataSource.AWS_CLOUDWATCH,
+                detail=(
+                    f"Live production reading, not a simulated service: CloudWatch "
+                    f"GetMetricStatistics for {LIVE_LAMBDA_NAMESPACE}/{LIVE_LAMBDA_METRIC} with "
+                    f"{LIVE_LAMBDA_CONTEXT_METRIC} beside it, dimension "
+                    f"{LIVE_LAMBDA_DIMENSION}={function_name}, Sum per "
+                    f"{LIVE_LAMBDA_PERIOD_SECONDS}s over the last {window_hours} hours: "
+                    f"{total_errors} errors in {total_invocations} invocations across "
+                    f"{len(points)} hourly datapoints, read at {read_at}. This is one of the "
+                    "hackathon's own Lambda functions. No deploy feed for it is connected, so "
+                    "Mercury does not attribute its errors to any commit."
+                ),
+                observed_at_utc=read_at,
+            ),
+        )
+
+    def get_production_series(self, function_name: str) -> MetricSeries:
+        """Return the live series for one allow-listed production function.
+
+        A fresh cached read is returned unchanged, ``observed_at_utc`` included, so the
+        read time on the board is the time CloudWatch was actually asked. Failures are
+        cached too: a missing IAM grant must not turn every page view into a call.
+        """
+        if function_name not in LIVE_PRODUCTION_FUNCTIONS:
+            raise ValueError(f"{function_name!r} is not an allow-listed production function")
+        cached = self.cached_live_series(function_name)
+        if cached is not None:
+            return cached
+        series = self._read_production_function(function_name)
+        if series.provenance.source is not DataSource.OFFLINE_FIXTURE:
+            with self._live_lock:
+                self._live_cache[function_name] = (time.monotonic(), series)
+        return series
+
     # ------------------------------------------------------------- Public API
 
     def get_error_series(
@@ -408,7 +591,15 @@ class CloudWatchMetricAdapter:
         dimension_name: str = "LoadBalancer",
         commit_times: list[datetime] | None = None,
     ) -> MetricSeries:
-        """Return the error metric series for a service over the recent window."""
+        """Return the error metric series for a service over the recent window.
+
+        An allow-listed production function is read from ``AWS/Lambda`` whenever a
+        live read is allowed (see :meth:`is_live_production_row`), over its own fixed
+        24 hour window. Every other name follows the original path: the fixture under
+        ``MERCURY_OFFLINE``, whatever ``MERCURY_LIVE_CLOUDWATCH`` says.
+        """
+        if self.is_live_production_row(service_name):
+            return self.get_production_series(service_name)
         if offline_mode_enabled():
             return self._simulated_series(
                 service_name, OFFLINE_REASON, window_minutes, anchor_at, commit_times
@@ -472,7 +663,7 @@ class CloudWatchMetricAdapter:
         except Exception as exc:
             return self._no_live_data(
                 service_name,
-                f"CloudWatch call failed ({type(exc).__name__}: {exc}).",
+                f"CloudWatch call failed ({describe_exception(exc)}).",
                 namespace,
                 metric_name,
             )

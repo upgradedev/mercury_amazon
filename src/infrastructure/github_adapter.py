@@ -27,11 +27,20 @@ mean_time_to_recovery_hours
 A repository with no GitHub Actions workflow runs cannot produce a deployment
 frequency or a change failure rate by this definition. The adapter reports that
 condition in the provenance detail rather than substituting a number.
+
+``MERCURY_LIVE_GITHUB=1`` lets the DORA report and the pull request radar call
+GitHub even under ``MERCURY_OFFLINE=1``, unauthenticated when no token is set. An
+anonymous caller gets 60 requests an hour per IP, so every live answer, a failed
+one included, is reused for :data:`DEFAULT_CACHE_SECONDS`. The switch does not open
+:meth:`GitHubTelemetryAdapter.list_recent_commits`, the incident correlator's commit
+feed: that stays on a token, so the board's recorded rollback demo is unchanged.
 """
 from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -42,7 +51,8 @@ import httpx
 from src.domain.dora_metrics import DORAMetricsReport
 from src.domain.git_radar import STALE_REVIEW_SLA_HOURS, PRRadarReport, PullRequestDigest
 from src.domain.provenance import DataSource, Provenance
-from src.infrastructure.offline_mode import offline_mode_enabled
+from src.infrastructure.offline_mode import live_github_enabled, offline_mode_enabled
+from src.infrastructure.safe_errors import describe_exception
 
 GITHUB_API_ROOT = "https://api.github.com"
 DEFAULT_REPO = "upgradedev/mercury_amazon"
@@ -53,6 +63,11 @@ MAX_PAGES = 5
 # runtime file past the cap, so a capped read is unknown, not a clean bill.
 COMMIT_FILES_CAP = 300
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "github_telemetry_fixture.json"
+#: How long one live DORA or radar answer is reused, a failed one included. See
+#: docs/EVIDENCE.md for the request count one refresh costs and the hourly budget
+#: that count gives against GitHub's 60 anonymous requests an hour per IP.
+CACHE_ENV = "MERCURY_GITHUB_CACHE_SECONDS"
+DEFAULT_CACHE_SECONDS = 900.0
 
 
 def _utc_now() -> datetime:
@@ -104,14 +119,65 @@ class GitHubTelemetryAdapter:
         self._client = client
         self._timeout = timeout
         self._allow_unauthenticated = allow_unauthenticated or bool(client)
+        self._cache: dict[str, tuple[float, Any]] = {}
+        self._cache_lock = threading.Lock()
 
     # ------------------------------------------------------------------ HTTP
 
     @property
     def can_call_live(self) -> bool:
+        """True when the DORA report and the pull request radar may call GitHub.
+
+        ``MERCURY_LIVE_GITHUB=1`` allows it whatever ``MERCURY_OFFLINE`` says, with the
+        token when one is set and anonymously when not.
+        """
+        if live_github_enabled():
+            return True
+        return self.can_list_commits_live
+
+    @property
+    def can_list_commits_live(self) -> bool:
+        """True when the incident correlator's commit feed may call GitHub.
+
+        Unchanged by ``MERCURY_LIVE_GITHUB``: the feed needs a token (or an injected
+        client), and ``MERCURY_OFFLINE`` still closes it.
+        """
         if offline_mode_enabled() and self._client is None:
             return False
         return bool(self.token) or self._allow_unauthenticated
+
+    # ----------------------------------------------------------------- Cache
+
+    @staticmethod
+    def _cache_seconds() -> float:
+        try:
+            return max(float(os.environ.get(CACHE_ENV, DEFAULT_CACHE_SECONDS)), 0.0)
+        except ValueError:
+            return DEFAULT_CACHE_SECONDS
+
+    def invalidate_cache(self) -> None:
+        """Drop every cached live answer, so the next call goes back to GitHub."""
+        with self._cache_lock:
+            self._cache.clear()
+
+    def _cached(self, key: str) -> Any:
+        with self._cache_lock:
+            entry = self._cache.get(key)
+        if entry is None:
+            return None
+        stored_at, value = entry
+        if time.monotonic() - stored_at > self._cache_seconds():
+            return None
+        return value
+
+    def _remember(self, key: str, value: Any) -> Any:
+        with self._cache_lock:
+            self._cache[key] = (time.monotonic(), value)
+        return value
+
+    def _live_failure_reason(self, exc: Exception) -> str:
+        how = "" if self.token else " (anonymous request under MERCURY_LIVE_GITHUB=1)"
+        return f"Live GitHub call failed{how} ({describe_exception(exc)})."
 
     def _headers(self) -> dict[str, str]:
         headers = {
@@ -268,10 +334,19 @@ class GitHubTelemetryAdapter:
     # ------------------------------------------------------------- Public API
 
     def get_metrics_raw(self) -> DORAMetricsReport:
-        """Return a DORA report, live from GitHub when possible, fixture otherwise."""
+        """Return a DORA report, live from GitHub when possible, fixture otherwise.
+
+        A live answer, or the fixture served after a failed live call, is reused for
+        the cache window, so a public page cannot spend the anonymous rate limit.
+        """
         if not self.can_call_live:
             return self._fixture_dora("GITHUB_TOKEN is not set, so no live call was attempted.")
+        cached = self._cached("dora")
+        if cached is not None:
+            return cached
+        return self._remember("dora", self._live_dora())
 
+    def _live_dora(self) -> DORAMetricsReport:
         try:
             since = _utc_now() - timedelta(days=self.window_days)
             repo_meta = self._get(f"/repos/{self.repository}")
@@ -346,13 +421,18 @@ class GitHubTelemetryAdapter:
                 window_days=self.window_days,
             )
         except Exception as exc:
-            return self._fixture_dora(f"Live GitHub call failed ({type(exc).__name__}: {exc}).")
+            return self._fixture_dora(self._live_failure_reason(exc))
 
     def get_pr_radar(self) -> PRRadarReport:
         """Return open pull requests and those past the 36 hour review SLA."""
         if not self.can_call_live:
             return self._fixture_pr_radar("GITHUB_TOKEN is not set, so no live call was attempted.")
+        cached = self._cached("pr_radar")
+        if cached is not None:
+            return cached
+        return self._remember("pr_radar", self._live_pr_radar())
 
+    def _live_pr_radar(self) -> PRRadarReport:
         try:
             open_prs, truncated = self._get_paged(
                 f"/repos/{self.repository}/pulls",
@@ -395,7 +475,7 @@ class GitHubTelemetryAdapter:
                 ),
             )
         except Exception as exc:
-            return self._fixture_pr_radar(f"Live GitHub call failed ({type(exc).__name__}: {exc}).")
+            return self._fixture_pr_radar(self._live_failure_reason(exc))
 
     def _commit_paths(self, full_sha: str) -> list[str] | None:
         """Filenames changed by one commit, or None when the API does not say.
@@ -427,9 +507,10 @@ class GitHubTelemetryAdapter:
         Returns an empty list when no live call is possible. The caller decides
         what to display; this adapter never invents a commit. Each commit counts
         one list read plus one files read, so a call costs at most ``limit + 2``
-        requests against the token's rate limit.
+        requests against the token's rate limit. ``MERCURY_LIVE_GITHUB`` does not open
+        it: see :attr:`can_list_commits_live`.
         """
-        if not self.can_call_live:
+        if not self.can_list_commits_live:
             return []
         try:
             repo_meta = self._get(f"/repos/{self.repository}")

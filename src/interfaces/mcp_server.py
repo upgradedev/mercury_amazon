@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from src.application.calculate_dora_use_case import CalculateDORAUseCase
 from src.application.detect_cost_anomalies_use_case import DetectCostAnomaliesUseCase
@@ -57,6 +58,12 @@ from src.interfaces.agent_mcp_routes import (  # noqa: E501
     render_cockpit_response,
 )
 from src.interfaces.handoff_routes import register_handoff_routes
+from src.interfaces.live_rows import (
+    inject_live_rows,
+    live_rows_enabled,
+    live_sources_summary,
+    read_production_rows,
+)
 
 logger = logging.getLogger("mercury.mcp")
 
@@ -312,6 +319,7 @@ async def health_check() -> dict[str, Any]:
         "github_live": github_adapter.can_call_live, "rollback_dispatch": _dispatch_mode(),
         "durable_state": bool(state_store), "dpad_demo_approval": _dispatch_mode() == "record-only",
         "mcp_protocol": "2025-11-25", "bedrock_agent": bedrock_agent.health_summary(),
+        "live_sources": live_sources_summary(cloudwatch_adapter, github_adapter),
     }
 
 
@@ -750,8 +758,17 @@ async def recommendation_liveness(
 
 @app.get("/")
 async def serve_cockpit(request: Request):
-    """Serve the same cockpit page that GitHub Pages publishes from docs/."""
-    return render_cockpit_response(WEB_DIR / "index.html", request)
+    """Serve the same cockpit page that GitHub Pages publishes from docs/.
+
+    With ``MERCURY_LIVE_CLOUDWATCH=1`` the served copy also carries the live production
+    rows (``src/interfaces/live_rows.py``); ``docs/index.html`` itself never changes.
+    """
+    response = render_cockpit_response(WEB_DIR / "index.html", request)
+    if not live_rows_enabled() or not str(response.media_type or "").startswith("text/html"):
+        return response
+    rows = await run_in_threadpool(read_production_rows, cloudwatch_adapter)
+    page = inject_live_rows(bytes(response.body).decode("utf-8"), rows)
+    return Response(content=page, media_type=response.media_type)
 
 
 @app.get("/{asset_name}")

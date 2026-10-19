@@ -118,7 +118,10 @@ and says so on screen.
 
 Set `MERCURY_OFFLINE=1` to force every data adapter (CloudWatch, Cost Explorer,
 GitHub) into fixture mode whatever credentials the machine has. That switch can only
-ever suppress a live call; it can never make a fixture look live. The agent brief's
+ever suppress a live call; it can never make a fixture look live. Two narrower switches,
+`MERCURY_LIVE_CLOUDWATCH=1` and `MERCURY_LIVE_GITHUB=1`, re-open one source each on top
+of it; they are built and tested but not set on the deployed board
+([Hybrid live data](#hybrid-live-data-built-not-deployed)). The agent brief's
 Bedrock adapter does not read it. That adapter answers deterministically unless the
 server sets `MERCURY_AGENT_MODEL=on`, and when the
 `anthropic` SDK, AWS credentials or Bedrock permission is missing or the call fails,
@@ -909,7 +912,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-790 tests and a re-measure on an idle machine is pending**.
+838 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -953,7 +956,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 790 passed
+# 838 passed
 ```
 
 #### Step 3: Start the server
@@ -1185,8 +1188,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 790 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2508 statements
+python -m pytest tests/ -q                                    # 838 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 2784 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1270,12 +1273,100 @@ moment and no later commit. The public cockpit is
 
 ---
 
+## Hybrid live data (built, not deployed)
+
+The deployed board runs `MERCURY_OFFLINE=1` with neither live switch, so nothing in this
+section is on the public page yet. It records what the switches do when set, measured on a
+local run. Deploying them needs one read-only IAM statement on
+`mercury-lambda-role-euw1-prod`, which this repository does not apply:
+
+```json
+{
+  "Sid": "MercuryReadOwnLambdaMetrics",
+  "Effect": "Allow",
+  "Action": "cloudwatch:GetMetricStatistics",
+  "Resource": "*"
+}
+```
+
+CloudWatch's permissions reference says metric read actions take `*` as the resource, so
+the policy cannot narrow the read to three functions. The narrowing is in the code:
+`LIVE_PRODUCTION_FUNCTIONS` in `src/infrastructure/cloudwatch_adapter.py` is a fixed
+tuple, and any other name a caller sends to `what_changed` is never passed to CloudWatch
+(`tests/unit/test_hybrid_live_sources.py` asserts zero client calls for the simulated
+services and for unknown names). Without the grant, the rows show NO LIVE DATA with the
+reason `ClientError: AccessDenied, the deployment's role is not allowed to make this
+read`, and the failure is cached for 60 seconds so a page view is not a call.
+
+**CloudWatch rows, measured 2026-10-19 10:09 UTC** with the maintainer's read-only
+credentials, `MERCURY_OFFLINE=1 MERCURY_LIVE_CLOUDWATCH=1 AWS_REGION=eu-west-1`, by an
+in-process TestClient script (not committed) that posts `what_changed` for each row and
+reads `/`. The equivalent by hand is
+`MERCURY_OFFLINE=1 MERCURY_LIVE_CLOUDWATCH=1 python -m src.interfaces.mcp_server`, then
+`curl -s -X POST http://127.0.0.1:8002/mcp/tools/what_changed -H "content-type: application/json" -d '{"service_name":"volcan-mcp-euw1-prod"}'`.
+Each read is two `GetMetricStatistics` calls, `Errors` and `Invocations`, Sum per hour,
+last 24 hours:
+
+| Row | Label | Verdict | Errors in the provenance |
+|---|---|---|---|
+| `mercury-wallboard-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 91 invocations across 6 hourly datapoints |
+| `volcan-mcp-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 89 invocations across 8 hourly datapoints |
+| `aletheia-provenance-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 61 invocations across 6 hourly datapoints |
+| `checkout-api` | OFFLINE FIXTURE | ANOMALY_ATTRIBUTED, 12.9x, rollback offered | generated, unchanged by the switch |
+| `quiet-service` | OFFLINE FIXTURE | INSUFFICIENT_DATA | none generated |
+
+These are hours with traffic only: CloudWatch publishes no Lambda datapoint for an hour
+with no invocation. The live rows' commit provenance is NO LIVE DATA: no deploy feed for
+those functions is connected, so none of them is ever attributed to a commit or offered a
+rollback, and errors that rise from a zero baseline are reported as cannot-attribute
+rather than as an all-clear. The script's output and the served page contained no run of
+twelve digits.
+
+**Layout, same local run,** measured with `getBoundingClientRect` in a Chromium pane, not
+with `scripts/measure_legibility.py`, and not by the browser suites, which run with the
+switch off:
+
+| Viewport | Rows | Last row bottom | Key bar top | Smallest row text |
+|---|---|---|---|---|
+| 1920x1080 | 8 | 972 px | 1018 px | 24.96 px |
+| 960x540, `tv-host` | 8 | 496 px | 508 px | 12.48 px (24.96 px at the 1920 scale) |
+
+To fit, the served copy adds a style block that trims the row padding and line height,
+moves a per-row LIVE or FIXTURE stamp into the fourth column and sets the long function
+names at 0.8em; `docs/index.html` itself is unchanged.
+
+**GitHub, measured the same day.** With `MERCURY_OFFLINE=1 MERCURY_LIVE_GITHUB=1` and no
+token, the private repository answered HTTP 404 and the DORA tile kept the fixture with
+the reason `Live GitHub call failed (anonymous request under MERCURY_LIVE_GITHUB=1)
+(HTTPStatusError: HTTP 404, not found, or not public)`; the commit feed made no request.
+Counting requests through an injected `httpx` client, with the maintainer's token so the
+private repository answered: one DORA refresh cost 4 requests, the radar 1, and a second
+DORA read inside the cache window 0 (3.1 deploys a day over 173 samples). At the 15-minute
+cache that is 20 anonymous requests an hour per instance, 40 for the two instances
+reserved concurrency allows, against GitHub's 60 an hour per IP. ESTIMATE: Lambda's egress
+address is shared with other tenants, so the anonymous limit can be reached by others;
+a 403 is cached like a 404 and shows the fixture with that reason.
+
+**Errors on the page.** Every adapter failure goes through `describe_exception` in
+`src/infrastructure/safe_errors.py`. `python -m pytest tests/unit/test_hybrid_live_sources.py -q`
+gave `48 passed`. Its end-to-end test feeds an `AccessDenied` whose message carries
+`arn:aws:sts::<12 digits>:assumed-role/...` through the CloudWatch client and asserts that
+no ARN and no run of twelve digits appears in `what_changed`, `/`, `/health` or the MCP
+`tools/call` response. Putting the raw exception text back into the CloudWatch adapter
+makes both of its cases fail.
+
+---
+
 ## Configuration
 
 | Variable | Effect | Default |
 |---|---|---|
 | `MERCURY_ROLLBACK_SECRET` | Bearer secret for both rollback endpoints | An ephemeral one is generated and logged |
 | `MERCURY_OFFLINE` | Force every adapter to skip its live call | off |
+| `MERCURY_LIVE_CLOUDWATCH` | `1` reads the three allow-listed production Lambda functions live, even under `MERCURY_OFFLINE`, and adds their rows to the served board. The simulated services stay fixtures | off |
+| `MERCURY_LIVE_GITHUB` | `1` reads the DORA report and the pull request radar live, even under `MERCURY_OFFLINE`, anonymously without a token. The commit feed is not opened | off |
+| `MERCURY_CLOUDWATCH_CACHE_SECONDS` | How long one live production-row read is reused | 60 |
+| `MERCURY_GITHUB_CACHE_SECONDS` | How long one live DORA or radar answer, a refusal included, is reused | 900 |
 | `GITHUB_TOKEN` | Enables the live GitHub path | unset, fixture mode |
 | `MERCURY_GITHUB_REPO` | Repository to measure | `upgradedev/mercury_amazon` |
 | `MERCURY_DORA_WINDOW_DAYS` | DORA measurement window | 30 |

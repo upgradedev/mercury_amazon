@@ -42,6 +42,7 @@ import httpx
 
 from src.application.governed_rollback_use_case import DispatchResult
 from src.domain.governed_rollback import GovernedRollbackAction, RollbackState
+from src.infrastructure.safe_errors import describe_exception, scrub
 
 GITHUB_API_ROOT = "https://api.github.com"
 DISPATCH_MODE_ENV = "MERCURY_ROLLBACK_DISPATCH"
@@ -230,7 +231,7 @@ class GitHubActionsRollbackDispatcher:
         except httpx.HTTPError as exc:
             raise RollbackDispatchError(
                 f"The rollback dispatch to {request.url} failed before a response was read "
-                f"({type(exc).__name__}: {exc}). Nothing is known to have run."
+                f"({describe_exception(exc)}). Nothing is known to have run."
             ) from exc
         finally:
             if owns_client:
@@ -239,7 +240,7 @@ class GitHubActionsRollbackDispatcher:
         if response.status_code != 204:
             raise RollbackDispatchError(
                 f"GitHub refused the workflow dispatch with HTTP {response.status_code}: "
-                f"{response.text[:300]}",
+                f"{scrub(response.text, limit=300)}",
                 status_code=response.status_code,
             )
 
