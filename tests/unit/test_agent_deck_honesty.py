@@ -197,7 +197,12 @@ def test_the_deck_script_makes_no_call_of_its_own_accord():
     (False, False, "unavailable_no_sdk_and_no_credentials"),
 ])
 def test_the_capability_label_follows_credentials_and_sdk(monkeypatch, creds, sdk, expected):
-    """The label an operator reads must not depend on what this machine happens to have."""
+    """The label an operator reads must not depend on what this machine happens to have.
+
+    With the server's opt-in set, the reported label is the credentials-and-SDK one.
+    Without it, see test_health_says_disabled_when_the_flag_is_off.
+    """
+    monkeypatch.setenv("MERCURY_AGENT_MODEL", "on")
     monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: creds))
     monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: sdk))
     adapter = BedrockIncidentAgentAdapter()
@@ -205,6 +210,47 @@ def test_the_capability_label_follows_credentials_and_sdk(monkeypatch, creds, sd
     # A second read inside the cache window does not resolve credentials again.
     assert adapter.credentials_present() is creds
     assert adapter.model_path_capability()["resolved_capability"] == expected
+    assert adapter.health_summary()["resolved_capability"] == expected
+
+
+@pytest.mark.parametrize("flag", [None, "off", "", "yes"])
+def test_health_says_disabled_when_the_flag_is_off(monkeypatch, flag):
+    """Live /health read 'ready_to_attempt' while MERCURY_AGENT_MODEL was not on, so
+    every brief was deterministic. With credentials and the SDK both present, the
+    reported label must still say no model will be called."""
+    if flag is None:
+        monkeypatch.delenv("MERCURY_AGENT_MODEL", raising=False)
+    else:
+        monkeypatch.setenv("MERCURY_AGENT_MODEL", flag)
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: True))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter.resolved_capability(refresh=True) == "ready_to_attempt"
+    assert adapter.health_summary()["resolved_capability"] == "disabled_by_flag"
+    assert adapter.health_summary()["model_calls_enabled"] is False
+    assert adapter.model_path_capability()["resolved_capability"] == "disabled_by_flag"
+    assert adapter.model_path_capability()["model_calls_enabled"] is False
+
+
+def test_health_says_capped_once_the_process_used_its_calls(monkeypatch):
+    monkeypatch.setenv("MERCURY_AGENT_MODEL", "on")
+    monkeypatch.setenv("MERCURY_AGENT_MODEL_MAX_CALLS", "0")
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: True))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter.health_summary()["resolved_capability"] == "disabled_call_cap_reached"
+
+
+def test_the_served_health_route_reports_the_flag(monkeypatch):
+    """The /health a judge reads, not only the adapter method."""
+    from fastapi.testclient import TestClient
+
+    from src.interfaces import mcp_server
+
+    monkeypatch.delenv("MERCURY_AGENT_MODEL", raising=False)
+    body = TestClient(mcp_server.app).get("/health").json()
+    assert body["bedrock_agent"]["resolved_capability"] == "disabled_by_flag"
+    assert body["bedrock_agent"]["model_calls_enabled"] is False
 
 
 def test_credentials_from_the_environment_count_without_boto3(monkeypatch):
@@ -352,3 +398,41 @@ def test_an_attributed_commit_without_a_rollback_target_names_the_candidate_and_
     assert result["incident_severity"] == "SEV-2_NO_ROLLBACK_TARGET"
     assert sha in result["commander_brief_10ft"]
     assert "No authenticated deployment marker proves a target." in text
+
+
+# ------------------------------------------------ 10-19 guard false positives on negations
+
+def test_the_prompt_names_the_rejected_phrasings_and_no_longer_dictates_a_negated_staging(seeded_client):
+    """A local run of 12 Sonnet 5 briefs on the fixtures had 9 rejected for 'has been staged' or
+    'is staged', mostly 'no rollback has been staged', which the old prompt's own line
+    'Nothing has been staged.' invited. The prompt now names what the guard rejects."""
+    capture = _CapturingClient(json.dumps({"commander_brief_10ft": "Candidate only."}))
+    BedrockIncidentAgentAdapter(client_factory=lambda region: capture).synthesize_incident_brief(
+        what_changed_payload=_payload_for(seeded_client, "checkout-api"),
+        data_label="OFFLINE FIXTURE",
+        rollback_dispatch="record-only",
+    )
+    prompt = capture.prompts[0]
+    assert "Nothing has been staged" not in prompt
+    assert "not even to deny it" in prompt
+    for phrasing in ("'caused by'", "'the cause is'", "'after <commit>'", "'has been staged'", "'awaiting'"):
+        assert phrasing in prompt, phrasing
+    assert "the only runtime commit in the window was <commit>" in prompt
+
+
+def test_a_rejected_answer_names_the_phrase_the_guard_matched(seeded_client):
+    claim = "No cause is proven and no rollback has been staged."
+    reply = json.dumps({"commander_brief_10ft": claim})
+    adapter = BedrockIncidentAgentAdapter(client_factory=lambda region: _CapturingClient(reply))
+    result = adapter.synthesize_incident_brief(what_changed_payload=_payload_for(seeded_client, "checkout-api"))
+    assert result["fallback_reason"] == "model_claim_rejected"
+    assert result["rejected_phrase"] == "has been staged"
+    assert claim not in json.dumps(result)
+
+
+def test_an_accepted_answer_carries_no_rejected_phrase(seeded_client):
+    reply = json.dumps({"commander_brief_10ft": "The only runtime commit in the window was a4ec9aa, a temporal candidate."})
+    adapter = BedrockIncidentAgentAdapter(client_factory=lambda region: _CapturingClient(reply))
+    result = adapter.synthesize_incident_brief(what_changed_payload=_payload_for(seeded_client, "checkout-api"))
+    assert result["synthesis_mode"] == "bedrock"
+    assert "rejected_phrase" not in result
