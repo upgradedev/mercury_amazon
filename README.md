@@ -28,9 +28,11 @@ CloudWatch error metrics and Cost Explorer spend when it has credentials, serves
 `POST /mcp/tools/agent_incident_brief`. The board's agent deck calls it only when you
 press **Ask the agent**; nothing runs on load or when you pick a row. The brief is
 written deterministically from Mercury's own correlation unless Claude Sonnet 5
-(`anthropic.claude-sonnet-5`) on Amazon Bedrock actually answers. That needs the
-`anthropic` SDK (a declared dependency), AWS credentials and Bedrock permission on the
-caller's role, and the answer card names the engine that wrote it, beside the
+(`anthropic.claude-sonnet-5`) on Amazon Bedrock actually answers. That needs the server
+flag `MERCURY_AGENT_MODEL=on` (off by default, and capped at `MERCURY_AGENT_MODEL_MAX_CALLS`
+calls per process, default 100), the `anthropic` SDK (a declared dependency), AWS
+credentials and Bedrock permission on the caller's role. The answer card names the engine
+that wrote it, and which fields a model wrote, beside the
 OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not read
 `MERCURY_OFFLINE`; the test suite keeps it off Bedrock with its own pytest guard.
 
@@ -42,7 +44,7 @@ OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not rea
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-772%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-790%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -163,7 +165,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 772 passed
+# 790 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -245,9 +247,9 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 
 `MERCURY_OFFLINE=1` forces every data adapter (CloudWatch, Cost Explorer, GitHub) into
 fixture mode. It can suppress a live call; it cannot make a fixture look live. The agent
-brief's Bedrock adapter is the exception: it does not read the switch, and it answers
-deterministically whenever the SDK, credentials or permission is missing or a call
-fails. Nothing on the page speaks or announces on load, the page calls no agent or
+brief's Bedrock adapter is the exception: it does not read the switch. It answers
+deterministically unless the server sets `MERCURY_AGENT_MODEL=on`, and whenever the SDK,
+credentials or permission is missing or a call fails. Nothing on the page speaks or announces on load, the page calls no agent or
 model until a viewer presses Ask the agent, and it makes no request to another origin.
 
 The engine's limits are measured, not hidden. Every figure comes from a synthetic
