@@ -82,6 +82,7 @@ python3 scripts/write_android_tv_runtime_receipt.py \
   --install-log "$evidence/adb-install.txt" \
   --launch-log "$evidence/launcher.txt" \
   --endpoint-health "$endpoint_health" \
+  --activities "$evidence/activities.txt" \
   --workflow-run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local}/actions/runs/${GITHUB_RUN_ID:-local}" \
   --artifact-name "mercury-android-tv-runtime-${GITHUB_SHA:-local}" \
   --built-by-command "./gradlew :app:assembleDebug -PmercuryCockpitUrl=$endpoint" \
