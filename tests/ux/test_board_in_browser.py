@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import socket
 import subprocess
 import sys
@@ -41,6 +42,20 @@ FAMILIES = ("Barlow", "Barlow Condensed", "JetBrains Mono")
 
 
 def _free_port() -> int:
+    """A free local port, looked for in 8900-8999 first.
+
+    Machines that run several agents' servers side by side keep test servers in that
+    band, so a test server never lands on a port somebody else is about to take.
+    """
+    start = random.randrange(100)
+    for offset in range(100):
+        port = 8900 + (start + offset) % 100
+        with socket.socket() as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
@@ -63,19 +78,86 @@ def sync_playwright():
 
 @pytest.fixture(scope="module")
 def base_url(tmp_path_factory):
-    port = _free_port()
-    base = f"http://127.0.0.1:{port}"
     env = os.environ.copy()
     env["MERCURY_OFFLINE"] = "1"
     for name in ("MERCURY_ROLLBACK_DISPATCH", "MERCURY_STATE_TABLE", "GITHUB_TOKEN"):
         env.pop(name, None)
+    yield from _serve(tmp_path_factory, env, ["-m", "uvicorn", "src.interfaces.mcp_server:app"])
+
+
+#: The server for the hybrid page (MERCURY_LIVE_CLOUDWATCH=1). CloudWatch is a stub set
+#: on the server's own adapter before it starts, so the three production rows are
+#: drawn LIVE without any AWS call; volcan's and aletheia's errors rise, so two rows
+#: read as anomalies Mercury cannot attribute.
+LIVE_ROWS_SERVER = """
+import sys
+from datetime import datetime, timedelta, timezone
+
+import uvicorn
+
+from src.interfaces import mcp_server
+
+
+#: volcan's errors rise against a baseline (an anomaly the board cannot attribute);
+#: aletheia's rise from a baseline of zero, which has no ratio; the wallboard is quiet.
+ERRORS = {
+    "volcan-mcp-euw1-prod": (1, 0, 0, 0, 0, 1),
+    "aletheia-provenance-euw1-prod": (0, 0, 0, 0, 0, 4),
+}
+
+
+class CloudWatchStub:
+    def get_metric_statistics(self, **kwargs):
+        function = kwargs["Dimensions"][0]["Value"]
+        if kwargs["MetricName"] == "Errors":
+            values = ERRORS.get(function, (0, 0, 0, 0, 0, 0))
+        else:
+            values = (5, 4, 6, 3, 5, 4)
+        end = datetime.now(timezone.utc)
+        return {"Datapoints": [
+            {"Timestamp": end - timedelta(hours=len(values) - index), "Sum": float(value)}
+            for index, value in enumerate(values)
+        ]}
+
+
+mcp_server.cloudwatch_adapter._client = CloudWatchStub()
+uvicorn.run(mcp_server.app, host="127.0.0.1", port=int(sys.argv[sys.argv.index("--port") + 1]))
+"""
+
+
+@pytest.fixture(scope="module")
+def live_rows_base_url(tmp_path_factory):
+    """The page as the hybrid deployment serves it: five fixture rows and three live ones.
+
+    No AWS credential can resolve in this server (the stub answers instead), so nothing
+    here reaches AWS whatever the developer's shell holds.
+    """
+    env = os.environ.copy()
+    env.update({
+        "MERCURY_OFFLINE": "1",
+        "MERCURY_LIVE_CLOUDWATCH": "1",
+        "AWS_EC2_METADATA_DISABLED": "true",
+        "AWS_SHARED_CREDENTIALS_FILE": str(tmp_path_factory.mktemp("no_aws") / "credentials"),
+        "AWS_CONFIG_FILE": str(tmp_path_factory.mktemp("no_aws_config") / "config"),
+    })
+    for name in ("MERCURY_ROLLBACK_DISPATCH", "MERCURY_STATE_TABLE", "GITHUB_TOKEN",
+                 "MERCURY_LIVE_GITHUB", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
+                 "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_DEFAULT_PROFILE",
+                 "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI"):
+        env.pop(name, None)
+    yield from _serve(tmp_path_factory, env, ["-c", LIVE_ROWS_SERVER])
+
+
+def _serve(tmp_path_factory, env, args):
+    """Start ``python <args> --host 127.0.0.1 --port <port>``, yield its URL once healthy."""
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
     # The server's access log goes to a file, not a pipe: nothing drains a pipe while
     # the browser runs, and a full one stalls the server mid-module.
     log_path = tmp_path_factory.mktemp("server") / "uvicorn.log"
     log = open(log_path, "w", encoding="utf-8")
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "src.interfaces.mcp_server:app",
-         "--host", "127.0.0.1", "--port", str(port)],
+        [sys.executable, *args, "--host", "127.0.0.1", "--port", str(port)],
         cwd=REPO_ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, text=True,
     )
     try:
@@ -856,5 +938,224 @@ def test_every_board_row_stays_above_the_key_bar_in_every_verdict(
                 f"{where}: text renders at {geometry['smallestFont']}px, under {floor_px}px"
             )
         assert errors == [], errors
+    finally:
+        context.close()
+
+
+# ------------------------------------------------- The hybrid page, eight rows
+
+LIVE_ROWS_GEOMETRY = """() => {
+  const box = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+  const rows = [...document.querySelectorAll('.departures-rows .btn-demo')];
+  const bar = document.querySelector('.keybar');
+  const shown = getComputedStyle(bar).display !== 'none';
+  return {
+    tvHost: document.documentElement.classList.contains('tv-host'),
+    scrollY: window.scrollY,
+    keybarTop: shown ? bar.getBoundingClientRect().top : innerHeight,
+    services: rows.map(row => row.dataset.service),
+    stamps: rows.map(row => { const s = row.querySelector('.row-stamp'); return s ? s.textContent.trim() : ''; }),
+    rows: rows.map(row => [row.dataset.service, box(row)]),
+    rowsBox: box(document.querySelector('.departures-rows')),
+    rollback: box(document.querySelector('#rollback')),
+    rollbackTitle: box(document.querySelector('#rollbackTitle')),
+  };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host",
+    [(1280, 720, False), (1920, 1080, False), (960, 540, True)],
+    ids=["laptop-1280x720", "tv-browser-1920x1080", "firetv-webview-960x540"],
+)
+def test_eight_rows_stay_on_the_board_with_the_live_rows_on(
+        browser, live_rows_base_url, width, height, host):
+    """With MERCURY_LIVE_CLOUDWATCH=1 the board has eight rows where it had five.
+
+    On a laptop the page caps the board at 21rem and shares it out in equal rows, so at
+    1280x720 the last live row used to spill out of the board and cover the next
+    section's heading, "Governed rollback and handoff". The live rows' own style lifts
+    that cap below 1400px; on the television layouts it never applied, and every row
+    still has to clear the remote's key bar there.
+    """
+    from src.infrastructure.cloudwatch_adapter import LIVE_PRODUCTION_FUNCTIONS
+
+    context, page, errors, _ = open_board(
+        browser, live_rows_base_url, width=width, height=height, host=host)
+    try:
+        wait_for_board(page)
+        geometry = page.evaluate(LIVE_ROWS_GEOMETRY)
+        where = f"{width}x{height}"
+        assert geometry["tvHost"] is host, f"{where}: {geometry}"
+        assert geometry["services"][-3:] == list(LIVE_PRODUCTION_FUNCTIONS), geometry["services"]
+        assert len(geometry["services"]) == 8, geometry["services"]
+        assert all(s.startswith("Live ") for s in geometry["stamps"][-3:]), geometry["stamps"]
+        name, last = geometry["rows"][-1]
+        # Half a pixel for sub-pixel rounding of fractional rem heights.
+        assert last["bottom"] <= geometry["rowsBox"]["bottom"] + 0.5, (
+            f"{where}: {name} spills out of the board: {last} vs {geometry['rowsBox']}"
+        )
+        assert last["bottom"] <= geometry["rollback"]["top"], (
+            f"{where}: {name} covers the next section: {last} vs {geometry['rollback']}"
+        )
+        assert last["bottom"] <= geometry["rollbackTitle"]["top"], (
+            f"{where}: {name} covers 'Governed rollback and handoff': {geometry['rollbackTitle']}"
+        )
+        if host or width >= 1400:
+            assert geometry["scrollY"] == 0, f"{where}: the page scrolled to {geometry['scrollY']}"
+            bar = geometry["keybarTop"]
+            covered = [n for n, b in geometry["rows"] if b["top"] < 0 or b["bottom"] > bar]
+            assert covered == [], f"{where}: rows behind the key bar at y={bar}: {covered}"
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+LIVE_HERO_STATE = """() => ({
+  service: document.querySelector('#heroService').textContent,
+  verdict: document.querySelector('#hero').dataset.verdict,
+  eyebrow: document.querySelector('#heroEyebrow').textContent,
+  headline: document.querySelector('#heroHeadline').textContent,
+  figure: document.querySelector('#heroFigure').textContent,
+  cause: document.querySelector('#heroCause').textContent,
+  rows: Object.fromEntries([...document.querySelectorAll('.btn-demo[data-row-source]')].map(row =>
+    [row.dataset.service, row.querySelector('[data-row-reading]').textContent])),
+  eyebrowBox: (r => [r.top, r.bottom])(document.querySelector('#heroEyebrow').getBoundingClientRect()),
+  headlineBox: (r => [r.top, r.bottom])(document.querySelector('#heroHeadline').getBoundingClientRect()),
+})"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host",
+    [(1920, 1080, False), (960, 540, True)],
+    ids=["tv-browser-1920x1080", "firetv-webview-960x540"],
+)
+def test_a_live_row_hero_never_describes_a_deploy_window(browser, live_rows_base_url, width, height, host):
+    """The largest text on the TV must not say a window was read for a live row.
+
+    docs/index.html (frozen) words every cannot-attribute answer outside a crowded
+    window as "Incident, cannot attribute: window empty" / "Cannot attribute this: no
+    change in the window". No deploy feed is connected for the production functions, so
+    no window was read; the switch-on page rewrites those two lines, and the zero-baseline
+    factor "0x", while the server's own refusal statement stays under them.
+    """
+    import re as _re
+
+    from src.interfaces.live_rows import LIVE_HERO_TEXT
+
+    context, page, errors, _ = open_board(
+        browser, live_rows_base_url, width=width, height=height, host=host)
+    try:
+        wait_for_board(page)
+        rows = page.evaluate(LIVE_HERO_STATE)["rows"]
+        # aletheia's row is filled by the board's own refresh, never selected yet.
+        assert rows["aletheia-provenance-euw1-prod"] == LIVE_HERO_TEXT["zero_factor"], rows
+        for service in ("volcan-mcp-euw1-prod", "aletheia-provenance-euw1-prod"):
+            page.locator(f'.btn-demo[data-service="{service}"]').click()
+            wait_for_board(page, service=service)
+            page.wait_for_timeout(200)
+            hero = page.evaluate(LIVE_HERO_STATE)
+            print(service, json.dumps(hero))
+            assert hero["verdict"] == "cannot", hero
+            for line in (hero["eyebrow"], hero["headline"]):
+                assert not _re.search(r"window|no change", line, _re.IGNORECASE), hero
+            assert hero["eyebrow"] == LIVE_HERO_TEXT["eyebrow"], hero
+            assert hero["headline"] == LIVE_HERO_TEXT["headline"], hero
+            assert "No deploy feed is connected" in hero["cause"], hero
+            assert "landed" not in hero["cause"], hero
+            assert hero["eyebrowBox"][1] <= hero["headlineBox"][0] + 1, hero
+        assert hero["figure"] == LIVE_HERO_TEXT["zero_factor"], hero
+        assert hero["rows"]["aletheia-provenance-euw1-prod"] == LIVE_HERO_TEXT["zero_factor"], hero
+        # A fixture row's empty-window answer keeps the board's own wording: there the
+        # recorded commit window was read and really was empty.
+        page.locator('.btn-demo[data-service="search-indexer"]').click()
+        wait_for_board(page, service="search-indexer")
+        fixture = page.evaluate(LIVE_HERO_STATE)
+        assert fixture["eyebrow"] == LIVE_HERO_TEXT["window_eyebrow"], fixture
+        # The rewritten lines take no more height than the board's own wording did, so
+        # the hero keeps its shape on the TV.
+        height = lambda box: box[1] - box[0]  # noqa: E731
+        assert height(hero["eyebrowBox"]) <= height(fixture["eyebrowBox"]) + 1, (hero, fixture)
+        assert height(hero["headlineBox"]) <= height(fixture["headlineBox"]) + 1, (hero, fixture)
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+LIVE_ROW_HANDOFF_STATE = """() => {
+  const box = el => { if (!el) return null; const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top * 10) / 10, bottom: Math.round(r.bottom * 10) / 10 }; };
+  const bar = document.querySelector('.keybar');
+  const shown = bar && getComputedStyle(bar).display !== 'none' && bar.getBoundingClientRect().height > 0;
+  const out = document.querySelector('#handoffOutput');
+  const current = window.mercuryNav.current;
+  return {
+    tvHost: document.documentElement.classList.contains('tv-host'),
+    keybarTop: shown ? bar.getBoundingClientRect().top : innerHeight,
+    viewport: innerHeight,
+    text: out.textContent,
+    card: box(out.querySelector('.error-card')),
+    focus: current && current.id,
+    focusBox: box(current),
+    scrollY: Math.round(scrollY),
+  };
+}"""
+
+
+@pytest.mark.parametrize(
+    "width, height, host",
+    [(1920, 1080, True), (960, 540, True)],
+    ids=["firetv-1920x1080", "firetv-webview-960x540"],
+)
+def test_a_live_row_handoff_refusal_is_shown_above_the_key_bar(
+        browser, live_rows_base_url, width, height, host):
+    """The board's own Publish handoff on a LIVE row, pressed with the D-pad.
+
+    A live row has no recorded demo handoff, so the server answers 422 with its reason.
+    The board's error card used to render behind the remote's key bar with the page not
+    scrolled, so a TV viewer saw only "HTTP 422" in the console header and never the
+    reason. The card must come up above the bar, with the cursor still on Publish.
+    """
+    from src.interfaces.handoff_routes import DEMO_HANDOFF_UNAVAILABLE
+
+    context, page, errors, _ = open_board(
+        browser, live_rows_base_url, width=width, height=height, host=host)
+    calls: list[tuple[str, int]] = []
+    page.on("response", lambda response: calls.append((urlsplit(response.url).path, response.status))
+            if "handoff" in response.url else None)
+    try:
+        wait_for_board(page)
+        service = "volcan-mcp-euw1-prod"
+        page.evaluate(f"window.mercuryNav.setFocus(document.querySelector('.btn-demo[data-service=\"{service}\"]'))")
+        assert page.evaluate("window.navigateDpad('SELECT')") is True
+        wait_for_board(page, service=service)
+        page.locator("#btnHandoff:not([disabled])").wait_for(timeout=10_000)
+        # DOWN from the live row, key by key, until the cursor is on Publish handoff.
+        path = []
+        for _ in range(12):
+            if page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnHandoff":
+                break
+            assert page.evaluate("window.navigateDpad('DOWN')") is True
+            path.append(page.evaluate(
+                "(c => c && (c.id || c.dataset.service))(window.mercuryNav.current)"))
+            page.wait_for_timeout(120)
+        assert page.evaluate("window.mercuryNav.current.id") == "btnHandoff", path
+        page.wait_for_timeout(300)
+        assert page.evaluate("window.navigateDpad('SELECT')") is True
+        page.locator("#handoffOutput .error-card").wait_for(timeout=10_000)
+        page.wait_for_timeout(400)
+        state = page.evaluate(LIVE_ROW_HANDOFF_STATE)
+        print("live row handoff:", path, json.dumps(state), calls)
+        assert state["tvHost"] is host, state
+        assert ("/mcp/tools/demo_update_handoff", 422) in calls, calls
+        assert DEMO_HANDOFF_UNAVAILABLE in state["text"], state["text"]
+        assert "Another screen published" not in state["text"], state["text"]
+        assert state["focus"] == "btnHandoff", state
+        assert state["card"]["top"] >= 0, state
+        assert state["card"]["bottom"] <= state["keybarTop"], (
+            f"{width}x{height}: the refusal is behind the key bar: {state}")
+        assert state["focusBox"]["top"] >= 0, state
+        # The browser logs the refused request itself; nothing else may error.
+        assert [e for e in errors if "422" not in e] == [], errors
     finally:
         context.close()

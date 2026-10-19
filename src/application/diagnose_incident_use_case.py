@@ -22,14 +22,24 @@ do; the GitHub commits API used here does not). With a runtime filter on the cor
 a commit whose files are all outside what the server is built from is not a deploy
 candidate, and the simulated reading is placed after a candidate, never after a commit
 the filter sets aside.
+
+A live production row (an allow-listed Lambda function read from CloudWatch, see
+``CloudWatchMetricAdapter.is_live_production_row``) takes a separate path: its reading
+is correlated against no commits at all, because no deploy feed for those functions is
+connected. Every text it carries says so rather than describing an empty deploy window,
+and errors that rise from a zero baseline are turned into a refusal rather than the
+correlator's NO_ANOMALY.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from src.domain.incident_correlation import (
+    AttributionRefusal,
     CommitRef,
+    CorrelationVerdict,
     IncidentCorrelation,
     IncidentCorrelator,
     MetricSeries,
@@ -85,6 +95,193 @@ def _commit_ref_from_entry(entry: dict) -> CommitRef | None:
         committed_at=stamp,
         paths=paths,
     )
+
+
+#: What ``what_changed`` reports as a live row's ``refusal_reason`` on a refusal. The
+#: domain's NO_CANDIDATE_IN_WINDOW means "nothing landed inside the window", a finding
+#: about a window Mercury never read for these functions. It is a wire value only: the
+#: correlator and the published trial never produce it.
+LIVE_ROW_REFUSAL_REASON = "NO_DEPLOY_FEED"
+#: A live row's ``claim_strength``: no candidate was looked for, so there is no
+#: TEMPORAL_CANDIDATE_ONLY claim to qualify.
+LIVE_ROW_CLAIM_STRENGTH = "NO_ATTRIBUTION_ATTEMPTED"
+
+
+@dataclass(frozen=True)
+class LiveRowCorrelation(IncidentCorrelation):
+    """Every verdict on a live production row, worded for a row with no deploy feed.
+
+    The correlator is handed no commits for a live row, so on an anomaly it says "no
+    commit landed in the window", which reads as a finding about the window. Mercury
+    never read these functions' deploys, so that sentence would be false. Every text a
+    live row carries (explanation, refusal statement, spoken summary, handoff fact)
+    says instead that no deploy feed is connected and attribution was not attempted.
+
+    ``zero_baseline`` marks a series of zeros ending in a run of non-zero readings that
+    reaches the newest one. The correlator divides by the baseline, so a lone rise from
+    zero has no ratio, and a run that already covers the last few hours (Lambda reports
+    Errors only for hours with invocations, so (0, 5, 5) is a real shape) is inside the
+    trailing mean it is compared against; either way it comes back NO_ANOMALY ("Nothing
+    to revert"). On a simulated row that cannot happen (every baseline is at least
+    1.00); on a real function it would be a false all-clear, so it is turned into a
+    refusal with a baseline of zero, which is what the readings before the run were.
+    ``zero_run`` is the length of that run. The correlator the published trial
+    measures is not touched.
+    """
+
+    zero_baseline: bool = False
+    zero_run: int = 0
+
+    def _rose_from_zero(self) -> str:
+        """How the metric left zero, true for a one-reading rise and for a longer run."""
+        if self.zero_run > 1:
+            return (
+                f"rose from zero and stayed above zero for the last {self.zero_run} readings, "
+                f"{self.current_value:g} in the newest"
+            )
+        return f"rose from zero to {self.current_value:g} in the newest reading"
+
+    def _no_feed(self) -> str:
+        return (
+            f"No deploy feed is connected for {self.service_name}, so Mercury did not attempt "
+            "to attribute this reading to a change and says nothing about its deploys."
+        )
+
+    @property
+    def causality_statement(self) -> str:
+        """The wire's ``causality_statement`` for a live row: no candidate was considered."""
+        return (
+            f"No deploy feed is connected for {self.service_name}, so no change was read, named "
+            "or considered for this reading, and this answer makes no claim about any deploy."
+        )
+
+    @property
+    def rollback_blocked_reason(self) -> str:
+        """Why no rollback is offered on a live row, in terms of what Mercury did.
+
+        It says what Mercury does, not what exists: an operator can record a deployment
+        marker for any service name, and the reason must stay true when one is on record.
+        """
+        return (
+            f"No rollback is offered: Mercury does not attribute a live production function's "
+            f"readings to a change (no deploy feed is connected for {self.service_name}), so it "
+            "names no rollback target."
+        )
+
+    @property
+    def refusal_statement(self) -> str | None:
+        if self.verdict is CorrelationVerdict.NO_ANOMALY:
+            return None
+        if self.verdict is CorrelationVerdict.INSUFFICIENT_DATA:
+            plural = "s" if self.sample_size != 1 else ""
+            return (
+                f"Mercury cannot attribute anything for {self.service_name}: it has "
+                f"{self.sample_size} reading{plural} of {self.metric_name} and a baseline needs at "
+                f"least two. {self._no_feed()}"
+            )
+        if self.zero_baseline:
+            return (
+                f"Mercury cannot attribute this for {self.service_name}: {self.metric_name} "
+                f"{self._rose_from_zero()}, so there is no ratio to a baseline. {self._no_feed()} "
+                "That is missing evidence, not a finding that nothing is wrong."
+            )
+        return (
+            f"Mercury cannot attribute this for {self.service_name}: {self.metric_name} is "
+            f"{self.anomaly_factor:.2f} times its baseline. {self._no_feed()} That is missing "
+            "evidence, not a finding about any deploy."
+        )
+
+    def to_voice_summary(self) -> str:
+        if self.verdict is CorrelationVerdict.NO_ANOMALY:
+            return (
+                f"{self.service_name} looks normal. {self.metric_name} is at "
+                f"{self.current_value:.2f} against a baseline of {self.baseline_value:.2f}. "
+                "No deploy feed is connected for it."
+            )
+        if self.verdict is CorrelationVerdict.INSUFFICIENT_DATA:
+            return (
+                f"I do not have enough {self.metric_name} data for {self.service_name} to answer "
+                "that. No deploy feed is connected for it."
+            )
+        if self.zero_baseline:
+            rose = self._rose_from_zero()
+        else:
+            rose = f"is {self.anomaly_factor:.1f} times its baseline"
+        return (
+            f"{self.metric_name} on {self.service_name} {rose}. No deploy feed is connected for "
+            "it, so Mercury did not attempt to attribute it to a change. Investigate manually."
+        )
+
+
+def live_row_correlation(correlation: IncidentCorrelation, series: MetricSeries) -> LiveRowCorrelation:
+    """Rewrap any correlation of a live row so none of its texts describes a deploy window."""
+    values = {f.name: getattr(correlation, f.name) for f in fields(IncidentCorrelation)}
+    latest = series.latest
+    run = _rise_from_zero_run(series)
+    zero_baseline = (
+        correlation.verdict is CorrelationVerdict.NO_ANOMALY
+        and latest is not None
+        and latest.value > 0
+        and (correlation.baseline_value <= 0 or run > 0)
+    )
+    no_feed = (
+        f"No deploy feed is connected for {correlation.service_name}, so attribution was not "
+        "attempted."
+    )
+    if zero_baseline:
+        run = max(run, 1)
+        if run > 1:
+            rose = (
+                f"rose from a baseline of zero and stayed above zero for the last {run} "
+                f"readings, {latest.value:g} in the newest"
+            )
+        else:
+            rose = f"rose from a baseline of zero to {latest.value:g} in the newest reading"
+        values.update(
+            verdict=CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION,
+            attribution_refusal=AttributionRefusal.NO_CANDIDATE_IN_WINDOW,
+            # The readings before the rise are all zero, so that is the baseline; the
+            # correlator's trailing mean would have counted the rise itself.
+            baseline_value=0.0,
+            anomaly_factor=0.0,
+            explanation=(
+                f"{series.metric_name} {rose}. A zero baseline gives no ratio, so this is not "
+                f"reported as normal. {no_feed}"
+            ),
+        )
+    elif correlation.verdict is CorrelationVerdict.ANOMALY_WITHOUT_ATTRIBUTION:
+        values.update(
+            explanation=(
+                f"{series.metric_name} is {correlation.anomaly_factor:.2f} times the baseline mean "
+                f"of {correlation.baseline_value:.2f}, which the correlator calls an anomaly. "
+                f"{no_feed}"
+            ),
+        )
+    else:
+        # NO_ANOMALY keeps the correlator's sentence first: the board reads the threshold
+        # out of "below the 3.0x threshold".
+        values.update(explanation=f"{correlation.explanation} {no_feed}")
+    return LiveRowCorrelation(
+        **values, zero_baseline=zero_baseline, zero_run=run if zero_baseline else 0
+    )
+
+
+def _rise_from_zero_run(series: MetricSeries) -> int:
+    """Length of the non-zero run ending at the newest reading, when only zeros precede it.
+
+    Zero when the newest reading is zero, when the run covers the whole series (nothing
+    before it to call a baseline), or when any reading before the run is non-zero.
+    """
+    values = [point.value for point in series.ordered_points()]
+    run = 0
+    for value in reversed(values):
+        if value <= 0:
+            break
+        run += 1
+    before = values[: len(values) - run]
+    if run == 0 or not before or any(value > 0 for value in before):
+        return 0
+    return run
 
 
 class DiagnoseIncidentUseCase:
@@ -159,7 +356,36 @@ class DiagnoseIncidentUseCase:
             observed_at_utc=_iso_now(),
         )
 
+    def _is_live_production_row(self, service_name: str) -> bool:
+        check = getattr(self._metrics, "is_live_production_row", None)
+        return bool(check(service_name)) if callable(check) else False
+
+    def _correlate_live_production_row(self, service_name: str, window_minutes: int) -> IncidentCorrelation:
+        """A real production function: read live, never attributed to a commit.
+
+        The commit feed behind the board is the recorded window or the invented deploy
+        feed, and neither deploys these functions. Correlating a real error against it
+        would put a fabricated temporal candidate beside a real reading, so the commit
+        list is empty and the commit provenance says attribution was not attempted. The
+        worst a live row can say is "cannot attribute", never "temporal candidate".
+        """
+        series = self._metrics.get_error_series(service_name, window_minutes=window_minutes)
+        commit_provenance = Provenance(
+            source=DataSource.NO_LIVE_DATA,
+            detail=(
+                f"Attribution is not attempted for {service_name}: it is a live production "
+                "function and no deploy feed for it is connected, so no commit is read or named "
+                "against its reading. The simulated rows' commit feed is never used for it."
+            ),
+            observed_at_utc=_iso_now(),
+        )
+        correlation = self._correlator.correlate(service_name, series, [], commit_provenance)
+        return live_row_correlation(correlation, series)
+
     def execute(self, service_name: str, window_minutes: int = 60) -> IncidentCorrelation:
+        if self._is_live_production_row(service_name):
+            return self._correlate_live_production_row(service_name, window_minutes)
+
         commits, commit_provenance = self._gather_commits()
 
         # The local checkout can name a parent the fetch window cannot see

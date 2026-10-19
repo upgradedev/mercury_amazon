@@ -66,11 +66,11 @@ SDK_MODULE = "anthropic"
 _ARN_MODEL_RE = re.compile(r"[:/]([a-z0-9-]+(?:\.[a-z0-9-]+)+)$", re.IGNORECASE)
 
 
-#: Words a model reply may not use about this board. The data is a fixture and
-#: dispatch is record-only, so a reply that says a rollback is staged or executed, or
-#: that names a cause, is wrong whatever else it says. This is a keyword guard, not a
-#: proof: it catches the phrasings seen on the live deck, and the card still labels
-#: any model text as an advisory draft.
+#: Words a model reply may not use about this board. The data is a fixture or a live
+#: reading no deploy feed is connected to, and dispatch is record-only, so a reply that
+#: says a rollback is staged or executed, or that names a cause, is wrong whatever else
+#: it says. This is a keyword guard, not a proof: it catches the phrasings seen on the
+#: live deck, and the card still labels any model text as an advisory draft.
 FORBIDDEN_CLAIMS = re.compile(
     r"\b(?:is|was|has been|been|now|already)\s+staged\b"
     # "awaiting authorization", "awaiting authorized staging", AWAITING_AUTHORIZED_STAGING
@@ -114,6 +114,96 @@ def forbidden_claim_match(text: str) -> str | None:
     """The first phrase in model text that the guard rejects, or None."""
     match = FORBIDDEN_CLAIMS.search(text or "")
     return match.group(0) if match else None
+
+
+#: Words a model reply may not use when no commit was read for the answer (its commit
+#: provenance is NO LIVE DATA: a live production row, which no deploy feed is connected
+#: to). They describe a commit window Mercury never looked at, so "no commit landed in
+#: the window" or "no deploy is implicated" is a claim about a check that never
+#: happened. Applied only to those answers: on a fixture row a commit window was read,
+#: and #64 tells the model to write "the only runtime commit in the window was <commit>".
+#: Like FORBIDDEN_CLAIMS this is a keyword guard for the phrasings below, not a proof
+#: that no reply can describe a window in other words. "deploy feed" is never a match,
+#: so the honest "no deploy feed is connected" passes.
+_CHANGE_NOUN = r"(?:commits?|changes?|deploys?|deployments?|releases?|rollouts?)"
+_CHANGE_QUALIFIERS = r"(?:(?:recent|new|runtime|code|candidate|earlier|prior|other)\s+)*"
+_WINDOW_CHANGE_NOUN = r"(?:commits?|deploys?(?!\s+feed)|deployments?|releases?|shipped|candidates?)"
+NO_COMMITS_READ_CLAIMS = re.compile(
+    r"\bno\s+" + _CHANGE_QUALIFIERS + _CHANGE_NOUN + r"\s+(?:has\s+|have\s+|had\s+)?"
+    r"(?:landed|shipped|occurred|happened|in\s+(?:(?:the|this|that)\s+)?(?:attribution\s+)?window)\b"
+    r"|\b(?:commits?|changes?|deploys?)\s+in\s+(?:(?:the|this|that)\s+)?(?:attribution\s+)?window\b"
+    r"|\bno\s+(?:recent\s+)?(?:commit|change|deploy|deployment)s?\s+(?:is\s+|was\s+|are\s+|were\s+)?"
+    r"(?:implicated|involved|responsible|to\s+blame)\b"
+    r"|\b(?:attribution\s+)?window\s+(?:is|was)\s+empty\b|\bempty\s+(?:attribution\s+)?window\b"
+    # "No code changes preceded the spike", "No runtime commits were found in the window",
+    # "No deployment activity was observed before the onset", "no deploys in the last 24 hours".
+    r"|\bno\s+" + _CHANGE_QUALIFIERS + _CHANGE_NOUN + r"\s+(?:(?:activity|activities|events?|history)\s+)?"
+    r"(?:(?:was|were|is|are|has\s+been|have\s+been|had\s+been)\s+)?"
+    r"(?:found|made|deployed|released|shipped|seen|observed|detected|recorded|identified|preceded?"
+    r"|before|prior\s+to|ahead\s+of|within"
+    r"|in\s+(?:(?:the|this|that|any)\s+)?(?:last|past|previous|preceding|prior|\d|(?:attribution\s+|deploy\s+)?window))\b"
+    # A window and a change in one sentence, either order: "The window had no runtime commit".
+    r"|\bwindow\b[^.!?;\"\n]{0,80}?\b" + _WINDOW_CHANGE_NOUN + r"\b"
+    r"|\b" + _WINDOW_CHANGE_NOUN + r"\b[^.!?;\"\n]{0,80}?\bwindow\b"
+    r"|\bnothing\s+(?:was\s+|has\s+been\s+)?(?:landed|deployed|shipped|released)\b"
+    # "The spike is not deploy-related", "unrelated to any deploy", "a code change is unlikely".
+    r"|\bnot\s+(?:a\s+)?(?:deploy|deployment|change|release|commit)[-\s]related\b"
+    r"|\bunrelated\s+to\s+(?:any\s+|a\s+|the\s+)?(?:recent\s+)?" + _CHANGE_NOUN + r"\b"
+    r"|\b(?:commit|change|deploy|deployment|release)s?\s+(?:is|are|was|were|seems?|looks?)\s+(?:un)?likely\b",
+    re.IGNORECASE,
+)
+
+
+def no_commits_read_claim_match(text: str) -> str | None:
+    """The first commit-window claim in model text written for an answer with no commits read."""
+    match = NO_COMMITS_READ_CLAIMS.search(text or "")
+    return match.group(0) if match else None
+
+
+def _cloudwatch_did_not_answer(detail: str | None) -> bool:
+    """True when a production row's CloudWatch read got no answer (a timeout, a dropped connection, the deadline)."""
+    from src.infrastructure.cloudwatch_adapter import UNREAD_REASON_PREFIX
+
+    return (detail or "").startswith(UNREAD_REASON_PREFIX)
+
+
+def is_production_row(service: str) -> bool:
+    """True for one of the team's own allow-listed Lambda functions (the live rows)."""
+    from src.infrastructure.cloudwatch_adapter import LIVE_PRODUCTION_FUNCTIONS
+
+    return service in LIVE_PRODUCTION_FUNCTIONS
+
+
+def data_label_line(data_label: str, service: str, production_row: bool | None = None) -> str:
+    """The prompt's sentence about where the data came from, true for each label.
+
+    It used to say "it is not a reading of a real service" whatever the label, which is
+    false for a LIVE production row: that is a CloudWatch reading of the team's own
+    function. Only the fixture label gets the fixture sentence, and only one of the
+    allow-listed production functions is called the team's own function with no deploy
+    feed (``production_row``, by default looked up from the service name): a simulated
+    service read from CloudWatch with ``MERCURY_OFFLINE`` unset is LIVE as well.
+    """
+    label = (data_label or "").strip().upper()
+    if production_row is None:
+        production_row = is_production_row(service)
+    if label == "OFFLINE FIXTURE":
+        return (
+            f"The data below is labelled {data_label}. Say so if you describe it: it is not a "
+            "reading of a real service.\n"
+        )
+    if label == "LIVE" and production_row:
+        return (
+            f"The data below is labelled {data_label}: it is a live CloudWatch reading of the "
+            f"team's own Lambda function {service}. Say so if you describe it. No deploy feed is "
+            "connected for that function, so do not connect the reading to any commit or deploy.\n"
+        )
+    if label == "LIVE":
+        return (
+            f"The data below is labelled {data_label}: it is a live CloudWatch reading. Say so if "
+            "you describe it.\n"
+        )
+    return f"The data below is labelled {data_label}. Say so if you describe it.\n"
 
 
 def public_model_label(model_id: str) -> str:
@@ -299,6 +389,11 @@ class BedrockIncidentAgentAdapter:
             return cached_copy
 
         started = time.perf_counter()
+        # NO LIVE DATA commit provenance means no commit was read for this answer (a live
+        # production row: no deploy feed is connected to it).
+        commits_read = (
+            (what_changed_payload.get("commit_provenance") or {}).get("display_label") != "NO LIVE DATA"
+        )
         deterministic = self._deterministic_brief(
             service=service,
             verdict=verdict,
@@ -307,6 +402,9 @@ class BedrockIncidentAgentAdapter:
             offending=offending,
             recommended=recommended,
             deployment=what_changed_payload.get("deployment_evidence"),
+            commits_read=commits_read,
+            metric_label=(what_changed_payload.get("metric_provenance") or {}).get("display_label"),
+            metric_detail=(what_changed_payload.get("metric_provenance") or {}).get("detail"),
         )
 
         if verdict == "INSUFFICIENT_DATA":
@@ -323,34 +421,59 @@ class BedrockIncidentAgentAdapter:
         causality = attribution.get("causality_statement") or (
             "Temporal proximity does not prove a change caused the anomaly."
         )
+        if commits_read:
+            cause_rule = "- Do not claim a cause. A named commit is only a temporal candidate. " + causality + "\n"
+            attribution_line = (
+                f"Attribution details: commits_in_window={attribution.get('commits_in_window')}, "
+                f"set_aside={attribution.get('commits_set_aside')}, "
+                f"refusal={attribution.get('refusal_statement')}\n"
+            )
+            write_instead = "Write 'the only runtime commit in the window was <commit>' or 'a temporal candidate' instead.\n"
+            hypothesis_field = "what the reading and the candidate commits do and do not show"
+        else:
+            # No commit was read for this answer (a live production row: no deploy feed
+            # is connected). A commit count or a window rule here would hand the model a
+            # check that never happened, so neither is in the prompt.
+            cause_rule = (
+                "- Do not claim a cause. No commits or deploys were read for this service: no deploy "
+                "feed is connected for it. Do not say whether any commit or deploy landed, how many, "
+                "or in which window, and do not connect the reading to any change.\n"
+            )
+            attribution_line = (
+                "Attribution details: no commits were read, because no deploy feed is connected for "
+                f"this service; attribution was not attempted. refusal={attribution.get('refusal_statement')}\n"
+            )
+            # #64's alternatives name a commit in a window and a temporal candidate; with
+            # no commit read there is neither, so the live answer is told what is true.
+            write_instead = "Write 'no deploy feed is connected for this function' instead.\n"
+            hypothesis_field = "what the reading does and does not show; no commits were read"
         prompt_recommended = (
             {k: recommended.get(k) for k in PROMPT_RECOMMENDED_FIELDS}
             if isinstance(recommended, dict) else None
         )
         prompt = (
             "You are drafting an advisory note for Mercury's Fire TV incident board.\n"
-            f"The data below is labelled {data_label}. Say so if you describe it: it is not a reading of a real service.\n"
-            f"Rollback dispatch is {rollback_dispatch}: Stage and Confirm record a decision and contact no pipeline.\n"
+            + data_label_line(data_label, service, production_row=not commits_read and is_production_row(service))
+            + f"Rollback dispatch is {rollback_dispatch}: Stage and Confirm record a decision and contact no pipeline.\n"
             "Rules:\n"
-            "- Do not claim a cause. A named commit is only a temporal candidate. " + causality + "\n"
+            + cause_rule +
             "- Do not say a rollback is staged, awaiting authorization, executed or completed, and do not mention"
             " rollback status at all, not even to deny it: the board shows that status itself.\n"
             "- Never use these phrasings, which the board rejects even in a negative sentence: 'caused by',"
             " 'root cause is', 'the cause is', 'the cause was', 'introduced the regression', 'after <commit>', 'is staged',"
             " 'has been staged', 'awaiting', 'ready to stage', 'ready to roll back', 'was executed', 'rolled back',"
-            " 'reverted', 'dispatched'. Write 'the only runtime commit in the window was <commit>' or"
-            " 'a temporal candidate' instead.\n"
+            " 'reverted', 'dispatched'. " + write_instead +
             "- Do not invent facts that are not in the data below.\n"
             "Return ONLY a valid JSON object (1-2 concise sentences per field) with these exact keys:\n"
             '  "incident_severity": one of ["SEV-1_ROLLBACK_READY", "SEV-2_ATTRIBUTION_REFUSED", "NOMINAL_NO_ANOMALY"],\n'
             '  "commander_brief_10ft": 2 concise sentences for a 10-foot TV screen,\n'
-            '  "root_cause_hypothesis": what the reading and the candidate commits do and do not show,\n'
+            f'  "root_cause_hypothesis": {hypothesis_field},\n'
             '  "responder_handoff_draft": {"current_action": "...", "confirmed_facts": ["..."], "next_step": "..."}\n\n'
             f"Service: {service}\n"
             f"Verdict: {verdict}\n"
             f"Metric: {json.dumps(metric)}\n"
-            f"Attribution details: commits_in_window={attribution.get('commits_in_window')}, set_aside={attribution.get('commits_set_aside')}, refusal={attribution.get('refusal_statement')}\n"
-            f"Offending commit candidate: {json.dumps(offending)}\n"
+            + attribution_line
+            + f"Offending commit candidate: {json.dumps(offending)}\n"
             f"Rollback target if a person stages one: {json.dumps(prompt_recommended)}\n"
         )
         try:
@@ -363,7 +486,10 @@ class BedrockIncidentAgentAdapter:
             )
             raw_text = self._extract_first_text(response)
             parsed, model_fields = self._parse_json_or_wrap(raw_text, deterministic)
-            rejected_phrase = forbidden_claim_match(json.dumps({f: parsed[f] for f in model_fields}))
+            model_text = json.dumps({f: parsed[f] for f in model_fields})
+            rejected_phrase = forbidden_claim_match(model_text)
+            if rejected_phrase is None and not commits_read:
+                rejected_phrase = no_commits_read_claim_match(model_text)
             if rejected_phrase is not None:
                 # A model answered and its reply was discarded: say exactly that, and which phrase.
                 self.last_fallback_reason = "model_claim_rejected"
@@ -450,6 +576,9 @@ class BedrockIncidentAgentAdapter:
         offending: dict[str, Any] | None,
         recommended: dict[str, Any] | None,
         deployment: dict[str, Any] | None = None,
+        commits_read: bool = True,
+        metric_label: str | None = None,
+        metric_detail: str | None = None,
     ) -> dict[str, Any]:
         """Write the brief from the correlator's own verdict, never from a guess.
 
@@ -457,6 +586,10 @@ class BedrockIncidentAgentAdapter:
         commit is described as a temporal candidate with the correlator's measured
         held-out precision. Nothing here says a rollback is staged: on this board Stage
         and Confirm are record-only, and nothing is staged until a viewer presses Stage.
+
+        ``commits_read`` is False when the answer's commit provenance is NO LIVE DATA (a
+        live production row, which no deploy feed is connected to). Then the refusal
+        brief gives no commit count and no window refusal code: none was read.
         """
         m_name = metric.get("name", "ErrorCount")
         baseline = metric.get("baseline", 0.0)
@@ -475,18 +608,53 @@ class BedrockIncidentAgentAdapter:
 
         if verdict == "INSUFFICIENT_DATA":
             severity = "INSUFFICIENT_DATA"
-            stmt = attribution.get("refusal_statement") or (
-                f"Mercury has no readings of {m_name} for {service}."
-            )
+            # The count comes from the answer: a live function with traffic in one hour
+            # of the 24 has one reading, and "no readings" would be false for it.
+            try:
+                readings = int(metric.get("sample_size") or 0)
+            except (TypeError, ValueError):
+                readings = 0
+            if readings > 0:
+                plural = "s" if readings != 1 else ""
+                have = f"has only {readings} reading{plural} of {m_name}, and a baseline needs at least two"
+            else:
+                have = f"has no readings of {m_name}"
+            stmt = attribution.get("refusal_statement") or f"Mercury has no readings of {m_name} for {service}."
             brief = (
-                f"{service} has no readings of {m_name}, so there is nothing to explain. "
+                f"{service} {have}, so there is nothing to explain yet. "
                 "Mercury refuses to guess: this is missing data, not a finding about any deploy."
             )
             hypothesis = stmt
+            label = (metric_label or "").strip().upper()
+            if label == "LIVE":
+                # CloudWatch is the source and it answered: the series is just short.
+                next_step = (
+                    f"CloudWatch was read for {service}; ask again once it has at least two hourly "
+                    f"{m_name} datapoints."
+                )
+                action = f"No action on {service}: too few readings to act on."
+            elif label == "NO LIVE DATA" and not commits_read and _cloudwatch_did_not_answer(metric_detail):
+                # CloudWatch did not answer: that is remembered for 30 s, then read again.
+                next_step = (
+                    f"CloudWatch did not give a reading for {service} this time (the board's stamp says "
+                    "why); ask again in a minute."
+                )
+                action = f"No action on {service}: there are no readings to act on."
+            elif label == "NO LIVE DATA" and not commits_read:
+                # CloudWatch refused or answered with nothing, or was never called (no
+                # credentials). Asking again soon returns the same answer, cached 60 s.
+                next_step = (
+                    f"Mercury has no usable CloudWatch reading for {service} (the board's stamp says "
+                    "why); asking again will not change that until the cause is fixed."
+                )
+                action = f"No action on {service}: there are no readings to act on."
+            else:
+                next_step = f"Connect a real metric source for {service} before asking again."
+                action = f"No action on {service}: there are no readings to act on."
             draft = {
-                "current_action": f"No action on {service}: there are no readings to act on.",
+                "current_action": action,
                 "confirmed_facts": [stmt],
-                "next_step": f"Connect a real metric source for {service} before asking again.",
+                "next_step": next_step,
             }
         elif verdict == "ANOMALY_ATTRIBUTED" and recommended and offending:
             severity = "SEV-1_ROLLBACK_READY"
@@ -562,15 +730,31 @@ class BedrockIncidentAgentAdapter:
             severity = "SEV-2_ATTRIBUTION_REFUSED"
             refusal = attribution.get("refusal_reason") or verdict
             stmt = attribution.get("refusal_statement") or "Attribution refused by correlator."
-            brief = (
-                f"{service} {m_name} rose {factor}x ({baseline} to {current}), but Mercury refused "
-                f"to name a commit ({refusal}). Rollback staging stays locked."
+            # A baseline of zero has no ratio: a live row whose errors rose from nothing
+            # would otherwise read "rose 0.0x". Simulated baselines are never zero.
+            rise = (
+                f"rose {factor}x ({baseline} to {current})" if baseline
+                else f"rose from {baseline} to {current}"
             )
-            hypothesis = f"{stmt} Commits in window: {attribution.get('commits_in_window', 0)}."
+            if commits_read:
+                brief = (
+                    f"{service} {m_name} {rise}, but Mercury refused "
+                    f"to name a commit ({refusal}). Rollback staging stays locked."
+                )
+                hypothesis = f"{stmt} Commits in window: {attribution.get('commits_in_window', 0)}."
+                action = f"Investigate {service} by hand; Mercury refused to name a commit ({refusal})."
+            else:
+                brief = (
+                    f"{service} {m_name} {rise}. No deploy feed is "
+                    "connected for it, so Mercury did not try to name a commit. Rollback staging "
+                    "stays locked."
+                )
+                hypothesis = stmt
+                action = f"Investigate {service} by hand; no deploy feed is connected, so no commit was named."
             draft = {
-                "current_action": f"Investigate {service} by hand; Mercury refused to name a commit ({refusal}).",
+                "current_action": action,
                 "confirmed_facts": [
-                    f"{m_name} rose {factor}x ({baseline} to {current}).",
+                    f"{m_name} {rise}.",
                     str(attribution.get("handoff_fact") or stmt),
                 ],
                 "next_step": (

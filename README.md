@@ -44,8 +44,8 @@ OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not rea
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-800%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-962%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 The repository is **private** today, so the CI badge does not resolve outside the
@@ -165,7 +165,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 800 passed
+# 962 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -217,8 +217,11 @@ offline-fixture mode whose `/health` reports the build SHA. Redeployed on 2026-1
 `e8ceae8`, the PR #62 merge, and probed the same day (`curl -s <url>/health`), it serves
 the press-only agent deck, record-only; the runtime receipt's
 `endpoint_health_build_sha` names the same build. It served the `b552a7c` build label before that.
-**Simulated:** every metric series on the board is an offline fixture, and a confirmed
-rollback is recorded, never sent to a pipeline. **Missing:**
+**Simulated:** every metric series on the deployed board is an offline fixture today,
+and a confirmed rollback is recorded, never sent to a pipeline. **Built, not deployed:**
+a hybrid mode ([live data switches](#live-data-switches)) that adds real CloudWatch rows
+for the hackathon's own Lambda functions beside the simulated services, and a live
+GitHub DORA read. The deployed board does not run it yet. **Missing:**
 
 - **A published video.** One take is rendered and not yet uploaded:
   `reviews/videos_20261006/mercury_amazon/output/mercury-demo.mp4` in the workspace,
@@ -238,19 +241,57 @@ rollback is recorded, never sent to a pipeline. **Missing:**
 
 | Part | On the board today | Live path |
 |---|---|---|
-| Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists. An empty or failed read now shows NO LIVE DATA and names nothing; it is never replaced with the generated series |
+| Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists. An empty or failed read now shows NO LIVE DATA and names nothing; it is never replaced with the generated series. With `MERCURY_LIVE_CLOUDWATCH=1` the board adds three rows for the hackathon's own production functions, read from `AWS/Lambda` (`Errors`, with `Invocations` beside it, last 24 hours) and stamped LIVE with the read time; the four simulated services stay fixtures. Not deployed yet |
 | Commits | Real commits from this repository's `git log` with their file lists (a 20-commit window recorded at merge `a4ec9aa`, so a new commit cannot change the demo's verdicts), stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy. The public cockpit has no git checkout, so it shows an invented, display-only deploy feed (`src/infrastructure/fixtures/deploy_feed_fixture.json`), stamped OFFLINE FIXTURE; no published figure is computed from it | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
-| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API |
-| Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified |
+| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API. With `MERCURY_LIVE_GITHUB=1` and no token it reads this repository anonymously, cached for 15 minutes; while the repository is private that read gets HTTP 404 and the board keeps the fixture and says why. Not deployed yet |
+| Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified. There is deliberately no live switch for it: Cost Explorer reports the whole account's bill, so under `MERCURY_OFFLINE=1` it is always the fixture |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
 | Fire TV | App source, a CI build workflow and a runtime receipt | Run 39210785053 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
 
 `MERCURY_OFFLINE=1` forces every data adapter (CloudWatch, Cost Explorer, GitHub) into
-fixture mode. It can suppress a live call; it cannot make a fixture look live. The agent
+fixture mode. It can suppress a live call; it cannot make a fixture look live. Two narrower
+switches re-open one source each on top of it; see [live data switches](#live-data-switches). The agent
 brief's Bedrock adapter is the exception: it does not read the switch. It answers
 deterministically unless the server sets `MERCURY_AGENT_MODEL=on`, and whenever the SDK,
 credentials or permission is missing or a call fails. Nothing on the page speaks or announces on load, the page calls no agent or
 model until a viewer presses Ask the agent, and it makes no request to another origin.
+
+### Live data switches
+
+Built on this branch and measured locally; **the deployed board does not set either
+switch yet**, so everything above about the public board still holds.
+
+| Switch | Live when set | Still a fixture |
+|---|---|---|
+| `MERCURY_OFFLINE=1` | Nothing | Every adapter |
+| `MERCURY_LIVE_CLOUDWATCH=1` on top of `MERCURY_OFFLINE=1` | Three extra board rows for the hackathon's own production functions, `mercury-wallboard-euw1-prod`, `volcan-mcp-euw1-prod` and `aletheia-provenance-euw1-prod`: `AWS/Lambda` `Errors`, with `Invocations` in the provenance, Sum per hour over the last 24 hours, each row stamped LIVE with the read time. Only those three names are ever sent to CloudWatch; a read is reused for 60 seconds | The four simulated services and `quiet-service`, whose rows gain a FIXTURE stamp. The rollback demo is unchanged |
+| `MERCURY_LIVE_GITHUB=1` | The DORA report and the pull request radar, from the GitHub REST API, anonymously when no `GITHUB_TOKEN` is set, every answer (a refusal included) reused for 15 minutes | The commit feed behind the rollback demo, which still needs a token |
+| none | | Cost Explorer under `MERCURY_OFFLINE=1`. It reports the whole account's bill, so it has no live switch |
+
+Without `MERCURY_OFFLINE`, every adapter tries its live path as before: the simulated
+service names then go to CloudWatch's load balancer metrics and show NO LIVE DATA, which is
+why the hybrid keeps `MERCURY_OFFLINE=1` and adds the switches on top.
+
+A live row is never attributed to a commit and never offers a rollback: no deploy feed for
+those functions is connected, and every text the row carries says so rather than describing
+an empty deploy window. A row whose errors rose from a zero baseline, including a run of
+errors that has lasted several hours after only zeros, is reported as cannot-attribute,
+never as nothing to revert. An adapter that fails puts only the
+exception class, an AWS error code or HTTP status, and a short reason into the provenance;
+ARNs, account ids, access key ids and request ids are removed
+(`src/infrastructure/safe_errors.py`). The deployment needs one read-only grant on the
+function's role, `cloudwatch:GetMetricStatistics` on `Resource: "*"` (CloudWatch metric
+reads take no resource ARN, so the fixed list of three names in
+`src/infrastructure/cloudwatch_adapter.py` is the only scope). Setting
+`MERCURY_LIVE_CLOUDWATCH=1` changes what the TV renders, eight rows instead of five, so the
+Android TV runtime receipt, recorded on the five-row page, needs a fresh emulator run after
+that deploy. Measurements: [Evidence](docs/EVIDENCE.md#hybrid-live-data-built-not-deployed).
+
+The planned deploy sets `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1` only. The GitHub
+switch waits until the repository is public (planned for 2026-10-21): before that every
+anonymous read gets HTTP 404. Known issue, not fixed here: with `MERCURY_LIVE_GITHUB=1`,
+`/health` reports `github_live` true from the switch alone, even while every read gets 404,
+and `video/capture-local.py` refuses to record while it is true.
 
 The engine's limits are measured, not hidden. Every figure comes from a synthetic
 corpus the authors wrote. Settings are tuned on a train split and reported on a

@@ -25,6 +25,7 @@ from typing import Any
 from src.domain.cloud_cost import CloudCostReport, CostAnomaly
 from src.domain.provenance import DataSource, Provenance
 from src.infrastructure.offline_mode import OFFLINE_REASON, offline_mode_enabled
+from src.infrastructure.safe_errors import describe_exception
 
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "aws_cost_fixture.json"
 ANOMALY_THRESHOLD_PCT = 50.0
@@ -270,10 +271,9 @@ class AWSCostAdapter:
             # Broad on purpose: any botocore error must degrade to the labelled
             # fixture rather than take the wallboard down. Logged so a real
             # failure is diagnosable instead of silently looking like fixture mode.
-            logger.warning("Cost Explorer call failed: %s: %s", type(exc).__name__, exc)
-            return self._fixture_report(
-                f"Cost Explorer call failed ({type(exc).__name__}: {exc})."
-            )
+            reason = describe_exception(exc)
+            logger.warning("Cost Explorer call failed: %s", reason)
+            return self._fixture_report(f"Cost Explorer call failed ({reason}).")
 
         self._cache = (time.time(), report)
         return report

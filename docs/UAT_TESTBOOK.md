@@ -47,6 +47,12 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-20 | A hostile cockpit URL cannot redirect the WebView | `app/src/test/kotlin/.../CockpitUrlResolverTest.kt` | `javascript:`, `file:`, `content:` and embedded whitespace all fall back to the safe default |
 | A-21 | Log output masks credentials and emails | `tests/unit/test_observability_harness.py` | Email addresses and tokens are replaced before emission |
 | A-22 | The asset route cannot be walked out of `docs/` | `tests/integration/test_mcp_endpoints.py` | Encoded traversal returns 404 |
+| A-23 | With `MERCURY_LIVE_CLOUDWATCH=1` only the three allow-listed production functions are read live | `tests/unit/test_hybrid_live_sources.py` | The simulated services and any other name make zero CloudWatch calls; the page carries three LIVE rows beside five FIXTURE rows; without the switch the page is unchanged |
+| A-24 | A live row never describes a deploy window Mercury did not read | `tests/unit/test_hybrid_live_sources.py` | For every verdict the explanation, refusal statement, spoken summary and handoff fact say no deploy feed is connected and contain no "no commit landed" or "no change landed"; on the wire `refusal_reason` is `NO_DEPLOY_FEED` and `commits_in_window` is null |
+| A-25 | Errors on a live row that rose from zero are never an all-clear | `tests/unit/test_hybrid_live_sources.py` | (0, 0, 0, 4), (0, 5, 5) and (0, 5, 5, 5) are `ANOMALY_WITHOUT_ATTRIBUTION` with `nothing_to_revert` false and a baseline of zero; (2, 2, 2, 2) and steady errors stay `NO_ANOMALY` |
+| A-26 | A slow CloudWatch cannot hold the page | `tests/unit/test_hybrid_live_sources.py` | With a stub that does not answer, `/` returns inside the page deadline (4 s in production, shortened in the test) plus a margin and draws the rows "Not read"; the client is built with a 2 s connect timeout, a 3 s read timeout and `retries={"max_attempts": 1}` |
+| A-27 | A demo handoff on a live row is refused as unavailable, not as a race | `tests/unit/test_hybrid_live_sources.py` | HTTP 422 with "No recorded demo handoff exists for this service; handoffs are demo-only."; the MCP tool returns an error result instead of raising; the demo service's stale-revision race is still 409 |
+| A-28 | Eight rows and the agent's answer stay above the key bar | `tests/ux/test_board_in_browser.py`, `tests/ux/test_agent_deck_in_browser.py` | With the switch on, the last row ends above the next section at 1280x720 and above the key bar at 1920x1080 and 960x540 `tv-host`; after Ask the agent the answer's engine pill ends above the key bar with focus left on Ask the agent |
 
 ---
 
@@ -65,6 +71,7 @@ They are listed so the gap is explicit rather than absent.
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
 | M-07 | The public cockpit answers and reports its deployed commit | **Passed for the web cockpit.** Root and `/health` answer; the latter publishes `build_sha` | `python scripts/probe_deployment.py` |
 | M-08 | Two responders resume from the TV state faster or with fewer omissions than the laptop dashboard | No comparative responder session has been run | Run the same incident once with the shared handoff panel and once with the existing dashboard; record recap time, omissions and preference |
+| M-09 | The deployed board shows the three LIVE rows read from CloudWatch | Not deployed: the switch is not set on the live function and the role has no `cloudwatch:GetMetricStatistics` grant | Apply the IAM statement in `docs/EVIDENCE.md`, deploy the merged SHA with `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1`, check `/health` `live_sources`, then re-run the Android TV emulator workflow |
 
 If you run any of these, `.github/ISSUE_TEMPLATE/firetv_device_report.yml` is the
 place to report what happened, whether it worked or not.
@@ -75,8 +82,8 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 800 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 93 percent of 2524 statements |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 962 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 94 percent of 3032 statements |
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 46/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | Met | Gate J4 passes from `android_tv_runtime_receipt.json`: the APK ran on the Android TV emulator (AOSP TV x86, API 34) in CI run 39210785053, against the page served at `e8ceae8`, which carries the press-only agent deck. The run drove the five journey events; it did not press 'Ask the agent' |

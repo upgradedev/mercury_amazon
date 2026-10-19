@@ -118,7 +118,10 @@ and says so on screen.
 
 Set `MERCURY_OFFLINE=1` to force every data adapter (CloudWatch, Cost Explorer,
 GitHub) into fixture mode whatever credentials the machine has. That switch can only
-ever suppress a live call; it can never make a fixture look live. The agent brief's
+ever suppress a live call; it can never make a fixture look live. Two narrower switches,
+`MERCURY_LIVE_CLOUDWATCH=1` and `MERCURY_LIVE_GITHUB=1`, re-open one source each on top
+of it; they are built and tested but not set on the deployed board
+([Hybrid live data](#hybrid-live-data-built-not-deployed)). The agent brief's
 Bedrock adapter does not read it. That adapter answers deterministically unless the
 server sets `MERCURY_AGENT_MODEL=on`, and when the
 `anthropic` SDK, AWS credentials or Bedrock permission is missing or the call fails,
@@ -909,7 +912,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-800 tests and a re-measure on an idle machine is pending**.
+962 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -953,7 +956,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 800 passed
+# 962 passed
 ```
 
 #### Step 3: Start the server
@@ -1185,8 +1188,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 800 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 93% of 2524 statements
+python -m pytest tests/ -q                                    # 962 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 3032 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1203,7 +1206,7 @@ python ci/readiness.py
 # SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**46/53 readiness gates** on this branch, because G2 fails until it is deployed: it changes `src/infrastructure/bedrock_incident_agent.py` after the live `e8ceae8` build (47 once a deploy of this code is probed; 46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
+**46/53 readiness gates** on this branch, because G2 fails until it is deployed: the hybrid live mode and the max_tokens fix change runtime files under `src/` after the live `ddccb3e` build (47 once a deploy of this code is probed; 46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1270,12 +1273,179 @@ moment and no later commit. The public cockpit is
 
 ---
 
+## Hybrid live data (built, not deployed)
+
+The deployed board runs `MERCURY_OFFLINE=1` with neither live switch, so nothing in this
+section is on the public page yet. It records what the switches do when set, measured on a
+local run. Deploying them needs one read-only IAM statement on
+`mercury-lambda-role-euw1-prod`, which this repository does not apply:
+
+```json
+{
+  "Sid": "MercuryReadOwnLambdaMetrics",
+  "Effect": "Allow",
+  "Action": "cloudwatch:GetMetricStatistics",
+  "Resource": "*"
+}
+```
+
+CloudWatch's permissions reference says metric read actions take `*` as the resource, so
+the policy cannot narrow the read to three functions. The narrowing is in the code:
+`LIVE_PRODUCTION_FUNCTIONS` in `src/infrastructure/cloudwatch_adapter.py` is a fixed
+tuple, and any other name a caller sends to `what_changed` is never passed to CloudWatch
+(`tests/unit/test_hybrid_live_sources.py` asserts zero client calls for the simulated
+services and for unknown names). Without the grant, the rows show NO LIVE DATA with the
+reason `ClientError: AccessDenied, the deployment's role is not allowed to make this
+read`, and the failure is cached for 60 seconds. The cache is per Lambda instance, so
+a page view is not a call only while that instance is warm: each warm instance normally
+makes one pair of calls per function a minute, a fresh instance starts with an empty
+cache, and two instances each make their own. The page waits at most 4 s for the three
+reads; a function that has not answered by then is drawn "Not read", and that is
+remembered for 30 s while its read finishes in the background. The client gives each
+call a 2 s connect and a 3 s read timeout and at most one retry (botocore counts
+`retries={"max_attempts": 1}` as retries), so the timeouts allow at most 2 x (2 s + 3 s)
+per call, inside the function's 30 s timeout. A read that ends in one of those timeouts,
+or whose connection is dropped before CloudWatch answers (`ConnectionClosedError`), is
+also a row not read: it is stamped "Not read" and remembered for 30 s, not stamped
+"No live data" (which is CloudWatch answering with nothing or refusing, cached 60 s). A
+local run with no AWS credentials never calls CloudWatch: its rows are "Not read" and
+NO LIVE DATA, never OFFLINE FIXTURE, and are not cached. The board's own questions
+about a live row (`what_changed`, and the agent brief built on it) wait at most 3 s for
+a read the page has not already made, then answer "not read" the same way; the agent's
+model call (at most 25 s) comes after that, inside the 30 s.
+A read that finishes after a newer read of the same function has answered never
+replaces that newer answer, so a slow background read cannot put an old failure back
+on the board (`tests/unit/test_hybrid_live_sources.py`,
+`test_a_late_failed_read_never_overwrites_a_newer_live_answer`). A newer read that got
+no answer is not an answer, so a late real reading replaces it
+(`test_a_late_real_answer_replaces_a_newer_read_that_never_answered`).
+
+**CloudWatch rows, measured 2026-10-19 10:09 UTC** with the maintainer's read-only
+credentials, `MERCURY_OFFLINE=1 MERCURY_LIVE_CLOUDWATCH=1 AWS_REGION=eu-west-1`, by an
+in-process TestClient script (not committed) that posts `what_changed` for each row and
+reads `/`. The equivalent by hand is
+`MERCURY_OFFLINE=1 MERCURY_LIVE_CLOUDWATCH=1 python -m src.interfaces.mcp_server`, then
+`curl -s -X POST http://127.0.0.1:8002/mcp/tools/what_changed -H "content-type: application/json" -d '{"service_name":"volcan-mcp-euw1-prod"}'`.
+Each read is two `GetMetricStatistics` calls, `Errors` and `Invocations`, Sum per hour,
+last 24 hours:
+
+| Row | Label | Verdict | Errors in the provenance |
+|---|---|---|---|
+| `mercury-wallboard-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 91 invocations across 6 hourly datapoints |
+| `volcan-mcp-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 89 invocations across 8 hourly datapoints |
+| `aletheia-provenance-euw1-prod` | LIVE | NO_ANOMALY | 0 errors in 61 invocations across 6 hourly datapoints |
+| `checkout-api` | OFFLINE FIXTURE | ANOMALY_ATTRIBUTED, 12.9x, rollback offered | generated, unchanged by the switch |
+| `quiet-service` | OFFLINE FIXTURE | INSUFFICIENT_DATA | none generated |
+
+These are hours with traffic only: CloudWatch publishes no Lambda datapoint for an hour
+with no invocation. The live rows' commit provenance is NO LIVE DATA: no deploy feed for
+those functions is connected, so none of them is ever attributed to a commit or offered a
+rollback, and errors that rise from a zero baseline are reported as cannot-attribute
+rather than as an all-clear. The script's output and the served page contained no run of
+twelve digits.
+
+The same holds for errors that left zero some readings ago and stayed up. Lambda
+publishes `Errors` only for hours with invocations, so a function with traffic in three
+hours can read (0, 5, 5). The correlator compares the newest 5 with the trailing mean of
+(0, 5), calls it 2.0 times a baseline of 2.50 and returns NO_ANOMALY; the pre-onset test
+never reaches index 1, because a baseline needs at least two readings. A live row whose
+readings are all zero before a run of non-zero readings that reaches the newest one is
+therefore reported against a baseline of zero, as cannot-attribute, never "looks normal"
+or "Nothing to revert" (`tests/unit/test_hybrid_live_sources.py`,
+`test_errors_that_left_zero_some_readings_ago_are_never_an_all_clear`, with (0, 5, 5),
+(0, 5, 5, 5) and (0, 2, 3, 2, 2)). The correlator, and every simulated row, is unchanged:
+a simulated baseline is never below 1.00.
+
+No window was read for these functions, so nothing about a live row may describe one.
+Its explanation, refusal statement, spoken summary and handoff fact say that no deploy
+feed is connected and attribution was not attempted; on the wire its `refusal_reason` is
+`NO_DEPLOY_FEED` (not `NO_CANDIDATE_IN_WINDOW`), its `claim_strength` is
+`NO_ATTRIBUTION_ATTEMPTED`, `commits_in_window` is null and `blocked_reason` says Mercury
+does not attribute the function's readings to a change, so it names no rollback target;
+the agent brief gives no commit count. With `MERCURY_AGENT_MODEL=on` the prompt carries
+no commit window and no commit-window wording to copy (it asks for "no deploy feed is
+connected for this function" instead), and a reply that uses one of a listed set of
+window phrasings ("no commit landed", "commits in the window", "no deploys in the last
+24 hours", "not deploy-related", a window and a commit or deploy in one sentence) is
+discarded for the deterministic brief. That is a keyword guard for those phrasings, not
+a guarantee that no model reply can describe a window in other words; the card still
+labels any model text as an advisory draft. On a live row the board's own Publish
+handoff is refused with HTTP 422 ("No recorded demo handoff exists for this service;
+handoffs are demo-only."), and the served page scrolls that error card up above the
+key bar with the cursor left on Publish (`tests/ux/test_board_in_browser.py`,
+`test_a_live_row_handoff_refusal_is_shown_above_the_key_bar`).
+`docs/index.html` words every other cannot-attribute answer as an empty window
+("window empty", "no change in the window") and is not edited here, so the switch-on page
+carries a small script that rewrites those two hero lines for a live row to "no deploy
+feed", and shows a zero-baseline factor as "from 0" on the hero and the row
+(`tests/ux/test_board_in_browser.py`,
+`test_a_live_row_hero_never_describes_a_deploy_window`). Known residual: the evidence
+panel under the board still prints such a row's factor as `0x over N points`.
+
+**Layout, same local run,** measured with `getBoundingClientRect` in a Chromium pane, not
+with `scripts/measure_legibility.py`:
+
+| Viewport | Rows | Last row bottom | Key bar top | Smallest row text |
+|---|---|---|---|---|
+| 1920x1080 | 8 | 972 px | 1018 px | 24.96 px |
+| 960x540, `tv-host` | 8 | 496 px | 508 px | 12.48 px (24.96 px at the 1920 scale) |
+
+To fit, the served copy adds a style block that trims the row padding and line height,
+moves a per-row LIVE or FIXTURE stamp into the fourth column and sets the long function
+names at 0.8em; `docs/index.html` itself is unchanged. On a laptop (601 to 1399 px wide,
+not the TV host) the page caps the board at 21rem and shares it out in equal rows, and
+eight rows overflowed it onto the next section's heading at 1280x720; there the style
+lifts the cap and lets each row take its own height. The browser suite now serves the
+switch-on page too, with CloudWatch stubbed, and checks the eight rows at 1280x720,
+1920x1080 and 960x540 `tv-host` (`test_eight_rows_stay_on_the_board_with_the_live_rows_on`).
+Known, not changed here: with the cap lifted, a tall laptop window (a portrait 1024x1366,
+for one) gets taller rows than the five-row page did; and on a 10-foot layout shorter
+than 16:9 (1440x900, 1536x730) or the 1280x593 `tv-host` case the fixed key bar covers
+some rows at load. That overlap predates the switch; the three extra rows make it larger.
+
+**GitHub, measured the same day.** With `MERCURY_OFFLINE=1 MERCURY_LIVE_GITHUB=1` and no
+token, the private repository answered HTTP 404 and the DORA tile kept the fixture with
+the reason `Live GitHub call failed (anonymous request under MERCURY_LIVE_GITHUB=1)
+(HTTPStatusError: HTTP 404, not found, or not public)`; the commit feed made no request.
+Counting requests through an injected `httpx` client, with the maintainer's token so the
+private repository answered: one DORA refresh cost 4 requests, the radar 1, and a second
+DORA read inside the cache window 0 (3.1 deploys a day over 173 samples). At the 15-minute
+cache that is 20 anonymous requests an hour per warm instance, 40 for the two instances
+the function's reserved concurrency of 2 allows, against GitHub's 60 an hour per IP. That
+reserved concurrency is real: the owner set it on 2026-10-19, in their own session, with
+`aws lambda put-function-concurrency`, outside Terraform, so `infra/main.tf` does not show
+it. Each cache is per instance, so a recycled instance spends one more refresh.
+ESTIMATE: Lambda's egress address is shared with other tenants, so the anonymous limit
+can be reached by others; a 403 is cached like a 404 and shows the fixture with that
+reason.
+
+The planned deploy therefore sets `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1`
+only; the GitHub switch waits until the repository is public (planned for 2026-10-21).
+Known issue, not fixed here: with `MERCURY_LIVE_GITHUB=1`, `/health` reports
+`github_live` true from the switch alone (`github_adapter.can_call_live`), even while
+every anonymous read gets 404, and `video/capture-local.py` refuses to record while it is
+true.
+
+**Errors on the page.** Every adapter failure goes through `describe_exception` in
+`src/infrastructure/safe_errors.py`. `python -m pytest tests/unit/test_hybrid_live_sources.py -q`
+gave `148 passed`. Its end-to-end test feeds an `AccessDenied` whose message carries
+`arn:aws:sts::<12 digits>:assumed-role/...` through the CloudWatch client and asserts that
+no ARN and no run of twelve digits appears in `what_changed`, `/`, `/health` or the MCP
+`tools/call` response. Putting the raw exception text back into the CloudWatch adapter
+makes both of its cases fail.
+
+---
+
 ## Configuration
 
 | Variable | Effect | Default |
 |---|---|---|
 | `MERCURY_ROLLBACK_SECRET` | Bearer secret for both rollback endpoints | An ephemeral one is generated and logged |
 | `MERCURY_OFFLINE` | Force every adapter to skip its live call | off |
+| `MERCURY_LIVE_CLOUDWATCH` | `1` reads the three allow-listed production Lambda functions live, even under `MERCURY_OFFLINE`, and adds their rows to the served board. The simulated services stay fixtures | off |
+| `MERCURY_LIVE_GITHUB` | `1` reads the DORA report and the pull request radar live, even under `MERCURY_OFFLINE`, anonymously without a token. The commit feed is not opened | off |
+| `MERCURY_CLOUDWATCH_CACHE_SECONDS` | How long one live production-row read is reused | 60 |
+| `MERCURY_GITHUB_CACHE_SECONDS` | How long one live DORA or radar answer, a refusal included, is reused | 900 |
 | `GITHUB_TOKEN` | Enables the live GitHub path | unset, fixture mode |
 | `MERCURY_GITHUB_REPO` | Repository to measure | `upgradedev/mercury_amazon` |
 | `MERCURY_DORA_WINDOW_DAYS` | DORA measurement window | 30 |

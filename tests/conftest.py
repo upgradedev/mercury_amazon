@@ -12,6 +12,10 @@ os.environ.setdefault("MERCURY_ROLLBACK_SECRET", "test-secret-do-not-use-in-prod
 # request on any developer machine with an AWS profile configured.
 os.environ["MERCURY_OFFLINE"] = "1"
 os.environ.pop("GITHUB_TOKEN", None)
+# The per-adapter opt-ins re-open one live source under MERCURY_OFFLINE, so a shell
+# that has them set must not carry them into the suite.
+for _live_switch in ("MERCURY_LIVE_CLOUDWATCH", "MERCURY_LIVE_GITHUB"):
+    os.environ.pop(_live_switch, None)
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

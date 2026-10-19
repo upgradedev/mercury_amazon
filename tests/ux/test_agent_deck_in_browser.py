@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
 import socket
 import subprocess
@@ -33,6 +34,20 @@ AGENT_CALL_PATHS = ("/mcp/tools/agent_incident_brief", "/mcp/tools/agent_status"
 
 
 def _free_port() -> int:
+    """A free local port, looked for in 8900-8999 first.
+
+    Machines that run several agents' servers side by side keep test servers in that
+    band, so a test server never lands on a port somebody else is about to take.
+    """
+    start = random.randrange(100)
+    for offset in range(100):
+        port = 8900 + (start + offset) % 100
+        with socket.socket() as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
@@ -296,5 +311,216 @@ def test_the_deck_adds_no_stop_to_the_hero_row(browser, base_url, path):
         page.evaluate("window.mercuryNav.setFocus(document.querySelector('#btnWhatChanged'))")
         page.evaluate("window.navigateDpad('RIGHT')")
         assert page.evaluate("window.mercuryNav.current.id") == "btnStage"
+    finally:
+        context.close()
+
+
+#: The D-pad path the owner's recording takes after the journey, measured on ddccb3e:
+#: Stage, Confirm, Publish handoff, then Ask the agent. Before the fix the answer card
+#: rendered behind the fixed key bar with only the console header showing.
+_PATH_TO_THE_AGENT = (
+    ("RIGHT", None), ("SELECT", "#btnConfirm:not([disabled])"),
+    ("RIGHT", None), ("SELECT", "#btnHandoff:not([disabled])"),
+    ("DOWN", None), ("SELECT", None),
+    ("DOWN", None),
+)
+
+_CARD_GEOMETRY = """card => {
+  const box = s => { const e = document.querySelector(s); if (!e) return null;
+    const r = e.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
+  const bar = document.querySelector('.keybar');
+  const shown = bar && getComputedStyle(bar).display !== 'none' && bar.getBoundingClientRect().height > 0;
+  const current = window.mercuryNav.current;
+  return {
+    viewport: [innerWidth, innerHeight], tvHost: document.documentElement.classList.contains('tv-host'),
+    keybarTop: shown ? Math.round(bar.getBoundingClientRect().top) : innerHeight,
+    card: box(card), pill: box(card + ' .agent-pills:nth-of-type(2)'),
+    engine: box(card + ' [data-agent-engine]'),
+    brief: box(card + ' .agent-brief-10ft'), scrollY: Math.round(scrollY),
+    focus: current && current.id,
+    focusBox: current ? (r => ({ top: Math.round(r.top), bottom: Math.round(r.bottom) }))(current.getBoundingClientRect()) : null,
+  };
+}"""
+
+_ACTIVE_ID = "document.activeElement && document.activeElement.id"
+
+_TV_SIZES = pytest.mark.parametrize(
+    "width, height, host", [(1920, 1080, False), (960, 540, True)],
+    ids=["1080p", "firetv-webview-960x540"])
+
+
+def _open_tv(browser, base_url, width, height, host, init_script=None, routes=()):
+    """The board as the TV shows it; ``host`` injects what the Fire TV app injects."""
+    context = browser.new_context(viewport={"width": width, "height": height}, color_scheme="dark")
+    if host:
+        # MainActivity.MercuryHost, as tests/ux/test_board_in_browser.py open_board(host=True).
+        context.add_init_script("window.MercuryHost = { reportJourney: function () {} };")
+    if init_script:
+        context.add_init_script(init_script)
+    for pattern, handler in routes:
+        context.route(pattern, handler)
+    page = context.new_page()
+    calls: list[str] = []
+    page.on("request", lambda request: calls.append(urlsplit(request.url).path)
+            if urlsplit(request.url).path.startswith("/mcp/tools/") else None)
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(base_url + "/", wait_until="domcontentloaded")
+    page.locator("#bedrockAgentSection").wait_for(state="attached", timeout=10_000)
+    page.locator("#btnStage:not([disabled])").wait_for(timeout=15_000)
+    return context, page, calls, errors
+
+
+def _walk_to_the_agent(page):
+    """The recorded path, key by key. It has to reach Ask the agent on its own."""
+    page.evaluate("window.mercuryNav.setFocus(document.querySelector('#btnWhatChanged'))")
+    for key, wait_for in _PATH_TO_THE_AGENT:
+        page.evaluate(f"window.navigateDpad('{key}')")
+        if wait_for:
+            page.locator(wait_for).wait_for(timeout=10_000)
+        page.wait_for_timeout(250)
+    # No fallback: if a new stop lands between Publish handoff and Ask the agent, or
+    # DOWN goes somewhere else, this is the regression the test exists for.
+    assert page.evaluate("window.mercuryNav.current && window.mercuryNav.current.id") == "btnAgentBrief"
+
+
+def _assert_card_clear_of_the_key_bar(geometry, focus):
+    assert geometry["pill"]["top"] >= 0, geometry
+    assert geometry["pill"]["bottom"] <= geometry["keybarTop"], geometry
+    if geometry["engine"] is not None:
+        assert geometry["engine"]["bottom"] < geometry["keybarTop"], geometry
+    if geometry["brief"] is not None:
+        assert geometry["brief"]["bottom"] <= geometry["keybarTop"], geometry
+    assert geometry["focus"] == focus, geometry
+    # The control the viewer is on stays on the screen too.
+    assert geometry["focusBox"]["top"] >= 0, geometry
+    assert geometry["focusBox"]["bottom"] <= geometry["keybarTop"], geometry
+
+
+@_TV_SIZES
+def test_the_agent_answer_is_brought_up_above_the_key_bar(browser, base_url, width, height, host):
+    context, page, calls, errors = _open_tv(browser, base_url, width, height, host)
+    try:
+        _walk_to_the_agent(page)
+        page.evaluate("window.navigateDpad('SELECT')")
+        page.locator("#card-agent-brief [data-agent-engine]").wait_for(timeout=10_000)
+        page.wait_for_timeout(300)
+        geometry = page.evaluate(_CARD_GEOMETRY, "#card-agent-brief")
+        print("agent card geometry:", json.dumps(geometry))
+        # 960x540 is measured as the Fire TV host lays it out, not as a small browser.
+        assert geometry["tvHost"] is host, geometry
+        _assert_card_clear_of_the_key_bar(geometry, "btnAgentBrief")
+        # Keyboard focus is back on the control the cursor is on: the button was
+        # disabled while the call ran, which dropped focus to the page body.
+        page.wait_for_function("document.querySelector('#btnAgentBrief').disabled === false")
+        assert page.evaluate(_ACTIVE_ID) == "btnAgentBrief"
+        # Focus stayed on Ask the agent, so a second Center asks again, and the second
+        # card is just as visible.
+        page.evaluate("window.navigateDpad('SELECT')")
+        page.wait_for_function("document.querySelector('#btnAgentBrief').disabled === false")
+        page.wait_for_timeout(500)
+        assert calls.count("/mcp/tools/agent_incident_brief") == 2, calls
+        again = page.evaluate(_CARD_GEOMETRY, "#card-agent-brief")
+        print("second agent card geometry:", json.dumps(again))
+        _assert_card_clear_of_the_key_bar(again, "btnAgentBrief")
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+@_TV_SIZES
+def test_the_recorded_handoff_card_stays_above_the_key_bar_and_keeps_the_cursor(
+        browser, base_url, width, height, host):
+    """Publish recorded demo handoff, one step right of Ask the agent.
+
+    The deck refreshes the page's shared handoff with a click on its button. That click
+    used to leave the D-pad cursor on 'Refresh shared handoff' in the rollback section,
+    and the refreshed handoff rendered above the deck after the card did, pushing the
+    card back under the key bar.
+    """
+    context, page, calls, errors = _open_tv(browser, base_url, width, height, host)
+    try:
+        _walk_to_the_agent(page)
+        page.evaluate("window.navigateDpad('RIGHT')")
+        page.wait_for_timeout(250)
+        assert page.evaluate("window.mercuryNav.current.id") == "btnAgentPublishHandoff"
+        page.evaluate("window.navigateDpad('SELECT')")
+        page.locator("#card-agent-handoff").wait_for(timeout=10_000)
+        # Let the page's own refresh render this revision of the shared handoff above
+        # the deck: that render is what used to push the card back under the bar.
+        revision = re.search(r"Revision: (\d+)", page.locator("#card-agent-handoff").inner_text()).group(1)
+        page.wait_for_function(
+            "r => (document.querySelector('#handoffOutput').textContent || '').includes('SHARED REVISION ' + r)",
+            arg=revision, timeout=10_000)
+        page.wait_for_timeout(500)
+        geometry = page.evaluate(_CARD_GEOMETRY, "#card-agent-handoff")
+        print("handoff card geometry:", json.dumps(geometry))
+        assert "/mcp/tools/demo_update_handoff" in calls, calls
+        _assert_card_clear_of_the_key_bar(geometry, "btnAgentPublishHandoff")
+        # Keyboard focus agrees with the cursor. It used to stay on the off-screen
+        # 'Refresh shared handoff' the deck clicks, so Shift+Tab jumped the page up to
+        # 'Publish responder handoff' outside the deck instead of reaching Ask the agent.
+        assert page.evaluate(_ACTIVE_ID) == "btnAgentPublishHandoff"
+        scrolled = page.evaluate("Math.round(scrollY)")
+        page.keyboard.press("Shift+Tab")
+        page.wait_for_timeout(200)
+        assert page.evaluate(_ACTIVE_ID) == "btnAgentBrief"
+        assert abs(page.evaluate("Math.round(scrollY)") - scrolled) <= 2
+        # The hint under the board names the control the remote is on.
+        assert "Refresh shared handoff" not in page.evaluate(
+            "window.mercuryNav.current.getAttribute('data-tv-label') || ''")
+        assert errors == [], errors
+    finally:
+        context.close()
+
+
+def test_a_refused_demo_handoff_shows_the_servers_reason(browser, base_url):
+    """A live row has no recorded demo handoff; the server says so with a 422."""
+    detail = "No recorded demo handoff exists for this service; handoffs are demo-only."
+    context, page, _calls, _errors = _open(
+        browser, base_url + "/",
+        routes=[("**/mcp/tools/demo_update_handoff", _fulfil_json(422, {"detail": detail}))])
+    try:
+        _press_center_on(page, "#btnAgentPublishHandoff")
+        page.locator("#card-agent-error").wait_for(timeout=10_000)
+        text = page.locator("#card-agent-error").inner_text()
+        assert "HTTP 422" in text and detail in text, text
+        assert "refused" in text and "No answer from" not in text, text
+        assert "race" not in text.lower() and "conflict" not in text.lower(), text
+    finally:
+        context.close()
+
+
+#: Holds the agent's answer back, as a cold start or a model answer would.
+_SLOW_AGENT = """(() => {
+  const real = window.fetch.bind(window);
+  window.fetch = (url, options) => String(url).includes('/mcp/tools/agent_incident_brief')
+    ? new Promise(resolve => setTimeout(resolve, 2500)).then(() => real(url, options))
+    : real(url, options);
+})();"""
+
+
+@_TV_SIZES
+def test_a_late_answer_does_not_scroll_away_from_where_the_viewer_moved(
+        browser, base_url, width, height, host):
+    context, page, _calls, errors = _open_tv(
+        browser, base_url, width, height, host, init_script=_SLOW_AGENT)
+    try:
+        _walk_to_the_agent(page)
+        page.evaluate("window.navigateDpad('SELECT')")
+        page.wait_for_timeout(200)
+        page.evaluate("window.navigateDpad('UP')")
+        page.evaluate("window.navigateDpad('UP')")
+        page.wait_for_timeout(400)
+        before = page.evaluate(_CARD_GEOMETRY, "#card-agent-brief")
+        assert before["focus"] != "btnAgentBrief", before
+        page.locator("#card-agent-brief").wait_for(state="attached", timeout=10_000)
+        page.wait_for_timeout(300)
+        after = page.evaluate(_CARD_GEOMETRY, "#card-agent-brief")
+        print("late answer:", json.dumps(before), json.dumps(after))
+        assert after["focus"] == before["focus"], (before, after)
+        assert after["scrollY"] == before["scrollY"], (before, after)
+        assert after["focusBox"]["top"] >= 0 and after["focusBox"]["bottom"] <= after["keybarTop"], after
+        assert errors == [], errors
     finally:
         context.close()
