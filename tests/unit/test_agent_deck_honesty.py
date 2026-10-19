@@ -179,3 +179,60 @@ def test_the_deck_script_makes_no_call_of_its_own_accord():
     assert "'bedrock')" not in AGENT_DECK_JS
     assert "Claude Sonnet 5 + MCP" not in AGENT_DECK_JS
     assert chr(0x2014) not in AGENT_DECK_JS  # no em dash in on-screen copy
+
+
+# ------------------------------------------------ capability branches, without AWS
+
+@pytest.mark.parametrize("creds,sdk,expected", [
+    (True, True, "ready_to_attempt"),
+    (True, False, "unavailable_sdk_not_installed"),
+    (False, True, "unavailable_no_credentials"),
+    (False, False, "unavailable_no_sdk_and_no_credentials"),
+])
+def test_the_capability_label_follows_credentials_and_sdk(monkeypatch, creds, sdk, expected):
+    """The label an operator reads must not depend on what this machine happens to have."""
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: creds))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: sdk))
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter.resolved_capability(refresh=True) == expected
+    # A second read inside the cache window does not resolve credentials again.
+    assert adapter.credentials_present() is creds
+    assert adapter.model_path_capability()["resolved_capability"] == expected
+
+
+def test_credentials_from_the_environment_count_without_boto3(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAEXAMPLEONLY")
+    assert BedrockIncidentAgentAdapter._resolve_credentials() is True
+
+
+def test_under_pytest_the_adapter_never_attempts_a_live_call(monkeypatch):
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: True))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    monkeypatch.delenv("MERCURY_ALLOW_BEDROCK_IN_PYTEST", raising=False)
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter._can_attempt_live_call(prefer_bedrock=True) is False
+    assert adapter.last_fallback_reason == "pytest_offline_guard"
+
+
+def test_outside_the_guard_a_missing_capability_is_the_fallback_reason(monkeypatch):
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "_resolve_credentials", staticmethod(lambda: False))
+    monkeypatch.setattr(BedrockIncidentAgentAdapter, "sdk_present", staticmethod(lambda: True))
+    monkeypatch.setenv("MERCURY_ALLOW_BEDROCK_IN_PYTEST", "1")
+    adapter = BedrockIncidentAgentAdapter()
+    assert adapter._can_attempt_live_call(prefer_bedrock=True) is False
+    assert adapter.last_fallback_reason == "unavailable_no_credentials"
+
+
+def test_an_empty_or_malformed_model_reply_falls_back_or_is_wrapped(seeded_client):
+    payload = _payload_for(seeded_client, "search-indexer")
+    empty = BedrockIncidentAgentAdapter(client_factory=lambda region: _CapturingClient("   "))
+    result = empty.synthesize_incident_brief(what_changed_payload=payload)
+    assert result["synthesis_mode"] == "deterministic"
+    assert result["fallback_reason"] == "ValueError"
+
+    broken = BedrockIncidentAgentAdapter(
+        client_factory=lambda region: _CapturingClient("{not json at all}"))
+    wrapped = broken.synthesize_incident_brief(what_changed_payload=payload)
+    assert wrapped["synthesis_mode"] == "bedrock"
+    assert wrapped["commander_brief_10ft"] == "{not json at all}"
+    assert wrapped["incident_severity"] == "SEV-2_ATTRIBUTION_REFUSED"
