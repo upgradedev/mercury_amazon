@@ -198,3 +198,13 @@ def screenshot_problem_text(tmp_path, data):
     path = tmp_path / "frame.png"
     path.write_bytes(data)
     return screenshot_problem(path)
+
+
+def test_a_real_cockpit_frame_passes_the_check():
+    """The thresholds were also run on real frames: run 38808232691's final.png
+    (253,396 B) and run 37464864870's both pass. This committed 1920x1080 render
+    of the board must pass too, so a tighter threshold cannot refuse the page."""
+    from pathlib import Path
+
+    board = Path(__file__).resolve().parents[2] / "docs" / "assets" / "incident-board-1920x1080.png"
+    assert screenshot_problem(board) is None
