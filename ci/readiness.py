@@ -145,7 +145,10 @@ ANDROID_TV_REQUIRED_EVENTS = {
 # from that page's scripts, so the hosted UI invalidates the receipt with the
 # APK: a headline change with a green receipt would otherwise claim a journey
 # the receipt never saw. Fonts, the manifest and the written documentation do
-# not drive the journey and stay out.
+# not drive the journey and stay out. The agent deck is part of the served page:
+# agent_mcp_routes.py injects /mcp/agent-deck.js into docs/index.html, and
+# agent_deck.py is that script. Run 38808232691 (build fdb5f56) stayed green
+# through PR #62, which added the deck, because neither file was watched.
 ANDROID_TV_RUNTIME_PATHS = (
     "app/",
     "gradle/",
@@ -159,6 +162,8 @@ ANDROID_TV_RUNTIME_PATHS = (
     "docs/index.html",
     "docs/webmcp_bridge.js",
     "docs/firetv_nav.js",
+    "src/interfaces/agent_deck.py",
+    "src/interfaces/agent_mcp_routes.py",
 )
 
 

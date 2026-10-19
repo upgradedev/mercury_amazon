@@ -44,7 +44,7 @@ OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not rea
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-790%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-791%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -165,7 +165,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 790 passed
+# 791 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in

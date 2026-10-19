@@ -909,7 +909,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-790 tests and a re-measure on an idle machine is pending**.
+791 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -953,7 +953,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 790 passed
+# 791 passed
 ```
 
 #### Step 3: Start the server
@@ -1139,7 +1139,7 @@ proof is the five `MercuryCockpit` events in the logcat. The run it replaced,
 [38808232691](https://github.com/upgradedev/mercury_amazon/actions/runs/38808232691),
 built APK `998fd25c1f20efa7` from `fdb5f56` over the same journey against the PR #50
 page; its receipt stayed green on paper after PR #62, because the deck is appended
-from `src/`, which J4 does not watch, but it never saw the page with the deck. The run
+from `src/`, which J4 did not watch then, but it never saw the page with the deck. J4 now watches `src/interfaces/agent_deck.py` and `src/interfaces/agent_mcp_routes.py`, so a deck change invalidates the receipt. The run
 before that, [37464864870](https://github.com/upgradedev/mercury_amazon/actions/runs/37464864870),
 built APK `c9a3f99cec750fc0` from `ea2cff5` over the same journey against the PR #42
 page; its receipt went stale on 2026-10-15 when PR #50 moved `docs/index.html` after
@@ -1185,7 +1185,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 790 passed
+python -m pytest tests/ -q                                    # 791 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2508 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored

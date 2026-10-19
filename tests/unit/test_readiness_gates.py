@@ -199,9 +199,9 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     build, run 36922314984 (build e0a857a) restored green again, run
     37464864870 (build ea2cff5) restored green after PR #42 moved
     docs/index.html, and run 38808232691 (build fdb5f56) restored green after
-    PR #50 moved it. PR #62 appended the deck from src/, which J4 does not
-    watch, so that receipt stayed green without seeing the deck until this
-    one landed.
+    PR #50 moved it. PR #62 appended the deck from src/, which J4 did not
+    watch then, so that receipt stayed green without seeing the deck until this
+    one landed. J4 now watches the deck script and the route that injects it.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -369,6 +369,27 @@ def test_a_receipt_from_before_the_page_change_still_fails_naming_the_file():
         _exists,
     )
     assert audited is False and "docs/index.html" in audited_message
+
+
+def test_a_receipt_from_before_the_agent_deck_fails_naming_the_deck():
+    """The served page includes the agent deck, so a deck change invalidates J4.
+
+    Run 38808232691 (build fdb5f56) stayed green through PR #62, which appended
+    the deck from src/, because J4 watched neither the deck script nor the route
+    that injects it. Rewinding the landed receipt's build to fdb5f56 must now fail
+    and name the deck files, not pass on a page the receipt never saw.
+    """
+    assert "src/interfaces/agent_deck.py" in readiness.ANDROID_TV_RUNTIME_PATHS
+    assert "src/interfaces/agent_mcp_routes.py" in readiness.ANDROID_TV_RUNTIME_PATHS
+    path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    receipt["build_sha"] = "fdb5f560168443db0d81c8d65d3e4b9b27fb858a"
+    receipt["endpoint_health_build_sha"] = receipt["build_sha"]
+    receipt["artifact_name"] = "mercury-android-tv-runtime-" + receipt["build_sha"]
+    problem = readiness.runtime_receipt_checkout_problem(receipt)
+    assert problem is not None
+    assert "src/interfaces/agent_deck.py" in problem
+    assert "src/interfaces/agent_mcp_routes.py" in problem
 
 
 def test_the_readme_publishes_the_score_the_auditor_prints():
