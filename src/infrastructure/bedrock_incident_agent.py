@@ -41,6 +41,12 @@ from typing import Any, Callable
 DEFAULT_MODEL_ID = "anthropic.claude-sonnet-5"
 DEFAULT_REGION = "eu-west-1"
 MODEL_CALL_TIMEOUT_SEC = 25.0
+#: Room for the model to think and still write the brief. Adaptive thinking is on by
+#: default for Claude Sonnet 5 on Bedrock and is billed against the same ceiling. At
+#: 1200, one of five local calls on 2026-10-19 stopped at max_tokens with a thinking
+#: block and no text, and the live verification press after the ddccb3e deploy failed
+#: the same way (ValueError, 16.2 s). Volcan uses 16000 for the same reason.
+MODEL_MAX_TOKENS = 16000
 CREDENTIAL_CACHE_SECONDS = 300.0
 MAX_CACHE_ENTRIES = 256
 
@@ -351,7 +357,7 @@ class BedrockIncidentAgentAdapter:
             client = self._build_client()
             response = client.messages.create(
                 model=self.model_id,
-                max_tokens=1200,
+                max_tokens=MODEL_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=MODEL_CALL_TIMEOUT_SEC,
             )

@@ -436,3 +436,20 @@ def test_an_accepted_answer_carries_no_rejected_phrase(seeded_client):
     result = adapter.synthesize_incident_brief(what_changed_payload=_payload_for(seeded_client, "checkout-api"))
     assert result["synthesis_mode"] == "bedrock"
     assert "rejected_phrase" not in result
+
+
+def test_the_model_call_leaves_room_to_think_and_still_write(seeded_client):
+    """At max_tokens=1200 Sonnet 5's adaptive thinking used the whole ceiling on 1 of 5
+    local calls and on the live verification press: a thinking block, no text, ValueError."""
+    sent: list[dict[str, Any]] = []
+
+    class _Client:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**kwargs: Any) -> dict[str, Any]:
+                sent.append(kwargs)
+                return {"content": [{"type": "text", "text": json.dumps({"commander_brief_10ft": "Candidate only."})}]}
+
+    BedrockIncidentAgentAdapter(client_factory=lambda region: _Client()).synthesize_incident_brief(
+        what_changed_payload=_payload_for(seeded_client, "checkout-api"))
+    assert sent and sent[0]["max_tokens"] >= 16000
