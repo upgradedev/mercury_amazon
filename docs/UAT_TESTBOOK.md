@@ -42,7 +42,7 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 | A-17c | Every file the Android build script names exists | `tests/unit/test_firetv_app_structure.py` | `app/proguard-rules.pro` and every other path named in `app/build.gradle.kts` is present, so the release variant configures |
 | A-17d | The Fire TV readiness gate cannot pass on a string match | `tests/unit/test_readiness_gates.py` | J4 accepts only a content-addressed Android TV workflow receipt or the legacy physical-device receipt; every missing field is driven through the predicate |
 | A-17e | The Fire TV build receipt cannot be written without evidence | `tests/unit/test_write_firetv_receipt.py` | `scripts/write_firetv_receipt.py` refuses, writes nothing and exits 2 on a missing, empty or non-zip APK, a zip with no `AndroidManifest.xml`, an APK outside the checkout, a non-zero gradle or adb exit code, or an empty device description; the receipt it does write hashes the APK itself and passes the gate's own predicate |
-| A-18 | Running the suite makes no billable AWS call | `tests/unit/test_aws_adapters.py` plus `tests/conftest.py` | `MERCURY_OFFLINE=1` suppresses the call even when a working client is injected |
+| A-18 | Running the suite makes no billable AWS call | `tests/unit/test_aws_adapters.py` plus `tests/conftest.py`, and the `pytest_offline_guard` in `src/infrastructure/bedrock_incident_agent.py` | `MERCURY_OFFLINE=1` suppresses the data adapters' calls even when a working client is injected; the agent brief's Bedrock adapter does not read that switch and is held off Bedrock by its own pytest guard |
 | A-19 | The Fire TV manifest is a TV manifest | `tests/unit/test_firetv_app_structure.py` | Leanback required, touchscreen not required, `LEANBACK_LAUNCHER` present, no `package` attribute |
 | A-20 | A hostile cockpit URL cannot redirect the WebView | `app/src/test/kotlin/.../CockpitUrlResolverTest.kt` | `javascript:`, `file:`, `content:` and embedded whitespace all fall back to the safe default |
 | A-21 | Log output masks credentials and emails | `tests/unit/test_observability_harness.py` | Email addresses and tokens are replaced before emission |
@@ -75,10 +75,10 @@ place to report what happened, whether it worked or not.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Automated suite green | Met | `python -m pytest tests/ -q`, 737 passed |
-| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 92 percent of 2443 statements |
+| Automated suite green | Met | `python -m pytest tests/ -q`, 790 passed |
+| Line coverage at or above 85 percent | Met | `python scripts/record_coverage_summary.py`, 92 percent of 2508 statements |
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
-| Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 47/53 passed, 0 blocking |
-| A Fire TV binary that somebody has watched run | Met | Gate J4 passes from `android_tv_runtime_receipt.json`: the APK ran on the Android TV emulator (AOSP TV x86, API 34) in CI run 37464864870 |
+| Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 46/53 passed, 0 blocking (G2 fails until the next deploy) |
+| A Fire TV binary that somebody has watched run | Met | Gate J4 passes from `android_tv_runtime_receipt.json`: the APK ran on the Android TV emulator (AOSP TV x86, API 34) in CI run 38808232691, against the page served at `fdb5f56`. The served page now carries the agent deck, so that run has to be repeated after the next deploy |
 | Verified on an allowed Fire TV track target | **Not met** | Android TV Emulator run pending; physical hardware is optional |
 | Verified against a live web deployment | Met | Root and `/health` answer; the deployment publishes its build SHA |

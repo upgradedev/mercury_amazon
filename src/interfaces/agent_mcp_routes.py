@@ -4,23 +4,26 @@ Implements:
 1. JSON-RPC 2.0 Model Context Protocol (revision 2025-11-25) Streamable HTTP at
    `POST /mcp` and `GET /mcp` (`initialize`, `notifications/initialized`, `ping`,
    `tools/list`, `tools/call` across 10 Mercury SRE war-room tools).
-2. `POST /mcp/tools/agent_incident_brief` and `GET /mcp/tools/agent_status`
-   bridging Mercury's temporal attribution engine and governed rollback tokens
-   with Amazon Bedrock (`anthropic.claude-sonnet-5` via `AnthropicBedrockMantle`).
+2. `POST /mcp/tools/agent_incident_brief` and `GET /mcp/tools/agent_status`.
+   The brief is advisory. It is written deterministically from Mercury's own
+   correlation unless a model on Amazon Bedrock (`anthropic.claude-sonnet-5` via
+   `AnthropicBedrockMantle`) actually answers, and the response says which.
+3. `GET /mcp/agent-deck.js`, the deck script in `agent_deck.py`, which the cockpit
+   page always carries. It makes no call until a viewer presses one of its buttons.
 """
 from __future__ import annotations
 
 import json
-import os
 import secrets
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.infrastructure.bedrock_incident_agent import BedrockIncidentAgentAdapter
+from src.interfaces.agent_deck import AGENT_DECK_JS
 
 PROTOCOL_VERSION = "2025-11-25"
 SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION, "2025-06-18")
@@ -41,7 +44,10 @@ class AgentIncidentBriefRequest(BaseModel):
     time_window_minutes: int = Field(default=60, ge=5, le=1440)
     prefer_bedrock: bool = Field(
         default=True,
-        description="Attempt Amazon Bedrock Claude Sonnet 5 synthesis when credentials + SDK resolve.",
+        description=(
+            "Attempt an Amazon Bedrock model call when the SDK, credentials and IAM permission "
+            "allow it; the brief is deterministic otherwise and says so."
+        ),
     )
 
 
@@ -49,17 +55,19 @@ def _mcp_tool_catalog() -> list[dict[str, Any]]:
     return [
         {
             "name": "agent_incident_brief",
-            "title": "Bedrock SRE Incident Commander Brief",
+            "title": "Advisory Incident Brief",
             "description": (
-                "Correlate service anomalies with deployment windows and synthesize a 10-foot "
-                "Fire TV Incident Commander root-cause brief and responder handoff via Amazon Bedrock (Claude Sonnet 5)."
+                "Run what_changed for a service and draft an advisory brief and responder handoff. "
+                "Deterministic unless a model on Amazon Bedrock answers; the response names the engine, "
+                "the data label and the rollback dispatch mode. A named commit is a temporal candidate, "
+                "not a cause."
             ),
             "inputSchema": AgentIncidentBriefRequest.model_json_schema(),
         },
         {
             "name": "agent_status",
-            "title": "Bedrock Agent & MCP 2025-11-25 Status",
-            "description": "Report Amazon Bedrock model capability, MCP 2025-11-25 transport, and CloudWatch EMF telemetry.",
+            "title": "Agent & MCP 2025-11-25 Status",
+            "description": "Report whether a Bedrock model call can be attempted, the MCP transport, and request telemetry.",
             "inputSchema": {"type": "object", "properties": {"refresh": {"type": "boolean"}}},
         },
         {
@@ -154,7 +162,11 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
             "observability": {
                 "format": "AWS CloudWatch Embedded Metric Format (EMF)",
                 "header": "X-Mercury-Request-Id",
-                "pii_redaction_active": True,
+                # The request audit log masks PII (observability_harness.mask_pii), and this
+                # says so only when that masking works on a probe. Nothing redacts what the
+                # agent sends to a model, so that flag is False.
+                "audit_log_pii_masking": _audit_masking_works(),
+                "agent_prompt_pii_redaction": False,
             },
         }
 
@@ -171,15 +183,27 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                 time_window_minutes=req.time_window_minutes,
             )
         )
+        data_label = str(
+            (correlation_payload.get("metric_provenance") or {}).get("display_label") or "UNLABELLED DATA"
+        )
+        rollback_dispatch = mcp_server._dispatch_mode()
         synthesis = bedrock_agent.synthesize_incident_brief(
             what_changed_payload=correlation_payload,
             prefer_bedrock=req.prefer_bedrock,
+            data_label=data_label,
+            rollback_dispatch=rollback_dispatch,
         )
-        return {
+        response = {
             **correlation_payload,
+            "data_label": data_label,
+            "rollback_dispatch": rollback_dispatch,
             "agent_synthesis": synthesis,
-            "bedrock_model_path": bedrock_agent.model_path_capability(),
         }
+        # A deterministic brief names no model and no region anywhere in the
+        # response; agent_status reports the capability.
+        if synthesis.get("synthesis_mode") == "bedrock":
+            response["bedrock_model_path"] = bedrock_agent.model_path_capability()
+        return response
 
     @app.get("/mcp")
     async def mcp_streamable_http_get() -> Response:
@@ -255,8 +279,9 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                         "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
                         "instructions": (
                             "Mercury 10-Foot Fire TV Incident War Room (MCP 2025-11-25). "
-                            "Use agent_incident_brief for Amazon Bedrock Claude Sonnet 5 root-cause "
-                            "synthesis and what_changed for deterministic runtime-scoped attribution."
+                            "Use what_changed for deterministic runtime-scoped attribution, and "
+                            "agent_incident_brief for an advisory brief over it. The public data is an "
+                            "offline fixture and rollback dispatch is record-only."
                         ),
                     },
                 },
@@ -369,307 +394,32 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
 
     @app.get("/mcp/agent-deck.js")
     async def serve_agent_deck_js() -> Response:
-        """Serve the interactive 10-foot Fire TV Bedrock Claude Sonnet 5 & MCP 2025-11-25 command deck."""
+        """Serve the agent deck script. It makes no call until a viewer presses a button."""
         return Response(content=AGENT_DECK_JS, media_type="application/javascript; charset=utf-8")
 
 
+def _audit_masking_works() -> bool:
+    """True when the request audit log's PII masking removes a probe address."""
+    from src.infrastructure.observability_harness import PrivateObservabilityHarness
+
+    probe = "contact probe.user@example.com"
+    return "probe.user@example.com" not in PrivateObservabilityHarness().mask_pii(probe)
+
+
 def render_cockpit_response(index_path: Path, request: Request) -> Response:
-    """Serve docs/index.html, injecting /mcp/agent-deck.js on AWS Lambda, local uvicorn, or ?agent=1."""
+    """Serve docs/index.html with /mcp/agent-deck.js injected, everywhere.
+
+    The deck used to be left out under pytest and under MERCURY_OFFLINE=1, so every
+    browser and D-pad test ran against a page judges never see. The deck makes no
+    call until a viewer presses one of its buttons, so there is no reason left to
+    serve two pages.
+    """
     if index_path.exists():
-        if (
-            os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
-            or request.query_params.get("agent") == "1"
-            or (not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("MERCURY_OFFLINE") != "1")
-        ):
-            html = index_path.read_text(encoding="utf-8")
-            injected = html.replace(
-                "</body>",
-                '  <script src="/mcp/agent-deck.js" defer></script>\n</body>',
-                1,
-            )
-            return Response(content=injected, media_type="text/html; charset=utf-8")
-        return FileResponse(index_path)
+        html = index_path.read_text(encoding="utf-8")
+        injected = html.replace(
+            "</body>",
+            '  <script src="/mcp/agent-deck.js" defer></script>\n</body>',
+            1,
+        )
+        return Response(content=injected, media_type="text/html; charset=utf-8")
     return JSONResponse({"message": "Mercury API is running. The cockpit page was not found in docs/."})
-
-
-AGENT_DECK_JS = r"""(function () {
-  if (document.getElementById('bedrockAgentSection')) return;
-  var anchor = document.getElementById('rollback') || document.getElementById('hero');
-  if (!anchor || !anchor.parentNode) return;
-
-  function syncTvViewport() {
-    if (!window.MercuryHost && window.innerWidth >= 900 && window.innerWidth < 1400 && window.innerHeight <= 600) {
-      document.documentElement.classList.add('tv-host');
-    }
-  }
-  syncTvViewport();
-  window.addEventListener('resize', syncTvViewport);
-
-  var style = document.createElement('style');
-  style.textContent = [
-    '#bedrockAgentSection, #bedrockAgentSection * { box-sizing:border-box; max-width:100%; overflow-wrap:anywhere; }',
-    '#bedrockAgentSection .agent-pills { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.65rem 0; }',
-    '#bedrockAgentSection .agent-pill { font-family:var(--mono, monospace); font-size:var(--fs-small, 0.9rem); padding:0.2rem 0.6rem; border:1px solid var(--rule, #2A2E37); background:var(--board, #0E1014); color:var(--ink-2, #A7B0C0); }',
-    '#bedrockAgentSection .agent-pill-ok { border-color:var(--ok, #3DD68C); color:var(--ok, #3DD68C); font-weight:600; }',
-    '#bedrockAgentSection .agent-pill-amber { border-color:var(--amber, #FFB23F); color:var(--amber, #FFB23F); font-weight:600; }',
-    '#bedrockAgentSection .agent-card { border-top:2px solid var(--amber, #FFB23F); background:var(--flap, #14171D); padding:0.9rem 1rem; margin-top:0.75rem; }',
-    '#bedrockAgentSection .agent-brief-10ft { font-family:var(--display, sans-serif); font-size:var(--fs-row, 1.25rem); color:var(--ink, #F3F5F8); line-height:1.35; margin:0.4rem 0 0.6rem; }',
-    '#bedrockAgentSection .agent-pre { white-space:pre-wrap; word-break:break-word; overflow-x:auto; max-width:100%; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.75rem; background:var(--board, #0E1014); border:1px solid var(--rule, #2A2E37); color:var(--ink-2, #A7B0C0); margin-top:0.5rem; }',
-    '.btn-hero-agent-jump { border-color:var(--ok, #3DD68C) !important; color:var(--ok, #3DD68C) !important; font-family:var(--mono, monospace); font-size:var(--fs-small, 0.85rem); padding:0.45rem 0.75rem; white-space:nowrap; }'
-  ].join('\n');
-  document.head.appendChild(style);
-
-  function mk(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined && text !== null) e.textContent = String(text);
-    return e;
-  }
-
-  function activeService() {
-    var btn = document.querySelector('.btn-demo[aria-pressed="true"]');
-    return (btn && btn.getAttribute('data-service')) || 'checkout-api';
-  }
-
-  var sec = mk('section', 'screen');
-  sec.id = 'bedrockAgentSection';
-  sec.setAttribute('aria-labelledby', 'bedrockAgentTitle');
-
-  sec.appendChild(mk('p', 'section-kicker', 'Amazon Bedrock Claude Sonnet 5 · MCP 2025-11-25 Streamable HTTP'));
-  var h2 = mk('h2', null, 'AI Incident Commander & MCP 2025-11-25 War Room');
-  h2.id = 'bedrockAgentTitle';
-  sec.appendChild(h2);
-  sec.appendChild(mk('p', 'note',
-    'Deterministic window correlation and HMAC-SHA256 governance tokens hold rollback authority, while Claude Sonnet 5 (anthropic.claude-sonnet-5 on Amazon Bedrock in eu-west-1) synthesizes 10-foot commander briefs and responder handoffs over MCP 2025-11-25 Streamable HTTP.'
-  ));
-
-  var bar = mk('div', 'actions-bar');
-  bar.style.marginTop = '0.85rem';
-
-  var btnBrief = mk('button', 'btn btn-primary', 'Ask Claude Sonnet 5 Commander');
-  btnBrief.id = 'btnAgentBrief';
-  btnBrief.type = 'button';
-  btnBrief.setAttribute('data-tv-focusable', '');
-  btnBrief.setAttribute('data-tv-label', 'Ask Claude Sonnet 5 Incident Commander');
-  btnBrief.title = 'Call POST /mcp/tools/agent_incident_brief for the selected service using Amazon Bedrock Claude Sonnet 5';
-
-  var btnPublish = mk('button', 'btn', 'Publish Agent Handoff to DynamoDB');
-  btnPublish.id = 'btnAgentPublishHandoff';
-  btnPublish.type = 'button';
-  btnPublish.setAttribute('data-tv-focusable', '');
-  btnPublish.setAttribute('data-tv-label', 'Publish Agent Handoff to DynamoDB');
-  btnPublish.title = 'Persist the responder handoff for the selected service into Amazon DynamoDB with optimistic concurrency';
-
-  var btnMcp = mk('button', 'btn', 'Verify MCP 2025-11-25 Handshake');
-  btnMcp.id = 'btnAgentMcpHandshake';
-  btnMcp.type = 'button';
-  btnMcp.setAttribute('data-tv-focusable', '');
-  btnMcp.setAttribute('data-tv-label', 'Verify MCP 2025-11-25 Streamable HTTP handshake');
-  btnMcp.title = 'Run JSON-RPC 2.0 initialize, notifications/initialized, tools/list, and tools/call against POST /mcp';
-
-  bar.appendChild(btnBrief);
-  bar.appendChild(btnPublish);
-  bar.appendChild(btnMcp);
-  sec.appendChild(bar);
-
-  var consoleBox = mk('div', 'console');
-  consoleBox.style.marginTop = '0.85rem';
-  var header = mk('div', 'console-header');
-  header.appendChild(mk('span', null, 'Claude Sonnet 5 SRE Synthesis & MCP 2025-11-25 Telemetry'));
-  var latencySpan = mk('span', 'latency', 'Ready (anthropic.claude-sonnet-5 · eu-west-1)');
-  latencySpan.id = 'bedrockAgentLatency';
-  header.appendChild(latencySpan);
-  consoleBox.appendChild(header);
-
-  var out = mk('div');
-  out.id = 'bedrockAgentOutput';
-  var empty = mk('div', 'empty-state-card',
-    'Hydrating live Amazon Bedrock Claude Sonnet 5 Incident Commander brief and MCP 2025-11-25 Streamable HTTP telemetry…'
-  );
-  empty.id = 'bedrockAgentEmpty';
-  out.appendChild(empty);
-  consoleBox.appendChild(out);
-  sec.appendChild(consoleBox);
-
-  anchor.parentNode.insertBefore(sec, anchor.nextSibling);
-
-  var heroActions = document.querySelector('.hero-actions');
-  if (heroActions && !document.getElementById('btnHeroJumpToAgent')) {
-    var jumpBtn = mk('button', 'btn btn-hero-agent-jump', 'Claude Sonnet 5 + MCP 2025-11-25 Live ↓');
-    jumpBtn.id = 'btnHeroJumpToAgent';
-    jumpBtn.type = 'button';
-    jumpBtn.setAttribute('data-tv-focusable', '');
-    jumpBtn.setAttribute('data-tv-label', 'Jump to AI Incident Commander and MCP 2025-11-25 War Room');
-    jumpBtn.title = 'Scroll to live Amazon Bedrock Claude Sonnet 5 Incident Commander and MCP 2025-11-25 War Room';
-    jumpBtn.addEventListener('click', function () {
-      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    heroActions.appendChild(jumpBtn);
-  }
-
-  var briefSeq = 0;
-  async function runBrief(overrideSvc) {
-    var svc = (typeof overrideSvc === 'string' && overrideSvc) ? overrideSvc : activeService();
-    var mySeq = ++briefSeq;
-    btnBrief.disabled = true;
-    btnBrief.setAttribute('aria-busy', 'true');
-    latencySpan.textContent = 'Calling Amazon Bedrock Claude Sonnet 5 for ' + svc + '…';
-    try {
-      var t0 = performance.now();
-      var r = await fetch('/mcp/tools/agent_incident_brief', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service_name: svc, environment: 'production', time_window_minutes: 60, prefer_bedrock: true })
-      });
-      var d = await r.json();
-      if (mySeq !== briefSeq) return;
-      var elapsed = Math.round(performance.now() - t0);
-      var syn = d.agent_synthesis || {};
-      var draft = syn.responder_handoff_draft || {};
-
-      var old = document.getElementById('bedrockAgentEmpty');
-      if (old) old.remove();
-      var prev = document.getElementById('card-agent-brief');
-      if (prev) prev.remove();
-
-      var card = mk('div', 'agent-card');
-      card.id = 'card-agent-brief';
-      var pills = mk('div', 'agent-pills');
-      pills.appendChild(mk('span', 'agent-pill agent-pill-amber', 'Service: ' + (d.service || svc)));
-      pills.appendChild(mk('span', 'agent-pill agent-pill-ok', 'Engine: ' + (syn.synthesis_mode || 'bedrock') + ' · ' + (syn.model_answered || syn.model_id || 'anthropic.claude-sonnet-5')));
-      pills.appendChild(mk('span', 'agent-pill', 'Severity: ' + (syn.incident_severity || 'EVALUATED')));
-      pills.appendChild(mk('span', 'agent-pill', 'Correlator Verdict: ' + (d.verdict || 'N/A')));
-      pills.appendChild(mk('span', 'agent-pill', 'Latency: ' + (syn.latency_ms || elapsed) + ' ms (cached: ' + Boolean(syn.cached) + ')'));
-      card.appendChild(pills);
-
-      card.appendChild(mk('p', 'agent-brief-10ft', syn.commander_brief_10ft || ''));
-      card.appendChild(mk('p', 'note', 'Root-Cause Hypothesis: ' + (syn.root_cause_hypothesis || '')));
-      card.appendChild(mk('p', 'note', 'Draft Responder Handoff — Action: ' + (draft.current_action || '') + ' | Next step: ' + (draft.next_step || '')));
-      card.appendChild(mk('p', 'note', 'Guardrail: ' + (syn.guardrail_attestation || syn.governance_guardrail || '')));
-      out.insertBefore(card, out.firstChild);
-      latencySpan.textContent = 'POST /mcp/tools/agent_incident_brief (' + svc + ') · ' + (syn.latency_ms || elapsed) + ' ms';
-    } catch (err) {
-      latencySpan.textContent = 'Error calling agent_incident_brief';
-    } finally {
-      if (mySeq === briefSeq) {
-        btnBrief.disabled = false;
-        btnBrief.setAttribute('aria-busy', 'false');
-      }
-    }
-  }
-  btnBrief.addEventListener('click', function () { runBrief(); });
-
-  document.addEventListener('click', function (ev) {
-    var row = ev.target && ev.target.closest && ev.target.closest('.btn-demo[data-service]');
-    if (row) {
-      var svc = row.getAttribute('data-service');
-      setTimeout(function () { runBrief(svc); }, 40);
-    }
-  });
-
-  btnPublish.addEventListener('click', async function () {
-    var svc = activeService();
-    btnPublish.disabled = true;
-    latencySpan.textContent = 'Publishing responder handoff for ' + svc + ' to Amazon DynamoDB…';
-    try {
-      var t0 = performance.now();
-      var r = await fetch('/mcp/tools/demo_update_handoff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service_name: svc })
-      });
-      var d = await r.json();
-      var elapsed = Math.round(performance.now() - t0);
-      var refreshBtn = document.querySelector('[data-action="handoff-refresh"]');
-      if (refreshBtn) refreshBtn.click();
-
-      var old = document.getElementById('bedrockAgentEmpty');
-      if (old) old.remove();
-      var prev = document.getElementById('card-agent-handoff');
-      if (prev) prev.remove();
-
-      var card = mk('div', 'agent-card');
-      card.id = 'card-agent-handoff';
-      var pills = mk('div', 'agent-pills');
-      pills.appendChild(mk('span', 'agent-pill agent-pill-ok', 'DynamoDB Revision: ' + (d.revision || 1)));
-      pills.appendChild(mk('span', 'agent-pill agent-pill-amber', 'Incident ID: ' + (d.incident_id || (svc + '-active'))));
-      pills.appendChild(mk('span', 'agent-pill', 'Responder: ' + (d.responder || 'oncall-sre')));
-      pills.appendChild(mk('span', 'agent-pill', 'Write Latency: ' + elapsed + ' ms'));
-      card.appendChild(pills);
-      card.appendChild(mk('p', 'note', 'Current Action: ' + (d.current_action || '')));
-      card.appendChild(mk('p', 'note', 'Next Step: ' + (d.next_step || '')));
-      out.insertBefore(card, out.firstChild);
-      latencySpan.textContent = 'POST /mcp/tools/demo_update_handoff · revision ' + (d.revision || 1) + ' (' + elapsed + ' ms)';
-    } finally {
-      btnPublish.disabled = false;
-    }
-  });
-
-  async function runMcp() {
-    btnMcp.disabled = true;
-    latencySpan.textContent = 'Running MCP 2025-11-25 Streamable HTTP handshake…';
-    try {
-      var t0 = performance.now();
-      var rInit = await fetch('/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: { protocolVersion: '2025-11-25', clientInfo: { name: 'mercury-firetv-cockpit', version: '0.2.0' }, capabilities: {} }
-        })
-      });
-      var initBody = await rInit.json();
-      var sessionId = rInit.headers.get('MCP-Session-Id') || 'stateless';
-      await fetch('/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2025-11-25' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} })
-      });
-      var rList = await fetch('/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2025-11-25' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })
-      });
-      var listBody = await rList.json();
-      var rCall = await fetch('/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2025-11-25' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'agent_status', arguments: {} } })
-      });
-      var callBody = await rCall.json();
-      var elapsed = Math.round(performance.now() - t0);
-      var tools = (listBody.result && listBody.result.tools) || [];
-
-      var old = document.getElementById('bedrockAgentEmpty');
-      if (old) old.remove();
-      var prev = document.getElementById('card-agent-mcp');
-      if (prev) prev.remove();
-
-      var card = mk('div', 'agent-card');
-      card.id = 'card-agent-mcp';
-      var pills = mk('div', 'agent-pills');
-      pills.appendChild(mk('span', 'agent-pill agent-pill-ok', 'MCP Protocol: ' + (initBody.result && initBody.result.protocolVersion)));
-      pills.appendChild(mk('span', 'agent-pill agent-pill-amber', 'Tools Published: ' + tools.length));
-      pills.appendChild(mk('span', 'agent-pill', 'Server: ' + (initBody.result && initBody.result.serverInfo && initBody.result.serverInfo.name)));
-      pills.appendChild(mk('span', 'agent-pill', 'Session: ' + sessionId.slice(0, 16) + '…'));
-      pills.appendChild(mk('span', 'agent-pill', 'Round-trip: ' + elapsed + ' ms'));
-      card.appendChild(pills);
-      card.appendChild(mk('p', 'note', 'Published Tools (' + tools.length + '): ' + tools.map(function (t) { return t.name; }).join(', ')));
-      card.appendChild(mk('pre', 'agent-pre', JSON.stringify((callBody.result && callBody.result.structuredContent) || callBody, null, 2)));
-      out.appendChild(card);
-      latencySpan.textContent = 'MCP 2025-11-25 verified (' + tools.length + ' tools · ' + elapsed + ' ms)';
-    } finally {
-      btnMcp.disabled = false;
-    }
-  }
-  btnMcp.addEventListener('click', runMcp);
-
-  setTimeout(function () {
-    runBrief();
-    setTimeout(runMcp, 180);
-  }, 120);
-})();
-"""
-

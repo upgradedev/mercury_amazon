@@ -52,6 +52,16 @@ RUNTIME_REQUIREMENTS = (
     "anyio==4.15.1",
     "idna==3.20",
     "certifi==2026.7.22",
+    # The agent brief's Bedrock client and the closure it needs that Lambda's Python
+    # runtime does not ship (boto3 and botocore are in the runtime). The same pin is
+    # declared in pyproject.toml, and a test fails if the two drift apart.
+    "anthropic==1.8.0",
+    "docstring-parser==0.18.0",
+    "httpx2==2.13.1",
+    "httpcore2==2.13.1",
+    "jiter==0.17.0",
+    "sniffio==1.3.1",
+    "truststore==0.10.4",
 )
 ZIP_DATE_TIME = (1980, 1, 1, 0, 0, 0)
 

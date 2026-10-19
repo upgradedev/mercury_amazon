@@ -202,6 +202,7 @@ Stated plainly, because the cockpit shows it anyway.
 | AWS spend | **Live** when credentials exist, and the badge says `aws-cost-explorer`. Otherwise a synthetic fixture that says so |
 | GitHub velocity and pull requests | **Recorded.** A real read of `pallets/flask` replayed from a committed fixture, labelled `offline-fixture` |
 | Error metric series | **Simulated.** Generated locally, labelled `offline-fixture`. The response text says the metric is generated and defers to the commit stamp beside the answer for what the commits are. With CloudWatch credentials, an empty or failed read shows NO LIVE DATA and names nothing; it is never replaced with the generated series |
+| Agent brief and MCP server | **Advisory, press-only in this code.** `POST /mcp/tools/agent_incident_brief` and `POST /mcp` (MCP 2025-11-25). A model is called only when the server sets `MERCURY_AGENT_MODEL=on`, at most `MERCURY_AGENT_MODEL_MAX_CALLS` times per process; otherwise deterministic rules write the brief and the card says so. On 2026-10-19 the Bedrock policy was detached from the live role, and live still runs the earlier deck until a redeploy |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 50.0% over 58 namings (95% interval 37.5% to 62.5%) under the corpus's assumption that a regression shows within 75 minutes (41.5% at 90, 27.3% at 180), recall 4.8% over 600 regressions, refusal on 90.0% of detected anomalies, with only commits that changed a runtime file counted as deploys, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
 | Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. That emulator run is the target proof. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
@@ -262,9 +263,18 @@ Stated here rather than left for a judge to find:
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. It runs the PR #50 build: redeployed on 2026-10-15
-  and probed the same day (`curl -s <url>/health`), `/health` reported
-  `fdb5f560168443db0d81c8d65d3e4b9b27fb858a`, record-only. That puts the PR #50 runtime
+  publishes the deployed build SHA. The committed `deploy_teardown_receipt.json` was probed
+  on 2026-10-18 at 13:12 UTC (`python scripts/probe_deployment.py`), when `/health` reported
+  `b552a7c13bb7ae449a3f8830c9144e6c2edc5f41`, record-only. That value is the build label
+  set on the function; the 10-18 audit found the deployed package was built from `b58977d`,
+  and the `b58977d` to `b552a7c` diff touches no runtime file. That live build carries the
+  agent deck in the form that asks for a brief on page load. This branch makes the deck
+  press-only and advisory: nothing is called until a viewer presses 'Ask the agent', and a
+  model is called only when the server sets `MERCURY_AGENT_MODEL=on`. Live gets that only
+  after a redeploy. On 2026-10-19 the Bedrock policy was detached from Mercury's Lambda
+  role, a cost decision, so every brief on live is deterministic and says so.
+  Before that, on 2026-10-15, it ran the PR #50 build:
+  `fdb5f560168443db0d81c8d65d3e4b9b27fb858a`, record-only. That put the PR #50 runtime
   changes live (service-specific handoff templates, declared observability gap panel and spend tile sync, 1080p hero compact fit above the sticky keybar, explicit spacing in heroCause and row-verdict, and split-flap race cancellation) on top of the PR #42 runtime changes (`ea2cff5`, deployed on 2026-10-06). Before that it ran
   `e0a857ae70349bd481140ced097d0791402d347b` (probed on 2026-10-01 and again on 2026-10-05),
   with the departures board, self-hosted fonts, the candidate headline and the candidate
