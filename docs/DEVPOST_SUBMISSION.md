@@ -258,21 +258,23 @@ Stated here rather than left for a judge to find:
   emulator against the deployed build; the fifth, the handoff publish, needed the redeploy
   below, because the deployed page predated the revision retry. Full 5-of-5 journeys
   followed on 2026-09-30 (runs 36661614006 and 36669903334), and run 36798893479 on
-  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation. Run 37464864870 on 2026-10-06 re-drove all five against the PR #42 page at `ea2cff5`, and run 38808232691 on 2026-10-15 re-drove all five against the PR #50 page, served by the Lambda redeployed at `fdb5f56`, and wrote the receipt checked in now.
+  2026-10-01 re-drove all five events against the candidate-language page, and run 36922314984 the same day re-drove all five against the clamped page after the smoke journey learned to wait for the opening correlation. Run 37464864870 on 2026-10-06 re-drove all five against the PR #42 page at `ea2cff5`, run 38808232691 on 2026-10-15 re-drove all five against the PR #50 page at `fdb5f56`, and run 39210785053 on 2026-10-19 re-drove all five against the page served by the Lambda redeployed at `e8ceae8`, with the press-only agent deck appended, and wrote the receipt checked in now. That run did not press 'Ask the agent', and its final screenshot is a black frame, so the journey proof is the five logcat events.
 * Mercury ships no deployment pipeline integration. When governance passes, the
   response says in plain words that no pipeline was contacted.
 * The public cockpit is deployed at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`; `/health`
-  publishes the deployed build SHA. The committed `deploy_teardown_receipt.json` was probed
-  on 2026-10-18 at 13:12 UTC (`python scripts/probe_deployment.py`), when `/health` reported
-  `b552a7c13bb7ae449a3f8830c9144e6c2edc5f41`, record-only. That value is the build label
-  set on the function; the 10-18 audit found the deployed package was built from `b58977d`,
-  and the `b58977d` to `b552a7c` diff touches no runtime file. That live build carries the
-  agent deck in the form that asks for a brief on page load. This branch makes the deck
-  press-only and advisory: nothing is called until a viewer presses 'Ask the agent', and a
-  model is called only when the server sets `MERCURY_AGENT_MODEL=on`. Live gets that only
-  after a redeploy. On 2026-10-19 the Bedrock policy was detached from Mercury's Lambda
-  role, a cost decision, so every brief on live is deterministic and says so.
+  publishes the deployed build SHA. On 2026-10-19 it was redeployed at
+  `e8ceae8fb3f76d542eace62214500730b8215991`, the PR #62 merge, record-only; `/health`
+  reported that SHA the same day (`curl -s <url>/health`), and so did the endpoint health
+  read inside emulator run 39210785053. That build makes the agent deck press-only and
+  advisory: nothing is called until a viewer presses 'Ask the agent', and a model is called
+  only when the server sets `MERCURY_AGENT_MODEL=on`. That deploy changed only
+  `MERCURY_BUILD_SHA` among the function's settings and does not set the flag, so every
+  brief on live is deterministic and says so. The committed
+  `deploy_teardown_receipt.json` is older: it was probed on 2026-10-18 at 13:12 UTC
+  (`python scripts/probe_deployment.py`), when `/health` reported the build label
+  `b552a7c13bb7ae449a3f8830c9144e6c2edc5f41` over a package built from `b58977d`; that
+  build carried the deck in the form that asked for a brief on page load.
   Before that, on 2026-10-15, it ran the PR #50 build:
   `fdb5f560168443db0d81c8d65d3e4b9b27fb858a`, record-only. That put the PR #50 runtime
   changes live (service-specific handoff templates, declared observability gap panel and spend tile sync, 1080p hero compact fit above the sticky keybar, explicit spacing in heroCause and row-verdict, and split-flap race cancellation) on top of the PR #42 runtime changes (`ea2cff5`, deployed on 2026-10-06). Before that it ran
