@@ -36,9 +36,12 @@ on top of it. The four simulated services keep their fixture series either way.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as wait_for
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -49,6 +52,12 @@ from src.domain.incident_correlation import (
     MetricSeries,
 )
 from src.domain.provenance import DataSource, Provenance
+from src.infrastructure import cloudwatch_read_outcome as outcome
+from src.infrastructure.cloudwatch_read_outcome import (  # importable from here too
+    NOT_CALLED_REASON_PREFIX,
+    UNREAD_CACHE_SECONDS,
+    UNREAD_REASON_PREFIX,
+)
 from src.infrastructure.offline_mode import (
     OFFLINE_REASON,
     live_cloudwatch_enabled,
@@ -79,6 +88,12 @@ LIVE_LAMBDA_PERIOD_SECONDS = 3600
 #: without this each page view would be two CloudWatch calls per function.
 LIVE_CACHE_ENV = "MERCURY_CLOUDWATCH_CACHE_SECONDS"
 DEFAULT_LIVE_CACHE_SECONDS = 60.0
+#: How a read ended, its 30 s "not read" memory and the client timeouts: cloudwatch_read_outcome.py.
+#: The longest a board question (``what_changed``, ``agent_incident_brief``) waits for a
+#: production row it has to read, as the page waits for its rows
+#: (``src/interfaces/live_rows.py``). The agent's model call (25 s) comes after it, and
+#: the function's own timeout is 30 s.
+ROUTE_READ_DEADLINE_SECONDS = 3.0
 
 # Where the newest simulated reading is placed relative to the newest known
 # commit. The unattributed offset is a multiple of the correlator's own
@@ -237,8 +252,12 @@ class CloudWatchMetricAdapter:
         self.simulate_incident = simulate_incident
         self._resolution_cached = False
         self._resolved_client: Any = None
-        self._live_cache: dict[str, tuple[float, MetricSeries]] = {}
+        # function -> (written at, ttl, series, the sequence number of the read that wrote
+        # it). The number is taken when a read begins, so a read that began later always
+        # has a larger one, even inside one tick of a coarse clock.
+        self._live_cache: dict[str, tuple[float, float, MetricSeries, float]] = {}
         self._live_lock = threading.Lock()
+        self._read_seq = itertools.count(1)
         # The page reads the production rows in parallel; without this a second thread
         # could see the resolution flagged as done before the client exists.
         self._client_lock = threading.Lock()
@@ -263,7 +282,17 @@ class CloudWatchMetricAdapter:
                 if session.get_credentials() is None:
                     self._resolved_client = None
                 else:
-                    self._resolved_client = session.client("cloudwatch", region_name=self.region)
+                    from botocore.config import Config
+
+                    self._resolved_client = session.client(
+                        "cloudwatch",
+                        region_name=self.region,
+                        config=Config(
+                            connect_timeout=outcome.CLIENT_CONNECT_TIMEOUT_SECONDS,
+                            read_timeout=outcome.CLIENT_READ_TIMEOUT_SECONDS,
+                            retries={"max_attempts": outcome.CLIENT_MAX_ATTEMPTS},
+                        ),
+                    )
             except Exception:
                 self._resolved_client = None
             self._resolution_cached = True
@@ -471,9 +500,41 @@ class CloudWatchMetricAdapter:
             entry = self._live_cache.get(function_name)
         if entry is None:
             return None
-        read_at, series = entry
-        if time.monotonic() - read_at > self._live_cache_seconds():
+        read_at, ttl, series = entry[:3]
+        if time.monotonic() - read_at > ttl:
             return None
+        return series
+
+    def mark_unread(self, function_name: str, waited_seconds: float) -> MetricSeries:
+        """Record that a production read did not answer in time, and return that row.
+
+        The row is NO LIVE DATA with a reason that names the wait and nothing else, and
+        it is remembered for :data:`UNREAD_CACHE_SECONDS`. A read still running in the
+        background replaces it with its real answer when it finishes. A read that
+        answered between the page giving up and this mark already left a fresh answer
+        in the cache (the read began with none, or it would not have been slow), and
+        that answer is kept and returned rather than hidden for 30 s.
+        """
+        series = self._no_live_data(
+            function_name,
+            (
+                f"{UNREAD_REASON_PREFIX} within {waited_seconds:g} s, so this row was not read "
+                "this time."
+            ),
+            LIVE_LAMBDA_NAMESPACE,
+            LIVE_LAMBDA_METRIC,
+        )
+        with self._live_lock:
+            entry = self._live_cache.get(function_name)
+            if entry is not None:
+                read_at, ttl, answered = entry[:3]
+                fresh = time.monotonic() - read_at <= ttl
+                if fresh and not outcome.is_unread(answered):
+                    return answered
+            # Sequence 0, older than any read: whichever read answers next, however late,
+            # replaces it.
+            self._live_cache[function_name] = (
+                time.monotonic(), UNREAD_CACHE_SECONDS, series, 0)
         return series
 
     def _sum_series(
@@ -491,15 +552,23 @@ class CloudWatchMetricAdapter:
         return sorted(response.get("Datapoints", []), key=lambda d: d["Timestamp"])
 
     def _no_credentials_for_production_row(self, function_name: str) -> MetricSeries:
+        """A production row CloudWatch was never asked about: no AWS credentials resolved.
+
+        It is NO LIVE DATA, never OFFLINE FIXTURE: there is no fixture for a real
+        function, and the deck and the agent stamp the answer with this label. The board
+        draws it "Not read". It only happens on a local run; the deployed function always
+        has its role's credentials.
+        """
         return MetricSeries(
             metric_name=LIVE_LAMBDA_METRIC,
             namespace=LIVE_LAMBDA_NAMESPACE,
             points=[],
             provenance=Provenance(
-                source=DataSource.OFFLINE_FIXTURE,
+                source=DataSource.NO_LIVE_DATA,
                 detail=(
-                    f"No AWS credentials resolved, so CloudWatch was not called for the production "
-                    f"function {function_name}, and no reading is invented for it."
+                    f"{NOT_CALLED_REASON_PREFIX} for the production function {function_name}: no "
+                    "AWS credentials resolved where this server runs, so this row was not read and "
+                    "no reading is invented for it."
                 ),
                 observed_at_utc=_iso_now(),
             ),
@@ -517,6 +586,18 @@ class CloudWatchMetricAdapter:
             errors = self._sum_series(client, LIVE_LAMBDA_METRIC, function_name, start, end)
             invocations = self._sum_series(client, LIVE_LAMBDA_CONTEXT_METRIC, function_name, start, end)
         except Exception as exc:
+            if outcome.got_no_answer(exc):
+                # CloudWatch did not answer (a timeout, or a connection dropped first):
+                # that is a row not read, not an answer with nothing in it, so it is
+                # stamped and remembered like the page's own deadline (30 s), not like a
+                # read that answered (60 s).
+                in_time = " in time" if outcome.is_timeout(exc) else ""
+                return self._no_live_data(
+                    function_name,
+                    f"{UNREAD_REASON_PREFIX}{in_time} ({describe_exception(exc)}), so this row was not read.",
+                    LIVE_LAMBDA_NAMESPACE,
+                    LIVE_LAMBDA_METRIC,
+                )
             return self._no_live_data(
                 function_name,
                 f"CloudWatch call failed ({describe_exception(exc)}).",
@@ -573,11 +654,52 @@ class CloudWatchMetricAdapter:
         cached = self.cached_live_series(function_name)
         if cached is not None:
             return cached
+        with self._live_lock:
+            started = next(self._read_seq)
         series = self._read_production_function(function_name)
-        if series.provenance.source is not DataSource.OFFLINE_FIXTURE:
-            with self._live_lock:
-                self._live_cache[function_name] = (time.monotonic(), series)
+        if outcome.not_called(series):
+            # No credentials: nothing was read, so nothing is remembered either.
+            return series
+        ttl = UNREAD_CACHE_SECONDS if outcome.is_unread(series) else self._live_cache_seconds()
+        with self._live_lock:
+            entry = self._live_cache.get(function_name)
+            if (
+                entry is not None
+                and entry[3] > started
+                and (not outcome.is_unread(entry[2]) or outcome.is_unread(series))
+            ):
+                # A read that began after this one has already written its answer (two
+                # requests missed the cache together, or this read outlived a deadline).
+                # That answer is newer, so this late one must not overwrite it; the
+                # caller gets the newer answer while it is fresh. A newer read that got
+                # no answer (a timeout) is not an answer, so a late real answer replaces
+                # it, and a not-read mark carries sequence 0 for the same reason.
+                read_at, newer_ttl, newer = entry[:3]
+                return newer if time.monotonic() - read_at <= newer_ttl else series
+            self._live_cache[function_name] = (time.monotonic(), ttl, series, started)
         return series
+
+    def get_production_series_within(self, function_name: str, deadline_seconds: float) -> MetricSeries:
+        """:meth:`get_production_series`, waiting at most ``deadline_seconds`` for it.
+
+        A read that has not answered by then is recorded as not read (``mark_unread``)
+        and carries on in the background, where its answer replaces that mark. The
+        worker is not joined, so a slow CloudWatch cannot hold the request.
+        """
+        if function_name not in LIVE_PRODUCTION_FUNCTIONS:
+            raise ValueError(f"{function_name!r} is not an allow-listed production function")
+        cached = self.cached_live_series(function_name)
+        if cached is not None:
+            return cached
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = pool.submit(self.get_production_series, function_name)
+            wait_for([future], timeout=deadline_seconds)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+        if future.done() and not future.cancelled():
+            return future.result()
+        return self.mark_unread(function_name, deadline_seconds)
 
     # ------------------------------------------------------------- Public API
 
@@ -599,7 +721,8 @@ class CloudWatchMetricAdapter:
         ``MERCURY_OFFLINE``, whatever ``MERCURY_LIVE_CLOUDWATCH`` says.
         """
         if self.is_live_production_row(service_name):
-            return self.get_production_series(service_name)
+            # A board question waits for the row no longer than the page does.
+            return self.get_production_series_within(service_name, ROUTE_READ_DEADLINE_SECONDS)
         if offline_mode_enabled():
             return self._simulated_series(
                 service_name, OFFLINE_REASON, window_minutes, anchor_at, commit_times

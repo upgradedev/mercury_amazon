@@ -23,6 +23,12 @@ from src.domain.incident_handoff import HandoffConflict, IncidentHandoffStore
 DEMO_INCIDENT_ID = "checkout-api-active"
 DEMO_ACTION_ID = "tv-demo-handoff"
 DEMO_STAMP = {"authorization_mode": "DPAD_RECORD_ONLY_DEMO", "external_effect": "NONE"}
+#: Said, with HTTP 422, when the selected row has no recorded demo handoff (a live
+#: production row, for one). It used to be a 409, which the board reads as two screens
+#: publishing at once, and that is not what happened.
+DEMO_HANDOFF_UNAVAILABLE = (
+    "No recorded demo handoff exists for this service; handoffs are demo-only."
+)
 
 
 class DemoHandoffRequest(BaseModel):
@@ -58,7 +64,7 @@ def register_handoff_routes(
         validate_record_only_demo(DEMO_ACTION_ID)
         payload = demo_payload(req.service_name)
         if payload is None:
-            raise HTTPException(status_code=409, detail="The labelled demo handoff is unavailable.")
+            raise HTTPException(status_code=422, detail=DEMO_HANDOFF_UNAVAILABLE)
         try:
             item = store.update(**payload, expected_revision=req.expected_revision)
         except HandoffConflict as exc:

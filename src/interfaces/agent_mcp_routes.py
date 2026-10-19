@@ -344,13 +344,29 @@ def register_agent_mcp_routes(app: FastAPI) -> None:
                     mcp_server.StageRollbackRequest(**arguments)
                 )
             elif name == "demo_update_handoff":
-                from src.interfaces.handoff_routes import DEMO_ACTION_ID, DEMO_STAMP
+                from src.interfaces.handoff_routes import (
+                    DEMO_ACTION_ID,
+                    DEMO_HANDOFF_UNAVAILABLE,
+                    DEMO_STAMP,
+                )
 
                 mcp_server._validate_record_only_demo(DEMO_ACTION_ID)
                 service_name = str(arguments.get("service_name", "checkout-api"))
                 demo_data = mcp_server.recorded_demo_handoff(
                     mcp_server.incident_use_case, mcp_server.deployment_evidence, service_name
                 )
+                if demo_data is None:
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "result": {
+                                "content": [{"type": "text", "text": DEMO_HANDOFF_UNAVAILABLE}],
+                                "isError": True,
+                            },
+                        },
+                    )
                 item = mcp_server.incident_handoffs.update(
                     **demo_data, expected_revision=arguments.get("expected_revision")
                 )

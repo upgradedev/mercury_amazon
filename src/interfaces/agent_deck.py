@@ -5,8 +5,9 @@ The deck is appended to the cockpit page. It is quiet and it is honest:
 1. It makes no call on page load and none when a departures row is selected. A call
    runs only when a viewer presses Center on a control that says what it does,
    'Ask the agent', 'Publish recorded demo handoff' or 'Check MCP handshake'.
-2. Every answer card carries the data label the server returned (OFFLINE FIXTURE on
-   the public deployment) and the rollback dispatch mode (record-only).
+2. Every answer card carries the data label the server returned (OFFLINE FIXTURE for
+   a simulated service, LIVE for a production row read from CloudWatch) and the
+   rollback dispatch mode (record-only).
 3. The engine label names a model only when a model actually answered. Otherwise it
    says the brief is deterministic and why. A reply the claim guard discarded reads
    'model answer rejected (claim guard)'. Each field says whether the model wrote it
@@ -14,6 +15,17 @@ The deck is appended to the cockpit page. It is quiet and it is honest:
    drawn as an error.
 4. It adds no stop to the hero's D-pad row, so the order the Android TV emulator run
    proved is unchanged. Its own controls sit in a section after the rollback screen.
+5. A new answer or error card is scrolled up above the remote's key bar, without
+   moving focus, so a second Center on 'Ask the agent' still asks again. It is only
+   scrolled while the D-pad cursor is still in the deck, never so far that the focused
+   control leaves the top of the screen, and again if the shared handoff the publish
+   button refreshes grows above it. That refresh is a click on the page's own button;
+   the cursor and the scroll position go back to where the viewer was afterwards, and
+   when the call ends keyboard focus goes back to the deck control the cursor is still
+   on (disabling it while the call ran had dropped focus to the page).
+6. The board's own Publish handoff error card (a live row has no recorded demo
+   handoff, so the server refuses it with a reason) is scrolled up above the key bar
+   the same way, without moving focus, while the cursor is on Publish handoff.
 """
 from __future__ import annotations
 
@@ -85,8 +97,10 @@ AGENT_DECK_JS = r"""(function () {
   h2.id = 'bedrockAgentTitle';
   sec.appendChild(h2);
   sec.appendChild(mk('p', 'note',
-    'Nothing here runs until you press a button. The agent reads the same answer the board shows, ' +
-    'so its data is the board\'s offline fixture, and rollback dispatch is record-only. Each answer ' +
+    'Nothing here runs until you press a button. The agent reads the same answer the board shows ' +
+    'for the selected row, and its card carries that answer\'s own data label: OFFLINE FIXTURE for a ' +
+    'simulated service; on a production function\'s row, the label says whether CloudWatch was read. ' +
+    'Rollback dispatch is record-only. Each answer ' +
     'names its engine: deterministic, unless a model actually answered. A named commit is a temporal ' +
     'candidate, not proof of cause, and the correlator\'s rollback rules stay in charge.'
   ));
@@ -133,14 +147,126 @@ AGENT_DECK_JS = r"""(function () {
     if (prev) prev.remove();
   }
 
-  /* An error is drawn as an error. It never borrows a brief's labels. */
-  function showError(what, detail) {
+  /* The remote's key bar is fixed over the bottom of the screen, and the deck sits at
+     the end of the page, so a new card used to render behind it: only the console's
+     header line showed. This scrolls the window, never the focus, until the card's
+     first lines (its stamps, the engine pill and the brief) clear the bar, and never
+     so far that the card's own top leaves the screen. */
+  function keybarTop() {
+    var bar = document.querySelector('.keybar');
+    var view = window.innerHeight || document.documentElement.clientHeight;
+    if (!bar) return view;
+    var box = bar.getBoundingClientRect();
+    if (!box.height || box.top >= view || getComputedStyle(bar).display === 'none') return view;
+    return box.top;
+  }
+
+  /* The control the D-pad cursor is on, or null when the page has no navigator. */
+  function cursor() {
+    var nav = window.mercuryNav;
+    return (nav && nav.current) || null;
+  }
+
+  /* Only while the viewer is still in the deck: an answer that lands after they moved
+     up to the board (a slow answer, a cold start) must not scroll the screen away from
+     the control they are on. And never so far that the focused control leaves the top. */
+  function revealCard(card, upTo) {
+    try {
+      var focused = cursor();
+      if (focused && !sec.contains(focused)) return;
+      var gap = 16;
+      var floor = keybarTop() - gap;
+      var overflow = (upTo || card).getBoundingClientRect().bottom - floor;
+      if (overflow <= 0) return;
+      var margin = Math.max(gap, Math.round((window.innerHeight || 0) * 0.04));
+      var room = card.getBoundingClientRect().top - margin;
+      if (focused) room = Math.min(room, focused.getBoundingClientRect().top - margin);
+      var distance = Math.min(overflow, Math.max(room, 0));
+      if (distance > 0) window.scrollBy(0, distance);
+    } catch (e) { /* measuring the layout must never break the deck */ }
+  }
+
+  /* Reveal again whenever the page grows something above the card for a while after
+     it lands: the shared handoff the publish refreshes renders above the deck after
+     the card does, and pushed it back under the key bar. */
+  function keepRevealed(card, upTo, watched) {
+    if (!watched || typeof MutationObserver !== 'function') return;
+    var frame = 0;
+    var watcher = new MutationObserver(function () {
+      if (frame) return;
+      var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+      frame = raf(function () {
+        frame = 0;
+        if (card.isConnected) revealCard(card, upTo);
+      });
+    });
+    watcher.observe(watched, { childList: true, subtree: true, characterData: true });
+    setTimeout(function () { watcher.disconnect(); }, 4000);
+  }
+
+  /* The board's own Publish handoff (docs/index.html, not edited here) brings its
+     answer up above the key bar, but not its error card, which rendered behind the
+     bar while the cursor stayed on Publish: a TV viewer saw only the HTTP status in
+     the console header, never the reason. On a live production row that error is the
+     normal answer (it has no recorded demo handoff). This scrolls the window, never
+     the focus, until the card clears the bar, only while the cursor is on Publish
+     handoff, and never so far that Publish handoff leaves the top of the screen. */
+  function revealBoardError(card) {
+    try {
+      var publish = document.getElementById('btnHandoff');
+      if (!publish || cursor() !== publish) return;
+      var gap = 16;
+      var overflow = card.getBoundingClientRect().bottom - (keybarTop() - gap);
+      if (overflow <= 0) return;
+      var room = publish.getBoundingClientRect().top - gap;
+      var distance = Math.min(overflow, Math.max(room, 0));
+      if (distance > 0) window.scrollBy(0, distance);
+    } catch (e) { /* measuring the layout must never break the board */ }
+  }
+  var boardHandoff = document.getElementById('handoffOutput');
+  if (boardHandoff && typeof MutationObserver === 'function') {
+    new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i++) {
+        var added = records[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var node = added[j];
+          if (node.nodeType === 1 && node.classList && node.classList.contains('error-card')) {
+            revealBoardError(node);
+            return;
+          }
+        }
+      }
+    }).observe(boardHandoff, { childList: true });
+  }
+
+  /* Disabling a focused button drops keyboard focus to the page, and the shared
+     handoff refresh is a click on the page's own button, which takes keyboard focus
+     there. The D-pad cursor never left the deck control, so when its call ends, and
+     only if that control had keyboard focus when it was pressed and the cursor is
+     still on it, keyboard focus goes back to it: Tab and Shift+Tab then start from
+     where the viewer is. It never moves the cursor to another control. */
+  function keepKeyboardFocus(control, hadFocus) {
+    try {
+      var nav = window.mercuryNav;
+      if (!hadFocus || !nav || nav.current !== control || control.disabled) return;
+      if (document.activeElement === control || typeof nav.setFocus !== 'function') return;
+      nav.setFocus(control);
+    } catch (e) { /* focus bookkeeping must never break the deck */ }
+  }
+
+  /* An error is drawn as an error. It never borrows a brief's labels. ``said`` is the
+     server's own reason when it answered with a refusal, so a refusal is shown as
+     one rather than as no answer. */
+  function showError(what, detail, said) {
     clearCard('card-agent-error');
     var card = mk('div', 'agent-card agent-card-error');
     card.id = 'card-agent-error';
-    card.appendChild(mk('p', 'note', 'No answer from ' + what + ': ' + detail + '. Nothing was drafted or written.'));
+    card.appendChild(mk('p', 'note', said
+      ? 'The server refused ' + what + ': ' + detail + '. ' + said + ' Nothing was drafted or written.'
+      : 'No answer from ' + what + ': ' + detail + '. Nothing was drafted or written.'));
     out.insertBefore(card, out.firstChild);
-    latencySpan.textContent = what + ' failed (' + detail + ')';
+    revealCard(card);
+    latencySpan.textContent = what + (said ? ' refused (' : ' failed (') + detail + ')';
   }
 
   async function postJson(url, body, headers) {
@@ -176,6 +302,7 @@ AGENT_DECK_JS = r"""(function () {
   async function runBrief() {
     var svc = activeService();
     var mySeq = ++briefSeq;
+    var hadFocus = document.activeElement === btnBrief;
     btnBrief.disabled = true;
     btnBrief.setAttribute('aria-busy', 'true');
     latencySpan.textContent = 'Asking the agent about ' + svc + '…';
@@ -213,12 +340,14 @@ AGENT_DECK_JS = r"""(function () {
       function source(field) {
         return byModel.indexOf(field) >= 0 ? 'model' : 'deterministic template';
       }
-      card.appendChild(mk('p', 'agent-brief-10ft', syn.commander_brief_10ft || ''));
+      var brief = mk('p', 'agent-brief-10ft', syn.commander_brief_10ft || '');
+      card.appendChild(brief);
       card.appendChild(mk('p', 'note', 'Brief above: ' + source('commander_brief_10ft') + '.'));
       card.appendChild(mk('p', 'note', 'What the evidence does and does not show (' + source('root_cause_hypothesis') + '): ' + (syn.root_cause_hypothesis || '')));
       card.appendChild(mk('p', 'note', 'Draft handoff (' + source('responder_handoff_draft') + '). Action: ' + (draft.current_action || '') + ' Next step: ' + (draft.next_step || '')));
       card.appendChild(mk('p', 'note', 'Advisory only: ' + (syn.guardrail_attestation || '')));
       out.insertBefore(card, out.firstChild);
+      revealCard(card, brief);
       latencySpan.textContent = 'POST /mcp/tools/agent_incident_brief (' + svc + ') · ' + (syn.latency_ms || elapsed) + ' ms';
     } catch (err) {
       if (mySeq === briefSeq) showError('agent_incident_brief', 'the request did not complete');
@@ -226,6 +355,7 @@ AGENT_DECK_JS = r"""(function () {
       if (mySeq === briefSeq) {
         btnBrief.disabled = false;
         btnBrief.setAttribute('aria-busy', 'false');
+        keepKeyboardFocus(btnBrief, hadFocus);
       }
     }
   }
@@ -233,6 +363,7 @@ AGENT_DECK_JS = r"""(function () {
 
   btnPublish.addEventListener('click', async function () {
     var svc = activeService();
+    var hadFocus = document.activeElement === btnPublish;
     btnPublish.disabled = true;
     latencySpan.textContent = 'Publishing the recorded demo handoff for ' + svc + '…';
     try {
@@ -241,11 +372,22 @@ AGENT_DECK_JS = r"""(function () {
       var elapsed = Math.round(performance.now() - t0);
       var d = res.body || {};
       if (!res.ok || d.revision === undefined) {
-        showError('demo_update_handoff', res.ok ? 'the response carried no revision' : 'HTTP ' + res.status);
+        // A live row has no recorded demo handoff, and the server says so (422).
+        var said = !res.ok && typeof d.detail === 'string' ? d.detail : '';
+        showError('demo_update_handoff', res.ok ? 'the response carried no revision' : 'HTTP ' + res.status, said);
         return;
       }
       var refreshBtn = document.querySelector('[data-action="handoff-refresh"]');
-      if (refreshBtn) refreshBtn.click();
+      if (refreshBtn) {
+        /* The page refreshes its shared handoff on a click, and the navigator moves the
+           cursor to whatever is clicked (and scrolls to it). The viewer is still on this
+           deck, so the cursor and the screen go back where they were. */
+        var before = cursor();
+        var keepY = window.pageYOffset;
+        refreshBtn.click();
+        if (before && cursor() !== before && window.mercuryNav.setFocus) window.mercuryNav.setFocus(before);
+        if (window.pageYOffset !== keepY) window.scrollTo(window.pageXOffset, keepY);
+      }
       clearCard('card-agent-error');
       clearCard('card-agent-handoff');
 
@@ -265,11 +407,14 @@ AGENT_DECK_JS = r"""(function () {
       card.appendChild(mk('p', 'note', 'This is the fixed demo handoff, not an agent draft. Current action: ' + (d.current_action || '')));
       card.appendChild(mk('p', 'note', 'Next step: ' + (d.next_step || '')));
       out.insertBefore(card, out.firstChild);
+      revealCard(card, pills);
+      keepRevealed(card, pills, document.getElementById('handoffOutput'));
       latencySpan.textContent = 'POST /mcp/tools/demo_update_handoff · revision ' + d.revision + ' (' + elapsed + ' ms)';
     } catch (err) {
       showError('demo_update_handoff', 'the request did not complete');
     } finally {
       btnPublish.disabled = false;
+      keepKeyboardFocus(btnPublish, hadFocus);
     }
   });
 
@@ -315,6 +460,7 @@ AGENT_DECK_JS = r"""(function () {
       card.appendChild(mk('p', 'note', 'Published tools (' + tools.length + '): ' + tools.map(function (t) { return t.name; }).join(', ')));
       card.appendChild(mk('pre', 'agent-pre', JSON.stringify(callResult.structuredContent || {}, null, 2)));
       out.appendChild(card);
+      revealCard(card, pills);
       latencySpan.textContent = 'MCP handshake answered (' + tools.length + ' tools · ' + elapsed + ' ms)';
     } catch (err) {
       showError('MCP handshake', 'the request did not complete');

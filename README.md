@@ -44,8 +44,8 @@ OFFLINE FIXTURE and record-only stamps. The brief's Bedrock adapter does not rea
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-838%20collected-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-962%20collected-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 The repository is **private** today, so the CI badge does not resolve outside the
@@ -165,7 +165,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 838 passed
+# 962 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
@@ -273,8 +273,10 @@ service names then go to CloudWatch's load balancer metrics and show NO LIVE DAT
 why the hybrid keeps `MERCURY_OFFLINE=1` and adds the switches on top.
 
 A live row is never attributed to a commit and never offers a rollback: no deploy feed for
-those functions is connected. A row whose errors rose from a zero baseline is reported as
-cannot-attribute, never as nothing to revert. An adapter that fails puts only the
+those functions is connected, and every text the row carries says so rather than describing
+an empty deploy window. A row whose errors rose from a zero baseline, including a run of
+errors that has lasted several hours after only zeros, is reported as cannot-attribute,
+never as nothing to revert. An adapter that fails puts only the
 exception class, an AWS error code or HTTP status, and a short reason into the provenance;
 ARNs, account ids, access key ids and request ids are removed
 (`src/infrastructure/safe_errors.py`). The deployment needs one read-only grant on the
@@ -284,6 +286,12 @@ reads take no resource ARN, so the fixed list of three names in
 `MERCURY_LIVE_CLOUDWATCH=1` changes what the TV renders, eight rows instead of five, so the
 Android TV runtime receipt, recorded on the five-row page, needs a fresh emulator run after
 that deploy. Measurements: [Evidence](docs/EVIDENCE.md#hybrid-live-data-built-not-deployed).
+
+The planned deploy sets `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1` only. The GitHub
+switch waits until the repository is public (planned for 2026-10-21): before that every
+anonymous read gets HTTP 404. Known issue, not fixed here: with `MERCURY_LIVE_GITHUB=1`,
+`/health` reports `github_live` true from the switch alone, even while every read gets 404,
+and `video/capture-local.py` refuses to record while it is true.
 
 The engine's limits are measured, not hidden. Every figure comes from a synthetic
 corpus the authors wrote. Settings are tuned on a train split and reported on a

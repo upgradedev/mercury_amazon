@@ -63,6 +63,7 @@ from src.interfaces.live_rows import (
     live_rows_enabled,
     live_sources_summary,
     read_production_rows,
+    withdraw_window_fields,
 )
 
 logger = logging.getLogger("mercury.mcp")
@@ -468,6 +469,8 @@ async def what_changed(req: WhatChangedRequest = WhatChangedRequest()) -> dict[s
             "blocked_reason": None,
         },
     }
+
+    withdraw_window_fields(payload, correlation)  # a live production row read no window
 
     if correlation.offending_commit is not None:
         commit = correlation.offending_commit
