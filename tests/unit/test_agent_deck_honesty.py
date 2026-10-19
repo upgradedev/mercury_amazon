@@ -398,3 +398,41 @@ def test_an_attributed_commit_without_a_rollback_target_names_the_candidate_and_
     assert result["incident_severity"] == "SEV-2_NO_ROLLBACK_TARGET"
     assert sha in result["commander_brief_10ft"]
     assert "No authenticated deployment marker proves a target." in text
+
+
+# ------------------------------------------------ 10-19 guard false positives on negations
+
+def test_the_prompt_names_the_rejected_phrasings_and_no_longer_dictates_a_negated_staging(seeded_client):
+    """A local run of 12 Sonnet 5 briefs on the fixtures had 9 rejected for 'has been staged' or
+    'is staged', mostly 'no rollback has been staged', which the old prompt's own line
+    'Nothing has been staged.' invited. The prompt now names what the guard rejects."""
+    capture = _CapturingClient(json.dumps({"commander_brief_10ft": "Candidate only."}))
+    BedrockIncidentAgentAdapter(client_factory=lambda region: capture).synthesize_incident_brief(
+        what_changed_payload=_payload_for(seeded_client, "checkout-api"),
+        data_label="OFFLINE FIXTURE",
+        rollback_dispatch="record-only",
+    )
+    prompt = capture.prompts[0]
+    assert "Nothing has been staged" not in prompt
+    assert "not even to deny it" in prompt
+    for phrasing in ("'caused by'", "'the cause is'", "'after <commit>'", "'has been staged'", "'awaiting'"):
+        assert phrasing in prompt, phrasing
+    assert "the only runtime commit in the window was <commit>" in prompt
+
+
+def test_a_rejected_answer_names_the_phrase_the_guard_matched(seeded_client):
+    claim = "No cause is proven and no rollback has been staged."
+    reply = json.dumps({"commander_brief_10ft": claim})
+    adapter = BedrockIncidentAgentAdapter(client_factory=lambda region: _CapturingClient(reply))
+    result = adapter.synthesize_incident_brief(what_changed_payload=_payload_for(seeded_client, "checkout-api"))
+    assert result["fallback_reason"] == "model_claim_rejected"
+    assert result["rejected_phrase"] == "has been staged"
+    assert claim not in json.dumps(result)
+
+
+def test_an_accepted_answer_carries_no_rejected_phrase(seeded_client):
+    reply = json.dumps({"commander_brief_10ft": "The only runtime commit in the window was a4ec9aa, a temporal candidate."})
+    adapter = BedrockIncidentAgentAdapter(client_factory=lambda region: _CapturingClient(reply))
+    result = adapter.synthesize_incident_brief(what_changed_payload=_payload_for(seeded_client, "checkout-api"))
+    assert result["synthesis_mode"] == "bedrock"
+    assert "rejected_phrase" not in result

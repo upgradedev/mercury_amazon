@@ -909,7 +909,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-796 tests and a re-measure on an idle machine is pending**.
+799 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -953,7 +953,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 796 passed
+# 799 passed
 ```
 
 #### Step 3: Start the server
@@ -1185,8 +1185,8 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 796 passed
-python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2518 statements
+python -m pytest tests/ -q                                    # 799 passed
+python -m pytest tests/ --cov=src --cov-report=term-missing   # 92% of 2523 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
 python scripts/attribution_split.py                           # train and held-out, 1160 cases each
@@ -1200,10 +1200,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 47/53 PASSED, 6/53 FAILED (0 of them blocking)
+# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**47/53 readiness gates** (46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
+**46/53 readiness gates** on this branch, because G2 fails until it is deployed: it changes `src/infrastructure/bedrock_incident_agent.py` after the live `e8ceae8` build (47 once a deploy of this code is probed; 46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1244,7 +1244,7 @@ persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which three are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 47/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 

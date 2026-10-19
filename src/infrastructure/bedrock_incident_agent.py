@@ -101,7 +101,13 @@ def max_model_calls() -> int:
 
 def forbidden_claim(text: str) -> bool:
     """True when model text claims a cause or a staged or executed rollback."""
-    return bool(FORBIDDEN_CLAIMS.search(text or ""))
+    return forbidden_claim_match(text) is not None
+
+
+def forbidden_claim_match(text: str) -> str | None:
+    """The first phrase in model text that the guard rejects, or None."""
+    match = FORBIDDEN_CLAIMS.search(text or "")
+    return match.group(0) if match else None
 
 
 def public_model_label(model_id: str) -> str:
@@ -321,7 +327,13 @@ class BedrockIncidentAgentAdapter:
             f"Rollback dispatch is {rollback_dispatch}: Stage and Confirm record a decision and contact no pipeline.\n"
             "Rules:\n"
             "- Do not claim a cause. A named commit is only a temporal candidate. " + causality + "\n"
-            "- Do not say a rollback is staged, awaiting authorization, executed or completed. Nothing has been staged.\n"
+            "- Do not say a rollback is staged, awaiting authorization, executed or completed, and do not mention"
+            " rollback status at all, not even to deny it: the board shows that status itself.\n"
+            "- Never use these phrasings, which the board rejects even in a negative sentence: 'caused by',"
+            " 'root cause is', 'the cause is', 'the cause was', 'introduced the regression', 'after <commit>', 'is staged',"
+            " 'has been staged', 'awaiting', 'ready to stage', 'ready to roll back', 'was executed', 'rolled back',"
+            " 'reverted', 'dispatched'. Write 'the only runtime commit in the window was <commit>' or"
+            " 'a temporal candidate' instead.\n"
             "- Do not invent facts that are not in the data below.\n"
             "Return ONLY a valid JSON object (1-2 concise sentences per field) with these exact keys:\n"
             '  "incident_severity": one of ["SEV-1_ROLLBACK_READY", "SEV-2_ATTRIBUTION_REFUSED", "NOMINAL_NO_ANOMALY"],\n'
@@ -345,9 +357,11 @@ class BedrockIncidentAgentAdapter:
             )
             raw_text = self._extract_first_text(response)
             parsed, model_fields = self._parse_json_or_wrap(raw_text, deterministic)
-            if forbidden_claim(json.dumps({f: parsed[f] for f in model_fields})):
-                # A model answered and its reply was discarded: say exactly that.
+            rejected_phrase = forbidden_claim_match(json.dumps({f: parsed[f] for f in model_fields}))
+            if rejected_phrase is not None:
+                # A model answered and its reply was discarded: say exactly that, and which phrase.
                 self.last_fallback_reason = "model_claim_rejected"
+                deterministic["rejected_phrase"] = rejected_phrase
                 deterministic["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
                 deterministic["fallback_reason"] = self.last_fallback_reason
                 deterministic["model_call_attempted"] = True
