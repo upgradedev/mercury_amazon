@@ -1,8 +1,8 @@
 {
   "schema": "mercury.coverage/1",
-  "note": "Line coverage of src/ measured by pytest-cov over the committed test suite. The CI floor is 85 percent. statements 2518 was counted on 2026-10-19 by 'python -m pytest tests/unit -q --cov=src --cov-report=term' after the disabled_by_flag change added 10 statements; percent 92 and missed 189 are still the TOTAL line CI run 39207074105 printed at ff4c56a (2508 statements), until CI re-measures this branch. --check compares statements and percent only, because the missed count differs by machine.",
+  "note": "Line coverage of src/ measured by pytest-cov over the committed test suite. The CI floor is 85 percent. These figures are the TOTAL line CI run 39217266708 printed at 7f6c0a8 on 2026-10-19 (2518 statements, 189 missed, 92%); --check compares statements and percent only, because the missed count differs by machine.",
   "measured_at_utc": "2026-10-19T05:58:13Z",
-  "measured_by_command": "python -m pytest tests/ -q --cov=src --cov-report=term (CI run 39207074105)",
+  "measured_by_command": "python -m pytest tests/ -q --cov=src --cov-report=term (CI run 39217266708)",
   "equivalent_command": "python -m pytest tests/ -q --cov=src --cov-report=term",
   "python_version": "3.11.0",
   "platform": "linux",
