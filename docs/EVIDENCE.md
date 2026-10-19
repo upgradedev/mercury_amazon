@@ -1200,10 +1200,10 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 47/53 PASSED, 6/53 FAILED (0 of them blocking)
+# SUMMARY: 46/53 PASSED, 7/53 FAILED (0 of them blocking)
 ```
 
-**47/53 readiness gates** (46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
+**46/53 readiness gates** (J4 fails, not counted against CI, because the receipt writer now refuses a uniform final frame and requires the activity dump: `scripts/write_android_tv_runtime_receipt.py` and `scripts/android_tv_smoke.sh` changed after run 39210785053's build, so its receipt no longer stands until this is merged and deployed and a fresh emulator run is landed; 47 before that change; 46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, which did not change the count). J4 is
 the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
@@ -1244,7 +1244,7 @@ persona review in this repository's own voice: the procedure that ran first, the
 three lenses, who owned each row, thirteen findings of which three are failures, and
 the questions nobody could close. The gates check its structure and open every file
 it cites, so deleting a lens or citing a test that is not there turns one of them
-red. `python ci/readiness.py` prints the same 47/53 from a bare clone, and the
+red. `python ci/readiness.py` prints the same 46/53 from a bare clone, and the
 coordination file itself stays out of this repository, where the workspace protocol
 requires it to stay.
 
