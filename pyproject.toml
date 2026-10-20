@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mercury_amazon"
 version = "0.1.0"
-description = "Mercury: Voice CTO Cockpit and Big-Screen War Room on Fire TV and Amazon Alexa+"
+description = "Mercury: a Fire TV incident board that names a deploy only when exactly one runtime change landed in the window"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

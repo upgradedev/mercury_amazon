@@ -358,7 +358,15 @@ your own checkout and every panel labels its data source on screen.
 ## Track declaration
 
 * **Primary track:** Fire TV.
-* **Mini challenges:** none. Single-track entry.
+* **Mini challenge:** Open Source (firetv-spatial-navigation). The contribution is
+  [pull request #1](https://github.com/upgradedev/firetv-spatial-navigation/pull/1)
+  to [firetv-spatial-navigation](https://github.com/upgradedev/firetv-spatial-navigation),
+  a dependency-free D-pad navigator for Fire TV and other television web views, under
+  the MIT licence. That pull request added the spatial scoring, the browser and native
+  input adapters, lifecycle cleanup, declarations, an example and executable tests.
+  The package was extracted from Mercury's navigator into its own repository. Mercury
+  does not import it: the board runs its own `docs/firetv_nav.js`, which has changed
+  separately since the extraction.
 
 ---
 
