@@ -4,8 +4,9 @@
 **Persona:** the on-call engineer holding the remote during a production incident.
 
 Each scenario below is either **Automated** and names the test that covers it, or
-**Manual, not executed** and says why. Nothing here claims a result that was not
-observed. Run `python -m pytest tests/ -q` to execute every automated row.
+**Manual** and says where its result is recorded or why it has not been run. Nothing
+here claims a result that was not observed. Run `python -m pytest tests/ -q` to execute
+every automated row.
 
 ---
 
@@ -56,16 +57,17 @@ observed. Run `python -m pytest tests/ -q` to execute every automated row.
 
 ---
 
-## 2. Manual scenarios, not executed
+## 2. Manual scenarios
 
-These need a dispatched workflow, a network or a person, and none of them has been performed.
-They are listed so the gap is explicit rather than absent.
+These need a dispatched workflow, a network or a person. M-01 to M-03, M-07 and M-09 have
+been run, and each says where its result is recorded. The others have not been performed;
+they are listed so the gap is explicit rather than absent.
 
-| ID | Scenario | Why it has not been run | How to run it |
+| ID | Scenario | Result, or why it has not been run | How to run it |
 |---|---|---|---|
-| M-01 | The candidate APK installs and normally launches on an allowed target | The new Android TV workflow has not yet been dispatched | Run `.github/workflows/android-tv-emulator.yml`; physical hardware is optional under the official FAQ |
-| M-02 | D-pad drives attribution, record-only confirmation and handoff in the APK | The new Android TV workflow has not yet been dispatched | The workflow runs `scripts/android_tv_smoke.sh` and rejects missing native journey events |
-| M-03 | CI assembles and retains the exact candidate APK | Previous Android builds passed; the candidate run is pending | Use the APK included in the Android TV runtime artifact and verify its receipt digest |
+| M-01 | The candidate APK installs and normally launches on an allowed target | **Passed on 2026-10-19.** Android TV emulator run 39334510932, dispatched on `e6aae2c`, installed the APK on AOSP TV on x86, Android 14 / API 34 (`adb install` exit code 0), and started it through the Leanback launcher with no `COCKPIT_URL` extra. The page it loaded was the compiled Lambda URL, whose `/health` reported `build_sha` `e6aae2c` (`android_tv_runtime_receipt.json`). The official FAQ accepts the Android TV Emulator for Fire TV. No Fire TV device was used | Dispatch `.github/workflows/android-tv-emulator.yml` again; physical hardware is optional under the official FAQ |
+| M-02 | D-pad drives attribution, record-only confirmation and handoff in the APK | **Passed on 2026-10-19, with ADB keyevents mapped to the D-pad, not a hand-held remote.** The same run logged the five `MercuryCockpit` journey events the receipt lists: page loaded, `what_changed` `ANOMALY_ATTRIBUTED`, rollback staged, rollback confirmed `RECORDED_ONLY` and handoff published. The run did not press 'Ask the agent', so the agent deck is not covered | The workflow runs `scripts/android_tv_smoke.sh` and rejects missing native journey events |
+| M-03 | CI assembles and retains the exact candidate APK | **Passed on 2026-10-19.** The same run built the debug APK (`./gradlew :app:assembleDebug`), SHA-256 `04cbab48b065caff…` and 9,261,223 B, installed that file, and kept it in the artifact `mercury-android-tv-runtime-e6aae2c…` with the logs, screenshot and receipt. GitHub lists that artifact as unexpired until 2027-01-17 (`gh api repos/upgradedev/mercury_amazon/actions/runs/39334510932/artifacts`, read on 2026-10-20). Every receipt hash was re-checked against the downloaded artifact with `sha256sum` (`docs/EVIDENCE.md`, Fire TV) | Download the APK from that artifact and compare its SHA-256 with `apk_sha256` in `android_tv_runtime_receipt.json` |
 | M-04 | Text is legible from three metres on a large screen | No television was available | Open the cockpit on a TV at 1080p and read it from a sofa |
 | M-05 | A real CloudWatch 5xx spike is correlated to a real deployment | No monitored service exists to produce one | Point `MERCURY_SIMULATE_INCIDENT=0` at a real load balancer with AWS credentials |
 | M-06 | A rollback reaches a deployment pipeline | The default dispatcher records locally. The GitHub Actions dispatcher exists but has never been fired and stays disarmed unless three variables are set | Set `MERCURY_ROLLBACK_DISPATCH`, `MERCURY_ROLLBACK_REPO`, `GITHUB_TOKEN` and `MERCURY_ROLLBACK_DISPATCH_ARMED`, against a repository that has the workflow |
@@ -87,5 +89,5 @@ place to report what happened, whether it worked or not.
 | Every rollback denial reason has a failing-input test | Met | 10 distinct denial reasons asserted in `tests/integration/test_rollback_authorization.py`, counted by `python ci/readiness.py` at gate I5 |
 | Readiness gates with no blocking failure | Met | `python ci/readiness.py`, 47/53 passed, 0 blocking |
 | A Fire TV binary that somebody has watched run | Met | Gate J4 passes from `android_tv_runtime_receipt.json`: the APK ran on the Android TV emulator (AOSP TV x86, API 34) in CI run 39334510932, against the page served at `e6aae2c`, which carries the press-only agent deck and, with `MERCURY_LIVE_CLOUDWATCH=1`, three LIVE CloudWatch rows (the run's `endpoint-health.json` lists them). The run drove the five journey events; it did not press 'Ask the agent' |
-| Verified on an allowed Fire TV track target | **Not met** | Android TV Emulator run pending; physical hardware is optional |
+| Verified on an allowed Fire TV track target | **Met, on the FAQ's emulator allowance** | The target is the Android TV emulator (AOSP TV x86, Android 14 / API 34) in run 39334510932, which the official FAQ accepts for Fire TV; see M-01 to M-03. No run on a Fire TV device is recorded, and no Vega Virtual Device run of Mercury is recorded here: the last Vega workflow run, 38241968838 on 2026-10-12, built the app and reported `vvd_status=builds_but_vvd_blocked`, because the Ubuntu VVD has no WebView module |
 | Verified against a live web deployment | Met | Root and `/health` answer; the deployment publishes its build SHA |

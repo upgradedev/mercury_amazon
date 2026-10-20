@@ -3,9 +3,15 @@
 ## Architecture
 
 `main.tf` declares a serverless public demo on AWS Lambda behind a Function URL.
-The deployed role can write only its DynamoDB state and logs. Terraform forces
-`MERCURY_OFFLINE=1`, so anonymous demo traffic receives labelled fixtures and
-cannot read account Cost Explorer or CloudWatch telemetry. Nothing runs continuously.
+The role it declares can write only its DynamoDB state and logs, and can invoke
+Bedrock models for the agent brief. Terraform forces `MERCURY_OFFLINE=1`, so a stack
+built from this file alone serves labelled fixtures to anonymous traffic and cannot
+read Cost Explorer or CloudWatch. Nothing runs continuously.
+
+The production function is not that stack alone. Since 2026-10-19 it also reads
+CloudWatch for three rows of the board, and the settings that allow it were made by
+hand, outside Terraform. See
+[What the live function runs that Terraform does not declare](#what-the-live-function-runs-that-terraform-does-not-declare).
 
 ## Monthly idle cost
 
@@ -33,7 +39,48 @@ deployment. The public Terraform stack does not grant these permissions:
 
 To replace these estimates with measurements, use a separately authenticated
 operator deployment, leave it idle for a full billing period, then read its actual
-Cost Explorer report. Do not enable live account telemetry on the anonymous URL.
+Cost Explorer report. Cost Explorer stays off the anonymous URL, because it reports
+the whole AWS account's bill.
+
+The anonymous URL does read one kind of live account telemetry. Since 2026-10-19 the
+production function runs with `MERCURY_LIVE_CLOUDWATCH=1`, and the board carries
+three LIVE rows read from `AWS/Lambda` `Errors` and `Invocations` for the hackathon's
+own functions: `mercury-wallboard-euw1-prod`, `volcan-mcp-euw1-prod` and
+`aletheia-provenance-euw1-prod`. A page view can trigger those reads. Each instance
+caches a successful read for 60 seconds and an unread one for 30
+(`DEFAULT_LIVE_CACHE_SECONDS` in `src/infrastructure/cloudwatch_adapter.py`,
+`UNREAD_CACHE_SECONDS` in `src/infrastructure/cloudwatch_read_outcome.py`). With
+reserved concurrency at 10, a busy board can make up to ten pairs of successful reads
+per function a minute (ESTIMATE, by arithmetic from that cache rule).
+
+The grant is the inline role policy `mercury-read-own-lambda-metrics`. It allows only
+`cloudwatch:GetMetricStatistics`, on `Resource: "*"`, because that action takes no
+resource-level scoping. IAM therefore lets the role read any CloudWatch metric in the
+account. The limit to three functions is enforced in the code
+(`LIVE_PRODUCTION_FUNCTIONS` in `src/infrastructure/cloudwatch_adapter.py`), not in
+the policy.
+
+## What the live function runs that Terraform does not declare
+
+Read on 2026-10-20 with read-only calls: `aws lambda get-function-configuration`,
+`aws lambda get-function-concurrency`, `aws iam list-role-policies`,
+`aws iam list-attached-role-policies` and `aws iam get-role-policy`. None of the
+settings below is in `main.tf`, so applying this file does not reproduce the
+production function. They were set outside Terraform; the 2026-10-19 changes to the
+environment, the CloudWatch grant and the concurrency were each approved by the owner.
+
+| Setting on `mercury-wallboard-euw1-prod` | Live value | In `main.tf` |
+|---|---|---|
+| `MERCURY_LIVE_CLOUDWATCH` | `1`, set on 2026-10-19 at 22:21 UTC | No |
+| `MERCURY_AGENT_MODEL` and `MERCURY_AGENT_MODEL_MAX_CALLS` | `on` and `40`, set on 2026-10-19 | No |
+| `MERCURY_ROLLBACK_SECRET` | Set; its value is not in the repository | No |
+| Inline policy `mercury-read-own-lambda-metrics` | `cloudwatch:GetMetricStatistics` on `*`, attached on 2026-10-19 at 22:21 UTC | No |
+| Reserved concurrency | 10, set on 2026-10-19 at 22:48 UTC; it was 2 before | No `reserved_concurrent_executions` |
+| The role's other grants | Inline `mercury-state-euw1-prod` (DynamoDB `GetItem`, `PutItem` and `Query` on its table), the AWS-managed `AWSLambdaBasicExecutionRole`, and the customer-managed `volcan-bedrock-mantle-euw1-prod` | `main.tf` declares one customer-managed policy, `mercury-serverless-policy-euw1-prod`, for logs, DynamoDB and Bedrock. It is not attached to the live role |
+
+The live function does carry what `main.tf` declares for its environment:
+`ENVIRONMENT`, `MERCURY_BUILD_SHA` (`e6aae2c`), `MERCURY_STATE_TABLE` and
+`MERCURY_OFFLINE=1`. Neither `MERCURY_LIVE_GITHUB` nor `GITHUB_TOKEN` is set.
 
 ## Deploy and teardown
 
@@ -67,12 +114,13 @@ remove that interrupted run before accepting a D2 receipt.
 
 The public cockpit is deployed at
 `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`.
-`GET /health` publishes the immutable build SHA. Probed on 2026-09-26 it reported
-`6dd76bd`, an older build than this repository's HEAD, so it has to be redeployed before
-it shows the current board. The deployment is forced to labelled
-offline fixtures and record-only rollback dispatch; its execution role cannot read live
-account telemetry. It does not claim a physical Fire TV run.
-`deploy_teardown_receipt.json` records a dated HTTP observation.
+`GET /health` publishes the immutable build SHA. Probed on 2026-10-19 at 22:23 UTC
+with `python scripts/probe_deployment.py <url>`, it reported `e6aae2c`, which matched
+the local HEAD at the time, and listed the three CloudWatch rows under `live_sources`.
+`deploy_teardown_receipt.json` records that dated HTTP observation. The deployment
+keeps `MERCURY_OFFLINE=1`, so the five demo services, Cost Explorer and GitHub are
+labelled fixtures, and rollback dispatch is record-only. Its execution role can read
+CloudWatch metrics, as described above. It does not claim a physical Fire TV run.
 
 Set `MERCURY_BUILD_SHA` at deploy time, or deploy from a git checkout, so that
 `GET /health` reports the commit it was built from. `scripts/probe_deployment.py`
