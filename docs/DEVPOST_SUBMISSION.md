@@ -206,14 +206,17 @@ Stated plainly, because the cockpit shows it anyway.
 | Agent brief and MCP server | **Advisory, press-only.** `POST /mcp/tools/agent_incident_brief` and `POST /mcp` (MCP 2025-11-25). A model is called only when the server sets `MERCURY_AGENT_MODEL=on`, at most `MERCURY_AGENT_MODEL_MAX_CALLS` times per process; otherwise deterministic rules write the brief and the card says so. On 2026-10-19 the live function was set to `MERCURY_AGENT_MODEL=on` with `MERCURY_AGENT_MODEL_MAX_CALLS=40`, a configuration change with no code change, and the Bedrock policy is attached to its role. A live press on `e8ceae8` reached Claude Sonnet 5, but the claim guard discarded the answer (`model_claim_rejected`), so that brief was deterministic; PR #64 then named the rejected phrasings in the prompt (in a local run on the fixtures, 19 of 20 Sonnet 5 briefs passed the guard, against 2 of 12 with the earlier prompt). The press after the `ddccb3e` deploy stopped at `max_tokens` with only a thinking block (`ValueError`), and PR #68 raised `MODEL_MAX_TOKENS` to 16000. On the deployed `e6aae2c` build, which carries both, one owner-approved press for `checkout-api` answered HTTP 200 in 15.37 s, timed by the client, with `synthesis_mode` `bedrock`, `model_answered` `anthropic.claude-sonnet-5`, all four fields written by the model and `latency_ms` 15102 (response kept in the workspace, outside git, as `reviews/deploy_20261019/mercury/agent_brief_verification_e6aae2c.json`). That is one press, not a rate |
 | The rollback itself | **Simulated dispatch.** Governance is real and enforced; no deployment pipeline is contacted, and the success response says that verbatim |
 | Attribution accuracy | **Measured on a synthetic, self-authored corpus.** Held-out split scored by `python scripts/attribution_split.py`: naming precision 50.0% over 58 namings (95% interval 37.5% to 62.5%) under the corpus's assumption that a regression shows within 75 minutes (41.5% at 90, 27.3% at 180), recall 4.8% over 600 regressions, refusal on 90.0% of detected anomalies, with only commits that changed a runtime file counted as deploys, shipped in every answer as `attribution.measured_accuracy`. The in-sample 52.2% it replaced is kept as history |
-| Fire TV target | **Candidate runtime pending.** The new workflow builds the intended endpoint, installs the exact APK in Android TV Emulator, normally launches it with no URL override and drives attribution, record-only confirmation and handoff by D-pad. That emulator run is the target proof. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
+| Fire TV target | **Android TV Emulator run landed on 2026-10-19; no device.** Run [39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932) built the APK from `e6aae2c` against the public endpoint, installed that exact file on AOSP TV (Android 14 / API 34), launched it through the Leanback launcher with no URL override and drove attribution, record-only confirmation and handoff with D-pad keyevents. Its receipt is `android_tv_runtime_receipt.json`, and gate J4 passes on it. The run did not press 'Ask the agent'. No run on a Fire TV device or a Vega Virtual Device is recorded. The [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't required at any stage of submission or judging" |
 
 ---
 
 ## What's next
 
-**Run the candidate APK workflow and retain its receipt.** This is the remaining
-track proof: install, normal launch, D-pad journey, logs, screenshot and APK digest.
+**Put the agent deck under the emulator receipt.** Run 39334510932 retained the
+install, normal launch, D-pad journey, logs, screenshot and APK digest. It never
+pressed 'Ask the agent', its final frame shows the handoff section rather than the
+board rows, and the deck is appended from `src/`, which gate J4 does not watch. The
+J4 deck watch (PR #65) and the uniform-frame refusal (PR #66) are still drafts.
 
 **Make the dispatch real.** `RollbackDispatcher` is a one-method protocol. Wiring
 it to a deployment pipeline turns the governed decision into a governed action
@@ -355,7 +358,18 @@ your own checkout and every panel labels its data source on screen.
 ## Track declaration
 
 * **Primary track:** Fire TV.
-* **Mini challenges:** none. Single-track entry.
+* **Mini challenge:** Open Source (firetv-spatial-navigation). The contribution is
+  [pull request #1](https://github.com/upgradedev/firetv-spatial-navigation/pull/1)
+  to [firetv-spatial-navigation](https://github.com/upgradedev/firetv-spatial-navigation),
+  a dependency-free D-pad navigator for Fire TV and other television web views, under
+  the MIT licence. That pull request extended a seed package that already held the
+  spatial scoring, keyboard input and a native bridge. It added legacy key-code input,
+  made the bridge collision-safe and restorable, added `destroy()` cleanup and stricter
+  navigability checks, validated the scoring inputs and adjusted its forward cut-off,
+  and extended the declarations, the example and the tests. The package was extracted
+  from Mercury's navigator into its own repository. Mercury does not import it: the
+  board runs its own `docs/firetv_nav.js`, which has changed separately since the
+  extraction.
 
 ---
 
