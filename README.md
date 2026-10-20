@@ -416,7 +416,8 @@ risky assumptions and their tests, and the first ten conversations are in
 - `python scripts/measure_legibility.py` measures every text size on the TV screen
   (smallest 24px).
 - `python scripts/security_audit.py` runs the rollback refusal checks over HTTP.
-- `python ci/readiness.py` runs the standards gates.
+- `python ci/readiness.py` runs the standards gates. Gates I1 to I4 read
+  `docs/PERSONA_REVIEW.md`, so the score is reproducible in a clone.
 
 ## Contributing and licence
 
