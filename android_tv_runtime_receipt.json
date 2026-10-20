@@ -1,16 +1,16 @@
 {
   "schema": "mercury.android_tv_runtime_receipt/1",
-  "recorded_at_utc": "2026-10-19T06:41:40.340473+00:00",
-  "build_sha": "e8ceae8fb3f76d542eace62214500730b8215991",
-  "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/39210785053",
-  "artifact_name": "mercury-android-tv-runtime-e8ceae8fb3f76d542eace62214500730b8215991",
+  "recorded_at_utc": "2026-10-19T22:51:40.132267+00:00",
+  "build_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+  "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932",
+  "artifact_name": "mercury-android-tv-runtime-e6aae2ca3d31cabf73354d2cab8778f46fe28907",
   "built_by_command": "./gradlew :app:assembleDebug -PmercuryCockpitUrl=https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
   "apk_path": "app/build/outputs/apk/debug/app-debug.apk",
-  "apk_sha256": "4f6e0b2d2ee0556895f253ec86e2df050f8095f607db229d6afac5dfdd42d666",
+  "apk_sha256": "04cbab48b065caff37d7cf2c5b7278cea36290cc16c810a1e43c20d638f71d3b",
   "adb_install_exit_code": 0,
   "normal_launcher": "am start MAIN + LEANBACK_LAUNCHER; no COCKPIT_URL intent extra",
   "endpoint_loaded_without_intent_override": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
-  "endpoint_health_build_sha": "e8ceae8fb3f76d542eace62214500730b8215991",
+  "endpoint_health_build_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
   "runtime": {
     "device_model": "AOSP TV on x86",
     "os_version": "Android 14 / API 34"
@@ -29,23 +29,23 @@
   "artifacts": {
     "apk": {
       "path": "app/build/outputs/apk/debug/app-debug.apk",
-      "sha256": "4f6e0b2d2ee0556895f253ec86e2df050f8095f607db229d6afac5dfdd42d666",
+      "sha256": "04cbab48b065caff37d7cf2c5b7278cea36290cc16c810a1e43c20d638f71d3b",
       "bytes": 9261223
     },
     "logcat": {
       "path": "build/android-tv-evidence/logcat.txt",
-      "sha256": "a8e5984388f717e2c04e2f34a10c7c9a72cffe4779d673a2c88c85f19a13ffe7",
-      "bytes": 1551359
+      "sha256": "5c30da31b51f3ac35a837fe6831f95e741568c089c4c916078b43e3c476fb40a",
+      "bytes": 1476290
     },
     "screenshot": {
       "path": "build/android-tv-evidence/final.png",
-      "sha256": "05377a96972306b771d4474d00222af062992f86ab1a12b2688f0cf8da5ba55b",
-      "bytes": 10608
+      "sha256": "9693dd4bc78816e24040d0824bae4baa928c322822afdbea9ba59c0c31b7659d",
+      "bytes": 255727
     },
     "endpoint_health": {
       "path": "build/android-tv-evidence/endpoint-health.json",
-      "sha256": "edaea55628de7f32f7244bc8ea64b10996a2e912c9e76f73d6a373b0cfb6812c",
-      "bytes": 408
+      "sha256": "822700b412760db7740c84450459ddeedaa6e3b38326731a25bfe6fffc87f9c6",
+      "bytes": 775
     },
     "install_log": {
       "path": "build/android-tv-evidence/adb-install.txt",
@@ -54,7 +54,7 @@
     },
     "launch_log": {
       "path": "build/android-tv-evidence/launcher.txt",
-      "sha256": "1a147a4d2cead2a6f0075013a7986123be2e5ff14d506327d687e48bc96bc864",
+      "sha256": "635858dbf4be2d8d3478fb38bec9ebf45f73f2c73dbb347fa6e6dcd9b5b30d31",
       "bytes": 289
     }
   }

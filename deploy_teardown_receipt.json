@@ -1,28 +1,28 @@
 {
   "schema": "mercury.deploy_receipt/2",
   "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
-  "probed_at_utc": "2026-10-19T07:27:52Z",
-  "probed_at_epoch": 1792394872.181337,
-  "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws",
+  "probed_at_utc": "2026-10-19T22:23:11Z",
+  "probed_at_epoch": 1792448591.614784,
+  "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
   "probes": [
     {
       "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
       "http_status": 200,
-      "elapsed_ms": 2813.63,
+      "elapsed_ms": 1018.92,
       "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mercury Fire TV incident board</title>\n  <meta name=\"description\" content=\"An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.\">\n  <link rel=\"manifest\" href=\"manifest.json\">\n  <meta name=\"theme-color\" content=\"#0B0C0E\">\n  <link rel=\"preload\" href=\"barlow-condensed-latin-700.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n  <style>\n    /* ------------------------------------------------------------------ Fonts\n       Served from this page's own origin, never from a font CDN: a Fire TV on an\n       on-call room network may never reach one, and the board mus",
       "error": null
     },
     {
       "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
       "http_status": 200,
-      "elapsed_ms": 322.46,
-      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"e8ceae8fb3f76d542eace62214500730b8215991\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true,\"mcp_protocol\":\"2025-11-25\",\"bedrock_agent\":{\"model_id\":\"anthropic.claude-sonnet-5\",\"region\":\"eu-west-1\",\"resolved_capability\":\"ready_to_attempt\"}}",
+      "elapsed_ms": 349.76,
+      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"e6aae2ca3d31cabf73354d2cab8778f46fe28907\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true,\"mcp_protocol\":\"2025-11-25\",\"bedrock_agent\":{\"model_id\":\"anthropic.claude-sonnet-5\",\"region\":\"eu-west-1\",\"resolved_capability\":\"ready_to_attempt\",\"model_calls_enabled\":true},\"live_sources\":{\"offline_mode\":true,\"cloudwatch_production_rows\":[\"mercury-wallboard-euw1-prod\",\"volcan-mcp-euw1-prod\",\"aletheia-provenance-euw1-prod\"],\"cloudwatch_production_reads_allowed\":true,\"cloudwatch_simulated_services\":\"offline-fixture\",\"github_dora_and_pr_radar\":false,\"github_commit_feed\":false,\"cost_explorer\":\"offline-fixture\"}}",
       "error": null
     }
   ],
-  "deployed_commit_sha": "e8ceae8fb3f76d542eace62214500730b8215991",
-  "local_head_sha": "13bf556b968cd751546e5e07c06047002574799f",
-  "deployed_matches_local_head": false,
+  "deployed_commit_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+  "local_head_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+  "deployed_matches_local_head": true,
   "teardown_verified": false,
   "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."
 }

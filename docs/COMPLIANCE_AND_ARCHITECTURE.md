@@ -48,7 +48,8 @@ public routes and fails if an ARN or a twelve-digit run comes back.
 ### Which sources may be live
 
 `MERCURY_OFFLINE=1` makes every adapter serve its labelled fixture. Two opt-ins re-open
-one source each on top of it, and neither is set on the deployed board yet:
+one source each on top of it. The deployed board sets `MERCURY_LIVE_CLOUDWATCH=1` since
+2026-10-19 and does not set `MERCURY_LIVE_GITHUB`:
 
 | Switch | Re-opens | Never re-opens |
 |---|---|---|
@@ -59,7 +60,9 @@ There is no switch for Cost Explorer: it returns the whole AWS account's spend, 
 not data for a public page. Least privilege for the CloudWatch read is one statement,
 `cloudwatch:GetMetricStatistics` on `Resource: "*"`; CloudWatch metric reads take no
 resource ARN, so the code's allow-list, not IAM, is what limits the read to three
-functions. That grant is not applied by this repository.
+functions. That grant is not applied by this repository; it was attached by hand on
+2026-10-19, with the owner's approval, as the inline policy
+`mercury-read-own-lambda-metrics` on the function's role, outside Terraform.
 
 ---
 
@@ -70,9 +73,9 @@ are used where they are the truth.
 
 | Pillar | What exists | Assessment |
 |---|---|---|
-| **Operational excellence** | Terraform in `infra/main.tf`. A public Function URL serves the cockpit and `GET /health` reports status and the build SHA. Structured CloudWatch EMF is emitted per request by `PrivateObservabilityHarness`, with PII masking. CI runs lint, 962 tests, a coverage floor and the readiness auditor. | **Partial.** The software path is deployed, but teardown has not been exercised; the Android TV runtime receipt landed in run 39210785053. |
+| **Operational excellence** | Terraform in `infra/main.tf`. A public Function URL serves the cockpit and `GET /health` reports status and the build SHA. Structured CloudWatch EMF is emitted per request by `PrivateObservabilityHarness`, with PII masking. CI runs lint, 962 tests, a coverage floor and the readiness auditor. | **Partial.** The software path is deployed, but teardown has not been exercised; the Android TV runtime receipt landed in run 39334510932. |
 | **Security** | Operator state changes require a bearer secret compared in constant time. Governance tokens are HMAC-signed, content-bound and single use. The public D-pad demo routes accept only fixed labelled fixture evidence, turn off whenever a dispatcher is selected, and have no external effect. | **Partial.** The operator secret is shared, with no rotation and no per-operator identity. DynamoDB makes nonces global across instances but does not identify the human actor. |
-| **Reliability** | Every adapter degrades to a labelled fallback rather than failing the request. Failed AWS calls are deliberately not cached. Rollback leases expire. The Lambda persists deployment markers, handoffs, staged actions and spent nonces in DynamoDB with conditional writes. | **Partial.** The local quickstart deliberately falls back to process memory, and deployed concurrency still needs operational evidence. |
+| **Reliability** | Every adapter degrades to a labelled fallback rather than failing the request. Failed AWS calls are deliberately not cached. Rollback leases expire. The Lambda persists deployment markers, handoffs, staged actions and spent nonces in DynamoDB with conditional writes. | **Partial.** The local quickstart deliberately falls back to process memory, and deployed concurrency still needs operational evidence. Reserved concurrency is 10, set outside Terraform on 2026-10-19 after board loads at 2 got HTTP 429 on 3 to 4 of their 8 row requests (`docs/EVIDENCE.md`, On the deployed board). |
 | **Performance efficiency** | Measured, not asserted: `python scripts/benchmark_suite.py` reports 2.88 ms to 65.90 ms mean per endpoint over 60 requests each, written to `benchmarks_summary.json`. Credential resolution and fixture reads are cached after a benchmark showed them costing over a second per request. | **Addressed for the local path.** No measurement exists from a Fire TV on a real network. |
 | **Cost optimisation** | Cost Explorer responses cached for 15 minutes because AWS bills per request. Serverless design with no always-on compute. | **Partial.** The idle cost figures in `infra/README.md` are labelled ESTIMATE because no bill has been read for a deployment of this project. |
 | **Sustainability** | Scale-to-zero compute; no continuous polling of paid APIs. | **Partial.** Asserted from the architecture, not measured. |
@@ -104,7 +107,7 @@ human will act on.
 | Customer or end-user personal data | None | None | None |
 | Commit author names and pull request author logins | Yes, from GitHub or local `git log` | In process memory only, for the life of a request | Rendered on the cockpit screen |
 | AWS account spend per service | Yes, when credentials resolve and `MERCURY_OFFLINE` is not set; never on the hybrid public board | 15 minute in-process cache | Rendered on the cockpit screen |
-| Lambda error and invocation counts for three named functions | Only with `MERCURY_LIVE_CLOUDWATCH=1` (not deployed) | 60 second in-process cache | Rendered on the cockpit screen |
+| Lambda error and invocation counts for three named functions | Only with `MERCURY_LIVE_CLOUDWATCH=1`, set on the deployed function since 2026-10-19 | 60 second in-process cache | Rendered on the cockpit screen |
 | Request metadata (client IP, path, status) | Yes | Emitted to logs as CloudWatch EMF | Masked before emission |
 
 Mercury reads no customer database and holds no end-user records. The only
