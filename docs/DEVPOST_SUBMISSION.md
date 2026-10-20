@@ -362,12 +362,14 @@ your own checkout and every panel labels its data source on screen.
   [pull request #1](https://github.com/upgradedev/firetv-spatial-navigation/pull/1)
   to [firetv-spatial-navigation](https://github.com/upgradedev/firetv-spatial-navigation),
   a dependency-free D-pad navigator for Fire TV and other television web views, under
-  the MIT licence. That pull request turned a seed commit, which already held the
-  spatial scoring, into the package: it added legacy key-code input, collision-safe
-  native bridging and lifecycle cleanup, and extended the declarations, the example
-  and the tests. The package was extracted from Mercury's navigator into its own
-  repository. Mercury does not import it: the board runs its own `docs/firetv_nav.js`,
-  which has changed separately since the extraction.
+  the MIT licence. That pull request extended a seed package that already held the
+  spatial scoring, keyboard input and a native bridge. It added legacy key-code input,
+  made the bridge collision-safe and restorable, added `destroy()` cleanup and stricter
+  navigability checks, validated the scoring inputs and adjusted its forward cut-off,
+  and extended the declarations, the example and the tests. The package was extracted
+  from Mercury's navigator into its own repository. Mercury does not import it: the
+  board runs its own `docs/firetv_nav.js`, which has changed separately since the
+  extraction.
 
 ---
 
