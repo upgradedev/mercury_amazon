@@ -1,12 +1,24 @@
 # Mercury: a Fire TV incident board that names a deploy only when it can
 
-> **Mercury tells an on-call engineer when it cannot blame a deployment, and names one only when exactly one runtime change landed in the window.** It reads a real commit history against an error metric, publishes how often each answer is right, and renders on a Fire TV as one of its screens.
+> **On Fire TV, Mercury names a deploy to the on-call engineer only when exactly one runtime change landed in the window, and otherwise says why.** The remote drives it, from asking what changed to a record-only rollback. On held-out synthetic cases it named an innocent change 29 times where blaming the latest deploy did so 482 times, and it found fewer causes than that rule.
 
 ![The Mercury incident board at 1920x1080: the top bar reads Mercury, Fire TV incident board, One deploy, or why not, and API reachable; column heads read Service, Reading, Verdict and Next; the answer row for checkout-api reads 12.9x against its baseline, with a hazard-striped OFFLINE FIXTURE stamp and a dashed STAND-IN stamp for Mercury's own commits beside the figure; the verdict Attributed names one commit, the only runtime change before the spike, at 50.0% held-out precision on a synthetic corpus assuming at most 75 minutes of lag, with its commit message quoted; the next action reads Record-only rollback to the preceding commit; below are the amber Ask what changed button, Stage rollback and Confirm, and five service rows reading Attributed, Nothing to revert, Cannot attribute, Cannot attribute and Insufficient data, above a Fire TV remote key legend](docs/assets/incident-board-1920x1080.png)
 
-*The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
+*The first screen at Fire TV resolution, from a local run with `MERCURY_OFFLINE=1`, committed on 2026-09-29. The board has changed since, and among the changes: the board's hero panel and its rows now call a named commit a **Temporal candidate**, the deployed board names a commit from an invented, labelled deploy feed, and it adds three LIVE rows under these five ([the eight rows](#how-it-works)). In the picture, the metric is an offline fixture and the stamp beside the number says so, and the named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.85 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 39334510932; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** live, serving build `e6aae2c` (its `/health` said so on 2026-10-20). The Fire OS app ran on an Android TV emulator (AOSP, API 34) in run 39334510932, not on a Fire TV device. The Vega OS app was built in CI run 38241968838 ([Vega OS](#vega-os)). It also runs end to end on a laptop with offline fixtures and no credentials. **Demo video:** [OWNER: public video link], [OWNER: length in seconds, from ffprobe] s.
+
+**Try it.** Open the [live board](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
+in a browser; arrow keys and Enter stand in for the remote. Press **Ask what changed**,
+then **Stage rollback**, **Confirm** and **Publish handoff**: the rollback is
+record-only and accepts only the labelled fixture target.
+[`/health`](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health)
+names the build the board serves and lists the three LIVE rows under `live_sources`.
+**Ask the agent**, in the agent deck below the handoff, is the one button that can call a
+model: each press makes at most one call to Claude Sonnet 5 on Amazon Bedrock, capped at
+40 per server process. A repeat press for the same service can return that process's
+earlier answer without a new call, and the card does not mark it as a repeat. The answer
+card names the engine that wrote it.
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -17,11 +29,16 @@ when exactly one landed in the 75 minutes before the spike started. Beside the n
 prints how often that is right on a held-out split it was not tuned on: 50.0% (n=58
 namings, synthetic corpus), under the corpus's assumption that a regression shows within
 75 minutes. At longer delays it is lower: 41.5% at 90 minutes, 27.3% at 180
-([table](docs/EVIDENCE.md#the-figure-depends-on-an-assumed-delay)). A named change can be
-rolled back from the remote, behind five checks and a single-use token.
+([table](docs/EVIDENCE.md#the-figure-depends-on-an-assumed-delay)). On the same held-out
+cases, blaming the latest deploy named an innocent change 482 times in 582 namings,
+against Mercury's 29 in 58; that rule finds more causes, 16.7% of regressions against
+Mercury's 4.8% ([comparison](docs/EVIDENCE.md#against-two-naive-rules)). A named change
+can be rolled back from the remote, behind five checks and a single-use token.
 
-**Amazon technology.** Fire TV: a Leanback Android app in `app/` hosts the board in a
-WebView and forwards the remote's D-pad keys to it. AWS: the server runs on Lambda
+**Amazon technology.** Fire TV, on two platforms. Fire OS: a Leanback Android app in
+`app/` hosts the board in a WebView and forwards the remote's D-pad keys to it. Vega OS:
+a React Native for Vega app in `vega/` shows the same page in Vega's WebView, with native
+launch and offline screens and BACK handling ([Vega OS](#vega-os)). AWS: the server runs on Lambda
 behind a function URL, keeps handoffs and spent tokens in DynamoDB, reads
 CloudWatch error metrics and Cost Explorer spend when it has credentials, serves
 `MCP 2025-11-25` Streamable HTTP on `POST /mcp`, and drafts an advisory brief on
@@ -41,7 +58,8 @@ calls; one owner-approved press on the deployed `e6aae2c` build came back HTTP 2
 
 | Link | What you get today |
 |---|---|
-| [Run it locally](#run-it-locally) | The build in the picture, with no credentials |
+| [Live board](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/) | The deployed board, eight rows; [`/health`](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health) names its build |
+| [Run it locally](#run-it-locally) | The five fixture rows, with no credentials |
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
@@ -51,8 +69,7 @@ calls; one owner-approved press on the deployed `e6aae2c` build came back HTTP 2
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The repository is **private** today, so the CI badge does not resolve outside the
-organisation. The other three badges are static values that the commands in
+Apart from the CI badge, the badges are static values that the commands in
 [Evidence](docs/EVIDENCE.md#measured-numbers) reproduce.
 
 ---
@@ -95,16 +112,24 @@ right 50.0% of the time on that held-out split (29 of 58, 95% interval 38% to 62
 and the board prints that figure next to the name with its condition: `≤75m lag`,
 because the corpus assumes no regression takes longer than the window to show.
 
-The board shows five services, one per answer. Each row is its own live response from
-the server; the readings come from the offline fixture.
+The board calls a named change a **Temporal candidate**: the only runtime commit in the
+window, not proof of cause.
 
-| Service | Verdict | What the board says |
-|---|---|---|
-| `checkout-api` | `ANOMALY_ATTRIBUTED` | Names the one runtime commit in the window and offers a record-only rollback |
-| `payments-worker` | `NO_ANOMALY` | 1.6x its baseline, under the 3.0x threshold: nothing to revert |
-| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION` | Cannot attribute: no change in the window, which is not proof of no deploy |
-| `release-train` | `ANOMALY_WITHOUT_ATTRIBUTION` | Cannot attribute: too many runtime changes landed to name one |
-| `quiet-service` | `INSUFFICIENT_DATA` | A name the fixture does not know, refused rather than invented |
+The deployed board shows eight rows, each its own live response from the server. Five
+are demo services, one per answer, whose readings come from the offline fixture; a local
+run with only `MERCURY_OFFLINE=1` shows these five. Three more read the hackathon's own
+Lambda functions from CloudWatch ([live data switches](#live-data-switches)). Mercury
+has no deploy feed for those three, so it does not attempt attribution for them: a LIVE
+row never names a commit and never offers a rollback.
+
+| Service | API verdict | What the board says | Stamp on the deployed board |
+|---|---|---|---|
+| `checkout-api` | `ANOMALY_ATTRIBUTED` | Temporal candidate: names the one runtime commit in the window and offers a record-only rollback | FIXTURE |
+| `payments-worker` | `NO_ANOMALY` | Nothing to revert: 1.6x its baseline, under the 3.0x threshold | FIXTURE |
+| `search-indexer` | `ANOMALY_WITHOUT_ATTRIBUTION` | Cannot attribute: no change in the window, which is not proof of no deploy | FIXTURE |
+| `release-train` | `ANOMALY_WITHOUT_ATTRIBUTION` | Cannot attribute: too many runtime changes landed to name one | FIXTURE |
+| `quiet-service` | `INSUFFICIENT_DATA` | Insufficient data: a name the fixture does not know, refused rather than invented | FIXTURE |
+| `mercury-wallboard-euw1-prod`, `volcan-mcp-euw1-prod`, `aletheia-provenance-euw1-prod` | Never `ANOMALY_ATTRIBUTED` | `AWS/Lambda` `Errors` over the last 24 hours, with attribution not attempted; at worst it says cannot attribute. When read on 2026-10-19 at 22:49 UTC all three were at 0x, nothing to revert ([reading](docs/EVIDENCE.md#on-the-deployed-board)) | LIVE, with the read time |
 
 The same page runs in a laptop browser, where arrow keys drive the same focus ring as
 the remote.
@@ -148,18 +173,13 @@ only and contacts nothing outside the server.
 
 ## Run it locally
 
-The repository is private today. The event's [FAQ](https://amazonappdev2026.devpost.com/details/faqs) sets the rule for that
-case: "Add the Amazon and Devpost reviewers as collaborators before the submission
-deadline". That is an owner step taken near submission; until then, `git clone`
-works only for collaborators. The MIT [LICENSE](LICENSE) file stays in the repository
-either way. If you hold the source, start at `pip install`. The install depends on your
-network; one clean install here ran past ten minutes. No credentials and no AWS account
-are needed.
+The install depends on your network; one clean install here ran past ten minutes. No
+credentials and no AWS account are needed. The code is under the MIT [LICENSE](LICENSE).
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while private
+git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
 ```
@@ -192,7 +212,14 @@ then **Stage rollback**, **Confirm** and **Publish handoff**. In record-only mod
 these accept only the labelled fixture target and contact no deployment system, and
 a spent confirmation token cannot be replayed.
 
-### 5. Build the Fire TV APK
+### 5. Put it on a Fire TV
+
+**Fire OS.** A prebuilt debug APK: [OWNER: GitHub Release URL for app-debug.apk]. It is the file
+[run 39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932)
+built from `e6aae2c` and installed on the Android TV emulator, sha256
+`04cbab48b065caff37d7cf2c5b7278cea36290cc16c810a1e43c20d638f71d3b`; check the hash before
+you install it. It loads the live board, so the TV needs a network connection. To build
+it yourself instead:
 
 ```bash
 ./gradlew :app:assembleDebug     # needs JDK 17 and the Android SDK
@@ -205,6 +232,28 @@ Emulator workflow. The target proof is an Android TV emulator run, not a physica
 TV. The event's [official FAQ](https://amazonappdev2026.devpost.com/details/faqs) says for Fire TV that "a physical device isn't
 required at any stage of submission or judging".
 
+**Vega OS.** A prebuilt package for the Vega Virtual Device on an Apple Silicon Mac:
+[OWNER: GitHub Release URL for mercurycockpit_aarch64.vpkg]. It is the aarch64 package
+[run 38241968838](https://github.com/upgradedev/mercury_amazon/actions/runs/38241968838)
+built, sha256 `01b5b93d6106cd00eb33fa07e249cc726b806a3af4c123734f5f58637543b25a`. Amazon's
+[Vega 0.24 run-apps page](https://developer.amazon.com/docs/vega/0.24/run-apps.html) gives
+the aarch64 package for an M-series Mac and says the package must match the development
+machine's architecture. With the Vega SDK installed and the Vega Virtual Device running, install and launch it with
+the commands `vega/manifest.toml` names, pointed at the downloaded file:
+
+```bash
+vega device install-app --packagePath mercurycockpit_aarch64.vpkg
+vega device launch-app --appName com.upgradedev.mercury.main
+```
+
+[OWNER: write "These commands were run on 2026-10-20 on the Vega Virtual Device on an
+Apple Silicon Mac." only if that session ran them; otherwise write "These commands have
+not been run for this project."]
+
+To build the packages yourself, run `npm ci && npm run build:release` in `vega/` on Linux
+or macOS with the Vega SDK. On Ubuntu or an Intel Mac the Vega Virtual Device refuses
+the package; see [Vega OS](#vega-os).
+
 ---
 
 ## What is real and what is not
@@ -212,7 +261,8 @@ required at any stage of submission or judging".
 **Real:** the correlation engine, scored on 1160 labelled cases per side of a train and
 held-out split, all synthetic; commits read from real git history, with their file lists,
 wherever there is a checkout (the public board has none and shows an invented deploy feed);
-the governed rollback and its refusals, each tested; the Leanback app source; an Android
+the governed rollback and its refusals, each tested; the Leanback app source; the Vega
+app source and the packages CI built from it ([Vega OS](#vega-os)); an Android
 TV runtime receipt from [run 39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932),
 which installed the exact APK on an emulator and drove the record-only path by D-pad
 (receipt: `android_tv_runtime_receipt.json`); and a live cockpit whose `/health` reports
@@ -220,37 +270,28 @@ the build SHA. Redeployed on 2026-10-19 at `e6aae2c`, the PR #67 merge, with
 `MERCURY_OFFLINE=1`, `MERCURY_LIVE_CLOUDWATCH=1` and `MERCURY_AGENT_MODEL=on`, and probed
 at 22:23 UTC that day by `python scripts/probe_deployment.py` (committed as
 `deploy_teardown_receipt.json`), it serves the press-only agent deck, record-only; the
-runtime receipt's `endpoint_health_build_sha` names the same build. It served `ddccb3e`
-before that, and `e8ceae8` before that. **Live on the deployed board:** three rows read
+runtime receipt's `endpoint_health_build_sha` names the same build, and `/health` still
+named `e6aae2c` when read on 2026-10-20 at 05:23 UTC. It served `ddccb3e`
+before that, and `e8ceae8` before that. The function's reserved concurrency is 10, set
+outside Terraform ([details](docs/EVIDENCE.md#on-the-deployed-board)). **Live on the
+deployed board:** three rows read
 from CloudWatch for the hackathon's own Lambda functions, stamped LIVE
 ([live data switches](#live-data-switches)). **Simulated:** every metric series of the
 five demo services is an offline fixture, and a confirmed rollback is recorded, never
-sent to a pipeline. **Built, not deployed:** a live GitHub DORA read. **Missing:**
-
-- **A published video.** One take is rendered and not yet uploaded:
-  `reviews/videos_20261006/mercury_amazon/output/mercury-demo.mp4` in the workspace,
-  outside git, 163.09 s (ffprobe), 1920x1080. It opens on 23.32 s of Android TV
-  emulator footage from CI run 37475795991: the debug APK on an AOSP emulator, API 34,
-  loading the public demo (`ea2cff5`, record-only), from the board's first frame, at 1x
-  with two static frames held longer. That is emulator footage, not a Fire TV device, and
-  it does not show the app being opened from the launcher. A label names each source on
-  every frame. The rest is a local run of commit `f7512bf` in a desktop browser at
-  1920x1080, not the TV layout, every key sent through the D-pad bridge the Leanback app
-  calls, with burned-in captions. It speaks the 50.0% held-out precision where the board
-  prints it and the 58 namings over the evidence sentence, and after Confirm shows the
-  board holding RECORDED, no pipeline contacted. The
-  sync gate passed. Details in [video/README.md](video/README.md).
-- **A public repository.** Private until the reviewers are added as collaborators; see
-  [Run it locally](#run-it-locally).
+sent to a pipeline. **Built, not deployed:** a live GitHub DORA read. **Missing:** a run
+on retail Fire TV hardware. The Fire OS app ran on an Android TV emulator, and no Vega
+Fire TV stick has run the Vega app; the event's FAQ says a physical device is not
+required (see [step 5](#5-put-it-on-a-fire-tv)).
 
 | Part | On the board today | Live path |
 |---|---|---|
 | Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists. An empty or failed read now shows NO LIVE DATA and names nothing; it is never replaced with the generated series. With `MERCURY_LIVE_CLOUDWATCH=1` the board adds three rows for the hackathon's own production functions, read from `AWS/Lambda` (`Errors`, with `Invocations` beside it, last 24 hours) and stamped LIVE with the read time; the four simulated services stay fixtures. Set on the deployed function since 2026-10-19 |
 | Commits | Real commits from this repository's `git log` with their file lists (a 20-commit window recorded at merge `a4ec9aa`, so a new commit cannot change the demo's verdicts), stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy. The public cockpit has no git checkout, so it shows an invented, display-only deploy feed (`src/infrastructure/fixtures/deploy_feed_fixture.json`), stamped OFFLINE FIXTURE; no published figure is computed from it | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
-| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API. With `MERCURY_LIVE_GITHUB=1` and no token it reads this repository anonymously, cached for 15 minutes; while the repository is private that read gets HTTP 404 and the board keeps the fixture and says why. Not deployed yet |
+| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API. With `MERCURY_LIVE_GITHUB=1` and no token it reads this repository anonymously, cached for 15 minutes; a refused read keeps the fixture and says why. The deployed function does not set this switch |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified. There is deliberately no live switch for it: Cost Explorer reports the whole account's bill, so under `MERCURY_OFFLINE=1` it is always the fixture |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
-| Fire TV | App source, a CI build workflow and a runtime receipt | Run 39334510932 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
+| Fire TV, Fire OS | App source, a CI build workflow and a runtime receipt | Run 39334510932 installed the exact APK on an Android TV emulator and drove the D-pad journey; receipt `android_tv_runtime_receipt.json`. The 2026-09-27 attempt stopped before install. The event FAQ does not require a physical Fire TV |
+| Fire TV, Vega OS | App source in `vega/` and the packages run 38241968838 built for armv7, x86_64 and aarch64 | The Vega Virtual Device on GitHub's Ubuntu runner refuses the package, because it has no WebView module. [OWNER: keep only if the 2026-10-20 session installed and ran the package: "The aarch64 package ran on the Vega Virtual Device on an Apple Silicon Mac."] Not run on a Vega Fire TV stick |
 
 `MERCURY_OFFLINE=1` forces every data adapter (CloudWatch, Cost Explorer, GitHub) into
 fixture mode. It can suppress a live call; it cannot make a fixture look live. Two narrower
@@ -297,10 +338,9 @@ was re-recorded after that deploy: run 39334510932 drove the D-pad journey again
 rows under `live_sources`. Its final screenshot shows the rollback and handoff section, not
 the rows. Measurements: [Evidence](docs/EVIDENCE.md#hybrid-live-data-deployed-at-e6aae2c).
 
-The deploy sets `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1` only. The GitHub
-switch waits until the repository is public (planned for 2026-10-21): before that every
-anonymous read gets HTTP 404. Known issue, not fixed here: with `MERCURY_LIVE_GITHUB=1`,
-`/health` reports `github_live` true from the switch alone, even while every read gets 404,
+Of the data switches, the deploy sets `MERCURY_OFFLINE=1` and `MERCURY_LIVE_CLOUDWATCH=1`;
+it does not set the GitHub switch. Known issue, not fixed here: with `MERCURY_LIVE_GITHUB=1`,
+`/health` reports `github_live` true from the switch alone, even while every read is refused,
 and `video/capture-local.py` refuses to record while it is true.
 
 The engine's limits are measured, not hidden. Every figure comes from a synthetic
@@ -320,6 +360,23 @@ cannot test that fit: at a 180 minute ceiling the shipped engine reads 27.3%. Th
 this page printed before was in-sample. A crowded window is
 refused, not ranked. The full list is in
 [Known limitations](docs/EVIDENCE.md#known-limitations).
+
+### Vega OS
+
+`vega/` holds the Vega OS app: a React Native for Vega shell around the same board page
+the Fire OS app loads, with its own launch and offline screens and BACK handling
+(`vega/src/App.tsx`). CI
+[run 38241968838](https://github.com/upgradedev/mercury_amazon/actions/runs/38241968838)
+built it on 2026-10-12 at `b88c4af` with Vega SDK 0.24.12112, for armv7, x86_64 and
+aarch64, with 53 of 53 Jest tests passing; `git diff b88c4af HEAD -- vega/` prints
+nothing, so the `vega/` sources are unchanged since. The Vega Virtual Device in that run, on
+GitHub's Ubuntu runner, refused to install the package because it has no WebView module
+(`vvd_status=builds_but_vvd_blocked`); `vega/manifest.toml` notes that the Vega Virtual
+Device runs WebView apps only on an Apple Silicon Mac. [OWNER: keep only if the
+2026-10-20 session installed and ran the package: "The demo video shows the aarch64
+package from that run on the Vega Virtual Device, the Vega OS simulator, on an Apple
+Silicon Mac."] No Vega Fire TV stick has run it. To install it, see
+[step 5](#5-put-it-on-a-fire-tv).
 
 ---
 
@@ -359,9 +416,7 @@ risky assumptions and their tests, and the first ten conversations are in
 - `python scripts/measure_legibility.py` measures every text size on the TV screen
   (smallest 24px).
 - `python scripts/security_audit.py` runs the rollback refusal checks over HTTP.
-- `python ci/readiness.py` runs the standards gates. The persona review those gates
-  read is [`docs/PERSONA_REVIEW.md`](docs/PERSONA_REVIEW.md), so the score is
-  reproducible in a clone.
+- `python ci/readiness.py` runs the standards gates.
 
 ## Contributing and licence
 
