@@ -146,7 +146,8 @@ def test_no_document_claims_an_alexa_integration_that_does_not_exist():
 
 def test_documents_cite_the_device_run_that_happened():
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "actions/runs/39334510932" in build_doc
+    receipt = json.loads((REPO_ROOT / "android_tv_runtime_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["workflow_run_url"] in build_doc
     assert "Physical Fire TV" in build_doc and "Optional and not run" in build_doc
 
 
@@ -167,8 +168,10 @@ def test_documents_distinguish_the_built_apk_from_a_device_run():
 
     build_doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8").lower()
     readme_lower = README.lower()
-    assert "actions/runs/39334510932" in build_doc
-    assert "actions/runs/39334510932" in readme_lower
+    receipt = json.loads((REPO_ROOT / "android_tv_runtime_receipt.json").read_text(encoding="utf-8"))
+    recorded_run = receipt["workflow_run_url"].lower()
+    assert recorded_run in build_doc
+    assert recorded_run in readme_lower
     assert "physical fire tv" in build_doc and "optional" in build_doc
 
 
