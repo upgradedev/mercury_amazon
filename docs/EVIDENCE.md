@@ -1223,7 +1223,7 @@ python ci/readiness.py
 ```
 
 **45/53 readiness gates** for the accessibility/recovery code change, pending deployment and a fresh Android TV journey. G2 correctly detects the changed hosted agent deck; J4 correctly detects the changed Android wrapper. D2, E2, E4 and owner actions O1 to O3 remain external blockers. The prior verified release at e6aae2c passed 47/53. Production gate predicates retain their default HEAD checks; historical receipt tests validate their immutable recorded source separately.
-the gate that asks whether the sponsor product is load-bearing, and Mercury is
+J4 is the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
 two text files, while the [Fire TV](#fire-tv) section two screens away said no APK

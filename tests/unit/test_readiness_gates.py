@@ -186,24 +186,10 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 
 
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
-    """The landed receipt, asserted by contents against the real checkout.
+    """The landed artifact validates against its immutable recorded source.
 
-    Actions run 39334510932 built the APK from e6aae2c, the PR #67 merge, and
-    drove the D-pad journey on an Android TV emulator against the page served
-    by the Lambda redeployed at e6aae2c on 2026-10-19, with the hybrid
-    CloudWatch rows switched on (the endpoint health in its artifact lists
-    them under live_sources). The receipt below is that run's artifact bytes,
-    downloaded and hash-verified, not written by hand; every field is asserted
-    below. History: on 2026-10-01 the 2026-09-30 receipt (run 36669903334) went
-    stale the day docs/index.html joined the invalidation set, run 36798893479
-    restored green, the hero-cause clamp moved docs/index.html after that
-    build, run 36922314984 (build e0a857a) restored green again, run
-    37464864870 (build ea2cff5) restored green after PR #42 moved
-    docs/index.html, and run 38808232691 (build fdb5f56) restored green after
-    PR #50 moved it. PR #62 appended the deck from src/, which J4 does not
-    watch, so that receipt stayed green without seeing the deck until run
-    39210785053 (build e8ceae8) landed. The hybrid rows also come from src/,
-    so that receipt stayed green without seeing them until this one landed.
+    Current-checkout freshness is verified independently below; a new wrapper
+    must never inherit a historical journey's current-pass claim.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -367,8 +353,8 @@ def test_the_audit_reports_j4_for_the_actual_receipt_freshness():
 def test_a_receipt_from_before_the_page_change_still_fails_naming_the_file():
     """The 2026-10-01 invalidation, pinned without waiting for the next drift.
 
-    The landed receipt is fresh, so the stale path would go untested if it
-    needed a stale checkout. Rewinding its build to 69aa972, the build the
+    Rewind the receipt independently of whether the current checkout is fresh
+    or stale, so rejection remains tested across releases. Rewinding its build to 69aa972, the build the
     2026-09-30 receipt was written from, replays the exact failure: the
     candidate page moved after that build, so the gate must fail and name
     docs/index.html rather than pass on a journey the receipt never saw.
