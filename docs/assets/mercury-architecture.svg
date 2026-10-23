@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="480" viewBox="0 0 1120 480" role="img" aria-labelledby="title desc">
+  <title id="title">Mercury architecture and verdicts</title>
+  <desc id="desc">Fire TV's Leanback WebView calls the Lambda API. CloudWatch supplies live metrics without a deploy feed; DynamoDB holds shared records. The correlator checks a 75-minute runtime-change window. Below threshold means nothing needs reverting; an empty or crowded window cannot attribute and clears no deploy; exactly one change is a temporal candidate, not proof of cause.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#FFB23F"/></marker></defs>
+  <rect width="1120" height="480" rx="16" fill="#0B0C0E"/>
+  <g fill="#16181C" stroke="#626872" stroke-width="2">
+    <rect x="40" y="44" width="250" height="80" rx="10"/>
+    <rect x="390" y="44" width="310" height="80" rx="10" stroke="#FFB23F"/>
+    <rect x="800" y="44" width="280" height="80" rx="10"/>
+    <rect x="40" y="176" width="250" height="84" rx="10"/>
+    <rect x="390" y="176" width="310" height="84" rx="10"/>
+    <rect x="40" y="354" width="320" height="86" rx="10"/>
+    <rect x="400" y="354" width="320" height="86" rx="10"/>
+    <rect x="760" y="354" width="320" height="86" rx="10" stroke="#FFB23F"/>
+  </g>
+  <g fill="none" stroke="#FFB23F" stroke-width="2" marker-end="url(#arrow)">
+    <path d="M290 84H390"/><path d="M700 84H800"/>
+    <path d="M290 218H340V106H390"/><path d="M545 124V176"/>
+    <path d="M940 124V298H920V354"/>
+    <path d="M940 298H560V354" stroke-dasharray="6 5"/>
+    <path d="M560 298H200V354" stroke-dasharray="6 5"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#F3F0E9">
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="77" font-size="22" font-weight="700">Fire TV remote</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="104" font-size="17">Leanback WebView</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="77" font-size="22" font-weight="700">AWS Lambda</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="104" font-size="17">Board + application API</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="77" font-size="22" font-weight="700">Correlator</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="104" font-size="17">75-minute runtime window</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="207" font-size="22" font-weight="700">CloudWatch</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="234" font-size="17">LIVE metrics; no deploy feed</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="207" font-size="22" font-weight="700">DynamoDB</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="234" font-size="17">Shared records + spent tokens</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="335" font-size="17" fill="#FFB23F">Reading under 3.0x baseline</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="335" font-size="17" fill="#FFB23F">Zero or several changes</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="335" font-size="17" fill="#FFB23F">Exactly one runtime change</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="389" font-size="21" font-weight="700">Nothing needs reverting</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="417" font-size="17">Only the below-threshold verdict</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="389" font-size="21" font-weight="700">Cannot attribute</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="417" font-size="17">Calls no deploy innocent</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="389" font-size="21" font-weight="700">Temporal candidate</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="417" font-size="17">Proximity is not proof of cause</text>
+  </g>
+</svg>
