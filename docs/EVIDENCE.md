@@ -1128,7 +1128,17 @@ measurement. The separate emulator workflow records the Android TV viewport.
 **What has been run, and what has not.** Be clear about this, because it is the
 weakest part of the submission.
 
-**Android TV emulator run landed.** Actions run [39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932)
+**Current Android TV proof (2026-10-23).** Run
+[39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709)
+built version 1.0.1 / versionCode 2 at `a438bf1`, installed the APK, normally launched
+it and drove the online D-pad record-only journey against the matching public build.
+The current `android_tv_runtime_receipt.json` is the exact downloaded receipt from
+that run. The [1.0.1 debug release](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1)
+contains the tested APK and SHA256SUMS. Native offline lifecycle JVM tests and
+screen-reader status wiring are separate from this online emulator proof; no
+physical remote/assistive-user offline session is claimed.
+
+**Historical Android TV proof (2026-10-19).** Actions run [39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932)
 built APK `04cbab48b065caff` (9,261,223 B) from `e6aae2c`, installed it on AOSP TV
 (Android 14 / API 34), launched through the normal Leanback path with no URL
 override, and drove page load, attribution, record-only approval and handoff by
@@ -1136,9 +1146,9 @@ D-pad against the page served by the Lambda redeployed at `e6aae2c` on 2026-10-1
 with the press-only agent deck and the three hybrid CloudWatch rows switched on: the
 `endpoint-health.json` in its artifact reports `build_sha` `e6aae2c` and lists
 `mercury-wallboard-euw1-prod`, `volcan-mcp-euw1-prod` and `aletheia-provenance-euw1-prod`
-under `live_sources`. The run did not press 'Ask the agent'. The receipt is checked in
-as `android_tv_runtime_receipt.json`, byte for byte the `receipt.json` of the run's
-artifact; the artifact holds the APK, install and launch logs, logcat, activity dump,
+under `live_sources`. The run did not press 'Ask the agent'. Its receipt was checked in at the time
+as `android_tv_runtime_receipt.json`, byte for byte the `receipt.json` of that run's
+artifact, and has since been superseded by run 39961752709; the artifact holds the APK, install and launch logs, logcat, activity dump,
 screenshot and receipt together, and every artifact hash in the receipt was re-checked
 against the downloaded artifact (`sha256sum`). The final screenshot is a 1920x1080 frame
 of 255,727 B showing the governed rollback and handoff section after the journey: the
@@ -1332,10 +1342,13 @@ as `agent_brief_verification_20261019.json` and `agent_brief_verification_ddccb3
 
 ## Hybrid live data (deployed at e6aae2c)
 
-Since 2026-10-19 the deployed function runs `e6aae2c` with `MERCURY_OFFLINE=1` and
+The hybrid configuration was first deployed at `e6aae2c` on 2026-10-19.
+The current hosted runtime is `a438bf1` (2026-10-23), with the same settings preserved:
+`MERCURY_OFFLINE=1` and
 `MERCURY_LIVE_CLOUDWATCH=1`, and without `MERCURY_LIVE_GITHUB` or a `GITHUB_TOKEN`: the
 three CloudWatch rows below are on the public board and the GitHub tiles stay fixtures.
-The committed probe's `/health` (`deploy_teardown_receipt.json`, 22:23 UTC) reports
+The historical probe's `/health` (`historical_public_probe` in
+`deploy_teardown_receipt.json`, 2026-10-19 22:23 UTC) reported
 `live_sources` with the three rows, `cloudwatch_production_reads_allowed` true and
 `github_dora_and_pr_radar` false. Most of the measurements below were taken on a local run
 before that deploy; the deployed board is described [at the end of this
@@ -1585,13 +1598,17 @@ given a substitute number.
   service name rather than from a constant, which makes all five answers (four
   verdict codes, one with two refusal reasons) reachable and reproducible, but it is generated locally and every surface that
   shows it says so.
-* **Eight green emulator runs.** Runs 36661614006, 36669903334, 36798893479, 36922314984, 37464864870, 38808232691, 39210785053 and 39334510932 each compiled the public endpoint, installed
+* **Eight green emulator runs (historical), plus current proof.** Runs 36661614006, 36669903334, 36798893479, 36922314984, 37464864870, 38808232691, 39210785053 and 39334510932 each compiled the public endpoint, installed
   the exact APK, launched without an ADB URL override and drove the record-only path
-  by D-pad; the latest receipt is checked in as `android_tv_runtime_receipt.json`. Eight runs
-  prove the path works and repeats, not that it is flake-free. The event FAQ does not require a physical Fire TV.
-* **The public deployment tracks HEAD.** The cockpit at
+  by D-pad. Current run 39961752709 repeats that path for `a438bf1`/APK1.0.1;
+  its exact receipt is checked in as `android_tv_runtime_receipt.json`. The historical
+  eight and the current run prove repetition, not that the path is flake-free. The event FAQ does not require a physical Fire TV.
+* **The public deployment is bound to verified runtime files.** The cockpit at
   `https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/` reports its
-  `build_sha` from `/health`; every merge ships a deploy verified byte-identical: a full code deploy, or an env-only SHA move over a proven-identical zip (an env-only label bump once shipped stale code under a fresh SHA, so the live zip is re-downloaded and compared after every deploy).
+  `build_sha` from `/health`. Runtime `a438bf1` is verified by its package hash
+  and matching native-workflow health snapshot. Documentation-only descendants can
+  retain that deployed revision when all packaged runtime files remain identical;
+  a newer documentation commit is not relabelled as a new runtime deployment.
   Readiness gate G2 pins the deployed build against the committed receipt: it passes when the deployed SHA is HEAD or an ancestor with unchanged live runtime files, and fails naming the files that moved after the deploy. It runs in labelled offline-fixture
   mode, with three LIVE CloudWatch rows for the hackathon's own functions since 2026-10-19. The allowed-target receipt above covers the APK.
 * **No published video.** One 163.09 s take, which opens on the Android TV emulator
@@ -1601,7 +1618,7 @@ given a substitute number.
   Gates E2 and E4 fail until it is public.
 * **The browser path is not Android TV evidence.** Playwright now drives the whole
   record-only journey, but the J4 evidence is the APK completing it in the emulator,
-  which run 39334510932 recorded.
+  which current run 39961752709 recorded for `a438bf1`.
 * **Cost Explorer lags.** It aggregates daily with up to 24 hours of reporting
   delay, so a spend spike in the last hour will not appear. Sub-hour spend alerting
   needs CloudWatch metric alarms, which Mercury does not implement.
@@ -1642,7 +1659,9 @@ given a substitute number.
 * **A crowded window is refused, not ranked.** Mercury says how many changes landed
   and names none of them. It does not rank or diff them. It does read which files they
   touched (`src/domain/change_scope.py`) and counts only commits that touched a
-  runtime path; with a `GITHUB_TOKEN` the file lists are unknown and every commit counts.
+  runtime path. The GitHub adapter reads each commit's file list with a
+  `GITHUB_TOKEN`, so the same filter applies. Only a failed or capped per-commit
+  file read leaves the scope unknown and conservatively keeps that commit as a candidate.
 * **The delivery-channel premise is an assumption, not a finding.** That an on-call
   engineer is in a room with a television during an incident has never been tested
   with a responder. Nobody has been asked. If they are all remote, the ten-foot
