@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="280" viewBox="0 0 1120 280" role="img" aria-labelledby="title desc">
+  <title id="title">Mercury: Fire TV incident triage</title>
+  <desc id="desc">A charcoal incident-board banner with amber focus styling and a D-pad. One temporal candidate, or why not. Record-only by default.</desc>
+  <rect width="1120" height="280" rx="16" fill="#0B0C0E"/>
+  <path d="M72 216H1048" stroke="#34383E" stroke-width="2"/>
+  <rect x="72" y="52" width="122" height="28" rx="4" fill="#FFB23F"/>
+  <text x="133" y="71" text-anchor="middle" fill="#140C00" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="2">FIRE TV</text>
+  <text x="72" y="144" fill="#F3F0E9" font-family="Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="5">MERCURY</text>
+  <text x="74" y="184" fill="#FFB23F" font-family="Arial, sans-serif" font-size="23">One temporal candidate, or why not.</text>
+  <text x="74" y="244" fill="#B7B9BD" font-family="Arial, sans-serif" font-size="14" letter-spacing="1">INCIDENT TRIAGE  /  REMOTE FIRST  /  RECORD-ONLY</text>
+  <g transform="translate(908 120)">
+    <rect x="-66" y="-66" width="132" height="132" rx="28" fill="#16181C" stroke="#FFB23F" stroke-width="3"/>
+    <path d="M-16-46H16V-16H46V16H16V46H-16V16H-46V-16H-16Z" fill="#2A2E34" stroke="#B7B9BD" stroke-width="2"/>
+    <circle r="15" fill="#FFB23F"/>
+    <path d="M-5-6L5 0L-5 6Z" fill="#140C00"/>
+    <path d="M0-38L-5-30H5ZM38 0L30-5V5ZM0 38L-5 30H5ZM-38 0L-30-5V5Z" fill="#F3F0E9"/>
+  </g>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="460" viewBox="0 0 1120 460" role="img" aria-labelledby="title desc">
+  <title id="title">Mercury record-only governance journey</title>
+  <desc id="desc">The remote stages an exact fixture target. Mercury mints a content-bound, single-use HMAC token. Confirmation checks authorization, content, nonce, the 300-second lease and the current recommendation. A valid decision and spent token are recorded in DynamoDB; failed checks return a named denial. The handoff is published through the API. No deployment pipeline is contacted.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#FFB23F"/></marker></defs>
+  <rect width="1120" height="460" rx="16" fill="#0B0C0E"/>
+  <g fill="#16181C" stroke="#626872" stroke-width="2">
+    <rect x="40" y="44" width="280" height="88" rx="10"/>
+    <rect x="420" y="44" width="280" height="88" rx="10"/>
+    <rect x="800" y="44" width="280" height="88" rx="10" stroke="#FFB23F"/>
+    <rect x="800" y="212" width="280" height="88" rx="10"/>
+    <rect x="420" y="212" width="280" height="88" rx="10"/>
+    <rect x="40" y="212" width="280" height="88" rx="10"/>
+  </g>
+  <g fill="none" stroke="#FFB23F" stroke-width="2" marker-end="url(#arrow)">
+    <path d="M320 88H420"/><path d="M700 88H800"/>
+    <path d="M940 132V212"/><path d="M800 256H700"/><path d="M420 256H320"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#F3F0E9">
+    <text x="180" y="80" font-size="22" font-weight="700">1. Stage target</text>
+    <text x="180" y="109" font-size="17">Exact labelled fixture payload</text>
+    <text x="560" y="80" font-size="22" font-weight="700">2. Mint token</text>
+    <text x="560" y="109" font-size="17">Content-bound, single-use HMAC</text>
+    <text x="940" y="80" font-size="22" font-weight="700">3. Confirm + verify</text>
+    <text x="940" y="109" font-size="17">Five checks must hold</text>
+    <text x="940" y="248" font-size="22" font-weight="700">4. Record in DynamoDB</text>
+    <text x="940" y="277" font-size="17">Decision + consumed token</text>
+    <text x="560" y="248" font-size="22" font-weight="700">5. Return RECORDED_ONLY</text>
+    <text x="560" y="277" font-size="17">No pipeline contacted</text>
+    <text x="180" y="248" font-size="22" font-weight="700">6. Publish handoff</text>
+    <text x="180" y="277" font-size="17">Shared record through the API</text>
+    <text x="560" y="360" font-size="20" fill="#FFB23F">Authorization / bound content / nonce / 300s lease / current recommendation</text>
+    <text x="560" y="398" font-size="18">A failed check returns a named denial; a token cannot be replayed.</text>
+  </g>
+</svg>
