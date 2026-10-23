@@ -1,28 +1,64 @@
 {
-  "schema": "mercury.deploy_receipt/2",
-  "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
-  "probed_at_utc": "2026-10-19T22:23:11Z",
-  "probed_at_epoch": 1792448591.614784,
+  "schema": "mercury.deploy_receipt/3",
+  "note": "Current deployment verified through AWS Lambda status/revision/package digest. Public HTTP history retains its original revision/time below. No model call or teardown by this release.",
   "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
-  "probes": [
-    {
-      "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
-      "http_status": 200,
-      "elapsed_ms": 1018.92,
-      "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mercury Fire TV incident board</title>\n  <meta name=\"description\" content=\"An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.\">\n  <link rel=\"manifest\" href=\"manifest.json\">\n  <meta name=\"theme-color\" content=\"#0B0C0E\">\n  <link rel=\"preload\" href=\"barlow-condensed-latin-700.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n  <style>\n    /* ------------------------------------------------------------------ Fonts\n       Served from this page's own origin, never from a font CDN: a Fire TV on an\n       on-call room network may never reach one, and the board mus",
-      "error": null
-    },
-    {
-      "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
-      "http_status": 200,
-      "elapsed_ms": 349.76,
-      "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"e6aae2ca3d31cabf73354d2cab8778f46fe28907\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true,\"mcp_protocol\":\"2025-11-25\",\"bedrock_agent\":{\"model_id\":\"anthropic.claude-sonnet-5\",\"region\":\"eu-west-1\",\"resolved_capability\":\"ready_to_attempt\",\"model_calls_enabled\":true},\"live_sources\":{\"offline_mode\":true,\"cloudwatch_production_rows\":[\"mercury-wallboard-euw1-prod\",\"volcan-mcp-euw1-prod\",\"aletheia-provenance-euw1-prod\"],\"cloudwatch_production_reads_allowed\":true,\"cloudwatch_simulated_services\":\"offline-fixture\",\"github_dora_and_pr_radar\":false,\"github_commit_feed\":false,\"cost_explorer\":\"offline-fixture\"}}",
-      "error": null
-    }
-  ],
-  "deployed_commit_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
-  "local_head_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+  "deployment_verified_at_utc": "2026-10-23T13:29:59.593757+00:00",
+  "verification_method": "AWS Lambda control-plane status and CodeSha256 matched to exact merged Git archive package",
+  "deployed_commit_sha": "a438bf163a9abf4084559a723bddb7b8103c530c",
+  "local_head_sha": "a438bf163a9abf4084559a723bddb7b8103c530c",
   "deployed_matches_local_head": true,
+  "source_revision": "a438bf163a9abf4084559a723bddb7b8103c530c",
+  "lambda_state": "Active",
+  "last_update_status": "Successful",
+  "code_sha256_b64": "/efgjpNehwmN1Z1TZUg6zzSlrUjkrVRcGnRd6EEnftU=",
+  "package_hash_matches": true,
+  "application_files_match_git": true,
+  "application_file_count": 59,
+  "dependency_entries_unchanged": 2096,
+  "runtime_settings_preserved": true,
+  "environment_values_preserved_except_build_sha": true,
+  "temporary_artifact_cleaned_up": true,
+  "rollback_dispatch": "record-only",
+  "github_live": null,
+  "model_calls": 0,
+  "probes": [],
   "teardown_verified": false,
-  "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."
+  "teardown_note": "No teardown: judge deployment stays online; verified prior package retained for rollback.",
+  "historical_public_probe": {
+    "schema": "mercury.deploy_receipt/2",
+    "note": "Every field below was observed by scripts/probe_deployment.py at the recorded time. deployed_commit_sha is null when the deployment does not report a build_sha from /health.",
+    "probed_at_utc": "2026-10-19T22:23:11Z",
+    "probed_at_epoch": 1792448591.614784,
+    "base_url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
+    "probes": [
+      {
+        "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/",
+        "http_status": 200,
+        "elapsed_ms": 1018.92,
+        "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mercury Fire TV incident board</title>\n  <meta name=\"description\" content=\"An incident departures board for the TV in the war room: what broke, whether one change can be blamed, and a governed rollback from the remote.\">\n  <link rel=\"manifest\" href=\"manifest.json\">\n  <meta name=\"theme-color\" content=\"#0B0C0E\">\n  <link rel=\"preload\" href=\"barlow-condensed-latin-700.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n  <style>\n    /* ------------------------------------------------------------------ Fonts\n       Served from this page's own origin, never from a font CDN: a Fire TV on an\n       on-call room network may never reach one, and the board mus",
+        "error": null
+      },
+      {
+        "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
+        "http_status": 200,
+        "elapsed_ms": 349.76,
+        "body_excerpt": "{\"status\":\"ok\",\"service\":\"mercury-firetv-cockpit\",\"version\":\"0.2.0\",\"build_sha\":\"e6aae2ca3d31cabf73354d2cab8778f46fe28907\",\"rollback_secret_is_ephemeral\":false,\"github_live\":false,\"rollback_dispatch\":\"record-only\",\"durable_state\":true,\"dpad_demo_approval\":true,\"mcp_protocol\":\"2025-11-25\",\"bedrock_agent\":{\"model_id\":\"anthropic.claude-sonnet-5\",\"region\":\"eu-west-1\",\"resolved_capability\":\"ready_to_attempt\",\"model_calls_enabled\":true},\"live_sources\":{\"offline_mode\":true,\"cloudwatch_production_rows\":[\"mercury-wallboard-euw1-prod\",\"volcan-mcp-euw1-prod\",\"aletheia-provenance-euw1-prod\"],\"cloudwatch_production_reads_allowed\":true,\"cloudwatch_simulated_services\":\"offline-fixture\",\"github_dora_and_pr_radar\":false,\"github_commit_feed\":false,\"cost_explorer\":\"offline-fixture\"}}",
+        "error": null
+      }
+    ],
+    "deployed_commit_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+    "local_head_sha": "e6aae2ca3d31cabf73354d2cab8778f46fe28907",
+    "deployed_matches_local_head": true,
+    "teardown_verified": false,
+    "teardown_note": "No terraform destroy has been executed by this script. Teardown is untested."
+  },
+  "runtime_public_health_evidence": {
+    "workflow_run_url": "https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709",
+    "artifact_name": "mercury-android-tv-runtime-a438bf163a9abf4084559a723bddb7b8103c530c",
+    "build_sha": "a438bf163a9abf4084559a723bddb7b8103c530c",
+    "request_succeeded": true,
+    "url": "https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health",
+    "artifact_sha256": "10d48402faf4a71c394feb01a7f0442fea99b79be192461fad3585e9c905048c",
+    "note": "Observed by the unchanged workflow before emulator boot; no model call. Exact artifact hash independently verified."
+  }
 }
