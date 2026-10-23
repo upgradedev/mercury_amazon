@@ -24,7 +24,7 @@
     <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="109" font-size="17">Five checks must hold</text>
     <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="248" font-size="22" font-weight="700">4. Record in DynamoDB</text>
     <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="277" font-size="17">Decision + consumed token</text>
-    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="248" font-size="22" font-weight="700">5. Return RECORDED_ONLY</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="248" font-size="20" font-weight="700">5. Return RECORDED_ONLY</text>
     <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="277" font-size="17">No pipeline contacted</text>
     <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="248" font-size="22" font-weight="700">6. Publish handoff</text>
     <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="277" font-size="17">Shared record through the API</text>
