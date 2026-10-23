@@ -948,7 +948,7 @@ long form, with the PowerShell variant and the operator secret, follows.
 #### Step 1: Install
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while the repository is private
+git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
 ```
@@ -1480,7 +1480,7 @@ for one) gets taller rows than the five-row page did; and on a 10-foot layout sh
 than 16:9 (1440x900, 1536x730) or the 1280x593 `tv-host` case the fixed key bar covers
 some rows at load. That overlap predates the switch; the three extra rows make it larger.
 
-**GitHub, measured the same day.** With `MERCURY_OFFLINE=1 MERCURY_LIVE_GITHUB=1` and no
+**GitHub, measured on 2026-10-19, while this repository was private.** With `MERCURY_OFFLINE=1 MERCURY_LIVE_GITHUB=1` and no
 token, the private repository answered HTTP 404 and the DORA tile kept the fixture with
 the reason `Live GitHub call failed (anonymous request under MERCURY_LIVE_GITHUB=1)
 (HTTPStatusError: HTTP 404, not found, or not public)`; the commit feed made no request.
