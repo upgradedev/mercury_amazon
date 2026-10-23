@@ -913,7 +913,7 @@ unless the gap is disclosed in the exact phrases `ci/readiness.py` returns from
 `stale_timing_disclosure`; quietly ageing is not one of the options. The published
 timing record was **measured over 541 collected tests**. Additional persistence,
 packaging, browser and Android TV checks were added afterward: **the suite now collects
-962 tests and a re-measure on an idle machine is pending**.
+963 tests and a re-measure on an idle machine is pending**.
 
 **How the figure moved between sessions, published rather than re-rolled.**
 `suite_timing_summary.json` carries the latest session's runs and the previous
@@ -957,7 +957,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 962 passed
+# 963 passed
 ```
 
 #### Step 3: Start the server
@@ -1204,7 +1204,7 @@ because it shells out to `git log` for the commit fallback.
 ### Tests and coverage
 
 ```bash
-python -m pytest tests/ -q                                    # 962 passed
+python -m pytest tests/ -q                                    # 963 passed
 python -m pytest tests/ --cov=src --cov-report=term-missing   # 94% of 3032 statements
 node tests/e2e/spatial_nav_spec.js                            # 32/32 assertions
 python scripts/correlation_trial.py                           # 1160 labelled cases scored
@@ -1219,11 +1219,11 @@ python ci/readiness.py                                        # standards gate a
 
 ```bash
 python ci/readiness.py
-# SUMMARY: 47/53 PASSED, 6/53 FAILED (0 of them blocking)
+# SUMMARY: 45/53 PASSED, 8/53 FAILED (0 of them blocking)
 ```
 
-**47/53 readiness gates** since `e6aae2c`, the PR #67 merge, was deployed on 2026-10-19 and a read-only probe of it was committed to `deploy_teardown_receipt.json`, so G2 passes again; the six that fail are D2, E2, E4 and the three owner actions O1 to O3, none of them blocking (46 on the PR #67 branch, whose hybrid live mode and max_tokens fix changed runtime files under `src/` after the live `ddccb3e` build; 46 from the `e8ceae8` deploy until a read-only probe of live `e8ceae8` was committed to `deploy_teardown_receipt.json` on 2026-10-19 and G2 passed again; 47 at `b552a7c`, before the 2026-10-19 agent deck rework changed live runtime files under `src/` and G2, which is not blocking, began to fail until the next deploy; 46 before `deploy_teardown_receipt.json` was refreshed at `b58977d`, 45 while PR #50 had moved `docs/index.html` after run 37464864870's build, 45 while PR #42 had moved it after run 36922314984's build, and 45 at `b99b154`, when the hero-cause clamp had moved the same file; each time the next emulator run re-drove the journey against the moved page and restored green, most recently run 38808232691 at `fdb5f56`; run 39210785053 at `e8ceae8` then re-drove it against the page with the agent deck, and run 39334510932 at `e6aae2c` against the page with the deck and the live CloudWatch rows, neither of which changed the count). J4 is
-the gate that asks whether the sponsor product is load-bearing, and Mercury is
+**45/53 readiness gates** for the accessibility/recovery code change, pending deployment and a fresh Android TV journey. G2 correctly detects the changed hosted agent deck; J4 correctly detects the changed Android wrapper. D2, E2, E4 and owner actions O1 to O3 remain external blockers. The prior verified release at e6aae2c passed 47/53. Production gate predicates retain their default HEAD checks; historical receipt tests validate their immutable recorded source separately.
+J4 is the gate that asks whether the sponsor product is load-bearing, and Mercury is
 entered in the Fire TV track, so J4 is the gate that matters most here. It passed
 on `bool(readme_terms) and 'LEANBACK_LAUNCHER' in manifest`, which is a grep over
 two text files, while the [Fire TV](#fire-tv) section two screens away said no APK
@@ -1234,15 +1234,16 @@ It now accepts either `android_tv_runtime_receipt.json` from the dispatched Andr
 TV workflow or the legacy `firetv_build_receipt.json` from physical hardware. The
 emulator receipt binds the full Git SHA, APK digest, compiled HTTPS endpoint, normal
 Leanback launch, D-pad journey events, logs and screenshot to one Actions artifact.
-The file exists at the repository root; run 39334510932 wrote the current one from
-build `e6aae2c`. J4 watches `docs/index.html`, `docs/firetv_nav.js` and `app/`, and
-this checkout leaves them as that build had them, so J4 passes. Since the agent deck,
+The historical file exists at the repository root; run 39334510932 wrote it from
+build `e6aae2c`. J4 watches `docs/index.html`, `docs/firetv_nav.js` and `app/`.
+This release changes the Android recovery screen, so that saved journey cannot
+prove the new wrapper. A fresh remote emulator receipt is required after deployment. Since the agent deck,
 the server appends `/mcp/agent-deck.js` to the page, which adds a section after the
 rollback screen. Its buttons sit in that section, not in the hero row, and the browser
 D-pad tests run against the page with the deck. With `MERCURY_LIVE_CLOUDWATCH=1` the
 server also adds three LIVE rows to the board, from `src/`, which J4 does not watch.
 Run 39334510932 drove the journey on the live page at `e6aae2c`, deck and live rows
-included, so J4's green covers the D-pad journey on the page as served; it still does
+included; that historical pass covers the recorded page and wrapper; it still does
 not cover a press of 'Ask the agent'. On a checkout where a live
 runtime path changed after the receipt was written, the gate fails and names the
 stale file instead of passing on a journey the receipt never saw: that happened
@@ -1287,7 +1288,7 @@ them instead of moving on every commit.
 was observed, including the immutable `build_sha` published by `/health` and the local
 HEAD at the moment of the probe, so `deployed_matches_local_head` describes that
 moment and no later commit. The public cockpit is
-`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e6aae2ca3d31cabf73354d2cab8778f46fe28907`, the PR #67 merge (which also carries PR #64's prompt rules and PR #68's `MODEL_MAX_TOKENS` of 16000), since a deploy on 2026-10-19 (UTC) that changed only `MERCURY_BUILD_SHA` among the function's settings, followed by a configuration change that added `MERCURY_LIVE_CLOUDWATCH=1`. The function runs with `MERCURY_OFFLINE=1`, `MERCURY_LIVE_CLOUDWATCH=1`, `MERCURY_AGENT_MODEL=on` and `MERCURY_AGENT_MODEL_MAX_CALLS=40`, with no `MERCURY_LIVE_GITHUB` and no `GITHUB_TOKEN`. The committed `deploy_teardown_receipt.json` records the probe of 2026-10-19 at 22:23 UTC by `python scripts/probe_deployment.py <url>` (two GETs, `/` and `/health`), which read `e6aae2ca3d31cabf73354d2cab8778f46fe28907`, `model_calls_enabled` true, `github_live` false, and `live_sources` naming the three CloudWatch rows; the endpoint health read inside emulator run 39334510932 reports the same. No live runtime file changed between `e6aae2c` and this branch, so `deployed_checkout_problem` finds nothing and gate G2 passes. That probe ran before the reserved concurrency was raised to 10 at 22:48 UTC ([below](#on-the-deployed-board)); G2 compares build SHAs and does not read concurrency. The probes before it read `e8ceae8` (2026-10-19, 07:27 UTC) and `b58977d` (2026-10-18). Between `e8ceae8` and `e6aae2c` the function served `ddccb3e`, the PR #64 merge, from a deploy earlier on 2026-10-19 that no committed probe recorded. Earlier deployments served `b58977d`, `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
+`https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/`, and it serves `e6aae2ca3d31cabf73354d2cab8778f46fe28907`, the PR #67 merge (which also carries PR #64's prompt rules and PR #68's `MODEL_MAX_TOKENS` of 16000), since a deploy on 2026-10-19 (UTC) that changed only `MERCURY_BUILD_SHA` among the function's settings, followed by a configuration change that added `MERCURY_LIVE_CLOUDWATCH=1`. The function runs with `MERCURY_OFFLINE=1`, `MERCURY_LIVE_CLOUDWATCH=1`, `MERCURY_AGENT_MODEL=on` and `MERCURY_AGENT_MODEL_MAX_CALLS=40`, with no `MERCURY_LIVE_GITHUB` and no `GITHUB_TOKEN`. The committed `deploy_teardown_receipt.json` records the probe of 2026-10-19 at 22:23 UTC by `python scripts/probe_deployment.py <url>` (two GETs, `/` and `/health`), which read `e6aae2ca3d31cabf73354d2cab8778f46fe28907`, `model_calls_enabled` true, `github_live` false, and `live_sources` naming the three CloudWatch rows; the endpoint health read inside emulator run 39334510932 reports the same. This accessibility release changes `src/interfaces/agent_deck.py`, so G2 remains pending until the exact merged runtime is deployed and its receipt recorded. That probe ran before the reserved concurrency was raised to 10 at 22:48 UTC ([below](#on-the-deployed-board)); G2 compares build SHAs and does not read concurrency. The probes before it read `e8ceae8` (2026-10-19, 07:27 UTC) and `b58977d` (2026-10-18). Between `e8ceae8` and `e6aae2c` the function served `ddccb3e`, the PR #64 merge, from a deploy earlier on 2026-10-19 that no committed probe recorded. Earlier deployments served `b58977d`, `5c6975b` and `fdb5f56` (PR #50, against which emulator run 38808232691 recorded `android_tv_runtime_receipt.json`), `ea2cff5` (PR #42), `e0a857a` (PR #38), `b99b154` (PR #37), `1bc8cd5` (PR #34), and `b2f7868`.
 
 ### The agent brief on the deployed build
 

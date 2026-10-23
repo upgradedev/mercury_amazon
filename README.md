@@ -47,7 +47,7 @@ calls; one owner-approved press on the deployed `e6aae2c` build came back HTTP 2
 | [Friction log](docs/FRICTION_LOG.md) | Nine problems we hit building for Fire TV and AWS, each with the task, steps, expected and actual result, severity, workaround and suggestion |
 
 [![CI](https://github.com/upgradedev/mercury_amazon/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-962%20collected-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-963%20collected-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -168,7 +168,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m pytest tests/ -q
-# 962 passed
+# 963 passed
 ```
 
 The suite's runtime moves with machine load; every measured run is in
