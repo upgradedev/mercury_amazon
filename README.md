@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, from a local run with `MERCURY_OFFLINE=1`, committed on 2026-09-29. The board has changed since, and among the changes: the board's hero panel and its rows now call a named commit a **Temporal candidate**, the deployed board names a commit from an invented, labelled deploy feed, and it adds three LIVE rows under these five ([the eight rows](#how-it-works)). In the picture, the metric is an offline fixture and the stamp beside the number says so, and the named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** hosted runtime `a438bf1` (2026-10-23), verified by Lambda package hash/build revision and the matching public health snapshot in [Android TV run 39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709). [Fire TV 1.0.1 debug APK and checksum](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) are available. The saved older video predates this release; a current public video URL and judge code access still need to be recorded.
+**Status:** hosted runtime `a438bf1` (2026-10-23), verified by Lambda package hash/build revision and the matching public health snapshot in [Android TV run 39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709). [Fire TV 1.0.1 debug APK and checksum](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) are available. The saved older video predates this release; a current public video URL still needs to be recorded. Source and APK release assets are public under MIT.
 
 **Try it.** Open the [live board](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/)
 in a browser; arrow keys and Enter stand in for the remote. Press **Ask what changed**,
@@ -60,7 +60,7 @@ calls; one owner-approved press on the earlier `e6aae2c` build came back HTTP 20
 | Link | What you get today |
 |---|---|
 | [Live board](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/) | Eight rows; [health](https://leol25sezuvokpankox5cvjopm0gtvfa.lambda-url.eu-west-1.on.aws/health) reports the deployed build |
-| [Fire TV 1.0.1 debug APK](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) | The exact emulator-tested APK and SHA256SUMS; repository access required while private |
+| [Fire TV 1.0.1 debug APK](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) | The exact emulator-tested APK and SHA256SUMS, available without repository membership |
 | [Run it locally](#run-it-locally) | The five fixture rows, with no credentials |
 | [Evidence](docs/EVIDENCE.md) | The measurements with the commands that produced them, and the audit history |
 | [What is real and what is not](#what-is-real-and-what-is-not) | What is measured, what is simulated, and what is still missing |
@@ -71,9 +71,9 @@ calls; one owner-approved press on the earlier `e6aae2c` build came back HTTP 20
 [![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The repository is **private** today, so the CI badge does not resolve outside the
-organisation. The other three badges are static values that the commands in
-[Evidence](docs/EVIDENCE.md#measured-numbers) reproduce.
+This repository is public and its CI badge is accessible without repository membership.
+Private forks require authorized access for repository-scoped badges. The other three
+badges are static values that the commands in [Evidence](docs/EVIDENCE.md#measured-numbers) reproduce.
 
 ---
 
@@ -177,18 +177,15 @@ only and contacts nothing outside the server.
 
 ## Run it locally
 
-The repository is private today. The event's [FAQ](https://amazonappdev2026.devpost.com/details/faqs) sets the rule for that
-case: "Add the Amazon and Devpost reviewers as collaborators before the submission
-deadline". That is an owner step taken near submission; until then, `git clone`
-works only for collaborators. The MIT [LICENSE](LICENSE) file stays in the repository
-either way. If you hold the source, start at `pip install`. The install depends on your
-network; one clean install here ran past ten minutes. No credentials and no AWS account
-are needed.
+The repository has been public since 2026-10-23 under the MIT [LICENSE](LICENSE).
+Reading and cloning need no collaborator invitation. If you already have the source,
+start at `pip install`. The install depends on your network; one clean install here ran
+past ten minutes. No credentials and no AWS account are needed for the fixture path.
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/upgradedev/mercury_amazon.git   # needs collaborator access while private
+git clone https://github.com/upgradedev/mercury_amazon.git
 cd mercury_amazon
 pip install -e ".[dev]"
 ```
@@ -242,7 +239,7 @@ This debug sideload build is version 1.0.1 / versionCode 2, 9,266,535 bytes, SHA
 `6d7d097ea9c48d9e3e5f15b8c5d8ab69eee5e6805afacadd3f6c3f47ab9c30b7`.
 It is the exact APK installed and driven by
 [run 39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709)
-against hosted `a438bf1`. The release is in this private repository; judges need access.
+against hosted `a438bf1`. The release and its APK/checksum assets are public.
 Check the checksum before installing:
 
 ```bash
@@ -326,14 +323,12 @@ sent to a pipeline. **Built, not deployed:** a live GitHub DORA read. **Missing:
   prints it and the 58 namings over the evidence sentence, and after Confirm shows the
   board holding RECORDED, no pipeline contacted. The
   sync gate passed. Details in [video/README.md](video/README.md).
-- **A public repository.** Private until the reviewers are added as collaborators; see
-  [Run it locally](#run-it-locally).
 
 | Part | On the board today | Live path |
 |---|---|---|
 | Error metric | Generated locally from the service name, stamped OFFLINE FIXTURE | CloudWatch via `boto3`. Run once against a real account, it returned no datapoints because no such load balancer exists. An empty or failed read now shows NO LIVE DATA and names nothing; it is never replaced with the generated series. With `MERCURY_LIVE_CLOUDWATCH=1` the board adds three rows for the hackathon's own production functions, read from `AWS/Lambda` (`Errors`, with `Invocations` beside it, last 24 hours) and stamped LIVE with the read time; the four simulated services stay fixtures. Set on the deployed function since 2026-10-19 |
 | Commits | Real commits from this repository's `git log` with their file lists (a 20-commit window recorded at merge `a4ec9aa`, so a new commit cannot change the demo's verdicts), stamped STAND-IN because they stand in for a deploy feed; only one that changed a runtime file counts as a deploy. The public cockpit has no git checkout, so it shows an invented, display-only deploy feed (`src/infrastructure/fixtures/deploy_feed_fixture.json`), stamped OFFLINE FIXTURE; no published figure is computed from it | GitHub REST API with `GITHUB_TOKEN`, plus one files read per commit, so the runtime filter applies there too; a failed or capped read stays a candidate |
-| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API. With `MERCURY_LIVE_GITHUB=1` and no token it reads this repository anonymously, cached for 15 minutes; while the repository is private that read gets HTTP 404 and the board keeps the fixture and says why. Not deployed yet |
+| Delivery velocity | A recording of a real GitHub read of `pallets/flask`, stamped OFFLINE FIXTURE | GitHub REST API. With `MERCURY_LIVE_GITHUB=1` and no token it reads this repository anonymously, cached for 15 minutes; a measured 2026-10-19 test, before publication, received HTTP 404 and kept the labelled fixture. The repository is now public; this optional live GitHub switch remains disabled on the deployed board |
 | Cloud spend | A synthetic fixture that says it was never read from an AWS account | Cost Explorer. The maintainer ran it once against a private account; no artefact is committed, so treat that as unverified. There is deliberately no live switch for it: Cost Explorer reports the whole account's bill, so under `MERCURY_OFFLINE=1` it is always the fixture |
 | Rollback | Recorded, never sent | A GitHub Actions dispatcher that has never been fired |
 | Fire TV, Fire OS | Native app source, APK 1.0.1 release and current runtime receipt | Run 39961752709 built and installed the exact a438bf1 APK, normally launched it and drove the record-only D-pad journey; receipt `android_tv_runtime_receipt.json`. Physical Fire TV is optional |
