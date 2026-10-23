@@ -16,19 +16,19 @@
     <path d="M940 132V212"/><path d="M800 256H700"/><path d="M420 256H320"/>
   </g>
   <g font-family="Arial, sans-serif" text-anchor="middle" fill="#F3F0E9">
-    <text x="180" y="80" font-size="22" font-weight="700">1. Stage target</text>
-    <text x="180" y="109" font-size="17">Exact labelled fixture payload</text>
-    <text x="560" y="80" font-size="22" font-weight="700">2. Mint token</text>
-    <text x="560" y="109" font-size="17">Content-bound, single-use HMAC</text>
-    <text x="940" y="80" font-size="22" font-weight="700">3. Confirm + verify</text>
-    <text x="940" y="109" font-size="17">Five checks must hold</text>
-    <text x="940" y="248" font-size="22" font-weight="700">4. Record in DynamoDB</text>
-    <text x="940" y="277" font-size="17">Decision + consumed token</text>
-    <text x="560" y="248" font-size="22" font-weight="700">5. Return RECORDED_ONLY</text>
-    <text x="560" y="277" font-size="17">No pipeline contacted</text>
-    <text x="180" y="248" font-size="22" font-weight="700">6. Publish handoff</text>
-    <text x="180" y="277" font-size="17">Shared record through the API</text>
-    <text x="560" y="360" font-size="20" fill="#FFB23F">Authorization / bound content / nonce / 300s lease / current recommendation</text>
-    <text x="560" y="398" font-size="18">A failed check returns a named denial; a token cannot be replayed.</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="80" font-size="22" font-weight="700">1. Stage target</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="109" font-size="17">Exact labelled fixture payload</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="80" font-size="22" font-weight="700">2. Mint token</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="109" font-size="17">Content-bound, single-use HMAC</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="80" font-size="22" font-weight="700">3. Confirm + verify</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="109" font-size="17">Five checks must hold</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="248" font-size="22" font-weight="700">4. Record in DynamoDB</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="277" font-size="17">Decision + consumed token</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="248" font-size="22" font-weight="700">5. Return RECORDED_ONLY</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="277" font-size="17">No pipeline contacted</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="248" font-size="22" font-weight="700">6. Publish handoff</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="180" y="277" font-size="17">Shared record through the API</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="360" font-size="20" fill="#FFB23F">Authorization / bound content / nonce / 300s lease / current recommendation</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="398" font-size="18">A failed check returns a named denial; a token cannot be replayed.</text>
   </g>
 </svg>

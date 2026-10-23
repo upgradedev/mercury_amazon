@@ -21,24 +21,24 @@
     <path d="M560 298H200V354" stroke-dasharray="6 5"/>
   </g>
   <g font-family="Arial, sans-serif" text-anchor="middle" fill="#F3F0E9">
-    <text x="165" y="77" font-size="22" font-weight="700">Fire TV remote</text>
-    <text x="165" y="104" font-size="17">Leanback WebView</text>
-    <text x="545" y="77" font-size="22" font-weight="700">AWS Lambda</text>
-    <text x="545" y="104" font-size="17">Board + application API</text>
-    <text x="940" y="77" font-size="22" font-weight="700">Correlator</text>
-    <text x="940" y="104" font-size="17">75-minute runtime window</text>
-    <text x="165" y="207" font-size="22" font-weight="700">CloudWatch</text>
-    <text x="165" y="234" font-size="17">LIVE metrics; no deploy feed</text>
-    <text x="545" y="207" font-size="22" font-weight="700">DynamoDB</text>
-    <text x="545" y="234" font-size="17">Shared records + spent tokens</text>
-    <text x="200" y="335" font-size="17" fill="#FFB23F">Reading under 3.0x baseline</text>
-    <text x="560" y="335" font-size="17" fill="#FFB23F">Zero or several changes</text>
-    <text x="920" y="335" font-size="17" fill="#FFB23F">Exactly one runtime change</text>
-    <text x="200" y="389" font-size="21" font-weight="700">Nothing needs reverting</text>
-    <text x="200" y="417" font-size="17">Only the below-threshold verdict</text>
-    <text x="560" y="389" font-size="21" font-weight="700">Cannot attribute</text>
-    <text x="560" y="417" font-size="17">Calls no deploy innocent</text>
-    <text x="920" y="389" font-size="21" font-weight="700">Temporal candidate</text>
-    <text x="920" y="417" font-size="17">Proximity is not proof of cause</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="77" font-size="22" font-weight="700">Fire TV remote</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="104" font-size="17">Leanback WebView</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="77" font-size="22" font-weight="700">AWS Lambda</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="104" font-size="17">Board + application API</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="77" font-size="22" font-weight="700">Correlator</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="940" y="104" font-size="17">75-minute runtime window</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="207" font-size="22" font-weight="700">CloudWatch</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="165" y="234" font-size="17">LIVE metrics; no deploy feed</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="207" font-size="22" font-weight="700">DynamoDB</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="545" y="234" font-size="17">Shared records + spent tokens</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="335" font-size="17" fill="#FFB23F">Reading under 3.0x baseline</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="335" font-size="17" fill="#FFB23F">Zero or several changes</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="335" font-size="17" fill="#FFB23F">Exactly one runtime change</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="389" font-size="21" font-weight="700">Nothing needs reverting</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="200" y="417" font-size="17">Only the below-threshold verdict</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="389" font-size="21" font-weight="700">Cannot attribute</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="560" y="417" font-size="17">Calls no deploy innocent</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="389" font-size="21" font-weight="700">Temporal candidate</text>
+    <text text-anchor="middle" font-family="Arial, sans-serif" x="920" y="417" font-size="17">Proximity is not proof of cause</text>
   </g>
 </svg>
