@@ -6,7 +6,7 @@
 
 *The first screen at Fire TV resolution, captured from a local run with `MERCURY_OFFLINE=1`. The metric is an offline fixture and the stamp beside the number says so. The named commit is one of this repository's own that changed server code, standing in for a deploy.*
 
-**Status:** runs end to end on a laptop with offline fixtures and no credentials. A 170.85 s demo video is rendered but not uploaded. An Android TV emulator run (AOSP, API 34) landed in run 39334510932; public access is still pending ([details](#what-is-real-and-what-is-not)).
+**Status:** hosted runtime `a438bf1` (2026-10-23), verified by Lambda package hash/build revision and the matching public health snapshot in [Android TV run 39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709). [Fire TV 1.0.1 debug APK and checksum](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) are available. The saved older video predates this release; a current public video URL and judge code access still need to be recorded.
 
 **What it does.** An error metric spikes during an incident and the room asks which
 deploy did it. Mercury answers on the room's TV, and most of the time the honest answer
@@ -95,7 +95,7 @@ right 50.0% of the time on that held-out split (29 of 58, 95% interval 38% to 62
 and the board prints that figure next to the name with its condition: `≤75m lag`,
 because the corpus assumes no regression takes longer than the window to show.
 
-The board shows five services, one per answer. Each row is its own live response from
+The fixture board shows five services, one per answer; deployed hybrid mode adds three production CloudWatch rows. Each row is its own live response from
 the server; the readings come from the offline fixture.
 
 | Service | Verdict | What the board says |
@@ -213,15 +213,20 @@ required at any stage of submission or judging".
 held-out split, all synthetic; commits read from real git history, with their file lists,
 wherever there is a checkout (the public board has none and shows an invented deploy feed);
 the governed rollback and its refusals, each tested; the Leanback app source; an Android
-TV runtime receipt from [run 39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932),
-which installed the exact APK on an emulator and drove the record-only path by D-pad
-(receipt: `android_tv_runtime_receipt.json`); and a live cockpit whose `/health` reports
-the build SHA. Redeployed on 2026-10-19 at `e6aae2c`, the PR #67 merge, with
-`MERCURY_OFFLINE=1`, `MERCURY_LIVE_CLOUDWATCH=1` and `MERCURY_AGENT_MODEL=on`, and probed
-at 22:23 UTC that day by `python scripts/probe_deployment.py` (committed as
-`deploy_teardown_receipt.json`), it serves the press-only agent deck, record-only; the
-runtime receipt's `endpoint_health_build_sha` names the same build. It served `ddccb3e`
-before that, and `e8ceae8` before that. **Live on the deployed board:** three rows read
+TV runtime receipt from [run 39961752709](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709),
+which installed the exact version 1.0.1 APK and drove the record-only path by D-pad
+(receipt: `android_tv_runtime_receipt.json`). The same merged build `a438bf1` was
+deployed on 2026-10-23; AWS Lambda Active/Successful, build revision and exact-package
+hash were verified. The workflow's public health snapshot names that build.
+`MERCURY_OFFLINE=1`, `MERCURY_LIVE_CLOUDWATCH=1` and the existing model-on/cap40 settings
+were preserved; this release made no model call. The agent deck now announces results
+and errors through an initially silent status region. The Fire OS wrapper offers a
+native focused Try again button after main-document HTTP/network failures; its
+failure lifecycle has JVM tests. The emulator proof covers the normal online journey,
+not a physical Fire TV or assistive-user test. Prior public probes of `e6aae2c` remain
+historical in `deploy_teardown_receipt.json`.
+
+**Live on the deployed board:** three rows read
 from CloudWatch for the hackathon's own Lambda functions, stamped LIVE
 ([live data switches](#live-data-switches)). **Simulated:** every metric series of the
 five demo services is an offline fixture, and a confirmed rollback is recorded, never

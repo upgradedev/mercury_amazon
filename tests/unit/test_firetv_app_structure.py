@@ -7,6 +7,7 @@ wiring, and the key handling contract between MainActivity and the cockpit page.
 The build itself is proved by .github/workflows/android.yml, which assembles the
 APK on a runner that has the Android SDK and uploads it.
 """
+import json
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -329,7 +330,8 @@ def test_an_android_ci_workflow_builds_and_uploads_the_apk():
 
 def test_the_build_document_states_what_has_been_run():
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "actions/runs/39334510932" in doc
+    receipt = json.loads((REPO_ROOT / "android_tv_runtime_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["workflow_run_url"] in doc
     assert "Physical Fire TV" in doc
     assert "Optional and not run" in doc
 
