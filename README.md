@@ -126,6 +126,8 @@ baselines. Mercury finds fewer causes: 4.8% recall against 16.7% and 56.8%.
 Precision is 50.0% (n=58 namings, 29 correct), assuming regression lag of at most
 75 minutes; it falls to 41.5% at 90 minutes and 27.3% at 180 minutes.
 [Method, labels and uncertainty](docs/EVIDENCE.md#how-often-it-is-right) are part of the result.
+Reproduce with `python scripts/attribution_split.py` and
+`python scripts/naive_attribution_baselines.py`.
 
 <details>
 <summary>Why the runtime filter lowered the published precision</summary>
