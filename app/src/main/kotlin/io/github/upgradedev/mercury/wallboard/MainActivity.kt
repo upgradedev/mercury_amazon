@@ -2,16 +2,26 @@ package io.github.upgradedev.mercury.wallboard
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 
 /**
  * Fire TV Leanback activity hosting the Mercury cockpit.
@@ -30,7 +40,9 @@ class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     private lateinit var cockpitUrl: String
-    private var pageLoaded = false
+    private lateinit var loadState: CockpitLoadState
+    private lateinit var root: FrameLayout
+    private var offlinePanel: View? = null
 
     /**
      * The object the page can call back into. Exposed to JavaScript under the
@@ -64,6 +76,7 @@ class MainActivity : Activity() {
             intentExtra = intent?.getStringExtra(CockpitUrlResolver.EXTRA_COCKPIT_URL),
             buildConfigUrl = BuildConfig.MERCURY_COCKPIT_URL,
         )
+        loadState = CockpitLoadState(cockpitUrl)
         Log.i(TAG, "Loading Mercury cockpit from $cockpitUrl")
 
         webView = WebView(this).apply {
@@ -83,13 +96,19 @@ class MainActivity : Activity() {
             webViewClient = CockpitWebViewClient()
             addJavascriptInterface(MercuryHost(), "MercuryHost")
         }
-        setContentView(webView)
+        root = FrameLayout(this).apply { addView(webView) }
+        setContentView(root)
         webView.loadUrl(cockpitUrl)
     }
 
     private inner class CockpitWebViewClient : WebViewClient() {
+        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            if (!loadState.offline) loadState.beginLoad()
+        }
+
         override fun onPageFinished(view: WebView?, url: String?) {
-            pageLoaded = true
+            if (!loadState.finishLoad()) return
+            webView.requestFocus()
             Log.i(TAG, "journey:page_loaded:${url ?: cockpitUrl}")
         }
 
@@ -100,44 +119,90 @@ class MainActivity : Activity() {
         ) {
             // Only replace the screen when the main document failed. A failed
             // sub-resource should not blank a working cockpit.
-            if (request?.isForMainFrame != true) return
-            pageLoaded = false
+            if (!loadState.fail(request?.isForMainFrame == true)) return
             val description = error?.description?.toString() ?: "unknown error"
             Log.w(TAG, "Cockpit failed to load: $description")
-            view?.loadDataWithBaseURL(null, offlineHtml(description), "text/html", "utf-8", null)
+            showOffline(description)
+        }
+
+        override fun onReceivedHttpError(
+            view: WebView?,
+            request: WebResourceRequest?,
+            response: WebResourceResponse?,
+        ) {
+            val status = response?.statusCode ?: return
+            if (!loadState.fail(request?.isForMainFrame == true, status)) return
+            showOffline("HTTP $status")
         }
     }
 
     /**
      * The screen shown when the cockpit cannot be reached. It states the address
-     * that failed and how to fix it, because a blank screen on a TV in a war room
-     * is worse than an error with instructions.
+     * that failed and offers native remote recovery even when no page loaded.
+     * Native text views render the error as text, never as executable HTML.
      */
-    private fun offlineHtml(reason: String): String {
-        val host = CockpitUrlResolver.hostOf(cockpitUrl)
-        return """
-            <html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-            <body style="background:#060913;color:#f8fafc;font-family:sans-serif;padding:6vh 8vw;">
-              <h1 style="color:#8b5cf6;font-size:5vh;">Mercury cockpit unreachable</h1>
-              <p style="font-size:3vh;line-height:1.5;">
-                This Fire TV could not load <code>${escape(cockpitUrl)}</code>.
-              </p>
-              <p style="font-size:2.4vh;color:#94a3b8;line-height:1.6;">
-                Reported: ${escape(reason)}<br><br>
-                Start the Mercury server, then relaunch pointing at it:<br>
-                <code style="color:#38bdf8;">adb shell am start -n $packageName/.MainActivity
-                --es COCKPIT_URL http://$host:8002/</code>
-              </p>
-            </body></html>
-        """.trimIndent()
+    private fun showOffline(reason: String) {
+        offlinePanel?.let { root.removeView(it) }
+        webView.visibility = View.GONE
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(40), dp(32), dp(40), dp(32))
+            setBackgroundColor(Color.rgb(6, 9, 19))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        fun text(value: String, size: Float): TextView = TextView(this).apply {
+            this.text = value
+            textSize = size
+            setTextColor(Color.rgb(248, 250, 252))
+            setPadding(0, 0, 0, dp(20))
+        }
+        content.addView(text("Mercury cockpit unreachable", 32f).apply {
+            isAccessibilityHeading = true
+        })
+        content.addView(text("Could not load $cockpitUrl\nReported: $reason", 22f))
+        content.addView(text("Check the network and Mercury server, then select Try again. Press Back to exit.", 22f))
+        val retry = Button(this).apply {
+            this.text = "Try again"
+            textSize = 24f
+            minHeight = dp(64)
+            isFocusable = true
+            setTextColor(Color.WHITE)
+            backgroundTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
+                intArrayOf(Color.rgb(37, 99, 235), Color.rgb(51, 65, 85)),
+            )
+            setOnClickListener { retryCockpit() }
+        }
+        content.addView(retry)
+        val panel = ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
+        }
+        offlinePanel = panel
+        root.addView(panel, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        retry.requestFocus()
     }
 
-    private fun escape(value: String): String = value
-        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    private fun retryCockpit() {
+        val target = loadState.retry()
+        offlinePanel?.let { root.removeView(it) }
+        offlinePanel = null
+        webView.visibility = View.VISIBLE
+        webView.requestFocus()
+        webView.loadUrl(target)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val direction = DpadBridge.directionFor(keyCode)
-        if (direction == null || !pageLoaded) return super.onKeyDown(keyCode, event)
+        if (loadState.offline && direction == DpadBridge.BACK) {
+            finish()
+            return true
+        }
+        if (direction == null || !loadState.pageLoaded) return super.onKeyDown(keyCode, event)
 
         if (direction == DpadBridge.BACK) {
             handleBack()

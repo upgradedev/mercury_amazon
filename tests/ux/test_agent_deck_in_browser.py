@@ -157,6 +157,11 @@ def test_no_agent_or_model_call_on_load_or_on_row_select(browser, base_url, path
     try:
         page.wait_for_timeout(1500)
         assert calls == [], f"the page called the agent on load: {calls}"
+        status = page.locator("#bedrockAgentStatus")
+        assert status.get_attribute("role") == "status"
+        assert status.get_attribute("aria-live") == "polite"
+        assert status.get_attribute("aria-atomic") == "true"
+        assert status.text_content() == "", "no unsolicited agent announcement on load"
 
         _press_center_on(page, '.btn-demo[data-service="search-indexer"]')
         page.wait_for_function(
@@ -187,6 +192,10 @@ def test_ask_the_agent_press_makes_one_call_and_the_card_carries_both_stamps(bro
         assert "deterministic" in engine.lower(), engine
         assert not re.search(r"sonnet|claude", engine, re.IGNORECASE), engine
         assert not re.search(r"\b(is|was|has been) staged\b|awaiting authori", card, re.IGNORECASE), card
+        page.wait_for_function("document.querySelector('#bedrockAgentStatus').textContent.startsWith('Agent answer for ')")
+        announcement = page.locator("#bedrockAgentStatus").text_content()
+        assert "OFFLINE FIXTURE" in announcement and "record-only" in announcement
+        assert page.locator("#card-agent-brief .agent-brief-10ft").text_content() in announcement
         assert not errors, errors
     finally:
         context.close()
@@ -296,6 +305,8 @@ def test_an_error_response_is_shown_as_an_error_not_as_a_brief(browser, base_url
         assert page.locator("#card-agent-brief").count() == 0
         text = page.locator("#card-agent-error").inner_text()
         assert f"HTTP {status}" in text, text
+        page.wait_for_function("document.querySelector('#bedrockAgentStatus').textContent.includes('No answer from ')")
+        assert page.locator("#bedrockAgentStatus").text_content() == text
         assert not re.search(r"sonnet|bedrock", text, re.IGNORECASE), text
     finally:
         context.close()
@@ -461,6 +472,7 @@ def test_the_recorded_handoff_card_stays_above_the_key_bar_and_keeps_the_cursor(
         # 'Refresh shared handoff' the deck clicks, so Shift+Tab jumped the page up to
         # 'Publish responder handoff' outside the deck instead of reaching Ask the agent.
         assert page.evaluate(_ACTIVE_ID) == "btnAgentPublishHandoff"
+        assert "Recorded demo handoff published" in page.locator("#bedrockAgentStatus").text_content()
         scrolled = page.evaluate("Math.round(scrollY)")
         page.keyboard.press("Shift+Tab")
         page.wait_for_timeout(200)
@@ -486,7 +498,27 @@ def test_a_refused_demo_handoff_shows_the_servers_reason(browser, base_url):
         text = page.locator("#card-agent-error").inner_text()
         assert "HTTP 422" in text and detail in text, text
         assert "refused" in text and "No answer from" not in text, text
+        assert page.locator("#bedrockAgentStatus").text_content() == text
         assert "race" not in text.lower() and "conflict" not in text.lower(), text
+    finally:
+        context.close()
+
+
+def test_mcp_completion_and_failure_are_announced_without_losing_remote_focus(browser, base_url):
+    context, page, _calls, errors = _open(browser, base_url + "/")
+    try:
+        _press_center_on(page, "#btnAgentMcpHandshake")
+        page.wait_for_function(
+            "document.querySelector('#bedrockAgentStatus').textContent.startsWith('MCP handshake complete.')")
+        assert "tools published" in page.locator("#bedrockAgentStatus").text_content()
+        assert page.evaluate(_ACTIVE_ID) == "btnAgentMcpHandshake"
+        page.route("**/mcp", _fulfil_json(503, {"detail": "Scripted unavailable"}))
+        _press_center_on(page, "#btnAgentMcpHandshake")
+        page.locator("#card-agent-error").wait_for(timeout=10_000)
+        announcement = page.locator("#bedrockAgentStatus").text_content()
+        assert "MCP initialize" in announcement and "HTTP 503" in announcement
+        assert page.evaluate(_ACTIVE_ID) == "btnAgentMcpHandshake"
+        assert errors == [], errors
     finally:
         context.close()
 

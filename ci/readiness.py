@@ -208,22 +208,22 @@ def deployed_checkout_problem(deployed: str) -> str | None:
     return None
 
 
-def runtime_receipt_checkout_problem(receipt: dict) -> str | None:
+def runtime_receipt_checkout_problem(receipt: dict, *, checkout_ref: str = "HEAD") -> str | None:
     """Return why a historical runtime receipt cannot prove this checkout."""
     build_sha = str(receipt.get("build_sha", ""))
     if not re.fullmatch(r"[0-9a-f]{40}", build_sha):
         return "runtime build SHA is not a full Git SHA"
     ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", build_sha, "HEAD"],
+        ["git", "merge-base", "--is-ancestor", build_sha, checkout_ref],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=20,
     )
     if ancestor.returncode != 0:
-        return f"runtime build {build_sha[:7]} is not an ancestor of HEAD"
+        return f"runtime build {build_sha[:7]} is not an ancestor of {checkout_ref}"
     changed = subprocess.run(
-        ["git", "diff", "--name-only", f"{build_sha}..HEAD", "--", *ANDROID_TV_RUNTIME_PATHS],
+        ["git", "diff", "--name-only", f"{build_sha}..{checkout_ref}", "--", *ANDROID_TV_RUNTIME_PATHS],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

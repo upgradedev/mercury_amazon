@@ -9,12 +9,17 @@ physical device is optional.
 
 | Check | Current state | Evidence |
 |---|---|---|
-| Kotlin unit tests and APK build | Passed for the previous master; the candidate is rebuilt in every PR | `.github/workflows/android.yml` |
+| Kotlin unit tests and APK build | Version 1.0.1; CI 39960725390 passed, including pure load-state recovery tests | `.github/workflows/android.yml` |
 | Compiled default endpoint | Public HTTPS Lambda URL; no ADB override is needed | `app/build.gradle.kts`, `CockpitUrlResolver.kt` |
 | Normal Leanback launch | Automated in a fresh Android TV emulator | `.github/workflows/android-tv-emulator.yml` |
 | D-pad golden path | Attribution → stage → single-use record-only confirm → fixed responder handoff | `scripts/android_tv_smoke.sh` |
-| Runtime receipt | Landed in run 39334510932 | `android_tv_runtime_receipt.json` holds the content-addressed pointer; full bundle in [the run artifact](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932) |
+| Runtime receipt | Run 39961752709, exact deployed `a438bf1`, version 1.0.1 | `android_tv_runtime_receipt.json`; [run artifact](https://github.com/upgradedev/mercury_amazon/actions/runs/39961752709); [APK/checksum release](https://github.com/upgradedev/mercury_amazon/releases/tag/firetv-v1.0.1) |
 | Physical Fire TV | Optional and not run | The FAQ does not require it |
+
+The normal online D-pad journey was re-run for this release. Native offline failure
+lifecycle is covered by JVM tests and Activity wiring checks; assistive-user and
+physical offline remote testing remain separate. The previous [run 39334510932](https://github.com/upgradedev/mercury_amazon/actions/runs/39334510932)
+records historical `e6aae2c` evidence and is superseded for current freshness.
 
 The demo path is deliberately effect-free. Its deployment markers are labelled
 recorded Mercury repository commits, not deployments of `checkout-api`; confirmation

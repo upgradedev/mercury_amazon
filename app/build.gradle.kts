@@ -12,8 +12,8 @@ android {
         // Fire OS 7 is based on Android 9 (API 28). Fire OS 8 is Android 11 (API 30).
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         // The cockpit this build points at. The normal artifact opens the exact
         // public candidate without an adb intent override. Override per build with

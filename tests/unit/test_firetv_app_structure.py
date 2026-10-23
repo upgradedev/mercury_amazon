@@ -7,6 +7,7 @@ wiring, and the key handling contract between MainActivity and the cockpit page.
 The build itself is proved by .github/workflows/android.yml, which assembles the
 APK on a runner that has the Android SDK and uploads it.
 """
+import json
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -266,7 +267,18 @@ def test_back_asks_the_page_before_closing_the_activity(activity_source):
 
 def test_the_activity_renders_an_error_screen_rather_than_a_blank_one(activity_source):
     assert "onReceivedError" in activity_source
-    assert "offlineHtml" in activity_source
+    assert "showOffline" in activity_source
+    assert "onReceivedHttpError" in activity_source
+    assert "loadState.fail(request?.isForMainFrame == true" in activity_source
+    assert "if (!loadState.finishLoad()) return" in activity_source
+    assert 'this.text = "Try again"' in activity_source
+    assert "retry.requestFocus()" in activity_source
+    assert "setOnClickListener { retryCockpit() }" in activity_source
+    assert "val target = loadState.retry()" in activity_source
+    assert "webView.loadUrl(target)" in activity_source
+    assert "loadState.offline && direction == DpadBridge.BACK" in activity_source
+    host = activity_source.split("inner class MercuryHost", 1)[1].split('@SuppressLint', 1)[0]
+    assert "loadUrl" not in host and "retryCockpit" not in host
     assert "unreachable" in activity_source.lower()
     assert "isForMainFrame" in activity_source, "a failed sub-resource must not blank the page"
 
@@ -294,6 +306,7 @@ def test_the_bridge_refuses_an_unknown_direction_rather_than_injecting_it():
 def test_kotlin_unit_tests_exist_for_both_pure_units():
     assert (KOTLIN_TESTS / "DpadBridgeTest.kt").exists()
     assert (KOTLIN_TESTS / "CockpitUrlResolverTest.kt").exists()
+    assert (KOTLIN_TESTS / "CockpitLoadStateTest.kt").exists()
 
 
 def test_the_url_resolver_refuses_non_http_schemes():
@@ -317,7 +330,8 @@ def test_an_android_ci_workflow_builds_and_uploads_the_apk():
 
 def test_the_build_document_states_what_has_been_run():
     doc = (REPO_ROOT / "docs" / "FIRE_TV_BUILD.md").read_text(encoding="utf-8")
-    assert "actions/runs/39334510932" in doc
+    receipt = json.loads((REPO_ROOT / "android_tv_runtime_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["workflow_run_url"] in doc
     assert "Physical Fire TV" in doc
     assert "Optional and not run" in doc
 

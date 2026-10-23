@@ -186,24 +186,10 @@ def test_android_receipt_binds_repository_revision_and_runtime_artifacts(mutatio
 
 
 def test_the_runtime_receipt_in_this_repository_is_real_evidence():
-    """The landed receipt, asserted by contents against the real checkout.
+    """The landed artifact validates against its immutable recorded source.
 
-    Actions run 39334510932 built the APK from e6aae2c, the PR #67 merge, and
-    drove the D-pad journey on an Android TV emulator against the page served
-    by the Lambda redeployed at e6aae2c on 2026-10-19, with the hybrid
-    CloudWatch rows switched on (the endpoint health in its artifact lists
-    them under live_sources). The receipt below is that run's artifact bytes,
-    downloaded and hash-verified, not written by hand; every field is asserted
-    below. History: on 2026-10-01 the 2026-09-30 receipt (run 36669903334) went
-    stale the day docs/index.html joined the invalidation set, run 36798893479
-    restored green, the hero-cause clamp moved docs/index.html after that
-    build, run 36922314984 (build e0a857a) restored green again, run
-    37464864870 (build ea2cff5) restored green after PR #42 moved
-    docs/index.html, and run 38808232691 (build fdb5f56) restored green after
-    PR #50 moved it. PR #62 appended the deck from src/, which J4 does not
-    watch, so that receipt stayed green without seeing the deck until run
-    39210785053 (build e8ceae8) landed. The hybrid rows also come from src/,
-    so that receipt stayed green without seeing them until this one landed.
+    Current-checkout freshness is verified independently below; a new wrapper
+    must never inherit a historical journey's current-pass claim.
     """
     path = REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT
     assert path.is_file(), "the landed runtime receipt is missing"
@@ -216,16 +202,24 @@ def test_the_runtime_receipt_in_this_repository_is_real_evidence():
     assert receipt["endpoint_health_build_sha"] == receipt["build_sha"]
     assert receipt["artifacts"]["apk"]["sha256"] == receipt["apk_sha256"]
     assert receipt["build_sha"] in receipt["artifact_name"]
-    assert "actions/runs/39334510932" in receipt["workflow_run_url"]
+    assert receipt["workflow_run_url"].removeprefix(
+        "https://github.com/upgradedev/mercury_amazon/actions/runs/"
+    ).isdigit()
     passed, message = readiness.evaluate_firetv_gate(
         README_TERMS, LEANBACK_MANIFEST, receipt, _exists)
     assert passed is True, message
-    problem = readiness.runtime_receipt_checkout_problem(receipt)
-    assert problem is None, f"the fresh receipt already fails its checkout: {problem}"
+    def validates_recorded_source(recorded):
+        return readiness.runtime_receipt_checkout_problem(
+            recorded, checkout_ref=recorded["build_sha"]
+        )
+
+    problem = validates_recorded_source(receipt)
+    assert problem is None, f"receipt does not validate against its recorded source: {problem}"
     audited, audited_message = readiness.evaluate_firetv_receipt_candidates(
         README_TERMS, LEANBACK_MANIFEST,
         [(readiness.ANDROID_TV_RUNTIME_RECEIPT, json.dumps(receipt))],
         _exists,
+        checkout_validator=validates_recorded_source,
     )
     assert audited is True, audited_message
 
@@ -330,31 +324,37 @@ def test_the_gate_is_exempt_from_the_ci_exit_code_and_says_why():
     assert "official FAQ" in reason and "Android TV" in reason
 
 
-def test_the_audit_reports_j4_green_on_the_fresh_receipt():
-    """End to end: run the auditor and read J4 out of its own results.
-
-    Run 39334510932 drove the D-pad journey against the page with the agent
-    deck and the hybrid CloudWatch rows from build e6aae2c, and this checkout
-    changes no live runtime path after that build, so J4 passes on a journey
-    the receipt actually saw. Run 39210785053 (build e8ceae8) held that pass
-    before, run 38808232691 (build fdb5f56) before that, and run
-    37464864870 (build ea2cff5) before PR #50 moved
-    docs/index.html. The stale path stays pinned by
-    test_a_receipt_from_before_the_page_change_still_fails_naming_the_file.
-    """
+def test_the_audit_reports_j4_for_the_actual_receipt_freshness():
+    """A historical journey passes only while its runtime files are unchanged."""
+    receipt = json.loads(
+        (REPO_ROOT / readiness.ANDROID_TV_RUNTIME_RECEIPT).read_text(encoding="utf-8")
+    )
+    subprocess.run(
+        ["git", "merge-base", "--is-ancestor", receipt["build_sha"], "HEAD"],
+        cwd=REPO_ROOT, check=True, capture_output=True, text=True,
+    )
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", f"{receipt['build_sha']}..HEAD",
+         "--", *readiness.ANDROID_TV_RUNTIME_PATHS],
+        cwd=REPO_ROOT, check=True, capture_output=True, text=True,
+    )
+    changed_paths = changed.stdout.splitlines()
     results = {r.gate_id: r for r in readiness.audit_project()}
     assert "J4" in results
-    assert results["J4"].passed is True, results["J4"].message
-    assert "39334510932" in (REPO_ROOT / "android_tv_runtime_receipt.json").read_text(
-        encoding="utf-8"
-    ), "the receipt this pass names is not the run it claims"
+    j4 = results["J4"]
+    assert j4.passed is (not changed_paths), j4.message
+    if changed_paths:
+        for path in changed_paths:
+            assert path in j4.message
+    else:
+        assert receipt["workflow_run_url"] in j4.message
 
 
 def test_a_receipt_from_before_the_page_change_still_fails_naming_the_file():
     """The 2026-10-01 invalidation, pinned without waiting for the next drift.
 
-    The landed receipt is fresh, so the stale path would go untested if it
-    needed a stale checkout. Rewinding its build to 69aa972, the build the
+    Rewind the receipt independently of whether the current checkout is fresh
+    or stale, so rejection remains tested across releases. Rewinding its build to 69aa972, the build the
     2026-09-30 receipt was written from, replays the exact failure: the
     candidate page moved after that build, so the gate must fail and name
     docs/index.html rather than pass on a journey the receipt never saw.

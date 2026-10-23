@@ -119,6 +119,15 @@ AGENT_DECK_JS = r"""(function () {
   bar.appendChild(btnMcp);
   sec.appendChild(bar);
 
+  // Present before any request: completion/error messages reach a screen reader
+  // while keyboard focus stays on the remote control. The initial page is quiet.
+  var status = mk('p', 'sr-only');
+  status.id = 'bedrockAgentStatus';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.setAttribute('aria-atomic', 'true');
+  sec.appendChild(status);
+
   var consoleBox = mk('div', 'console');
   consoleBox.style.marginTop = '0.85rem';
   var header = mk('div', 'console-header');
@@ -267,6 +276,7 @@ AGENT_DECK_JS = r"""(function () {
     out.insertBefore(card, out.firstChild);
     revealCard(card);
     latencySpan.textContent = what + (said ? ' refused (' : ' failed (') + detail + ')';
+    status.textContent = card.textContent;
   }
 
   async function postJson(url, body, headers) {
@@ -306,6 +316,7 @@ AGENT_DECK_JS = r"""(function () {
     btnBrief.disabled = true;
     btnBrief.setAttribute('aria-busy', 'true');
     latencySpan.textContent = 'Asking the agent about ' + svc + '…';
+    status.textContent = 'Asking the agent about ' + svc + '.';
     try {
       var t0 = performance.now();
       var res = await postJson('/mcp/tools/agent_incident_brief',
@@ -349,6 +360,10 @@ AGENT_DECK_JS = r"""(function () {
       out.insertBefore(card, out.firstChild);
       revealCard(card, brief);
       latencySpan.textContent = 'POST /mcp/tools/agent_incident_brief (' + svc + ') · ' + (syn.latency_ms || elapsed) + ' ms';
+      status.textContent = 'Agent answer for ' + (d.service || svc) + '. '
+        + (d.data_label || 'UNLABELLED DATA') + '. Dispatch: '
+        + (d.rollback_dispatch || 'unknown') + '. ' + enginePill(syn).textContent
+        + '. ' + brief.textContent + ' Details in Agent answers.';
     } catch (err) {
       if (mySeq === briefSeq) showError('agent_incident_brief', 'the request did not complete');
     } finally {
@@ -366,6 +381,7 @@ AGENT_DECK_JS = r"""(function () {
     var hadFocus = document.activeElement === btnPublish;
     btnPublish.disabled = true;
     latencySpan.textContent = 'Publishing the recorded demo handoff for ' + svc + '…';
+    status.textContent = 'Publishing the recorded demo handoff for ' + svc + '.';
     try {
       var t0 = performance.now();
       var res = await postJson('/mcp/tools/demo_update_handoff', { service_name: svc });
@@ -410,6 +426,10 @@ AGENT_DECK_JS = r"""(function () {
       revealCard(card, pills);
       keepRevealed(card, pills, document.getElementById('handoffOutput'));
       latencySpan.textContent = 'POST /mcp/tools/demo_update_handoff · revision ' + d.revision + ' (' + elapsed + ' ms)';
+      status.textContent = 'Recorded demo handoff published for ' + svc + '. Revision '
+        + d.revision + '. External effect: ' + (d.external_effect || 'not stated')
+        + '. Current action: ' + (d.current_action || 'not stated')
+        + '. Next step: ' + (d.next_step || 'not stated') + '.';
     } catch (err) {
       showError('demo_update_handoff', 'the request did not complete');
     } finally {
@@ -419,8 +439,10 @@ AGENT_DECK_JS = r"""(function () {
   });
 
   async function runMcp() {
+    var hadFocus = document.activeElement === btnMcp;
     btnMcp.disabled = true;
     latencySpan.textContent = 'Running the MCP 2025-11-25 handshake…';
+    status.textContent = 'Running the MCP handshake.';
     var mcpHeaders = { 'MCP-Protocol-Version': '2025-11-25' };
     try {
       var t0 = performance.now();
@@ -462,10 +484,14 @@ AGENT_DECK_JS = r"""(function () {
       out.appendChild(card);
       revealCard(card, pills);
       latencySpan.textContent = 'MCP handshake answered (' + tools.length + ' tools · ' + elapsed + ' ms)';
+      status.textContent = 'MCP handshake complete. Protocol '
+        + init.body.result.protocolVersion + '. ' + tools.length
+        + ' tools published. Details in Agent answers.';
     } catch (err) {
       showError('MCP handshake', 'the request did not complete');
     } finally {
       btnMcp.disabled = false;
+      keepKeyboardFocus(btnMcp, hadFocus);
     }
   }
   btnMcp.addEventListener('click', runMcp);
